@@ -1,0 +1,59 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "estudiantes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "sedeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "apellido",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "finanzas",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "sedeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fecha",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "asistencia",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "sedeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fecha",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "estadoEntrega",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Taekwondo Ga Jog - Módulo de Gestión (end)",
+  "description": "Un módulo integral para administrar estudiantes, pagos, consentimientos y notificaciones para la escuela de TaekwondoGa Jog. La aplicación está completamente en español y utiliza la API de Gemini para la personalización de mensajes.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "prompt": ""
+}

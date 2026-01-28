@@ -1,0 +1,21 @@
+{
+  "short_name": "TKDGa Jog",
+  "name": "TaekwondoGa Jog - Módulo de Gestión",
+  "description": "Módulo integral para la gestión de la escuela de TaekwondoGa Jog.",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1f3e90",
+  "background_color": "#ffffff"
+}

@@ -1,0 +1,67 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isInstructor() {
+      return isAuthenticated() && 
+             (get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['instructor', 'admin']);
+    }
+
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024; // 5MB limit
+    }
+
+    // ============================================
+    // PUBLIC INSCIPCION DEPOSITS
+    // ============================================
+    match /temp_soporte/{fileName} {
+      allow read: if isInstructor();
+      allow create: if isValidSize(); // Anyone can upload a proof
+    }
+
+    // ============================================
+    // FIRMAS DIGITALES
+    // ============================================
+    match /firmas/{fileName} {
+      allow read: if isInstructor();
+      allow create: if isValidSize(); // Public can sign
+    }
+
+    // ============================================
+    // GENERAL UPLOADS (instructors only)
+    // ============================================
+    match /uploads/{userId}/{allPaths=**} {
+      allow read: if request.auth.uid == userId || isInstructor();
+      allow create: if request.auth.uid == userId && isValidSize();
+      allow delete: if request.auth.uid == userId || isAdmin();
+    }
+
+    // ============================================
+    // PUBLIC ASSETS (logos, etc.)
+    // ============================================
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================
+    // DEFAULT: Deny all other access
+    // ============================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
