@@ -49,4 +49,5 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$HOME/gcp_key.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp_key.json"
+          npx firebase-tools target:apply storage rules tudojang.firebasestorage.app --project tudojang
           npx firebase-tools deploy --only functions,firestore:rules,storage:rules --force --project tudojang
