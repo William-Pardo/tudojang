@@ -2,12 +2,9 @@
     "firestore": {
         "rules": "firestore.rules"
     },
-    "storage": [
-        {
-            "bucket": "tudojang.firebasestorage.app",
-            "rules": "storage.rules"
-        }
-    ],
+    "storage": {
+        "rules": "storage.rules"
+    },
     "functions": [
         {
             "source": "functions",
