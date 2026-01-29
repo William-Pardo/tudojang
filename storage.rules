@@ -12,12 +12,12 @@ service firebase.storage {
 
     function isAdmin() {
       return isAuthenticated() && 
-             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+             get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol == 'Admin';
     }
 
     function isInstructor() {
       return isAuthenticated() && 
-             (get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['instructor', 'admin']);
+             (get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol in ['Admin', 'Editor', 'Asistente']);
     }
 
     function isValidSize() {

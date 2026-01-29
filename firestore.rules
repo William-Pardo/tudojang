@@ -21,15 +21,15 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      return isAuthenticated() && currentUserData().role == role;
+      return isAuthenticated() && currentUserData().rol == role;
     }
 
     function isAdmin() {
-      return hasRole('admin');
+      return hasRole('Admin');
     }
 
     function isInstructor() {
-      return hasRole('instructor') || isAdmin();
+      return hasRole('Admin') || hasRole('Editor') || hasRole('Asistente');
     }
 
     // ============================================
