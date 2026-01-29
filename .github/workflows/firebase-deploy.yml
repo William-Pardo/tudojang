@@ -10,7 +10,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   build-and-deploy:
