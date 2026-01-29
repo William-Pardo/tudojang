@@ -1,7 +1,6 @@
-
 // servicios/censoApi.ts
 import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import type { MisionKicho, RegistroTemporal, Estudiante, PagoRegistro } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
 

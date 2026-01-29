@@ -1,16 +1,16 @@
 // servicios/tiendaApi.ts
-import { 
-    collection, 
-    getDocs, 
-    doc, 
-    updateDoc, 
-    addDoc, 
+import {
+    collection,
+    getDocs,
+    doc,
+    updateDoc,
+    addDoc,
     getDoc,
     writeBatch,
     query,
     where
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import { EstadoPago, EstadoSolicitudCompra, CategoriaImplemento } from '../tipos';
 import type { Estudiante, Implemento, VariacionImplemento, SolicitudCompra } from '../tipos';
 import { obtenerEstudiantePorId, obtenerEstudiantePorNumIdentificacion } from './estudiantesApi';
@@ -165,17 +165,17 @@ export const registrarCompra = async (idEstudiante: string, implemento: Implemen
         throw new Error("Estudiante no encontrado.");
     }
     const estudiante = { id: estudianteSnap.id, ...estudianteSnap.data() } as Estudiante;
-    
+
     const nuevoSaldo = estudiante.saldoDeudor + variacion.precio;
-    const nuevoEstadoPago = (estudiante.estadoPago === EstadoPago.AlDia && variacion.precio > 0) 
-        ? EstadoPago.Pendiente 
+    const nuevoEstadoPago = (estudiante.estadoPago === EstadoPago.AlDia && variacion.precio > 0)
+        ? EstadoPago.Pendiente
         : estudiante.estadoPago;
 
     await updateDoc(estudianteDocRef, {
         saldoDeudor: nuevoSaldo,
         estadoPago: nuevoEstadoPago
     });
-    
+
     return { ...estudiante, saldoDeudor: nuevoSaldo, estadoPago: nuevoEstadoPago };
 };
 
@@ -183,7 +183,7 @@ export const crearSolicitudCompra = async (numIdentificacion: string, implemento
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Creando solicitud de compra.");
         const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
-         const mockSolicitud: SolicitudCompra = {
+        const mockSolicitud: SolicitudCompra = {
             id: `mock-sc-${Date.now()}`,
             // Added comment above fix: Picked specific fields from Estudiante to satisfy SolicitudCompra.estudiante interface.
             estudiante: {
@@ -232,9 +232,9 @@ export const crearSolicitudCompra = async (numIdentificacion: string, implemento
         fechaSolicitud: new Date().toISOString(),
         estado: EstadoSolicitudCompra.Pendiente,
     };
-    
+
     const docRef = await addDoc(solicitudesCompraCollection, nuevaSolicitudData);
-    
+
     return { id: docRef.id, ...nuevaSolicitudData } as unknown as SolicitudCompra;
 };
 
@@ -261,9 +261,9 @@ export const gestionarSolicitudCompra = async (idSolicitud: string, nuevoEstado:
     if (!solicitudSnap.exists()) {
         throw new Error("Solicitud de compra no encontrada.");
     }
-    
+
     const solicitud = solicitudSnap.data() as SolicitudCompra;
-    
+
     const batch = writeBatch(db);
     batch.update(solicitudDocRef, { estado: nuevoEstado });
 
@@ -274,7 +274,7 @@ export const gestionarSolicitudCompra = async (idSolicitud: string, nuevoEstado:
         const nuevoEstadoPago = (estudiante.estadoPago === EstadoPago.AlDia && solicitud.variacion.precio > 0)
             ? EstadoPago.Pendiente
             : estudiante.estadoPago;
-            
+
         batch.update(estudianteDocRef, {
             saldoDeudor: nuevoSaldo,
             estadoPago: nuevoEstadoPago,

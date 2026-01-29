@@ -1,7 +1,7 @@
 
 // servicios/asistenciaApi.ts
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import { type Asistencia, EstadoEntrega } from '../tipos';
 
 const asistenciaCollection = collection(db, 'asistencia');
@@ -35,15 +35,15 @@ export const actualizarEstadoEntrega = async (asistenciaId: string, nuevoEstado:
 // NUEVA FUNCIÓN: Listener en tiempo real
 export const escucharAsistenciasActivasSede = (sedeId: string, callback: (asistencias: any[]) => void) => {
     const hoy = new Date().toISOString().split('T')[0];
-    
+
     if (!isFirebaseConfigured) {
         callback([]);
-        return () => {};
+        return () => { };
     }
 
     const q = query(
-        asistenciaCollection, 
-        where("sedeId", "==", sedeId), 
+        asistenciaCollection,
+        where("sedeId", "==", sedeId),
         where("fecha", "==", hoy),
         where("estadoEntrega", "!=", EstadoEntrega.Entregado)
     );
@@ -57,7 +57,7 @@ export const escucharAsistenciasActivasSede = (sedeId: string, callback: (asiste
 
 export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Promise<{ asistencia: Asistencia, nombres: string } | null> => {
     const hoy = new Date().toISOString().split('T')[0];
-    
+
     if (!isFirebaseConfigured) {
         if (identificacion === '123') {
             return {
@@ -71,13 +71,13 @@ export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Pr
     const qEst = query(collection(db, 'estudiantes'), where("numeroIdentificacion", "==", identificacion.trim()));
     const estSnap = await getDocs(qEst);
     if (estSnap.empty) return null;
-    
+
     const estDoc = estSnap.docs[0];
     const estData = estDoc.data();
 
     const qAsist = query(
-        asistenciaCollection, 
-        where("estudianteId", "==", estDoc.id), 
+        asistenciaCollection,
+        where("estudianteId", "==", estDoc.id),
         where("fecha", "==", hoy),
         orderBy("horaEntrada", "desc"),
         limit(1)
@@ -89,9 +89,9 @@ export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Pr
     const asistData = asistSnap.docs[0].data() as Asistencia;
     const nombreOfuscado = `${estData.nombres.split(' ')[0]} ${estData.apellidos[0]}.`;
 
-    return { 
-        asistencia: { id: asistSnap.docs[0].id, ...asistData }, 
-        nombres: nombreOfuscado 
+    return {
+        asistencia: { ...asistData, id: asistSnap.docs[0].id },
+        nombres: nombreOfuscado
     };
 };
 
@@ -100,8 +100,8 @@ export const obtenerAsistenciasActivasSede = async (sedeId: string): Promise<any
     if (!isFirebaseConfigured) return [];
 
     const q = query(
-        asistenciaCollection, 
-        where("sedeId", "==", sedeId), 
+        asistenciaCollection,
+        where("sedeId", "==", sedeId),
         where("fecha", "==", hoy),
         where("estadoEntrega", "!=", EstadoEntrega.Entregado)
     );

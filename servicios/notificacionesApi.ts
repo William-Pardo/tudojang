@@ -1,6 +1,6 @@
 // servicios/notificacionesApi.ts
 import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import type { NotificacionHistorial } from '../tipos';
 import { TipoNotificacion } from '../tipos';
 

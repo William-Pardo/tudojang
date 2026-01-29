@@ -2,7 +2,7 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, auth, isFirebaseConfigured } from '@/src/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
 import type { Usuario } from '../tipos';
 
@@ -27,10 +27,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Si no hay configuración de Firebase, no hacer nada con onAuthStateChanged
     if (!isFirebaseConfigured) {
-        setCargandoSesion(false);
-        return;
+      setCargandoSesion(false);
+      return;
     }
-      
+
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -42,19 +42,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userData = userDocSnap.data();
             setUsuario({
               id: firebaseUser.uid,
-              email: firebaseUser.email!,
-              nombreUsuario: userData.nombreUsuario,
-              rol: userData.rol,
-            });
+              ...userData
+            } as Usuario);
           } else {
             // El perfil de usuario no existe, cerrar sesión
             await apiCerrarSesion();
             setUsuario(null);
           }
         } catch (e) {
-            console.error("Error al obtener perfil de usuario:", e);
-            await apiCerrarSesion();
-            setUsuario(null);
+          console.error("Error al obtener perfil de usuario:", e);
+          await apiCerrarSesion();
+          setUsuario(null);
         }
       } else {
         // Usuario ha cerrado sesión

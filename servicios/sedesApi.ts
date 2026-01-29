@@ -1,7 +1,7 @@
 
 // servicios/sedesApi.ts
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import type { Sede } from '../tipos';
 
 const sedesCollection = collection(db, 'sedes');

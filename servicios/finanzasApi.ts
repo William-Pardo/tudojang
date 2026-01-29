@@ -1,7 +1,7 @@
 
 // servicios/finanzasApi.ts
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import { TipoMovimiento, CategoriaFinanciera, type MovimientoFinanciero } from '../tipos';
 
 const finanzasCollection = collection(db, 'finanzas');
@@ -21,12 +21,12 @@ export const obtenerMovimientos = async (sedeId?: string): Promise<MovimientoFin
         }
         return filtrados.sort((a, b) => b.fecha.localeCompare(a.fecha));
     }
-    
+
     let q = query(finanzasCollection, orderBy('fecha', 'desc'));
     if (sedeId && sedeId !== 'todas') {
         q = query(finanzasCollection, where('sedeId', '==', sedeId), orderBy('fecha', 'desc'));
     }
-    
+
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MovimientoFinanciero));
 };

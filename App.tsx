@@ -1,10 +1,9 @@
-
 // App.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-import './firebase/config';
+import '../src/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';

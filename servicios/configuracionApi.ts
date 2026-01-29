@@ -1,7 +1,6 @@
-
 // servicios/configuracionApi.ts
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured } from '@/src/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
@@ -40,13 +39,13 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
             limiteEstudiantes: 100
         } as ConfiguracionClub;
     }
-    
+
     const tenantsRef = collection(db, 'tenants');
     const q = query(tenantsRef, where("slug", "==", slug.toLowerCase().trim()));
     const querySnapshot = await getDocs(q);
-    
+
     if (querySnapshot.empty) return null;
-    
+
     return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as any;
 };
 
@@ -55,7 +54,7 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
  */
 export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    
+
     const nuevoTenantId = `tnt-${Date.now()}`;
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
@@ -74,13 +73,13 @@ export const obtenerConfiguracionClub = async (tenantId?: string): Promise<Confi
         // Added comment above fix: explicitly cast CONFIGURACION_CLUB_POR_DEFECTO to ConfiguracionClub.
         return CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub;
     }
-    
+
     if (tenantId) {
         const docRef = doc(db, 'tenants', tenantId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() } as any;
     }
-    
+
     const host = window.location.hostname;
     let slug = host.split('.')[0];
     if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
@@ -95,8 +94,8 @@ export const guardarConfiguracionClub = async (config: ConfiguracionClub): Promi
 };
 
 export const actualizarCapacidadClub = async (
-    tenantId: string, 
-    campo: 'limiteEstudiantes' | 'limiteUsuarios' | 'limiteSedes', 
+    tenantId: string,
+    campo: 'limiteEstudiantes' | 'limiteUsuarios' | 'limiteSedes',
     cantidad: number
 ): Promise<void> => {
     if (!isFirebaseConfigured) return;
@@ -107,7 +106,7 @@ export const actualizarCapacidadClub = async (
 };
 
 export const actualizarPlanClub = async (
-    tenantId: string, 
+    tenantId: string,
     nuevoPlan: any
 ): Promise<void> => {
     if (!isFirebaseConfigured) return;
