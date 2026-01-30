@@ -1,41 +1,44 @@
-
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0047A0" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>Taekwondo Ga Jog - Gestión</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              'tkd-blue': 'var(--color-secundario, #0047A0)', 
-              'tkd-red': 'var(--color-acento, #CD2E3A)',
-              'tkd-dark': 'var(--color-primario, #111111)',
-              'tkd-gray': '#F8F9FA',
-            }
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0047A0" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Taekwondo Ga Jog - Gestión</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'tkd-blue': 'var(--color-secundario, #0047A0)',
+            'tkd-red': 'var(--color-acento, #CD2E3A)',
+            'tkd-dark': 'var(--color-primario, #111111)',
+            'tkd-gray': '#F8F9FA',
           }
         }
       }
-    </script>
-     <script>
-      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    </script>
+    }
+  </script>
+  <script>
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
 
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
+  <script src="https://checkout.wompi.co/widget.js"></script>
 </head>
-  <body class="bg-tkd-gray dark:bg-tkd-dark">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-tkd-gray dark:bg-tkd-dark">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

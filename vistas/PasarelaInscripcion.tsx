@@ -12,6 +12,7 @@ import {
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
+import { abrirCheckoutWompi } from '../servicios/wompiService';
 
 const PasarelaInscripcion: React.FC = () => {
     const { solicitudId } = useParams();
@@ -44,15 +45,23 @@ const PasarelaInscripcion: React.FC = () => {
         cargarSolicitud();
     }, [solicitudId]);
 
-    const handleSubirSoporte = async () => {
-        if (!solicitudId || !soporteUrl) return;
+    const handlePagarConWompi = async () => {
+        if (!solicitudId || !solicitud || !tenant) return;
         setSubiendo(true);
         try {
-            await subirSoportePago(solicitudId, soporteUrl, 'otros');
-            const s = await obtenerSolicitudInscripcion(solicitudId);
-            setSolicitud(s);
+            const montoEnCentavos = (solicitud.pago?.monto || 0) * 100;
+            const referencia = `INS_${solicitudId}_${Date.now()}`;
+
+            await abrirCheckoutWompi({
+                referencia,
+                montoEnCentavos,
+                email: solicitud.datos?.email || '',
+                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`,
+                telefono: solicitud.datos?.telefono || '',
+                redirectUrl: window.location.href
+            });
         } catch (e: any) {
-            console.error("Error al subir soporte");
+            console.error("Error al iniciar pago con Wompi");
         } finally {
             setSubiendo(false);
         }
@@ -127,22 +136,15 @@ const PasarelaInscripcion: React.FC = () => {
                             </div>
 
                             <div className="space-y-4">
-                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Sube tu comprobante (PNG/JPG)</label>
-                                <input
-                                    type="text"
-                                    placeholder="Pega aquí el link del soporte o simula carga"
-                                    className={inputClass}
-                                    value={soporteUrl}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSoporteUrl(e.target.value)}
-                                />
                                 <button
-                                    onClick={handleSubirSoporte}
-                                    disabled={subiendo || !soporteUrl}
+                                    onClick={handlePagarConWompi}
+                                    disabled={subiendo}
                                     className="w-full bg-tkd-blue text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"
                                 >
                                     {subiendo ? <Loader /> : <IconoAprobar className="w-5 h-5" />}
-                                    Enviar Soporte
+                                    Pagar Inscripción con Wompi
                                 </button>
+                                <p className="text-[9px] text-gray-400 text-center font-bold uppercase">Pago Seguro Protegido por SSL</p>
                             </div>
                         </div>
                     )}

@@ -7,8 +7,9 @@ import * as yup from 'yup';
 import { buscarTenantPorSlug, registrarNuevaEscuela } from '../servicios/configuracionApi';
 import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado, IconoInformacion } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
-import { DATOS_RECAUDO_MASTER } from '../constantes';
+import { DATOS_RECAUDO_MASTER, PLANES_SAAS } from '../constantes';
 import FormInputError from '../components/FormInputError';
+import { guardarCookie, obtenerCookie } from '../utils/cookieUtils';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -23,8 +24,10 @@ const RegistroEscuela: React.FC = () => {
     const [paso, setPaso] = useState<'formulario' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
     const { mostrarNotificacion } = useNotificacion();
-    const { register, handleSubmit, formState: { errors }, watch } = useForm({
-        resolver: yupResolver(schema)
+    const [planSeleccionado, setPlanSeleccionado] = useState(obtenerCookie('plan_pendiente') || 'starter');
+    const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
+        resolver: yupResolver(schema),
+        defaultValues: obtenerCookie('registro_pendiente') || {}
     });
 
     const slugDeseado = watch('slug');
@@ -42,9 +45,11 @@ const RegistroEscuela: React.FC = () => {
             await registrarNuevaEscuela({
                 nombreClub: data.nombreClub,
                 slug: data.slug,
-                emailClub: data.email
+                emailClub: data.email,
+                plan: planSeleccionado
             });
 
+            guardarCookie('registro_finalizado', { ...data, plan: planSeleccionado });
             setPaso('exito');
         } catch (error) {
             mostrarNotificacion("Error al procesar el registro.", "error");
@@ -61,7 +66,7 @@ const RegistroEscuela: React.FC = () => {
                     <div className="space-y-2">
                         <h2 className="text-3xl font-black uppercase text-tkd-dark dark:text-white tracking-tighter">¡Reserva Exitosa!</h2>
                         <p className="text-sm text-gray-500 leading-relaxed uppercase font-bold tracking-tight px-4">
-                            Hemos reservado la URL <br/> <span className="text-tkd-blue">"{slugDeseado}.tudojang.com"</span> <br/> para tu academia.
+                            Hemos reservado la URL <br /> <span className="text-tkd-blue">"{slugDeseado}.tudojang.com"</span> <br /> para tu academia.
                         </p>
                     </div>
                     <div className="p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-[2.5rem] border border-blue-100 dark:border-blue-800 text-left">
@@ -72,7 +77,7 @@ const RegistroEscuela: React.FC = () => {
                             <li className="flex gap-3"><span className="text-tkd-blue">03.</span> Recibirás tus credenciales de acceso.</li>
                         </ul>
                     </div>
-                    <a 
+                    <a
                         href={`https://wa.me/57${DATOS_RECAUDO_MASTER.whatsappSoporte}?text=Hola! Acabo de registrar mi academia ${slugDeseado}. Envío el comprobante para activación.`}
                         target="_blank"
                         className="block w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95"
@@ -93,7 +98,7 @@ const RegistroEscuela: React.FC = () => {
                     </div>
                     <div className="space-y-4">
                         <h1 className="text-5xl md:text-6xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">
-                            Crea tu <br/> <span className="text-tkd-blue">Dojang Digital</span>
+                            Crea tu <br /> <span className="text-tkd-blue">Dojang Digital</span>
                         </h1>
                         <p className="text-gray-400 text-lg font-bold uppercase leading-tight tracking-tight max-w-sm">
                             La plataforma definitiva para escalar la gestión de tu escuela de Taekwondo.
@@ -139,8 +144,8 @@ const RegistroEscuela: React.FC = () => {
                             <p className="text-[9px] text-gray-400 font-bold mt-3 uppercase px-2 leading-relaxed opacity-60">Este nombre será tu acceso directo y marca digital única en el sistema.</p>
                         </div>
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={cargando}
                             className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:bg-tkd-blue transition-all flex items-center justify-center gap-4 disabled:bg-gray-200 disabled:text-gray-400 hover:scale-[1.02] active:scale-95"
                         >

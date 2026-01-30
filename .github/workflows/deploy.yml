@@ -33,6 +33,8 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_WOMPI_PUBLIC_KEY: ${{ secrets.VITE_WOMPI_PUBLIC_KEY }}
+          VITE_WOMPI_INTEGRITY_SECRET: ${{ secrets.VITE_WOMPI_INTEGRITY_SECRET }}
 
       - name: Install Functions dependencies
         run: npm --prefix functions install
@@ -51,3 +53,5 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp_key.json"
           npx firebase-tools target:apply storage rules tudojang.firebasestorage.app --project tudojang
           npx firebase-tools deploy --only functions,firestore:rules,storage:rules --force --project tudojang
+        env:
+          WOMPI_EVENTS_SECRET: ${{ secrets.WOMPI_EVENTS_SECRET }}

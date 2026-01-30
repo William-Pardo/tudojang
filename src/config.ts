@@ -27,4 +27,9 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 const messaging = isFirebaseConfigured ? getMessaging(app) : null;
 
+export const wompiConfig = {
+    publicKey: import.meta.env.VITE_WOMPI_PUBLIC_KEY || 'pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB',
+    integritySecret: import.meta.env.VITE_WOMPI_INTEGRITY_SECRET || 'prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm',
+};
+
 export { app, db, auth, storage, messaging };
