@@ -230,196 +230,196 @@ const RegistroEscuela: React.FC = () => {
                             transition={{ duration: 4, repeat: Infinity }}
                             className="absolute -bottom-10 -right-10 w-40 h-40 bg-tkd-red/30 rounded-full blur-[100px]"
                         />
+                    </motion.div>
                 </div>
-            </div>
 
-            {/* LADO DERECHO: FORMULARIO POR PASOS */}
-            <div className="relative">
-                <div className="bg-white p-10 md:p-16 rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] border border-gray-100 space-y-10">
+                {/* LADO DERECHO: FORMULARIO POR PASOS */}
+                <div className="relative">
+                    <div className="bg-white p-10 md:p-16 rounded-[4rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] border border-gray-100 space-y-10">
 
-                    {/* INDICADOR DE PASOS */}
-                    <div className="flex gap-2 justify-center lg:justify-start mb-8">
-                        {(['nombre', 'contacto', 'identidad'] as FormPaso[]).map((p, i) => (
-                            <div
-                                key={p}
-                                className={`h-1.5 rounded-full transition-all duration-500 ${pasoActual === p ? 'w-12 bg-tkd-blue' : 'w-4 bg-gray-100'}`}
-                            />
-                        ))}
-                        {esModoTest && (
-                            <div className="ml-auto flex items-center gap-2">
-                                <span className="flex h-2 w-2 rounded-full bg-tkd-red animate-pulse"></span>
-                                <span className="text-[8px] font-black text-tkd-red uppercase tracking-widest">Sandbox Activo</span>
-                            </div>
-                        )}
-                    </div>
-
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                        <AnimatePresence mode="wait">
-                            {confirmando && (
-                                <motion.div
-                                    key="resumen"
-                                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-8"
-                                >
-                                    <div className="text-center space-y-2">
-                                        <h3 className="text-2xl font-black uppercase tracking-tight">Resumen de Activación</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirma los datos de tu academia</p>
-                                    </div>
-
-                                    <div className="bg-gray-50 p-8 rounded-[2rem] space-y-4 border border-gray-100">
-                                        <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
-                                            <span className="text-gray-400">Plan:</span>
-                                            <span className="text-tkd-blue">{(PLANES_SAAS as any)[planSeleccionado].nombre}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
-                                            <span className="text-gray-400">Total a Pagar:</span>
-                                            <span className="text-xl font-black text-tkd-dark">${(PLANES_SAAS as any)[planSeleccionado].precio.toLocaleString()} COP</span>
-                                        </div>
-                                        <div className="h-px bg-gray-200 my-2" />
-                                        <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                            <span className="text-gray-400">Sede Digital:</span>
-                                            <span className="text-tkd-red">{slugDeseado}.tudojang.com</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => lanzarPago({ nombreClub: nombreAcademia, slug: slugDeseado, email: emailDirector })}
-                                            className="w-full bg-tkd-red text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:scale-[1.02] transition-all"
-                                        >
-                                            {esModoTest ? 'Simular Pago (Sandbox)' : 'Proceder al Pago Seguro'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setConfirmando(false)}
-                                            className="w-full py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all"
-                                        >
-                                            Corregir datos
-                                        </button>
-                                    </div>
-                                </motion.div>
+                        {/* INDICADOR DE PASOS */}
+                        <div className="flex gap-2 justify-center lg:justify-start mb-8">
+                            {(['nombre', 'contacto', 'identidad'] as FormPaso[]).map((p, i) => (
+                                <div
+                                    key={p}
+                                    className={`h-1.5 rounded-full transition-all duration-500 ${pasoActual === p ? 'w-12 bg-tkd-blue' : 'w-4 bg-gray-100'}`}
+                                />
+                            ))}
+                            {esModoTest && (
+                                <div className="ml-auto flex items-center gap-2">
+                                    <span className="flex h-2 w-2 rounded-full bg-tkd-red animate-pulse"></span>
+                                    <span className="text-[8px] font-black text-tkd-red uppercase tracking-widest">Sandbox Activo</span>
+                                </div>
                             )}
+                        </div>
 
-                            {!confirmando && pasoActual === 'nombre' && (
-                                <motion.div
-                                    key="step1"
-                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                                    className="space-y-6"
-                                >
-                                    <div className="space-y-2 text-center lg:text-left">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre de la Institución</label>
-                                        <input
-                                            {...register('nombreClub')}
-                                            autoFocus
-                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('contacto'))}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
-                                            placeholder="EJ: CLUB DRAGONES"
-                                        />
-                                        <FormInputError mensaje={errors.nombreClub?.message as string} />
-                                    </div>
-                                    {nombreAcademia?.length > 2 && (
-                                        <motion.button
-                                            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                            type="button"
-                                            onClick={() => irASiguiente('contacto')}
-                                            className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-xl transition-all flex items-center justify-center gap-4 group"
-                                        >
-                                            Continuar
-                                            <IconoEnviar className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                        </motion.button>
-                                    )}
-                                </motion.div>
-                            )}
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                            <AnimatePresence mode="wait">
+                                {confirmando && (
+                                    <motion.div
+                                        key="resumen"
+                                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                                        className="space-y-8"
+                                    >
+                                        <div className="text-center space-y-2">
+                                            <h3 className="text-2xl font-black uppercase tracking-tight">Resumen de Activación</h3>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirma los datos de tu academia</p>
+                                        </div>
 
-                            {pasoActual === 'contacto' && (
-                                <motion.div
-                                    key="step2"
-                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                                    className="space-y-6"
-                                >
-                                    <div className="space-y-2 text-center lg:text-left">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Correo del Director</label>
-                                        <input
-                                            {...register('email')}
-                                            type="email"
-                                            autoFocus
-                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('identidad'))}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
-                                            placeholder="DIRECTOR@DOJANG.COM"
-                                        />
-                                        <FormInputError mensaje={errors.email?.message as string} />
-                                    </div>
-                                    {emailDirector?.includes('@') && emailDirector?.includes('.') && (
-                                        <div className="grid grid-cols-1 gap-4">
+                                        <div className="bg-gray-50 p-8 rounded-[2rem] space-y-4 border border-gray-100">
+                                            <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
+                                                <span className="text-gray-400">Plan:</span>
+                                                <span className="text-tkd-blue">{(PLANES_SAAS as any)[planSeleccionado].nombre}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
+                                                <span className="text-gray-400">Total a Pagar:</span>
+                                                <span className="text-xl font-black text-tkd-dark">${(PLANES_SAAS as any)[planSeleccionado].precio.toLocaleString()} COP</span>
+                                            </div>
+                                            <div className="h-px bg-gray-200 my-2" />
+                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                                <span className="text-gray-400">Sede Digital:</span>
+                                                <span className="text-tkd-red">{slugDeseado}.tudojang.com</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => lanzarPago({ nombreClub: nombreAcademia, slug: slugDeseado, email: emailDirector })}
+                                                className="w-full bg-tkd-red text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:scale-[1.02] transition-all"
+                                            >
+                                                {esModoTest ? 'Simular Pago (Sandbox)' : 'Proceder al Pago Seguro'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setConfirmando(false)}
+                                                className="w-full py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all"
+                                            >
+                                                Corregir datos
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {!confirmando && pasoActual === 'nombre' && (
+                                    <motion.div
+                                        key="step1"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="space-y-2 text-center lg:text-left">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre de la Institución</label>
+                                            <input
+                                                {...register('nombreClub')}
+                                                autoFocus
+                                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('contacto'))}
+                                                className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
+                                                placeholder="EJ: CLUB DRAGONES"
+                                            />
+                                            <FormInputError mensaje={errors.nombreClub?.message as string} />
+                                        </div>
+                                        {nombreAcademia?.length > 2 && (
                                             <motion.button
                                                 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                                                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                                 type="button"
-                                                onClick={() => irASiguiente('identidad')}
-                                                className="bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center gap-4"
+                                                onClick={() => irASiguiente('contacto')}
+                                                className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-xl transition-all flex items-center justify-center gap-4 group"
                                             >
-                                                Siguiente Paso
+                                                Continuar
+                                                <IconoEnviar className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                                             </motion.button>
-                                            <button type="button" onClick={() => setPasoActual('nombre')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Atrás</button>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            )}
+                                        )}
+                                    </motion.div>
+                                )}
 
-                            {pasoActual === 'identidad' && (
-                                <motion.div
-                                    key="step3"
-                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                                    className="space-y-8"
-                                >
-                                    <div className="space-y-2 text-center lg:text-left">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre Corto de URL</label>
-                                        <div className="relative">
+                                {pasoActual === 'contacto' && (
+                                    <motion.div
+                                        key="step2"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                                        className="space-y-6"
+                                    >
+                                        <div className="space-y-2 text-center lg:text-left">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Correo del Director</label>
                                             <input
-                                                {...register('slug')}
+                                                {...register('email')}
+                                                type="email"
                                                 autoFocus
-                                                className={`w-full bg-gray-50 border-2 rounded-3xl p-6 pr-32 text-xl font-black outline-none transition-all shadow-inner lowercase ${slugDisponible === true ? 'border-green-500 bg-green-50' : slugDisponible === false ? 'border-tkd-red bg-red-50' : 'border-transparent focus:border-tkd-blue focus:bg-white'}`}
-                                                placeholder="mi-academia"
+                                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('identidad'))}
+                                                className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
+                                                placeholder="DIRECTOR@DOJANG.COM"
                                             />
-                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                                {validandoSlug ? (
-                                                    <div className="w-5 h-5 border-2 border-tkd-blue border-t-transparent rounded-full animate-spin" />
-                                                ) : slugDisponible === true ? (
-                                                    <IconoAprobar className="w-6 h-6 text-green-500 animate-pulse" />
-                                                ) : slugDisponible === false ? (
-                                                    <div className="text-[10px] font-black text-tkd-red uppercase">Ocupado</div>
-                                                ) : null}
-                                            </div>
+                                            <FormInputError mensaje={errors.email?.message as string} />
                                         </div>
-                                        <FormInputError mensaje={errors.slug?.message as string} />
-                                    </div>
+                                        {emailDirector?.includes('@') && emailDirector?.includes('.') && (
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <motion.button
+                                                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                                    type="button"
+                                                    onClick={() => irASiguiente('identidad')}
+                                                    className="bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center gap-4"
+                                                >
+                                                    Siguiente Paso
+                                                </motion.button>
+                                                <button type="button" onClick={() => setPasoActual('nombre')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Atrás</button>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
 
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <motion.button
-                                            type="submit"
-                                            disabled={cargando || !slugDisponible}
-                                            initial={false}
-                                            animate={slugDisponible ? { scale: [1, 1.02, 1], shadow: "0px 20px 40px rgba(205,46,58,0.4)" } : {}}
-                                            transition={slugDisponible ? { duration: 1.5, repeat: Infinity } : {}}
-                                            className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4 ${slugDisponible ? 'bg-tkd-red text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-40'}`}
-                                        >
-                                            {cargando ? (
-                                                <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                                            ) : (
-                                                <>¡Lanzar mi Dojang Digital ahora!</>
-                                            )}
-                                        </motion.button>
-                                        <button type="button" onClick={() => setPasoActual('contacto')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Cambiar datos de contacto</button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </form>
+                                {pasoActual === 'identidad' && (
+                                    <motion.div
+                                        key="step3"
+                                        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                                        className="space-y-8"
+                                    >
+                                        <div className="space-y-2 text-center lg:text-left">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre Corto de URL</label>
+                                            <div className="relative">
+                                                <input
+                                                    {...register('slug')}
+                                                    autoFocus
+                                                    className={`w-full bg-gray-50 border-2 rounded-3xl p-6 pr-32 text-xl font-black outline-none transition-all shadow-inner lowercase ${slugDisponible === true ? 'border-green-500 bg-green-50' : slugDisponible === false ? 'border-tkd-red bg-red-50' : 'border-transparent focus:border-tkd-blue focus:bg-white'}`}
+                                                    placeholder="mi-academia"
+                                                />
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                    {validandoSlug ? (
+                                                        <div className="w-5 h-5 border-2 border-tkd-blue border-t-transparent rounded-full animate-spin" />
+                                                    ) : slugDisponible === true ? (
+                                                        <IconoAprobar className="w-6 h-6 text-green-500 animate-pulse" />
+                                                    ) : slugDisponible === false ? (
+                                                        <div className="text-[10px] font-black text-tkd-red uppercase">Ocupado</div>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            <FormInputError mensaje={errors.slug?.message as string} />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <motion.button
+                                                type="submit"
+                                                disabled={cargando || !slugDisponible}
+                                                initial={false}
+                                                animate={slugDisponible ? { scale: [1, 1.02, 1], shadow: "0px 20px 40px rgba(205,46,58,0.4)" } : {}}
+                                                transition={slugDisponible ? { duration: 1.5, repeat: Infinity } : {}}
+                                                className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4 ${slugDisponible ? 'bg-tkd-red text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-40'}`}
+                                            >
+                                                {cargando ? (
+                                                    <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                ) : (
+                                                    <>¡Lanzar mi Dojang Digital ahora!</>
+                                                )}
+                                            </motion.button>
+                                            <button type="button" onClick={() => setPasoActual('contacto')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Cambiar datos de contacto</button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
         </div >
     );
 };
