@@ -35,6 +35,13 @@ export const DATOS_RECAUDO_MASTER = {
     whatsappSoporte: "3007654321",
 };
 
+export const WOMPI_CONFIG = {
+    // LLAVES PÚBLICAS (Seguras en frontend)
+    PUB_KEY_SANDBOX: "pub_test_Q5yS99s5S79W8p4m16999b9V67469796", // Llave de test estándar de Wompi
+    PUB_KEY_PROD: "", // SE MANTIENE VACÍA PARA EVITAR COBROS REALES
+    MODO_TEST: true, // TRUE por defecto para máxima seguridad inicial
+};
+
 export const CONFIGURACION_POR_DEFECTO = {
     tenantId: 'escuela-gajog-001',
     diaCobroMensual: 1,
