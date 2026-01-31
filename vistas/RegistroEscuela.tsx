@@ -375,20 +375,28 @@ const RegistroEscuela: React.FC = () => {
                                         className="space-y-8"
                                     >
                                         <div className="space-y-2 text-center lg:text-left">
-                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre Corto de URL</label>
+                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest flex justify-between">
+                                                <span>Nombre Corto de URL</span>
+                                                <span className={`${(slugDeseado?.length || 0) >= 3 ? 'text-green-500' : 'text-tkd-red'} transition-colors`}>
+                                                    {(slugDeseado?.length || 0)}/3 caracteres mín.
+                                                </span>
+                                            </label>
                                             <div className="relative">
                                                 <input
                                                     {...register('slug')}
                                                     autoFocus
-                                                    className={`w-full bg-gray-50 border-2 rounded-3xl p-6 pr-32 text-xl font-black outline-none transition-all shadow-inner lowercase ${slugDisponible === true ? 'border-green-500 bg-green-50' : slugDisponible === false ? 'border-tkd-red bg-red-50' : 'border-transparent focus:border-tkd-blue focus:bg-white'}`}
+                                                    className={`w-full bg-gray-50 border-2 rounded-3xl p-6 pr-32 text-xl font-black outline-none transition-all shadow-inner lowercase ${slugDisponible === true ? 'border-green-500 bg-green-100/50' : slugDisponible === false ? 'border-tkd-red bg-red-50' : 'border-transparent focus:border-tkd-blue focus:bg-white'}`}
                                                     placeholder="mi-academia"
                                                 />
                                                 <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
                                                     {validandoSlug ? (
                                                         <div className="w-5 h-5 border-2 border-tkd-blue border-t-transparent rounded-full animate-spin" />
-                                                    ) : slugDisponible === true ? (
-                                                        <IconoAprobar className="w-6 h-6 text-green-500 animate-pulse" />
-                                                    ) : slugDisponible === false ? (
+                                                    ) : (slugDeseado?.length || 0) >= 3 && slugDisponible === true ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black text-green-600 uppercase">Disponible</span>
+                                                            <IconoAprobar className="w-6 h-6 text-green-500 animate-pulse" />
+                                                        </div>
+                                                    ) : (slugDeseado?.length || 0) >= 3 && slugDisponible === false ? (
                                                         <div className="text-[10px] font-black text-tkd-red uppercase">Ocupado</div>
                                                     ) : null}
                                                 </div>

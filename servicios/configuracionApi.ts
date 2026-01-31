@@ -26,18 +26,18 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
 
 export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionClub | null> => {
     if (!isFirebaseConfigured) {
-        // Added comment above fix: explicitly cast the mock object to ConfiguracionClub.
-        return {
-            ...CONFIGURACION_CLUB_POR_DEFECTO,
-            slug: slug,
-            tenantId: `id-${slug}`,
-            nombreClub: slug === 'gajog' ? 'Taekwondo Ga Jog' : `Academia ${slug.toUpperCase()}`,
-            colorPrimario: slug === 'dragones' ? '#4c1d95' : '#1f3e90',
-            estadoSuscripcion: 'activo',
-            fechaVencimiento: '2025-12-31',
-            plan: 'pro',
-            limiteEstudiantes: 100
-        } as ConfiguracionClub;
+        // En modo mock, solo simulamos que 'gajog' y 'dragones' están ocupados
+        if (slug === 'gajog' || slug === 'dragones' || slug === 'master') {
+            return {
+                ...CONFIGURACION_CLUB_POR_DEFECTO,
+                slug: slug,
+                tenantId: `id-${slug}`,
+                nombreClub: slug === 'gajog' ? 'Taekwondo Ga Jog' : `Academia ${slug.toUpperCase()}`,
+                estadoSuscripcion: 'activo',
+                plan: 'pro',
+            } as ConfiguracionClub;
+        }
+        return null;
     }
 
     const tenantsRef = collection(db, 'tenants');
