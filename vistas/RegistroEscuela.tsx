@@ -100,8 +100,11 @@ const RegistroEscuela: React.FC = () => {
         <div className="min-h-screen bg-white dark:bg-tkd-dark flex items-center justify-center p-6 transition-colors duration-500">
             <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-20 items-center animate-fade-in">
                 <div className="space-y-10">
-                    <div className="w-20 h-20 bg-tkd-blue/5 rounded-3xl flex items-center justify-center border border-tkd-blue/10">
-                        <IconoLogoOficial className="w-12 h-12" />
+                    <div className="flex flex-col items-center mb-10">
+                        <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-b-4 border-tkd-blue/20 mb-4 scale-125">
+                            <IconoLogoOficial className="w-24" />
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em] mt-4">Registro de Nueva Academia</p>
                     </div>
                     <div className="space-y-4">
                         <h1 className="text-5xl md:text-6xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">

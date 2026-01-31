@@ -69,8 +69,10 @@ const PublicLanding: React.FC = () => {
                         <div className="bg-gray-100 rounded-[3rem] aspect-square lg:aspect-video flex items-center justify-center p-12 shadow-inner border border-gray-200">
                             <IconoLogoOficial className="w-64 h-64 opacity-10" />
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl border border-gray-100 animate-bounce-slow">
-                                    <IconoDashboard className="w-16 h-16 text-tkd-blue" />
+                                <div className="mb-8 flex justify-center">
+                                    <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[3rem] shadow-2xl border-4 border-white/50 animate-bounce-soft">
+                                        <IconoLogoOficial className="w-32 sm:w-40" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -171,7 +173,7 @@ const PublicLanding: React.FC = () => {
             </section>
 
             {/* MISIÓN KICHO: REFUERZO DE COMPRA */}
-            <section id="kicho" className="py-24 bg-tkd-dark text-white px-6 sm:px-12 relative overflow-hidden">
+            <section id="kicho" className="py-24 bg-tkd-blue text-white px-6 sm:px-12 relative overflow-hidden">
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative z-10">
                     <div className="space-y-8">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
@@ -188,13 +190,13 @@ const PublicLanding: React.FC = () => {
                         <div className="h-px bg-white/10 my-8"></div>
                         <a
                             href="https://wa.me/573007654321?text=Deseo%20activar%20una%20Misión%20Kicho%20para%20mi%20escuela"
-                            className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-800 shadow-xl transition-all"
+                            className="inline-block bg-white text-tkd-blue px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 shadow-2xl transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
                         >
-                            Agendar Misión Kicho (Onboarding 72h)
+                            Agendar Protocolo Kicho (72h)
                         </a>
                     </div>
                 </div>
-                <div className="absolute top-0 right-0 w-96 h-96 bg-tkd-blue/20 rounded-full blur-[150px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-[150px]"></div>
             </section>
 
             {/* FINAL CTA: PUNTO DE CIERRE 3 */}

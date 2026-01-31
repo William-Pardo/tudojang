@@ -3,7 +3,7 @@
 // Es la primera pantalla que ve un usuario no autenticado.
 
 import React, { useState } from 'react';
-import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoUsuario, IconoLogoOficial, IconoLogin } from '../components/Iconos';
+import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoUsuario, IconoLogoOficial, IconoLogin } from './components/Iconos';
 
 interface LoginProps {
   onLogin: (usuario: string, contrasena: string) => void;
@@ -24,17 +24,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, error }) => {
     <div className="flex items-center justify-center min-h-screen bg-tkd-blue">
       <div className="w-full max-w-md p-8 space-y-8 bg-tkd-gray rounded-lg shadow-2xl dark:bg-gray-800">
         <div className="text-center">
-            <IconoLogoOficial aria-label="Logo TaekwondoGa Jog" className="w-24 h-24 mx-auto" />
-            <h2 className="mt-6 text-3xl font-extrabold text-tkd-dark dark:text-white">
-                Bienvenido
-            </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Inicia sesión en el Módulo de Gestión
-            </p>
+          <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border-b-4 border-tkd-blue/20 inline-block scale-110 mb-8">
+            <IconoLogoOficial aria-label="Logo TuDoJang" className="w-24 mx-auto" />
+          </div>
+          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 dark:text-gray-400">
+            Módulo de Gestión Maestro
+          </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={manejarSubmit}>
           <div className="relative">
-             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <IconoUsuario className="w-5 h-5 text-gray-400" />
             </div>
             <input
@@ -51,7 +50,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, error }) => {
           </div>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <IconoCandado className="w-5 h-5 text-gray-400" />
+              <IconoCandado className="w-5 h-5 text-gray-400" />
             </div>
             <input
               id="contrasena"
@@ -70,11 +69,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, error }) => {
                 onClick={() => setMostrarContrasena(!mostrarContrasena)}
                 className="text-gray-400 hover:text-tkd-blue dark:hover:text-white transition-colors duration-200"
               >
-                {mostrarContrasena ? <IconoOjoCerrado className="w-5 h-5"/> : <IconoOjoAbierto className="w-5 h-5" />}
+                {mostrarContrasena ? <IconoOjoCerrado className="w-5 h-5" /> : <IconoOjoAbierto className="w-5 h-5" />}
               </button>
             </div>
           </div>
-          
+
           {error && <p className="text-sm text-center text-tkd-red">{error}</p>}
 
           <div>
