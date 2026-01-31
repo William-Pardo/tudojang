@@ -187,11 +187,31 @@ export const VistaEstudiantes: React.FC = () => {
                     <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
                 </div>
 
-                {activeTab === 'directorio' && (
+                {(activeTab === 'directorio' || activeTab === 'kicho') && (
                     <div className="flex items-center gap-2 w-full md:w-auto">
+                        {usuario?.tenantId?.includes('demo') || true ? ( // Simplificado para detectar trial
+                            <div className="mr-4 hidden lg:flex items-center gap-2 px-4 py-2 bg-tkd-blue/5 rounded-2xl border border-tkd-blue/10">
+                                <IconoInformacion className="w-4 h-4 text-tkd-blue" />
+                                <span className="text-[9px] font-black uppercase text-tkd-blue tracking-widest">
+                                    Trial: {estudiantes.length}/15 Alumnos
+                                </span>
+                            </div>
+                        ) : null}
                         <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition-all shadow-lg" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
-                        <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"><IconoInformacion className="w-4 h-4" /><span>Importar CSV</span></button>
-                        <button onClick={() => abrirFormulario()} className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"><IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span></button>
+                        <button
+                            disabled={estudiantes.length >= 15}
+                            onClick={() => setModalImportMasivaAbierto(true)}
+                            className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale"
+                        >
+                            <IconoInformacion className="w-4 h-4" /><span>Importar CSV</span>
+                        </button>
+                        <button
+                            disabled={estudiantes.length >= 15}
+                            onClick={() => abrirFormulario()}
+                            className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                        >
+                            <IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span>
+                        </button>
                     </div>
                 )}
             </header>

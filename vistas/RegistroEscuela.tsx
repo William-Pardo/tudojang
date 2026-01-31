@@ -1,6 +1,7 @@
 
 // vistas/RegistroEscuela.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -70,19 +71,25 @@ const RegistroEscuela: React.FC = () => {
                         </p>
                     </div>
                     <div className="p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-[2.5rem] border border-blue-100 dark:border-blue-800 text-left">
-                        <p className="text-[10px] font-black uppercase text-tkd-blue mb-4 tracking-[0.2em]">Próximos Pasos de Activación:</p>
+                        <p className="text-[10px] font-black uppercase text-tkd-blue mb-4 tracking-[0.2em]">Acceso Inmediato Habilitado:</p>
                         <ul className="text-[11px] font-black text-gray-700 dark:text-gray-300 space-y-3 uppercase">
-                            <li className="flex gap-3"><span className="text-tkd-blue">01.</span> Realiza el pago de tu plan elegido.</li>
-                            <li className="flex gap-3"><span className="text-tkd-blue">02.</span> Envía el comprobante a nuestro WhatsApp.</li>
-                            <li className="flex gap-3"><span className="text-tkd-blue">03.</span> Recibirás tus credenciales de acceso.</li>
+                            <li className="flex gap-3"><span className="text-tkd-blue">01.</span> Tu entorno ya está listo para operar.</li>
+                            <li className="flex gap-3"><span className="text-tkd-blue">02.</span> Tienes 7 días de prueba completa.</li>
+                            <li className="flex gap-3"><span className="text-tkd-blue">03.</span> Límite de trial: 15 estudiantes.</li>
                         </ul>
                     </div>
-                    <a
-                        href={`https://wa.me/57${DATOS_RECAUDO_MASTER.whatsappSoporte}?text=Hola! Acabo de registrar mi academia ${slugDeseado}. Envío el comprobante para activación.`}
-                        target="_blank"
-                        className="block w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95"
+                    <Link
+                        to="/login"
+                        className="block w-full bg-tkd-blue text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all hover:scale-[1.02] active:scale-95 text-center"
                     >
-                        Enviar Comprobante
+                        Entrar a mi Academia
+                    </Link>
+                    <a
+                        href={`https://wa.me/57${DATOS_RECAUDO_MASTER.whatsappSoporte}?text=Hola! Acabo de registrar mi academia ${slugDeseado}. Deseo asesoría técnica.`}
+                        target="_blank"
+                        className="block w-full text-gray-400 py-2 font-black uppercase text-[9px] tracking-widest hover:text-tkd-blue transition-all text-center"
+                    >
+                        O hablar con un consultor
                     </a>
                 </div>
             </div>
@@ -125,13 +132,13 @@ const RegistroEscuela: React.FC = () => {
                         <div>
                             <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-2 tracking-widest">Nombre de la Institución</label>
                             <input {...register('nombreClub')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all" placeholder="EJ: CLUB DRAGONES DEL SUR" />
-                            <FormInputError mensaje={errors.nombreClub?.message} />
+                            <FormInputError mensaje={errors.nombreClub?.message as string} />
                         </div>
 
                         <div>
                             <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-2 tracking-widest">Correo del Director</label>
                             <input {...register('email')} type="email" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all" placeholder="DIRECTOR@DOJANG.COM" />
-                            <FormInputError mensaje={errors.email?.message} />
+                            <FormInputError mensaje={errors.email?.message as string} />
                         </div>
 
                         <div>
@@ -140,7 +147,7 @@ const RegistroEscuela: React.FC = () => {
                                 <input {...register('slug')} className="w-full bg-blue-50/50 dark:bg-blue-900/20 border-2 border-transparent focus:border-tkd-blue rounded-2xl p-5 text-sm font-black text-tkd-blue outline-none lowercase transition-all" placeholder="mi-escuela" />
                                 <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 uppercase tracking-widest">.tudojang.com</span>
                             </div>
-                            <FormInputError mensaje={errors.slug?.message} />
+                            <FormInputError mensaje={errors.slug?.message as string} />
                             <p className="text-[9px] text-gray-400 font-bold mt-3 uppercase px-2 leading-relaxed opacity-60">Este nombre será tu acceso directo y marca digital única en el sistema.</p>
                         </div>
 

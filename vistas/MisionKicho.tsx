@@ -103,6 +103,12 @@ const VistaMisionKicho: React.FC = () => {
             const expDate = new Date();
             expDate.setHours(expDate.getHours() + 72);
 
+            if (estudiantes.length >= 15) {
+                mostrarNotificacion("Límite de Trial Alcanzado (15 alumnos). Mejora tu plan para cargar más.", "warning");
+                setActivando(false);
+                return;
+            }
+
             await crearMisionKicho({
                 tenantId: usuario.tenantId,
                 nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",

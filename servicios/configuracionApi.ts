@@ -61,8 +61,10 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
         ...datos,
         tenantId: nuevoTenantId,
         slug: datos.slug?.toLowerCase().trim() || '',
-        estadoSuscripcion: 'demo', // Inicia en demo hasta confirmar pago
-        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de gracia
+        estadoSuscripcion: 'demo', // Acceso inmediato en modo prueba
+        plan: datos.plan || 'starter', // Plan inicial para el trial
+        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de prueba
+        limiteEstudiantes: 15, // Límite estricto de trial
     };
 
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);

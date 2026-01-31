@@ -15,7 +15,7 @@ const CensoPublico: React.FC = () => {
     const [enviado, setEnviado] = useState(false);
     const [cargando, setCargando] = useState(false);
     const [errores, setErrores] = useState<Record<string, string>>({});
-    
+
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
         fechaNacimiento: '', tutorNombre: '', tutorEmail: '',
@@ -40,7 +40,13 @@ const CensoPublico: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Validaciones (abreviadas por espacio)
+        // Validaciones de trial
+        if (tenant?.plan === 'starter' && (tenant as any).estudiantesActuales >= 15) {
+            setErrores({ global: "Esta academia ha alcanzado su límite de cupos del periodo de prueba." });
+            setCargando(false);
+            return;
+        }
+
         setCargando(true);
         try {
             await registrarAspirantePublico(misionId || 'general', tenant?.tenantId || 'anon', formData);
@@ -121,7 +127,7 @@ const CensoPublico: React.FC = () => {
                                 </div>
                                 <h3 className="text-sm font-black uppercase text-tkd-dark dark:text-white tracking-widest">Datos del Acudiente Responsable</h3>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="sm:col-span-2">
                                     <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Nombre Completo Tutor</label>
@@ -146,13 +152,18 @@ const CensoPublico: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-10 border-t dark:border-gray-800">
-                    <button type="submit" disabled={cargando} className="w-full py-5 text-white rounded-[2rem] font-black uppercase text-sm tracking-[0.3em] shadow-2xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4" style={{ backgroundColor: tenant?.colorSecundario }}>
+                    {errores.global && (
+                        <div className="mb-6 p-4 bg-red-50 text-tkd-red rounded-2xl text-[10px] font-black uppercase border border-red-100 flex items-center gap-3">
+                            <IconoInformacion className="w-5 h-5" /> {errores.global}
+                        </div>
+                    )}
+                    <button type="submit" disabled={cargando} className="w-full py-5 text-white rounded-[2rem] font-black uppercase text-sm tracking-[0.3em] shadow-2xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4 disabled:opacity-50" style={{ backgroundColor: tenant?.colorSecundario }}>
                         {cargando ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-6 h-6" />}
                         Finalizar Registro
                     </button>
                 </div>
             </form>
-            
+
             <footer className="mt-12 text-center space-y-4">
                 <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Seguridad cifrada por Tudojang SaaS Core v4.2</p>
                 <Link to="/login" className="text-white/20 hover:text-white transition-colors text-[9px] font-bold uppercase tracking-[0.5em]">Login Admin</Link>
