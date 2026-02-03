@@ -25,14 +25,19 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
 };
 
 export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionClub | null> => {
+    const slugLimpio = slug.toLowerCase().trim();
+
+    // SLUGS RESERVADOS: No pueden ser creados por procesos de registro de usuarios.
+    const reservados = ['gajog', 'master', 'admin', 'aliant', 'tudojang', 'www', 'api', 'root', 'support'];
+
     if (!isFirebaseConfigured) {
-        // En modo mock, solo simulamos que 'gajog' y 'dragones' están ocupados
-        if (slug === 'gajog' || slug === 'dragones' || slug === 'master') {
+        // Mock logic para desarrollo local
+        if (reservados.includes(slugLimpio) || slugLimpio === 'dragones') {
             return {
                 ...CONFIGURACION_CLUB_POR_DEFECTO,
-                slug: slug,
-                tenantId: `id-${slug}`,
-                nombreClub: slug === 'gajog' ? 'Taekwondo Ga Jog' : `Academia ${slug.toUpperCase()}`,
+                slug: slugLimpio,
+                tenantId: `id-${slugLimpio}`,
+                nombreClub: slugLimpio === 'gajog' ? 'Taekwondo Ga Jog' : `Academia ${slugLimpio.toUpperCase()}`,
                 estadoSuscripcion: 'activo',
                 plan: 'pro',
             } as ConfiguracionClub;
@@ -40,11 +45,22 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
         return null;
     }
 
+    // Buscamos en Firebase (tenants reales)
     const tenantsRef = collection(db, 'tenants');
-    const q = query(tenantsRef, where("slug", "==", slug.toLowerCase().trim()));
+    const q = query(tenantsRef, where("slug", "==", slugLimpio));
     const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) return null;
+    if (querySnapshot.empty) {
+        // Bloqueo preventivo de slugs reservados incluso si no existen en DB
+        if (reservados.includes(slugLimpio)) {
+            return {
+                slug: slugLimpio,
+                nombreClub: 'SISTEMA / RESERVADO',
+                estadoSuscripcion: 'suspendido'
+            } as any;
+        }
+        return null;
+    }
 
     return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as any;
 };

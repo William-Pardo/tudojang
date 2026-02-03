@@ -13,7 +13,7 @@ import { DATOS_RECAUDO_MASTER } from '../constantes';
 import FormInputError from '../components/FormInputError';
 import { guardarCookie, obtenerCookie } from '../utils/cookieUtils';
 import { useSearchParams } from 'react-router-dom';
-import { abrirCheckoutWompi, generarReferenciaPago } from '../servicios/wompiServicio';
+import { abrirCheckoutWompi, generarReferenciaPago } from '../servicios/wompiService';
 import { dispararNotificacionNuevaEscuela } from '../servicios/notificacionesApi';
 import { slugify } from '../utils/formatters';
 import { PLANES_SAAS } from '../constantes';
@@ -71,11 +71,10 @@ const RegistroEscuela: React.FC = () => {
             try {
                 const existe = await buscarTenantPorSlug(provisionalSlug);
                 if (existe) {
-                    mostrarNotificacion("Este nombre de academia ya está en uso o no está disponible.", "error");
                     setSlugDisponible(false);
-                    return;
+                } else {
+                    setSlugDisponible(true);
                 }
-                setSlugDisponible(true);
                 setPasoActual(siguiente);
             } catch (error) {
                 mostrarNotificacion("Error al verificar disponibilidad.", "error");
@@ -136,10 +135,10 @@ const RegistroEscuela: React.FC = () => {
         const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
 
         abrirCheckoutWompi({
-            referencia: generarReferenciaPago(data.slug, planSeleccionado),
+            referencia: generarReferenciaPago(data.slug, 'PLAN'),
             montoEnPesos: infoPlan.precio,
-            nombreAcademia: data.nombreClub,
-            emailResponsable: data.email,
+            nombreCompleto: data.nombreClub,
+            email: data.email,
             esSimulacion: esModoTest,
             onSuccess: () => processRegistration(data)
         });
@@ -410,25 +409,41 @@ const RegistroEscuela: React.FC = () => {
                                             <div className="mx-auto w-16 h-16 bg-tkd-blue/10 rounded-full flex items-center justify-center">
                                                 <IconoAprobar className="w-8 h-8 text-tkd-blue" />
                                             </div>
-                                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-dark">Confirma tu Identidad</h3>
+                                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-dark">Configura tu URL</h3>
                                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
-                                                Este será el dominio y nombre que verás en tu membresía oficial. <br />
-                                                ¿Estás seguro de que deseas continuar?
+                                                Este será el dominio de tu academia. Puedes personalizarlo ahora mismo.
                                             </p>
                                         </div>
 
-                                        <div className="bg-gray-50 p-8 rounded-[2rem] border-2 border-tkd-blue/10 text-center">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tu Dominio Seleccionado:</p>
-                                            <p className="text-2xl font-black text-tkd-blue">{slugDeseado}.tudojang.com</p>
+                                        <div className="space-y-4">
+                                            <div className="relative">
+                                                <input
+                                                    {...register('slug')}
+                                                    className={`w-full bg-gray-50 border-2 ${slugDisponible === false ? 'border-tkd-red' : 'border-tkd-blue/20'} rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner lowercase`}
+                                                    onChange={async (e) => {
+                                                        const val = slugify(e.target.value);
+                                                        setValue('slug', val);
+                                                        if (val.length > 2) {
+                                                            const existe = await buscarTenantPorSlug(val);
+                                                            setSlugDisponible(!existe);
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                    {slugDisponible === true && <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Disponible</span>}
+                                                    {slugDisponible === false && <span className="text-[10px] font-black text-tkd-red uppercase tracking-widest">Ocupado</span>}
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-center font-bold text-gray-400 uppercase tracking-widest">URL Final: {slugDeseado}.tudojang.com</p>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4">
                                             <motion.button
                                                 type="submit"
-                                                disabled={cargando}
+                                                disabled={cargando || slugDisponible === false}
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
-                                                className={`w-full py-7 rounded-[2.5rem] bg-tkd-red text-white font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4`}
+                                                className={`w-full py-7 rounded-[2.5rem] ${slugDisponible === false ? 'bg-gray-300' : 'bg-tkd-red'} text-white font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4`}
                                             >
                                                 {cargando ? (
                                                     <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>

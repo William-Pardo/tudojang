@@ -25,10 +25,10 @@ const VistaPasarelaPagos: React.FC = () => {
 
         await abrirCheckoutWompi({
             referencia: referenciaTecnica,
-            montoEnCentavos: montoEnCentavos,
+            montoEnPesos: montoBase,
             email: tenant?.emailClub || '',
             nombreCompleto: tenant?.nombreClub || '',
-            telefono: tenant?.pagoNequi || '', // Usamos el cel de contacto si no hay otro
+            telefono: tenant?.pagoNequi || '',
             redirectUrl: `${window.location.origin}/#/aliant-control`
         });
     };
@@ -90,8 +90,8 @@ const VistaPasarelaPagos: React.FC = () => {
                             whileHover={{ y: -10 }}
                             onClick={() => setPlanSeleccionado(plan.id as any)}
                             className={`cursor-pointer rounded-[3rem] p-8 border-4 transition-all relative flex flex-col ${planSeleccionado === plan.id
-                                    ? 'border-tkd-blue bg-white shadow-2xl z-10'
-                                    : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
+                                ? 'border-tkd-blue bg-white shadow-2xl z-10'
+                                : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
                                 }`}
                         >
                             {plan.popular && (

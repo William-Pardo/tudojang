@@ -53,12 +53,12 @@ const PasarelaInscripcion: React.FC = () => {
             const referencia = `INS_${solicitudId}_${Date.now()}`;
 
             await abrirCheckoutWompi({
-                referencia,
-                montoEnCentavos,
-                email: solicitud.datos?.email || '',
-                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`,
-                telefono: solicitud.datos?.telefono || '',
-                redirectUrl: window.location.href
+                referencia: referencia, // Usar la referencia generada para la solicitud
+                montoEnPesos: solicitud.pago?.monto || 0, // Usar el monto de la solicitud
+                email: solicitud.datos?.email || '', // Usar el email del aspirante
+                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`, // Usar el nombre del aspirante
+                telefono: solicitud.datos?.telefono || '', // Usar el teléfono del aspirante
+                redirectUrl: window.location.href // Redirigir a la misma página de inscripción
             });
         } catch (e: any) {
             console.error("Error al iniciar pago con Wompi");

@@ -1,0 +1,1 @@
+{"mcpServers":{"puppeteer":{"command":"npx","args":["-y","@modelcontextprotocol/server-puppeteer"],"disabled":false,"alwaysAllow":[]},"memory":{"command":"npx","args":["-y","@modelcontextprotocol/server-memory"],"disabled":false,"alwaysAllow":[]}}}

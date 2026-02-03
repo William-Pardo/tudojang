@@ -1,16 +1,33 @@
 
 // servicios/wompiService.ts
-import { wompiConfig } from '../src/config';
+import { WOMPI_CONFIG } from '../constantes';
 
 /**
- * Genera una firma de integridad para Wompi usando SubtleCrypto (Nativo en navegadores modernos).
- * @param referencia Referencia única de la transacción.
- * @param montoEnCentavos Monto en centavos.
- * @param moneda Moneda (ej. 'COP').
- * @returns Hash SHA256 en formato hex.
+ * Servicio robusto para la integración con Wompi (Sandbox y Producción).
+ * Este archivo consolida la lógica de pagos tanto para el registro de escuelas (SaaS)
+ * como para la inscripción premium de alumnos (In-app).
+ */
+
+/**
+ * Obtiene la llave pública según el entorno (Sandbox siempre prevalece si MODO_TEST es true).
+ */
+export const obtenerLlavePublicaWompi = (esSimulacion: boolean = true) => {
+    if (esSimulacion || WOMPI_CONFIG.MODO_TEST || !WOMPI_CONFIG.PUB_KEY_PROD) {
+        return WOMPI_CONFIG.PUB_KEY_SANDBOX;
+    }
+    return WOMPI_CONFIG.PUB_KEY_PROD;
+};
+
+/**
+ * Genera una firma de integridad para Wompi usando SubtleCrypto.
+ * Requerida para transacciones seguras en el checkout.
  */
 export const generarFirmaIntegridad = async (referencia: string, montoEnCentavos: number, moneda: string = 'COP'): Promise<string> => {
-    const cadena = `${referencia}${montoEnCentavos}${moneda}${wompiConfig.integritySecret}`;
+    // El secreto de integridad debería estar en constantes o env. 
+    // Para simplificar, usamos el del config si está disponible o uno de prueba.
+    const integritySecret = import.meta.env.VITE_WOMPI_INTEGRITY_SECRET || 'test_integrity_secret_xxxxx';
+
+    const cadena = `${referencia}${montoEnCentavos}${moneda}${integritySecret}`;
     const msgUint8 = new TextEncoder().encode(cadena);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -18,25 +35,52 @@ export const generarFirmaIntegridad = async (referencia: string, montoEnCentavos
 };
 
 /**
- * Abre el checkout de Wompi de forma dinámica.
+ * Genera una referencia de pago estándar para Tudojang.
  */
-export const abrirCheckoutWompi = async (config: {
+export const generarReferenciaPago = (identificador: string, tipo: 'PLAN' | 'INS' | 'STORE') => {
+    const timestamp = Date.now();
+    const cleanId = identificador.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return `TDJ-${tipo}-${cleanId}-${timestamp}`;
+};
+
+/**
+ * Interfaz unificada para el checkout.
+ */
+interface CheckoutConfig {
     referencia: string;
-    montoEnCentavos: number;
+    montoEnPesos: number;
     email: string;
     nombreCompleto: string;
-    telefono: string;
-    redirectUrl: string;
-}) => {
-    const firma = await generarFirmaIntegridad(config.referencia, config.montoEnCentavos);
+    telefono?: string;
+    esSimulacion?: boolean;
+    redirectUrl?: string;
+    onSuccess?: (transaction: any) => void;
+    onClose?: () => void;
+}
 
-    // @ts-ignore
+/**
+ * Abre el Widget de Wompi de forma dinámica y segura.
+ */
+export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
+    const publicKey = obtenerLlavePublicaWompi(config.esSimulacion);
+    const montoCents = config.montoEnPesos * 100;
+
+    // Intentamos generar la firma de integridad
+    let signature = {};
+    try {
+        const hash = await generarFirmaIntegridad(config.referencia, montoCents);
+        signature = { integrity: hash };
+    } catch (e) {
+        console.warn("⚠️ No se pudo generar firma de integridad. El pago podría fallar si el comercio la exige.");
+    }
+
+    // @ts-ignore - WidgetCheckout cargado en index.html
     const checkout = new WidgetCheckout({
         currency: 'COP',
-        amountInCents: config.montoEnCentavos,
+        amountInCents: montoCents,
         reference: config.referencia,
-        publicKey: wompiConfig.publicKey,
-        signature: { integrity: firma },
+        publicKey: publicKey,
+        signature: signature,
         redirectUrl: config.redirectUrl,
         customerData: {
             email: config.email,
@@ -48,6 +92,12 @@ export const abrirCheckoutWompi = async (config: {
 
     checkout.open((result: any) => {
         const transaction = result.transaction;
-        console.log('Transacción terminada:', transaction);
+        if (transaction.status === 'APPROVED') {
+            console.log("✅ Wompi: Transacción Aprobada", transaction);
+            if (config.onSuccess) config.onSuccess(transaction);
+        } else {
+            console.warn("❌ Wompi: Estado de transacción", transaction.status);
+        }
+        if (config.onClose) config.onClose();
     });
 };
