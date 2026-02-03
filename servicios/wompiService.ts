@@ -87,38 +87,66 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
     }
 
     try {
-        // @ts-ignore
-        const checkout = new WidgetCheckout({
+        const options: any = {
             currency: 'COP',
             amountInCents: montoCents,
             reference: config.referencia,
             publicKey: publicKey,
-            signature: signature,
-            redirectUrl: config.redirectUrl,
             customerData: {
                 email: config.email,
                 fullName: config.nombreCompleto,
-                phoneNumber: config.telefono,
-                phoneNumberPrefix: '+57'
             }
-        });
+        };
 
-        console.log("💳 Abriendo modal de Wompi...");
+        // Solo añadir firma si se generó correctamente
+        if (signature && Object.keys(signature).length > 0) {
+            options.signature = signature;
+        }
+
+        // Solo añadir teléfono si existe
+        if (config.telefono) {
+            options.customerData.phoneNumber = config.telefono;
+            options.customerData.phoneNumberPrefix = '+57';
+        }
+
+        // Solo añadir redirect si existe
+        if (config.redirectUrl) {
+            options.redirectUrl = config.redirectUrl;
+        }
+
+        console.log("💳 Abriendo modal de Wompi con opciones:", options);
+
+        // @ts-ignore
+        const checkout = new WidgetCheckout(options);
+
         checkout.open((result: any) => {
-            const transaction = result.transaction;
-            console.log("📡 Resultado Wompi:", transaction.status);
+            const transaction = result?.transaction;
+            console.log("📡 Resultado Wompi:", transaction?.status);
 
-            if (transaction.status === 'APPROVED') {
+            if (transaction?.status === 'APPROVED') {
                 if (config.onSuccess) config.onSuccess(transaction);
-            } else if (transaction.status === 'DECLINED' || transaction.status === 'ERROR') {
+            } else if (transaction?.status === 'DECLINED' || transaction?.status === 'ERROR') {
                 alert(`El pago fue ${transaction.status === 'DECLINED' ? 'declinado' : 'fallido'}. Por favor intenta de nuevo.`);
             }
 
             if (config.onClose) config.onClose();
         });
     } catch (error: any) {
-        console.error("🔥 Error al abrir el checkout:", error);
-        alert("Error al iniciar la pasarela de pagos: " + error.message);
+        console.error("🔥 Error crítico al abrir el checkout de Wompi:", error);
+
+        // Reporte de error mejorado para "undefined"
+        let errorDetalle = "Error desconocido";
+        if (typeof error === 'string') errorDetalle = error;
+        else if (error?.message) errorDetalle = error.message;
+        else {
+            try {
+                errorDetalle = JSON.stringify(error);
+            } catch (e) {
+                errorDetalle = String(error);
+            }
+        }
+
+        alert("Error al iniciar la pasarela de pagos: " + errorDetalle);
         if (config.onClose) config.onClose();
     }
 };
