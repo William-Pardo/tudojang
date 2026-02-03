@@ -138,22 +138,36 @@ const RegistroEscuela: React.FC = () => {
     };
 
     const lanzarPago = (data: any) => {
-        setCargandoPago(true);
-        console.log("🚀 Iniciando proceso de pago para:", data);
-        const beneficios = obtenerBeneficiosCortesia(data.slug);
-        const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
+        try {
+            setCargandoPago(true);
+            console.log("🚀 Iniciando proceso de pago para:", data);
+            const beneficios = obtenerBeneficiosCortesia(data.slug);
+            const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
 
-        const montoFinal = beneficios ? beneficios.precioEspecial : infoPlan.precio;
+            if (!infoPlan) {
+                alert("Error: No se encontró información del plan: " + planSeleccionado);
+                setCargandoPago(false);
+                return;
+            }
 
-        abrirCheckoutWompi({
-            referencia: generarReferenciaPago(data.slug, 'PLAN'),
-            montoEnPesos: montoFinal,
-            nombreCompleto: data.nombreClub,
-            email: data.email,
-            esSimulacion: esModoTest,
-            onSuccess: () => processRegistration(data),
-            onClose: () => setCargandoPago(false)
-        });
+            const montoFinal = beneficios ? beneficios.precioEspecial : infoPlan.precio;
+
+            console.log("💰 Monto a cobrar:", montoFinal);
+
+            abrirCheckoutWompi({
+                referencia: generarReferenciaPago(data.slug, 'PLAN'),
+                montoEnPesos: montoFinal,
+                nombreCompleto: data.nombreClub,
+                email: data.email,
+                esSimulacion: esModoTest,
+                onSuccess: () => processRegistration(data),
+                onClose: () => setCargandoPago(false)
+            });
+        } catch (err: any) {
+            console.error("🔥 Error en lanzarPago:", err);
+            alert("Error crítico al lanzar pago: " + err.message);
+            setCargandoPago(false);
+        }
     };
 
     if (finalizado) {
