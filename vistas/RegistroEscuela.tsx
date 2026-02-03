@@ -37,7 +37,8 @@ const RegistroEscuela: React.FC = () => {
     const [cargando, setCargando] = useState(false);
     const { mostrarNotificacion } = useNotificacion();
     const [planSeleccionado] = useState(obtenerCookie('plan_pendiente') || 'starter');
-    const [confirmando, setConfirmando] = useState(false); // Nuevo paso de confirmación
+    const [confirmando, setConfirmando] = useState(false);
+    const [cargandoPago, setCargandoPago] = useState(false);
 
     // Estados para validación de slug en tiempo real
     const [slugDisponible, setSlugDisponible] = useState<boolean | null>(null);
@@ -137,6 +138,7 @@ const RegistroEscuela: React.FC = () => {
     };
 
     const lanzarPago = (data: any) => {
+        setCargandoPago(true);
         console.log("🚀 Iniciando proceso de pago para:", data);
         const beneficios = obtenerBeneficiosCortesia(data.slug);
         const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
@@ -149,7 +151,8 @@ const RegistroEscuela: React.FC = () => {
             nombreCompleto: data.nombreClub,
             email: data.email,
             esSimulacion: esModoTest,
-            onSuccess: () => processRegistration(data)
+            onSuccess: () => processRegistration(data),
+            onClose: () => setCargandoPago(false)
         });
     };
 
@@ -357,15 +360,21 @@ const RegistroEscuela: React.FC = () => {
                                         <div className="space-y-4">
                                             <button
                                                 type="button"
+                                                disabled={cargandoPago}
                                                 onClick={() => lanzarPago({ nombreClub: nombreAcademia, slug: slugDeseado, email: emailDirector })}
-                                                className="w-full bg-tkd-red text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:scale-[1.02] transition-all"
+                                                className={`w-full ${cargandoPago ? 'bg-gray-400' : 'bg-tkd-red'} text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3`}
                                             >
-                                                {esModoTest ? 'Simular Pago (Sandbox)' : 'Proceder al Pago Seguro'}
+                                                {cargandoPago ? (
+                                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                    esModoTest ? 'Simular Pago (Sandbox)' : 'Proceder al Pago Seguro'
+                                                )}
                                             </button>
                                             <button
                                                 type="button"
+                                                disabled={cargandoPago}
                                                 onClick={() => setConfirmando(false)}
-                                                className="w-full py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all"
+                                                className="w-full py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all disabled:opacity-30"
                                             >
                                                 Corregir datos
                                             </button>

@@ -62,48 +62,63 @@ interface CheckoutConfig {
  * Abre el Widget de Wompi de forma dinámica y segura.
  */
 export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
+    console.log("🛠️ Configurando checkout de Wompi...", { referencia: config.referencia, monto: config.montoEnPesos });
+
     const publicKey = obtenerLlavePublicaWompi(config.esSimulacion);
-    const montoCents = config.montoEnPesos * 100;
+    const montoCents = Math.round(config.montoEnPesos * 100);
 
     // Intentamos generar la firma de integridad
     let signature = {};
     try {
         const hash = await generarFirmaIntegridad(config.referencia, montoCents);
         signature = { integrity: hash };
+        console.log("🔐 Firma de integridad generada.");
     } catch (e) {
-        console.warn("⚠️ No se pudo generar firma de integridad. El pago podría fallar si el comercio la exige.");
+        console.warn("⚠️ No se pudo generar firma de integridad. Continuando sin ella...");
     }
 
     // @ts-ignore - WidgetCheckout cargado en index.html
     if (typeof WidgetCheckout === 'undefined') {
-        alert("⚠️ El sistema de pagos (Wompi) no ha cargado correctamente. Por favor, refresca la página (F5).");
+        const msg = "⚠️ El script de Wompi no ha cargado. Verifica tu conexión o bloqueadores de anuncios.";
+        console.error(msg);
+        alert(msg);
+        if (config.onClose) config.onClose();
         return;
     }
 
-    // @ts-ignore
-    const checkout = new WidgetCheckout({
-        currency: 'COP',
-        amountInCents: montoCents,
-        reference: config.referencia,
-        publicKey: publicKey,
-        signature: signature,
-        redirectUrl: config.redirectUrl,
-        customerData: {
-            email: config.email,
-            fullName: config.nombreCompleto,
-            phoneNumber: config.telefono,
-            phoneNumberPrefix: '+57'
-        }
-    });
+    try {
+        // @ts-ignore
+        const checkout = new WidgetCheckout({
+            currency: 'COP',
+            amountInCents: montoCents,
+            reference: config.referencia,
+            publicKey: publicKey,
+            signature: signature,
+            redirectUrl: config.redirectUrl,
+            customerData: {
+                email: config.email,
+                fullName: config.nombreCompleto,
+                phoneNumber: config.telefono,
+                phoneNumberPrefix: '+57'
+            }
+        });
 
-    checkout.open((result: any) => {
-        const transaction = result.transaction;
-        if (transaction.status === 'APPROVED') {
-            console.log("✅ Wompi: Transacción Aprobada", transaction);
-            if (config.onSuccess) config.onSuccess(transaction);
-        } else {
-            console.warn("❌ Wompi: Estado de transacción", transaction.status);
-        }
+        console.log("💳 Abriendo modal de Wompi...");
+        checkout.open((result: any) => {
+            const transaction = result.transaction;
+            console.log("📡 Resultado Wompi:", transaction.status);
+
+            if (transaction.status === 'APPROVED') {
+                if (config.onSuccess) config.onSuccess(transaction);
+            } else if (transaction.status === 'DECLINED' || transaction.status === 'ERROR') {
+                alert(`El pago fue ${transaction.status === 'DECLINED' ? 'declinado' : 'fallido'}. Por favor intenta de nuevo.`);
+            }
+
+            if (config.onClose) config.onClose();
+        });
+    } catch (error: any) {
+        console.error("🔥 Error al abrir el checkout:", error);
+        alert("Error al iniciar la pasarela de pagos: " + error.message);
         if (config.onClose) config.onClose();
-    });
+    }
 };

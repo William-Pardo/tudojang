@@ -37,9 +37,9 @@ export const DATOS_RECAUDO_MASTER = {
 
 export const WOMPI_CONFIG = {
     // LLAVES PÚBLICAS (Seguras en frontend)
-    PUB_KEY_SANDBOX: "pub_test_Q5yS99s5S79W8p4m16999b9V67469796", // Llave de test estándar de Wompi
-    PUB_KEY_PROD: "", // SE MANTIENE VACÍA PARA EVITAR COBROS REALES
-    MODO_TEST: true, // TRUE por defecto para máxima seguridad inicial
+    PUB_KEY_SANDBOX: "pub_test_Q5yS99s5S79W8p4m16999b9V67469796",
+    PUB_KEY_PROD: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
+    MODO_TEST: true, // Cambiar a false para producción real
 };
 
 export const CONFIGURACION_POR_DEFECTO = {
