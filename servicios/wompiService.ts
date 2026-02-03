@@ -67,14 +67,20 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
     const publicKey = obtenerLlavePublicaWompi(config.esSimulacion);
     const montoCents = Math.round(config.montoEnPesos * 100);
 
-    // Intentamos generar la firma de integridad
-    let signature = {};
-    try {
-        const hash = await generarFirmaIntegridad(config.referencia, montoCents);
-        signature = { integrity: hash };
-        console.log("🔐 Firma de integridad generada.");
-    } catch (e) {
-        console.warn("⚠️ No se pudo generar firma de integridad. Continuando sin ella...");
+    // Intentamos generar la firma de integridad (Solo si hay un secreto real configurado)
+    let signature = null;
+    const isGenericSecret = !import.meta.env.VITE_WOMPI_INTEGRITY_SECRET || import.meta.env.VITE_WOMPI_INTEGRITY_SECRET.includes('xxxxx');
+
+    if (!isGenericSecret) {
+        try {
+            const hash = await generarFirmaIntegridad(config.referencia, montoCents);
+            signature = { integrity: hash };
+            console.log("🔐 Firma de integridad generada.");
+        } catch (e) {
+            console.warn("⚠️ No se pudo generar firma de integridad. Continuando sin ella...");
+        }
+    } else {
+        console.log("ℹ️ Saltando firma de integridad (Secreto no configurado o genérico).");
     }
 
     // @ts-ignore - WidgetCheckout cargado en index.html
@@ -109,8 +115,8 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
             }
         };
 
-        // Solo añadir firma si se generó correctamente
-        if (signature && Object.keys(signature).length > 0) {
+        // Solo añadir firma si se generó correctamente y no es nula
+        if (signature) {
             options.signature = signature;
         }
 
@@ -119,7 +125,12 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
             options.redirectUrl = config.redirectUrl;
         }
 
-        console.log("💳 Abriendo modal de Wompi con opciones finales:", options);
+        console.log("💳 Abriendo modal de Wompi con opciones finales:", {
+            referencia: options.reference,
+            monto: options.amountInCents,
+            conFirma: !!signature,
+            keyUsada: publicKey
+        });
 
         // @ts-ignore
         const checkout = new WidgetCheckout(options);
