@@ -40,6 +40,35 @@ export const dispararLegalizacionPrivada = async (telefono: string, nombreAlumno
     await enviarNotificacion('WhatsApp', telefono, mensaje);
 };
 
+/**
+ * PREMIUM: Envía notificación formal de apertura de suscripción con el nuevo slug.
+ */
+export const dispararNotificacionNuevaEscuela = async (email: string, slug: string, nombreClub: string): Promise<void> => {
+    const mensaje = `
+🥋 *¡BIENVENIDO A LA ÉLITE DIGITAL, ${nombreClub.toUpperCase()}!*
+
+Es un honor confirmar que tu ecosistema de gestión de artes marciales ha sido desplegado con éxito.
+
+*Detalles de tu nueva membresía:*
+🌐 *Dominio Adquirido:* https://${slug}.tudojang.com
+👤 *Nombre de la Escuela:* ${nombreClub}
+🚀 *Estado:* Activo (Periodo de Lanzamiento)
+
+Desde este momento, tienes el control total de tu academia en la palma de tu mano. Tu legado ahora cuenta con una infraestructura de clase mundial.
+
+*Próximos pasos:*
+1. Ingresa a tu nuevo portal.
+2. Configura tus sedes y programas.
+3. Comienza a registrar a tus alumnos.
+
+¡El camino a la excelencia digital comienza hoy!
+
+Atentamente,
+*Equipo de Expansión Tudojang*
+    `.trim();
+    await enviarNotificacion('Email', email, mensaje);
+};
+
 
 const historialCollection = collection(db, 'historialNotificaciones');
 

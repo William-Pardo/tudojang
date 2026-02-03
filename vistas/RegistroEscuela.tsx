@@ -14,10 +14,12 @@ import FormInputError from '../components/FormInputError';
 import { guardarCookie, obtenerCookie } from '../utils/cookieUtils';
 import { useSearchParams } from 'react-router-dom';
 import { abrirCheckoutWompi, generarReferenciaPago } from '../servicios/wompiServicio';
+import { dispararNotificacionNuevaEscuela } from '../servicios/notificacionesApi';
+import { slugify } from '../utils/formatters';
 import { PLANES_SAAS } from '../constantes';
 
 const schema = yup.object({
-    nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
+    nombreClub: yup.string().min(3, 'Mínimo 3 letras.').required('El nombre de la academia es obligatorio.'),
     email: yup.string().email('Email inválido.').required('El email es obligatorio.'),
     slug: yup.string()
         .matches(/^[a-z0-9-]+$/, 'Solo letras minúsculas, números y guiones.')
@@ -41,7 +43,7 @@ const RegistroEscuela: React.FC = () => {
     const [slugDisponible, setSlugDisponible] = useState<boolean | null>(null);
     const [validandoSlug, setValidandoSlug] = useState(false);
 
-    const { register, handleSubmit, formState: { errors }, watch, trigger } = useForm({
+    const { register, handleSubmit, formState: { errors }, watch, trigger, setValue } = useForm({
         resolver: yupResolver(schema),
         mode: 'onChange',
         defaultValues: obtenerCookie('registro_pendiente') || {}
@@ -51,32 +53,38 @@ const RegistroEscuela: React.FC = () => {
     const nombreAcademia = watch('nombreClub');
     const emailDirector = watch('email');
 
-    // Validación de slug con debounce
-    useEffect(() => {
-        if (!slugDeseado || slugDeseado.length < 3) {
-            setSlugDisponible(null);
-            return;
-        }
-
-        const timer = setTimeout(async () => {
-            setValidandoSlug(true);
-            try {
-                const existe = await buscarTenantPorSlug(slugDeseado);
-                setSlugDisponible(!existe);
-            } catch (error) {
-                console.error("Error validando slug:", error);
-                setSlugDisponible(null);
-            } finally {
-                setValidandoSlug(false);
-            }
-        }, 600);
-
-        return () => clearTimeout(timer);
-    }, [slugDeseado]);
+    // Eliminamos el useEffect que validaba el slug con debounce ya que ahora la validación 
+    // es parte del flujo de pasos y ocurre al darle "Siguiente" en el Paso 1.
 
     const irASiguiente = async (siguiente: FormPaso) => {
         let campoAValidar: any = '';
-        if (pasoActual === 'nombre') campoAValidar = 'nombreClub';
+        if (pasoActual === 'nombre') {
+            campoAValidar = 'nombreClub';
+            const esValido = await trigger(campoAValidar);
+            if (!esValido) return;
+
+            // Validación de disponibilidad automática basada en el nombre
+            setValidandoSlug(true);
+            const provisionalSlug = slugify(nombreAcademia);
+            setValue('slug', provisionalSlug);
+
+            try {
+                const existe = await buscarTenantPorSlug(provisionalSlug);
+                if (existe) {
+                    mostrarNotificacion("Este nombre de academia ya está en uso o no está disponible.", "error");
+                    setSlugDisponible(false);
+                    return;
+                }
+                setSlugDisponible(true);
+                setPasoActual(siguiente);
+            } catch (error) {
+                mostrarNotificacion("Error al verificar disponibilidad.", "error");
+            } finally {
+                setValidandoSlug(false);
+            }
+            return;
+        }
+
         if (pasoActual === 'contacto') campoAValidar = 'email';
 
         const esValido = await trigger(campoAValidar);
@@ -93,6 +101,9 @@ const RegistroEscuela: React.FC = () => {
                 plan: planSeleccionado,
                 ...(esModoTest && { modo_simulacion: true })
             });
+
+            // Disparar notificación formal
+            await dispararNotificacionNuevaEscuela(data.email, data.slug, data.nombreClub);
 
             guardarCookie('registro_finalizado', { ...data, plan: planSeleccionado });
             setFinalizado(true);
@@ -139,9 +150,25 @@ const RegistroEscuela: React.FC = () => {
             <div className="min-h-screen bg-white flex items-center justify-center p-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] text-center space-y-8 border border-gray-100"
+                    className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] text-center space-y-8 border border-gray-100 relative overflow-hidden"
                 >
-                    <IconoExitoAnimado className="mx-auto text-tkd-blue w-20 h-20" />
+                    {/* BANNER DE BIENVENIDA DINÁMICO */}
+                    <motion.div
+                        initial={{ y: -100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.3, type: 'spring', stiffness: 100 }}
+                        className="absolute top-0 left-0 right-0 bg-tkd-blue py-4 shadow-lg flex items-center justify-center gap-3"
+                    >
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                        <p className="text-white text-xs font-black uppercase tracking-[0.2em]">
+                            ¡Bienvenido a la red: {slugDeseado}!
+                        </p>
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                    </motion.div>
+
+                    <div className="pt-8">
+                        <IconoExitoAnimado className="mx-auto text-tkd-blue w-20 h-20" />
+                    </div>
                     <div className="space-y-4">
                         <h2 className="text-4xl font-black uppercase tracking-tighter text-tkd-dark">¡Portal Activo!</h2>
                         <p className="text-sm text-gray-500 font-bold uppercase tracking-tight">
@@ -197,9 +224,9 @@ const RegistroEscuela: React.FC = () => {
                                 {pasoActual === 'identidad' && <>Crea tu <span className="text-tkd-blue">Dojang Digital</span></>}
                             </h1>
                             <p className="text-lg text-gray-500 font-medium uppercase leading-relaxed max-w-md">
-                                {pasoActual === 'nombre' && "Comienza el viaje. El nombre de tu academia es el primer paso para la digitalización de tu enseñanza."}
+                                {pasoActual === 'nombre' && "Comienza el viaje. El nombre de tu academia (mínimo 3 letras) es el primer paso para la digitalización de tu enseñanza."}
                                 {pasoActual === 'contacto' && "Necesitamos tu correo institucional para enviarte las llaves de tu nuevo centro de gestión digital."}
-                                {pasoActual === 'identidad' && "Define tu dirección en la red. Este será el portal donde tus alumnos y padres de familia interactuarán con tu academia."}
+                                {pasoActual === 'identidad' && "Este será el nombre que representará tu academia y el que aparecerá en tu membresía oficial."}
                             </p>
                         </motion.div>
                     </AnimatePresence>
@@ -216,7 +243,7 @@ const RegistroEscuela: React.FC = () => {
                                     <IconoCasa className="w-8 h-8 text-white" />
                                 </div>
                                 <div className="overflow-hidden">
-                                    <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em] mb-1">Identidad Digital:</p>
+                                    <p className="text-[10px] font-black text-white/70 uppercase tracking-[0.3em] mb-1">Tu Membresía:</p>
                                     <p className="text-lg font-black tracking-tight leading-none truncate w-full">
                                         {slugDeseado ? slugDeseado : 'mi-academia'}
                                         <span className="text-white opacity-40">.tudojang.com</span>
@@ -307,13 +334,17 @@ const RegistroEscuela: React.FC = () => {
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                                         className="space-y-6"
                                     >
-                                        <div className="space-y-2 text-center lg:text-left">
+                                        <div className="space-y-4">
+                                            <p className="text-[10px] font-bold text-tkd-dark/60 uppercase text-center mb-4">
+                                                Indica el nombre de tu escuela o club. <br />
+                                                Este nombre te representará en adelante.
+                                            </p>
                                             <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre de la Institución</label>
                                             <input
                                                 {...register('nombreClub')}
                                                 autoFocus
                                                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('contacto'))}
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
+                                                className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner uppercase"
                                                 placeholder="EJ: CLUB DRAGONES"
                                             />
                                             <FormInputError mensaje={errors.nombreClub?.message as string} />
@@ -323,11 +354,12 @@ const RegistroEscuela: React.FC = () => {
                                                 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                                                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                                 type="button"
+                                                disabled={validandoSlug}
                                                 onClick={() => irASiguiente('contacto')}
-                                                className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-xl transition-all flex items-center justify-center gap-4 group"
+                                                className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-xl transition-all flex items-center justify-center gap-4 group disabled:opacity-50"
                                             >
-                                                Continuar
-                                                <IconoEnviar className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                                {validandoSlug ? 'Verificando...' : 'Siguiente'}
+                                                {!validandoSlug && <IconoEnviar className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                                             </motion.button>
                                         )}
                                     </motion.div>
@@ -374,44 +406,29 @@ const RegistroEscuela: React.FC = () => {
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                                         className="space-y-8"
                                     >
-                                        <div className="space-y-2 text-center lg:text-left">
-                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest flex justify-between">
-                                                <span>Nombre Corto de URL</span>
-                                                <span className={`${(slugDeseado?.length || 0) >= 3 ? 'text-green-500' : 'text-tkd-red'} transition-colors`}>
-                                                    {(slugDeseado?.length || 0)}/3 caracteres mín.
-                                                </span>
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    {...register('slug')}
-                                                    autoFocus
-                                                    className={`w-full bg-gray-50 border-2 rounded-3xl p-6 pr-32 text-xl font-black outline-none transition-all shadow-inner lowercase ${slugDisponible === true ? 'border-green-500 bg-green-100/50' : slugDisponible === false ? 'border-tkd-red bg-red-50' : 'border-transparent focus:border-tkd-blue focus:bg-white'}`}
-                                                    placeholder="mi-academia"
-                                                />
-                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                                    {validandoSlug ? (
-                                                        <div className="w-5 h-5 border-2 border-tkd-blue border-t-transparent rounded-full animate-spin" />
-                                                    ) : (slugDeseado?.length || 0) >= 3 && slugDisponible === true ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-black text-green-600 uppercase">Disponible</span>
-                                                            <IconoAprobar className="w-6 h-6 text-green-500 animate-pulse" />
-                                                        </div>
-                                                    ) : (slugDeseado?.length || 0) >= 3 && slugDisponible === false ? (
-                                                        <div className="text-[10px] font-black text-tkd-red uppercase">Ocupado</div>
-                                                    ) : null}
-                                                </div>
+                                        <div className="text-center space-y-4">
+                                            <div className="mx-auto w-16 h-16 bg-tkd-blue/10 rounded-full flex items-center justify-center">
+                                                <IconoAprobar className="w-8 h-8 text-tkd-blue" />
                                             </div>
-                                            <FormInputError mensaje={errors.slug?.message as string} />
+                                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-dark">Confirma tu Identidad</h3>
+                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
+                                                Este será el dominio y nombre que verás en tu membresía oficial. <br />
+                                                ¿Estás seguro de que deseas continuar?
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-gray-50 p-8 rounded-[2rem] border-2 border-tkd-blue/10 text-center">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tu Dominio Seleccionado:</p>
+                                            <p className="text-2xl font-black text-tkd-blue">{slugDeseado}.tudojang.com</p>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-4">
                                             <motion.button
                                                 type="submit"
-                                                disabled={cargando || !slugDisponible}
-                                                initial={false}
-                                                animate={slugDisponible ? { scale: [1, 1.02, 1], shadow: "0px 20px 40px rgba(205,46,58,0.4)" } : {}}
-                                                transition={slugDisponible ? { duration: 1.5, repeat: Infinity } : {}}
-                                                className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4 ${slugDisponible ? 'bg-tkd-red text-white' : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-40'}`}
+                                                disabled={cargando}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                className={`w-full py-7 rounded-[2.5rem] bg-tkd-red text-white font-black uppercase tracking-[0.25em] text-sm shadow-2xl transition-all flex items-center justify-center gap-4`}
                                             >
                                                 {cargando ? (
                                                     <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
