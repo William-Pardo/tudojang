@@ -52,26 +52,26 @@ export const CONFIGURACION_POR_DEFECTO = {
 };
 
 export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
-    tenantId: 'escuela-gajog-001',
-    slug: 'gajog',
-    nombreClub: 'Taekwondo Ga Jog',
-    nit: '900.123.456-7',
-    representanteLegal: 'CARLOS ANDRÉS PÉREZ',
-    ccRepresentante: '1.020.333.444',
+    tenantId: 'escuela-nuevo-001',
+    slug: '',
+    nombreClub: 'Nueva Academia',
+    nit: '',
+    representanteLegal: '',
+    ccRepresentante: '',
     lugarFirma: 'Bogotá D.C.',
     duracionContratoMeses: 12,
-    valorMensualidad: 180000,
+    valorMensualidad: 140000,
     metodoPago: 'Transferencia Directa',
-    pagoNequi: '3001234567',
+    pagoNequi: '',
     pagoDaviplata: '',
     pagoBreB: '',
-    pagoBanco: 'Bancolombia Ahorros #123-456789-01',
+    pagoBanco: '',
     diasSuspension: 30,
-    direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
+    direccionClub: '',
     colorPrimario: '#FFFFFF',
     colorSecundario: '#0047A0',
     colorAcento: '#CD2E3A',
-    emailClub: 'academia@gajog.com',
+    emailClub: '',
     estadoSuscripcion: 'activo' as const,
     fechaVencimiento: '2025-12-31',
     plan: 'starter',
@@ -80,6 +80,7 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     limiteSedes: 1,
 };
 
+// ... (El resto de las constantes se mantienen: ADMIN_WHATSAPP, FRASES_SALIDA, BASE_CONOCIMIENTO_PQRS) ...
 export const ADMIN_WHATSAPP = "3001234567";
 
 export const FRASES_SALIDA = [
@@ -137,4 +138,25 @@ export const COSTOS_ADICIONALES = {
     estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes' },
     instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor' },
     sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede' }
+};
+
+/**
+ * Lógica de beneficios especiales para partners fundadores.
+ * Permite aplicar capacidades superiores sobre planes básicos.
+ */
+export const obtenerBeneficiosCortesia = (slug: string) => {
+    const slugLimpio = slug.toLowerCase().trim();
+
+    // BENEFICIO FUNDADOR: Ga Jog
+    // Recibe Plan Growth al precio de Starter
+    if (slugLimpio === 'gajog') {
+        return {
+            nombreCortesia: "Beneficio Partner Fundador",
+            mensaje: "¡Gracias por inspirar Tudojang! Disfrutas de capacidades Growth al precio de Starter por tiempo vitalicio.",
+            upgradePlanId: 'growth',
+            precioEspecial: 160000 // Precio de Starter
+        };
+    }
+
+    return null;
 };

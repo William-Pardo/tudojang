@@ -16,7 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { abrirCheckoutWompi, generarReferenciaPago } from '../servicios/wompiService';
 import { dispararNotificacionNuevaEscuela } from '../servicios/notificacionesApi';
 import { slugify } from '../utils/formatters';
-import { PLANES_SAAS } from '../constantes';
+import { PLANES_SAAS, obtenerBeneficiosCortesia } from '../constantes';
 
 const schema = yup.object({
     nombreClub: yup.string().min(3, 'Mínimo 3 letras.').required('El nombre de la academia es obligatorio.'),
@@ -93,12 +93,16 @@ const RegistroEscuela: React.FC = () => {
     const processRegistration = async (data: any) => {
         setCargando(true);
         try {
+            const beneficios = obtenerBeneficiosCortesia(data.slug);
+
             await registrarNuevaEscuela({
                 nombreClub: data.nombreClub,
                 slug: data.slug,
                 emailClub: data.email,
-                plan: planSeleccionado,
-                ...(esModoTest && { modo_simulacion: true })
+                plan: beneficios ? beneficios.upgradePlanId : planSeleccionado,
+                ...(esModoTest && { modo_simulacion: true }),
+                // @ts-ignore
+                ...(beneficios && { nota_admin: `Beneficio: ${beneficios.nombreCortesia}` })
             });
 
             // Disparar notificación formal
@@ -132,11 +136,14 @@ const RegistroEscuela: React.FC = () => {
     };
 
     const lanzarPago = (data: any) => {
+        const beneficios = obtenerBeneficiosCortesia(data.slug);
         const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
+
+        const montoFinal = beneficios ? beneficios.precioEspecial : infoPlan.precio;
 
         abrirCheckoutWompi({
             referencia: generarReferenciaPago(data.slug, 'PLAN'),
-            montoEnPesos: infoPlan.precio,
+            montoEnPesos: montoFinal,
             nombreCompleto: data.nombreClub,
             email: data.email,
             esSimulacion: esModoTest,
@@ -292,19 +299,56 @@ const RegistroEscuela: React.FC = () => {
                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirma los datos de tu academia</p>
                                         </div>
 
-                                        <div className="bg-gray-50 p-8 rounded-[2rem] space-y-4 border border-gray-100">
-                                            <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
-                                                <span className="text-gray-400">Plan:</span>
-                                                <span className="text-tkd-blue">{(PLANES_SAAS as any)[planSeleccionado].nombre}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-sm font-bold uppercase tracking-tight">
-                                                <span className="text-gray-400">Total a Pagar:</span>
-                                                <span className="text-xl font-black text-tkd-dark">${(PLANES_SAAS as any)[planSeleccionado].precio.toLocaleString()} COP</span>
-                                            </div>
-                                            <div className="h-px bg-gray-200 my-2" />
-                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                                <span className="text-gray-400">Sede Digital:</span>
-                                                <span className="text-tkd-red">{slugDeseado}.tudojang.com</span>
+                                        <div className="bg-tkd-dark text-white p-10 rounded-[4rem] shadow-2xl relative overflow-hidden group">
+                                            {/* EFECTO DE LUZ */}
+                                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-tkd-blue/20 rounded-full blur-[100px] group-hover:bg-tkd-blue/30 transition-all duration-1000" />
+
+                                            <div className="relative z-10 space-y-8">
+                                                <div className="flex justify-between items-center border-b border-white/10 pb-6">
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] mb-1">Membresía Seleccionada:</p>
+                                                        <h4 className="text-2xl font-black uppercase tracking-tight">{planSeleccionado}</h4>
+                                                    </div>
+                                                    <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
+                                                        <IconoLogoOficial className="w-6 h-6 text-white" />
+                                                    </div>
+                                                </div>
+
+                                                {/* BANNER DE CORTESÍA DINÁMICO */}
+                                                {obtenerBeneficiosCortesia(slugDeseado) && (
+                                                    <motion.div
+                                                        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                                        className="bg-tkd-blue/20 border border-tkd-blue/30 p-4 rounded-2xl space-y-2"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-2 h-2 bg-tkd-blue rounded-full animate-pulse" />
+                                                            <span className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.2em]">{obtenerBeneficiosCortesia(slugDeseado)?.nombreCortesia}</span>
+                                                        </div>
+                                                        <p className="text-[9px] font-bold text-blue-200/70 uppercase leading-relaxed text-left">
+                                                            {obtenerBeneficiosCortesia(slugDeseado)?.mensaje}
+                                                        </p>
+                                                    </motion.div>
+                                                )}
+
+                                                <div className="flex justify-between items-end">
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-[0.3em] mb-1">Inversión Lanzamiento:</p>
+                                                        <div className="flex flex-col">
+                                                            {obtenerBeneficiosCortesia(slugDeseado) ? (
+                                                                <>
+                                                                    <span className="text-xs text-gray-500 line-through font-bold">${(PLANES_SAAS as any)[planSeleccionado].precio.toLocaleString()}</span>
+                                                                    <span className="text-4xl font-black text-tkd-blue">${obtenerBeneficiosCortesia(slugDeseado)!.precioEspecial.toLocaleString()}</span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-4xl font-black">${(PLANES_SAAS as any)[planSeleccionado].precio.toLocaleString()}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.3em] mb-1">Ciclo Pago:</p>
+                                                        <p className="text-xs font-black text-white/50 uppercase">Mensual</p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
