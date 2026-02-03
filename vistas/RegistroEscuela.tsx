@@ -20,6 +20,8 @@ import { PLANES_SAAS, obtenerBeneficiosCortesia } from '../constantes';
 
 const schema = yup.object({
     nombreClub: yup.string().min(3, 'Mínimo 3 letras.').required('El nombre de la academia es obligatorio.'),
+    nombreDirector: yup.string().min(6, 'Ingresa nombre y apellido.').required('El nombre del director es obligatorio.'),
+    telefonoDirector: yup.string().min(10, 'Formato inválido.').required('El teléfono es obligatorio.'),
     email: yup.string().email('Email inválido.').required('El email es obligatorio.'),
     slug: yup.string()
         .matches(/^[a-z0-9-]+$/, 'Solo letras minúsculas, números y guiones.')
@@ -53,6 +55,8 @@ const RegistroEscuela: React.FC = () => {
     const slugDeseado = watch('slug');
     const nombreAcademia = watch('nombreClub');
     const emailDirector = watch('email');
+    const nombreDirector = watch('nombreDirector');
+    const telefonoDirector = watch('telefonoDirector');
 
     // Eliminamos el useEffect que validaba el slug con debounce ya que ahora la validación 
     // es parte del flujo de pasos y ocurre al darle "Siguiente" en el Paso 1.
@@ -86,7 +90,11 @@ const RegistroEscuela: React.FC = () => {
             return;
         }
 
-        if (pasoActual === 'contacto') campoAValidar = 'email';
+        if (pasoActual === 'contacto') {
+            const esValido = await trigger(['email', 'nombreDirector', 'telefonoDirector']);
+            if (esValido) setPasoActual(siguiente);
+            return;
+        }
 
         const esValido = await trigger(campoAValidar);
         if (esValido) setPasoActual(siguiente);
@@ -157,8 +165,9 @@ const RegistroEscuela: React.FC = () => {
             abrirCheckoutWompi({
                 referencia: generarReferenciaPago(data.slug, 'PLAN'),
                 montoEnPesos: montoFinal,
-                nombreCompleto: data.nombreClub,
+                nombreCompleto: data.nombreDirector,
                 email: data.email,
+                telefono: data.telefonoDirector,
                 esSimulacion: esModoTest,
                 onSuccess: () => processRegistration(data),
                 onClose: () => setCargandoPago(false)
@@ -375,7 +384,13 @@ const RegistroEscuela: React.FC = () => {
                                             <button
                                                 type="button"
                                                 disabled={cargandoPago}
-                                                onClick={() => lanzarPago({ nombreClub: nombreAcademia, slug: slugDeseado, email: emailDirector })}
+                                                onClick={() => lanzarPago({
+                                                    nombreClub: nombreAcademia,
+                                                    slug: slugDeseado,
+                                                    email: emailDirector,
+                                                    nombreDirector,
+                                                    telefonoDirector
+                                                })}
                                                 className={`w-full ${cargandoPago ? 'bg-gray-400' : 'bg-tkd-red'} text-white py-7 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3`}
                                             >
                                                 {cargandoPago ? (
@@ -384,6 +399,18 @@ const RegistroEscuela: React.FC = () => {
                                                     esModoTest ? 'Simular Pago (Sandbox)' : 'Proceder al Pago Seguro'
                                                 )}
                                             </button>
+
+                                            {/* SELLOS DE CONFIANZA */}
+                                            <div className="pt-4 border-t border-gray-100">
+                                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center mb-4">Pagos Protegidos por Wompi con:</p>
+                                                <div className="grid grid-cols-4 gap-4 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
+                                                    <img src="https://checkout.wompi.co/images/pse_logo.png" alt="PSE" className="h-4 object-contain mx-auto" />
+                                                    <img src="https://checkout.wompi.co/images/nequi_logo.png" alt="Nequi" className="h-4 object-contain mx-auto" />
+                                                    <img src="https://checkout.wompi.co/images/bancolombia_logo.png" alt="Bancolombia" className="h-4 object-contain mx-auto" />
+                                                    <img src="https://checkout.wompi.co/images/visa_logo.png" alt="Visa" className="h-4 object-contain mx-auto" />
+                                                </div>
+                                            </div>
+
                                             <button
                                                 type="button"
                                                 disabled={cargandoPago}
@@ -439,32 +466,51 @@ const RegistroEscuela: React.FC = () => {
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                                         className="space-y-6"
                                     >
-                                        <div className="space-y-2 text-center lg:text-left">
-                                            <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Correo del Director</label>
-                                            <input
-                                                {...register('email')}
-                                                type="email"
-                                                autoFocus
-                                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), irASiguiente('identidad'))}
-                                                className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-6 text-xl font-black outline-none transition-all shadow-inner"
-                                                placeholder="DIRECTOR@DOJANG.COM"
-                                            />
-                                            <FormInputError mensaje={errors.email?.message as string} />
-                                        </div>
-                                        {emailDirector?.includes('@') && emailDirector?.includes('.') && (
-                                            <div className="grid grid-cols-1 gap-4">
-                                                <motion.button
-                                                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                                                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                                    type="button"
-                                                    onClick={() => irASiguiente('identidad')}
-                                                    className="bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center gap-4"
-                                                >
-                                                    Siguiente Paso
-                                                </motion.button>
-                                                <button type="button" onClick={() => setPasoActual('nombre')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Atrás</button>
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Nombre del Director</label>
+                                                <input
+                                                    {...register('nombreDirector')}
+                                                    className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-5 text-lg font-black outline-none transition-all shadow-inner"
+                                                    placeholder="NOMBRE Y APELLIDO"
+                                                />
+                                                <FormInputError mensaje={errors.nombreDirector?.message as string} />
                                             </div>
-                                        )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">WhatsApp</label>
+                                                    <input
+                                                        {...register('telefonoDirector')}
+                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-5 text-lg font-black outline-none transition-all shadow-inner"
+                                                        placeholder="300 123 4567"
+                                                    />
+                                                    <FormInputError mensaje={errors.telefonoDirector?.message as string} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black uppercase text-gray-400 ml-4 tracking-widest">Email Principal</label>
+                                                    <input
+                                                        {...register('email')}
+                                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-tkd-blue focus:bg-white rounded-3xl p-5 text-lg font-black outline-none transition-all shadow-inner"
+                                                        placeholder="MASTER@CORREO.COM"
+                                                    />
+                                                    <FormInputError mensaje={errors.email?.message as string} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-4 pt-4">
+                                            <motion.button
+                                                initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                                type="button"
+                                                onClick={() => irASiguiente('identidad')}
+                                                className="bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-xs hover:bg-tkd-blue shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] transition-all flex items-center justify-center gap-4"
+                                            >
+                                                Continuar a Personalización
+                                            </motion.button>
+                                            <button type="button" onClick={() => setPasoActual('nombre')} className="py-2 font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-tkd-dark transition-all">Atrás</button>
+                                        </div>
                                     </motion.div>
                                 )}
 
