@@ -137,6 +137,7 @@ const RegistroEscuela: React.FC = () => {
     };
 
     const lanzarPago = (data: any) => {
+        console.log("🚀 Iniciando proceso de pago para:", data);
         const beneficios = obtenerBeneficiosCortesia(data.slug);
         const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
 
@@ -300,9 +301,9 @@ const RegistroEscuela: React.FC = () => {
                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirma los datos de tu academia</p>
                                         </div>
 
-                                        <div className="bg-tkd-dark text-white p-10 rounded-[4rem] shadow-2xl relative overflow-hidden group">
+                                        <div className="bg-tkd-blue text-white p-10 rounded-[4rem] shadow-2xl relative overflow-hidden group">
                                             {/* EFECTO DE LUZ */}
-                                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-tkd-blue/20 rounded-full blur-[100px] group-hover:bg-tkd-blue/30 transition-all duration-1000" />
+                                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-white/10 rounded-full blur-[100px] group-hover:bg-white/20 transition-all duration-1000" />
 
                                             <div className="relative z-10 space-y-8">
                                                 <div className="flex justify-between items-center border-b border-white/10 pb-6">
@@ -319,11 +320,11 @@ const RegistroEscuela: React.FC = () => {
                                                 {obtenerBeneficiosCortesia(slugDeseado) && (
                                                     <motion.div
                                                         initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                                                        className="bg-tkd-blue/20 border border-tkd-blue/30 p-4 rounded-2xl space-y-2"
+                                                        className="bg-white/20 border border-white/30 p-4 rounded-2xl space-y-2"
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-2 h-2 bg-tkd-blue rounded-full animate-pulse" />
-                                                            <span className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.2em]">{obtenerBeneficiosCortesia(slugDeseado)?.nombreCortesia}</span>
+                                                            <span className="text-[10px] font-black uppercase text-white tracking-[0.2em]">{obtenerBeneficiosCortesia(slugDeseado)?.nombreCortesia}</span>
                                                         </div>
                                                         <p className="text-[9px] font-bold text-blue-200/70 uppercase leading-relaxed text-left">
                                                             {obtenerBeneficiosCortesia(slugDeseado)?.mensaje}
@@ -409,7 +410,7 @@ const RegistroEscuela: React.FC = () => {
                                     </motion.div>
                                 )}
 
-                                {pasoActual === 'contacto' && (
+                                {!confirmando && pasoActual === 'contacto' && (
                                     <motion.div
                                         key="step2"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
@@ -444,7 +445,7 @@ const RegistroEscuela: React.FC = () => {
                                     </motion.div>
                                 )}
 
-                                {pasoActual === 'identidad' && (
+                                {!confirmando && pasoActual === 'identidad' && (
                                     <motion.div
                                         key="step3"
                                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}

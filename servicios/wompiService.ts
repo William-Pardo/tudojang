@@ -75,6 +75,12 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
     }
 
     // @ts-ignore - WidgetCheckout cargado en index.html
+    if (typeof WidgetCheckout === 'undefined') {
+        alert("⚠️ El sistema de pagos (Wompi) no ha cargado correctamente. Por favor, refresca la página (F5).");
+        return;
+    }
+
+    // @ts-ignore
     const checkout = new WidgetCheckout({
         currency: 'COP',
         amountInCents: montoCents,
