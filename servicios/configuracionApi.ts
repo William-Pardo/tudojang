@@ -46,23 +46,40 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
     }
 
     // Buscamos en Firebase (tenants reales)
-    const tenantsRef = collection(db, 'tenants');
-    const q = query(tenantsRef, where("slug", "==", slugLimpio));
-    const querySnapshot = await getDocs(q);
+    try {
+        const tenantsRef = collection(db, 'tenants');
+        const q = query(tenantsRef, where("slug", "==", slugLimpio));
+        const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) {
-        // Bloqueo preventivo de slugs reservados incluso si no existen en DB
-        if (reservados.includes(slugLimpio)) {
-            return {
-                slug: slugLimpio,
-                nombreClub: 'SISTEMA / RESERVADO',
-                estadoSuscripcion: 'suspendido'
-            } as any;
+        if (querySnapshot.empty) {
+            // Bloqueo preventivo de slugs reservados incluso si no existen en DB
+            if (reservados.includes(slugLimpio)) {
+                return {
+                    slug: slugLimpio,
+                    nombreClub: 'SISTEMA / RESERVADO',
+                    estadoSuscripcion: 'suspendido'
+                } as any;
+            }
+            return null;
         }
-        return null;
-    }
 
-    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as any;
+        return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as any;
+    } catch (error: any) {
+        console.error("🔥 Error crítico en buscarTenantPorSlug:", error);
+
+        // RESILIENCIA: Si falla Firebase (índices, permisos, etc) y estamos en local,
+        // devolvemos null para permitir que el flujo de registro continúe con lógica de reserva.
+        const esLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (esLocal) {
+            console.warn("⚠️ Fallo en Firebase. Usando modo de emergencia para permitir navegación local.");
+            if (reservados.includes(slugLimpio)) {
+                return { slug: slugLimpio, nombreClub: 'RESERVADO', estadoSuscripcion: 'suspendido' } as any;
+            }
+            return null;
+        }
+
+        throw error; // En producción seguimos lanzando el error para seguridad
+    }
 };
 
 /**

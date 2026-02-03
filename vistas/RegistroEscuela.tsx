@@ -76,8 +76,9 @@ const RegistroEscuela: React.FC = () => {
                     setSlugDisponible(true);
                 }
                 setPasoActual(siguiente);
-            } catch (error) {
-                mostrarNotificacion("Error al verificar disponibilidad.", "error");
+            } catch (error: any) {
+                console.error("🔥 Error al verificar disponibilidad:", error);
+                mostrarNotificacion(`Error de disponibilidad: ${error.message || 'Error desconocido'}`, "error");
             } finally {
                 setValidandoSlug(false);
             }
