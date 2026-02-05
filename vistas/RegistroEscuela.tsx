@@ -16,7 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { abrirCheckoutWompi, generarReferenciaPago } from '../servicios/wompiService';
 import { dispararNotificacionNuevaEscuela } from '../servicios/notificacionesApi';
 import { slugify } from '../utils/formatters';
-import { PLANES_SAAS, obtenerBeneficiosCortesia } from '../constantes';
+import { WOMPI_CONFIG, PLANES_SAAS, obtenerBeneficiosCortesia } from '../constantes';
 
 const schema = yup.object({
     nombreClub: yup.string().min(3, 'Mínimo 3 letras.').required('El nombre de la academia es obligatorio.'),
@@ -34,7 +34,7 @@ type FormPaso = 'nombre' | 'contacto' | 'identidad';
 const RegistroEscuela: React.FC = () => {
     const [pasoActual, setPasoActual] = useState<FormPaso>('nombre');
     const [searchParams] = useSearchParams();
-    const esModoTest = searchParams.get('test') === 'true';
+    const esModoTest = searchParams.get('test') === 'true' || WOMPI_CONFIG.MODO_TEST;
     const [finalizado, setFinalizado] = useState(false);
     const [cargando, setCargando] = useState(false);
     const { mostrarNotificacion } = useNotificacion();
@@ -58,8 +58,17 @@ const RegistroEscuela: React.FC = () => {
     const nombreDirector = watch('nombreDirector');
     const telefonoDirector = watch('telefonoDirector');
 
-    // Eliminamos el useEffect que validaba el slug con debounce ya que ahora la validación 
-    // es parte del flujo de pasos y ocurre al darle "Siguiente" en el Paso 1.
+    // Detectar retorno de Wompi exitoso via URL
+    useEffect(() => {
+        const exito = searchParams.get('exito') === 'true';
+        const slug = searchParams.get('slug');
+        const registroPendiente = obtenerCookie('registro_pendiente');
+
+        if (exito && slug && registroPendiente && !finalizado) {
+            console.log("✅ Retorno de Wompi detectado. Finalizando registro...");
+            processRegistration(registroPendiente);
+        }
+    }, [searchParams]);
 
     const irASiguiente = async (siguiente: FormPaso) => {
         let campoAValidar: any = '';
@@ -67,6 +76,10 @@ const RegistroEscuela: React.FC = () => {
             campoAValidar = 'nombreClub';
             const esValido = await trigger(campoAValidar);
             if (!esValido) return;
+
+            // Guardar datos temporalmente en cookie para recuperarlos tras el redirect de Wompi
+            const currentData = watch();
+            guardarCookie('registro_pendiente', currentData);
 
             // Validación de disponibilidad automática basada en el nombre
             setValidandoSlug(true);
@@ -92,24 +105,35 @@ const RegistroEscuela: React.FC = () => {
 
         if (pasoActual === 'contacto') {
             const esValido = await trigger(['email', 'nombreDirector', 'telefonoDirector']);
-            if (esValido) setPasoActual(siguiente);
+            if (esValido) {
+                // Actualizamos cookie
+                guardarCookie('registro_pendiente', watch());
+                setPasoActual(siguiente);
+            }
             return;
         }
 
         const esValido = await trigger(campoAValidar);
-        if (esValido) setPasoActual(siguiente);
+        if (esValido) {
+            guardarCookie('registro_pendiente', watch());
+            setPasoActual(siguiente);
+        }
     };
 
     const processRegistration = async (data: any) => {
         setCargando(true);
         try {
             const beneficios = obtenerBeneficiosCortesia(data.slug);
+            const infoPlan = (PLANES_SAAS as any)[planSeleccionado];
 
             await registrarNuevaEscuela({
                 nombreClub: data.nombreClub,
                 slug: data.slug,
                 emailClub: data.email,
+                representanteLegal: data.nombreDirector,
+                pagoNequi: data.telefonoDirector, // Usamos este campo para guardar el WP del director
                 plan: beneficios ? beneficios.upgradePlanId : planSeleccionado,
+                limiteEstudiantes: beneficios ? (PLANES_SAAS as any)[beneficios.upgradePlanId].limiteEstudiantes : infoPlan.limiteEstudiantes,
                 ...(esModoTest && { modo_simulacion: true }),
                 // @ts-ignore
                 ...(beneficios && { nota_admin: `Beneficio: ${beneficios.nombreCortesia}` })
@@ -169,6 +193,7 @@ const RegistroEscuela: React.FC = () => {
                 email: data.email,
                 telefono: data.telefonoDirector,
                 esSimulacion: esModoTest,
+                redirectUrl: `${window.location.origin}/#/registro-escuela?exito=true&slug=${data.slug}`,
                 onSuccess: () => processRegistration(data),
                 onClose: () => setCargandoPago(false)
             });
@@ -404,10 +429,10 @@ const RegistroEscuela: React.FC = () => {
                                             <div className="pt-4 border-t border-gray-100">
                                                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center mb-4">Pagos Protegidos por Wompi con:</p>
                                                 <div className="grid grid-cols-4 gap-4 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
-                                                    <img src="https://checkout.wompi.co/images/pse_logo.png" alt="PSE" className="h-4 object-contain mx-auto" />
-                                                    <img src="https://checkout.wompi.co/images/nequi_logo.png" alt="Nequi" className="h-4 object-contain mx-auto" />
-                                                    <img src="https://checkout.wompi.co/images/bancolombia_logo.png" alt="Bancolombia" className="h-4 object-contain mx-auto" />
-                                                    <img src="https://checkout.wompi.co/images/visa_logo.png" alt="Visa" className="h-4 object-contain mx-auto" />
+                                                    <img src="https://social-plugins.wompi.co/logos/pse.png" alt="PSE" className="h-6 object-contain mx-auto" />
+                                                    <img src="https://social-plugins.wompi.co/logos/nequi.png" alt="Nequi" className="h-6 object-contain mx-auto" />
+                                                    <img src="https://social-plugins.wompi.co/logos/bancolombia.png" alt="Bancolombia" className="h-6 object-contain mx-auto" />
+                                                    <img src="https://social-plugins.wompi.co/logos/visa.png" alt="Visa" className="h-6 object-contain mx-auto" />
                                                 </div>
                                             </div>
 

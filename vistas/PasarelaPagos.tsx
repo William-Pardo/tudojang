@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
-import { PLANES_SAAS } from '../constantes';
+import { PLANES_SAAS, WOMPI_CONFIG } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
 import { IconoAprobar, IconoEstudiantes, IconoUsuario, IconoCasa } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
@@ -29,6 +29,7 @@ const VistaPasarelaPagos: React.FC = () => {
             email: tenant?.emailClub || '',
             nombreCompleto: tenant?.nombreClub || '',
             telefono: tenant?.pagoNequi || '',
+            esSimulacion: WOMPI_CONFIG.MODO_TEST,
             redirectUrl: `${window.location.origin}/#/aliant-control`
         });
     };
@@ -44,9 +45,16 @@ const VistaPasarelaPagos: React.FC = () => {
                 </div>
                 <div>
                     <h1 className="text-5xl font-black text-tkd-blue tracking-tighter mb-1">TUDOJANG</h1>
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">
-                        {tenant?.nombreClub || 'Gestión Técnica Profesional'}
-                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">
+                            {tenant?.nombreClub || 'Gestión Técnica Profesional'}
+                        </p>
+                        {WOMPI_CONFIG.MODO_TEST && (
+                            <span className="bg-tkd-red/10 text-tkd-red px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-tkd-red/20 animate-pulse">
+                                Sandbox
+                            </span>
+                        )}
+                    </div>
                 </div>
             </header>
 

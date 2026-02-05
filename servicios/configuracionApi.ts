@@ -85,6 +85,10 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
     if (!isFirebaseConfigured) return;
 
     const nuevoTenantId = `tnt-${Date.now()}`;
+    const diasPrueba = 7;
+    const fechaVencimiento = new Date();
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + diasPrueba);
+
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
         ...datos,
@@ -92,8 +96,10 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
         slug: datos.slug?.toLowerCase().trim() || '',
         estadoSuscripcion: 'demo', // Acceso inmediato en modo prueba
         plan: datos.plan || 'starter', // Plan inicial para el trial
-        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de prueba
-        limiteEstudiantes: 15, // Límite estricto de trial
+        fechaVencimiento: fechaVencimiento.toISOString().split('T')[0],
+        limiteEstudiantes: datos.limiteEstudiantes || 15, // Límite estricto de trial
+        representanteLegal: datos.representanteLegal || '',
+        pagoNequi: datos.pagoNequi || '', // Guardamos el teléfono del director aquí también por ahora
     };
 
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);

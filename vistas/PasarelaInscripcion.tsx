@@ -13,6 +13,7 @@ import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
 import { abrirCheckoutWompi } from '../servicios/wompiService';
+import { WOMPI_CONFIG } from '../constantes';
 
 const PasarelaInscripcion: React.FC = () => {
     const { solicitudId } = useParams();
@@ -34,6 +35,12 @@ const PasarelaInscripcion: React.FC = () => {
     useEffect(() => {
         const cargarSolicitud = async () => {
             if (solicitudId) {
+                // Si venimos de un pago exitoso, marcamos antes de cargar
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('pago') === 'exito') {
+                    await subirSoportePago(solicitudId, 'confirmacion_wompi_redirect', 'otros');
+                }
+
                 const s = await obtenerSolicitudInscripcion(solicitudId);
                 setSolicitud(s);
                 if (s?.datos) {
@@ -53,12 +60,18 @@ const PasarelaInscripcion: React.FC = () => {
             const referencia = `INS_${solicitudId}_${Date.now()}`;
 
             await abrirCheckoutWompi({
-                referencia: referencia, // Usar la referencia generada para la solicitud
-                montoEnPesos: solicitud.pago?.monto || 0, // Usar el monto de la solicitud
-                email: solicitud.datos?.email || '', // Usar el email del aspirante
-                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`, // Usar el nombre del aspirante
-                telefono: solicitud.datos?.telefono || '', // Usar el teléfono del aspirante
-                redirectUrl: window.location.href // Redirigir a la misma página de inscripción
+                referencia: referencia,
+                montoEnPesos: solicitud.pago?.monto || 0,
+                email: solicitud.datos?.email || '',
+                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`,
+                telefono: solicitud.datos?.telefono || '',
+                esSimulacion: WOMPI_CONFIG.MODO_TEST,
+                redirectUrl: `${window.location.origin}/#/unete/${solicitudId}?pago=exito`,
+                onSuccess: async () => {
+                    // Si el callback se ejecuta (pago inmediato)
+                    await subirSoportePago(solicitudId, 'confirmacion_wompi', 'otros');
+                    window.location.reload();
+                }
             });
         } catch (e: any) {
             console.error("Error al iniciar pago con Wompi");
@@ -116,7 +129,14 @@ const PasarelaInscripcion: React.FC = () => {
                 {/* --- HEADER DE ESTADO --- */}
                 <div className="p-8 bg-tkd-dark text-white border-b border-white/5 flex justify-between items-center">
                     <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Estado de tu proceso:</p>
+                        <div className="flex items-center gap-3 mb-1">
+                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Estado de tu proceso:</p>
+                            {WOMPI_CONFIG.MODO_TEST && (
+                                <span className="bg-tkd-red text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter animate-pulse">
+                                    Sandbox
+                                </span>
+                            )}
+                        </div>
                         <h2 className="text-lg font-black uppercase tracking-tight">
                             {solicitud.estado === 'pendiente_pago' && "💳 Pendiente de Pago"}
                             {solicitud.estado === 'por_verificar' && "⏳ Verificando Soporte"}
