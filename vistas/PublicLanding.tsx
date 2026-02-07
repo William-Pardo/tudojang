@@ -140,18 +140,16 @@ const PublicLanding: React.FC = () => {
                                         <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4" /> {plan.limiteSedes} Sedes</li>
                                     </ul>
                                 </div>
-                                <a
-                                    href="#/registro"
+                                <button
                                     onClick={() => {
-                                        console.log("%c >>> PLAN SELECCIONADO: " + plan.id, "background: #0047A0; color: white; font-size: 20px; font-weight: bold;");
+                                        console.log("%c >>> SELECCIONANDO PLAN: " + plan.id, "background: #0047A0; color: white; font-size: 20px; font-weight: bold;");
                                         guardarCookie('plan_pendiente', plan.id);
-                                        // Forzar hash por si el link nativo fallara en algún navegador
-                                        window.location.hash = "/registro";
+                                        window.location.href = "#/registro";
                                     }}
                                     className="btn-emergency"
                                 >
                                     Elegir este Plan
-                                </a>
+                                </button>
                             </div>
                         ))}
                     </div>

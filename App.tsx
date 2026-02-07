@@ -214,10 +214,17 @@ const AppRoutes: React.FC = () => {
     const { tenant } = useTenant();
     const location = ReactRouterDOM.useLocation();
 
-    // Logger de navegación maestro
+    // Logger de navegación maestro y corrección de desincronización
     React.useEffect(() => {
-        console.log(`[NAV] Ruta actual: ${location.pathname} | Host: ${window.location.hostname}`);
-    }, [location]);
+        const hashLimpio = window.location.hash.replace('#', '') || '/';
+        console.log(`%c[NAV] Cambio detectado: Hash=${hashLimpio} | Pathname=${location.pathname}`, "color: #CD2E3A; font-weight: bold;");
+
+        // Corrección de emergencia si el router se queda pegado en la raíz pero el hash dice que estamos en otro lado
+        if (hashLimpio !== location.pathname && hashLimpio !== '/') {
+            console.warn("⚠️ Desincronización de ruta detectada. Intentando corregir...");
+            // No hacemos nada drástico aún, el HashRouter debería manejarlo, pero logueamos.
+        }
+    }, [location, window.location.hash]);
 
     if (cargandoSesion) {
         return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;

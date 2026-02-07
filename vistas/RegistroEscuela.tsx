@@ -32,6 +32,7 @@ const RegistroEscuela: React.FC = () => {
     const { mostrarNotificacion } = useNotificacion();
     const [planSeleccionado, setPlanSeleccionado] = useState(() => {
         const cookie = obtenerCookie('plan_pendiente');
+        console.log("%c >>> REGISTRO: Cargando plan desde cookie: " + cookie, "background: #CD2E3A; color: white; pading: 4px;");
         return (PLANES_SAAS as any)[cookie] ? cookie : 'starter';
     });
     const [emailExistente, setEmailExistente] = useState(false);
@@ -357,25 +358,24 @@ const RegistroEscuela: React.FC = () => {
                                         key={plan.id}
                                         type="button"
                                         onClick={() => {
+                                            console.log("Cambiando plan a:", plan.id);
                                             setPlanSeleccionado(plan.id);
                                             guardarCookie('plan_pendiente', plan.id);
                                         }}
-                                        className={`p-6 rounded-3xl border-2 text-left transition-all relative overflow-hidden flex flex-col justify-between h-40 group cursor-pointer ${planSeleccionado === plan.id ? 'border-tkd-blue bg-blue-50 shadow-md' : 'border-gray-100 bg-white hover:border-gray-200'}`}
+                                        className={`p-6 rounded-3xl border-4 text-left transition-all relative overflow-hidden flex flex-col justify-between h-48 group cursor-pointer ${planSeleccionado === plan.id ? 'border-tkd-red bg-blue-50 shadow-2xl scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-200 opacity-60'}`}
                                     >
                                         <div className="relative z-10">
-                                            {plan.popular && <span className="absolute -top-4 -right-4 bg-tkd-blue text-white p-2 rounded-bl-xl"><IconoAprobar className="w-3 h-3" /></span>}
+                                            {planSeleccionado === plan.id && (
+                                                <div className="bg-tkd-red text-white text-[8px] font-black uppercase px-2 py-1 rounded-full w-fit mb-2 animate-pulse">
+                                                    Plan Seleccionado
+                                                </div>
+                                            )}
                                             <p className={`text-[10px] font-black uppercase tracking-widest ${planSeleccionado === plan.id ? 'text-tkd-blue' : 'text-gray-400'}`}>{plan.nombre}</p>
                                             <p className="text-xl font-black mt-1 tracking-tighter">${plan.precio.toLocaleString()}</p>
                                         </div>
                                         <div className="relative z-10">
                                             <p className="text-[8px] font-bold text-gray-400 uppercase leading-none">Hasta {plan.limiteEstudiantes} alumnos</p>
                                         </div>
-                                        {planSeleccionado === plan.id && (
-                                            <motion.div
-                                                layoutId="plan-active"
-                                                className="absolute inset-0 bg-blue-50 border-2 border-tkd-blue rounded-[1.3rem] pointer-events-none z-0"
-                                            />
-                                        )}
                                     </button>
                                 ))}
                             </div>
