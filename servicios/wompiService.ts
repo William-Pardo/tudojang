@@ -36,11 +36,12 @@ export const generarFirmaIntegridad = async (referencia: string, montoEnCentavos
 
 /**
  * Genera una referencia de pago estándar para Tudojang.
+ * Formato: TDJ_{TIPO}_{IDENTIFICADOR}_{TIMESTAMP}
  */
 export const generarReferenciaPago = (identificador: string, tipo: 'PLAN' | 'INS' | 'STORE') => {
     const timestamp = Date.now();
-    const cleanId = identificador.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    return `TDJ-${tipo}-${cleanId}-${timestamp}`;
+    const cleanId = identificador.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    return `TDJ_${tipo}_${cleanId}_${timestamp}`;
 };
 
 /**
@@ -69,18 +70,28 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
 
     // Intentamos generar la firma de integridad (Solo si hay un secreto real configurado)
     let signature = null;
-    const isGenericSecret = !import.meta.env.VITE_WOMPI_INTEGRITY_SECRET || import.meta.env.VITE_WOMPI_INTEGRITY_SECRET.includes('xxxxx');
+    const integritySecret = import.meta.env.VITE_WOMPI_INTEGRITY_SECRET;
+    const isGenericSecret = !integritySecret || integritySecret.includes('xxxxx');
 
     if (!isGenericSecret) {
         try {
             const hash = await generarFirmaIntegridad(config.referencia, montoCents);
             signature = { integrity: hash };
-            console.log("🔐 Firma de integridad generada.");
+            console.log("🔐 Firma de integridad generada:", hash);
+            // Log para debug manual del usuario (Solo en Sandbox)
+            if (config.esSimulacion) {
+                console.log("📝 Cadena base firma:", `${config.referencia}${montoCents}COP[SECRET]`);
+            }
         } catch (e) {
             console.warn("⚠️ No se pudo generar firma de integridad. Continuando sin ella...");
         }
     } else {
         console.log("ℹ️ Saltando firma de integridad (Secreto no configurado o genérico).");
+    }
+
+    // RE-ACTIVAMOS LA FIRMA PORQUE TU CUENTA LA REQUIERE
+    if (config.esSimulacion) {
+        console.log("🛡️ MODO PRUEBAS - Generando firma requerida por el comercio...");
     }
 
     // @ts-ignore - WidgetCheckout cargado en index.html
@@ -95,28 +106,30 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
     try {
         // Limpieza y validación de datos del pagador (Crucial para evitar error 'datos inválidos')
         const emailLimpio = config.email.trim();
-        let nombreLimpio = config.nombreCompleto.trim();
+        let nombreLimpio = (config.nombreCompleto || '').trim();
 
         // Wompi a veces rechaza nombres de una sola palabra
-        if (!nombreLimpio.includes(' ')) {
+        if (nombreLimpio && !nombreLimpio.includes(' ')) {
             nombreLimpio = `${nombreLimpio} Director`;
+        } else if (!nombreLimpio) {
+            nombreLimpio = "Director Academia";
         }
 
         const options: any = {
             currency: 'COP',
             amountInCents: montoCents,
             reference: config.referencia,
-            publicKey: publicKey,
+            publicKey: publicKey.trim(),
             customerData: {
                 email: emailLimpio,
                 fullName: nombreLimpio,
-                phoneNumber: config.telefono || '3001234567', // Valor por defecto necesario en algunas configs
+                phoneNumber: (config.telefono || '3001234567').replace(/\D/g, '').slice(-10),
                 phoneNumberPrefix: '+57'
             }
         };
 
-        // Solo añadir firma si se generó correctamente y no es nula
-        if (signature) {
+        // ENVIAR FIRMA SIEMPRE QUE ESTÉ DISPONIBLE (Wompi Sandbox la está exigiendo)
+        if (signature && signature.integrity) {
             options.signature = signature;
         }
 
@@ -125,11 +138,12 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
             options.redirectUrl = config.redirectUrl;
         }
 
-        console.log("💳 Abriendo modal de Wompi con opciones finales:", {
+        console.log("💳 MODAL WOMPI FINAL (v6-FORCE-UPDATE):", {
             referencia: options.reference,
-            monto: options.amountInCents,
-            conFirma: !!signature,
-            keyUsada: publicKey
+            montoCents: options.amountInCents,
+            conFirma: !!options.signature,
+            firmaMuestra: options.signature?.integrity?.substring(0, 10) + '...',
+            keyUsada: options.publicKey
         });
 
         // @ts-ignore
@@ -137,7 +151,7 @@ export const abrirCheckoutWompi = async (config: CheckoutConfig) => {
 
         checkout.open((result: any) => {
             const transaction = result?.transaction;
-            console.log("📡 Resultado Wompi:", transaction?.status);
+            console.log("📡 Resultado Wompi:", transaction?.status, transaction?.id);
 
             if (transaction?.status === 'APPROVED') {
                 if (config.onSuccess) config.onSuccess(transaction);

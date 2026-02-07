@@ -10,6 +10,7 @@ import {
     deleteDoc,
     query,
     where,
+    orderBy,
     writeBatch
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -32,7 +33,7 @@ const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'con
     return downloadURL;
 };
 
-export const obtenerEstudiantes = async (): Promise<Estudiante[]> => {
+export const obtenerEstudiantes = async (tenantId: string): Promise<Estudiante[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
         return [
@@ -50,9 +51,14 @@ export const obtenerEstudiantes = async (): Promise<Estudiante[]> => {
                 consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false, consentimientoFotosVideos: false,
                 carnetGenerado: false
             }
-        ];
+        ].filter(e => e.tenantId === tenantId);
     }
-    const snapshot = await getDocs(estudiantesCollection);
+    const q = query(
+        estudiantesCollection,
+        where('tenantId', '==', tenantId),
+        orderBy('apellidos', 'asc')
+    );
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, carnetGenerado: false, ...doc.data() } as Estudiante));
 };
 
@@ -69,9 +75,9 @@ export const marcarCarnetsComoGenerados = async (ids: string[]): Promise<void> =
     await batch.commit();
 };
 
-export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estudiante> => {
+export const obtenerEstudiantePorId = async (idEstudiante: string, tenantId?: string): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
-        const all = await obtenerEstudiantes();
+        const all = await obtenerEstudiantes(tenantId || 'escuela-gajog-001');
         const found = all.find(e => e.id === idEstudiante);
         if (found) return found;
         throw new Error("Estudiante no encontrado.");
@@ -85,9 +91,9 @@ export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estu
     }
 };
 
-export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: string): Promise<Estudiante> => {
+export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: string, tenantId?: string): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
-        const all = await obtenerEstudiantes();
+        const all = await obtenerEstudiantes(tenantId || 'escuela-gajog-001');
         const found = all.find(e => e.numeroIdentificacion === numIdentificacion);
         if (found) return found;
         throw new Error("No se encontró un estudiante con ese número de identificación.");

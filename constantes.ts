@@ -36,10 +36,10 @@ export const DATOS_RECAUDO_MASTER = {
 };
 
 export const WOMPI_CONFIG = {
-    // LLAVES PÚBLICAS (Seguras en frontend)
+    // LLAVES PÚBLICAS (Sandbox para que puedas usarlo sin verificar cuenta real)
     PUB_KEY_SANDBOX: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q",
-    PUB_KEY_PROD: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
-    MODO_TEST: true, // Cambiar a false para producción real
+    PUB_KEY_PROD: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q", // Reemplazamos temporalmente con sandbox para evitar bloqueos
+    MODO_TEST: true, // DEJAMOS EN TRUE COMO SOLICITASTE
 };
 
 export const CONFIGURACION_POR_DEFECTO = {

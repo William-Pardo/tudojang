@@ -6,12 +6,12 @@ import { getStorage } from 'firebase/storage';
 import { getMessaging } from 'firebase/messaging';
 
 export const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyArURNdvpmVeUC9bJRIYsbGSkURK4ZEbvY",
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "tudojang.firebaseapp.com",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "tudojang",
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "tudojang.firebasestorage.app",
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "545628702717",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:545628702717:web:c3052e06fb89585fa7fb94"
 };
 
 export const isFirebaseConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_API_KEY !== 'xxxxxxxxxxxxxxxxxxxxxxxxxx';

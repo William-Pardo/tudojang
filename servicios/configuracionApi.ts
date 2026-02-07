@@ -28,7 +28,7 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
     const slugLimpio = slug.toLowerCase().trim();
 
     // SLUGS RESERVADOS: No pueden ser creados por procesos de registro de usuarios.
-    const reservados = ['gajog', 'master', 'admin', 'aliant', 'tudojang', 'www', 'api', 'root', 'support'];
+    const reservados = ['master', 'admin', 'aliant', 'tudojang', 'www', 'api', 'root', 'support'];
 
     if (!isFirebaseConfigured) {
         // Mock logic para desarrollo local
@@ -81,8 +81,8 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
 /**
  * Crea un nuevo tenant en el sistema (Onboarding)
  */
-export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): Promise<void> => {
-    if (!isFirebaseConfigured) return;
+export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): Promise<string> => {
+    if (!isFirebaseConfigured) return 'mock-id';
 
     const nuevoTenantId = `tnt-${Date.now()}`;
     const diasPrueba = 7;
@@ -103,6 +103,7 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
     };
 
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);
+    return nuevoTenantId;
 };
 
 export const obtenerConfiguracionClub = async (tenantId?: string): Promise<ConfiguracionClub> => {

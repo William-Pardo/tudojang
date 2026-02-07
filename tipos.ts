@@ -148,6 +148,7 @@ export interface Usuario {
         firmado: boolean;
     };
     estadoContrato?: string;
+    requiereCambioPassword?: boolean;
 }
 
 export interface Estudiante {
@@ -216,6 +217,7 @@ export interface Evento {
 
 export interface SolicitudInscripcion {
     id: string;
+    tenantId: string;
     eventoId: string;
     estudiante: {
         id: string;
@@ -234,6 +236,7 @@ export interface VariacionImplemento {
 
 export interface Implemento {
     id: string;
+    tenantId: string;
     nombre: string;
     descripcion: string;
     imagenUrl: string;
@@ -243,6 +246,7 @@ export interface Implemento {
 
 export interface SolicitudCompra {
     id: string;
+    tenantId: string;
     estudiante: {
         id: string;
         nombres: string;
@@ -330,6 +334,7 @@ export interface ConfiguracionClub {
 
 export interface NotificacionHistorial {
     id: string;
+    tenantId: string;
     fecha: string;
     estudianteId: string;
     estudianteNombre: string;
@@ -343,6 +348,7 @@ export interface NotificacionHistorial {
 
 export interface Asistencia {
     id: string;
+    tenantId: string;
     estudianteId: string;
     sedeId: string;
     fecha: string;
@@ -392,4 +398,15 @@ export interface RegistroTemporal {
         sedeSugeridaId?: string;
         programasInteres?: string[]; // IDs de programas elegidos
     };
+}
+export interface PuntoCalor {
+    x: number;
+    y: number;
+    tipo: 'click' | 'move';
+    rol?: string;
+    ruta?: string;
+    hora?: number;
+    dia?: string;
+    elemento?: string;
+    intensidad?: number;
 }

@@ -24,10 +24,15 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         const inicializarSaaS = async () => {
             const host = window.location.hostname;
             let slug = host.split('.')[0];
-            
+
+            // SOPORTE PARA FALLBACK DE SSL (Parámetro ?s=slug)
+            const params = new URLSearchParams(window.location.search);
+            const slugParam = params.get('s');
+            if (slugParam) slug = slugParam;
+
             // Detección de dominio raíz (Landing Page tudojang.com)
-            const isRoot = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
-            
+            const isRoot = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'tudojang.web.app' || host === 'localhost' || host === '127.0.0.1';
+
             if (isRoot && (slug === 'tudojang' || slug === 'www' || slug === 'localhost' || slug === '127')) {
                 // Si es la landing, usamos la configuración de gajog como fallback visual pero marcamos OK
                 try {
@@ -35,7 +40,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                     setTenant(config);
                     setEstado('ok');
                     return;
-                } catch(e) {
+                } catch (e) {
                     setEstado('ok'); // Fallback silencioso para la landing
                     return;
                 }
@@ -54,7 +59,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                 document.documentElement.style.setProperty('--color-primario', config.colorPrimario);
                 document.documentElement.style.setProperty('--color-secundario', config.colorSecundario);
                 document.documentElement.style.setProperty('--color-acento', config.colorAcento);
-                
+
                 const hoy = new Date();
                 const vencimiento = new Date(config.fechaVencimiento);
 
@@ -96,8 +101,8 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                             <IconoAlertaTriangulo className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Aviso del Sistema: Suscripción Vencida o Cuenta Suspendida</span>
                         </div>
-                        <button 
-                            onClick={() => setBypassDev(true)} 
+                        <button
+                            onClick={() => setBypassDev(true)}
                             className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase transition-all"
                         >
                             Omitir para Desarrollo (Debug)

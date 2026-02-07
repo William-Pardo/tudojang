@@ -15,7 +15,9 @@ import {
     getDocs,
     deleteDoc,
     updateDoc,
-    arrayUnion
+    arrayUnion,
+    query,
+    where
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '@/src/config';
 import type { Usuario } from '../tipos';
@@ -137,9 +139,10 @@ export const cerrarSesion = async (): Promise<void> => {
     if (isFirebaseConfigured) await signOut(getAuth());
 };
 
-export const obtenerUsuarios = async (): Promise<Usuario[]> => {
-    if (!isFirebaseConfigured) return usuariosMock.map(({ contrasena: _, ...u }) => u);
-    const userSnapshot = await getDocs(collection(db, "usuarios"));
+export const obtenerUsuarios = async (tenantId: string): Promise<Usuario[]> => {
+    if (!isFirebaseConfigured) return usuariosMock.filter(u => u.tenantId === tenantId).map(({ contrasena: _, ...u }) => u);
+    const q = query(collection(db, "usuarios"), where('tenantId', '==', tenantId));
+    const userSnapshot = await getDocs(q);
     return userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Usuario));
 };
 

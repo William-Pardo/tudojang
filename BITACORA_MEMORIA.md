@@ -94,3 +94,25 @@ Una vez guardes el último secret:
 ## Historial de Cambios
 - [x] Protocolo de Autonomía activado.
 - [x] Migración de bitácora a archivo local `BITACORA_MEMORIA.md` para persistencia.
+- [x] Implementación de **Firma Digital Opción B** (Texto cursivo) con validación de tutor.
+- [x] Estabilización de Pasarela Wompi en Modo Sandbox.
+
+<details>
+<summary>MIGRACIÓN TÉCNICA: FIRMA OPT-B (JSON)</summary>
+
+```json
+{
+  "context": "Signature Evolution",
+  "features": ["Typography Signature", "Tutor Validation", "Wompi Sandbox"],
+  "files_modified": [
+    "hooks/usePaginaFirma.ts",
+    "vistas/FirmaContrato.tsx",
+    "vistas/FirmaImagen.tsx",
+    "vistas/FirmaConsentimiento.tsx",
+    "index.html",
+    "constantes.ts"
+  ],
+  "status": "Ready for Testing"
+}
+```
+</details>

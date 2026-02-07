@@ -1,8 +1,8 @@
 
 // context/DataContext.tsx
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
-import type { 
-    Usuario, Estudiante, Evento, Implemento, SolicitudCompra, 
+import type {
+    Usuario, Estudiante, Evento, Implemento, SolicitudCompra,
     MovimientoFinanciero, Sede, ConfiguracionNotificaciones, ConfiguracionClub,
     Programa
 } from '../tipos';
@@ -97,8 +97,8 @@ interface SedesContextType {
 const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { tenant } = useTenant(); 
-    
+    const { tenant } = useTenant();
+
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({} as any);
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
@@ -117,15 +117,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setCargando(true);
         try {
             const [u, cn, s, e, ev, imp, sc, m, pr] = await Promise.all([
-                api.obtenerUsuarios(),
+                api.obtenerUsuarios(tenant.tenantId),
                 api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                api.obtenerSedes(),
-                api.obtenerEstudiantes(),
-                api.obtenerEventos(),
-                api.obtenerImplementos(),
-                api.obtenerSolicitudesCompra(),
-                api.obtenerMovimientos(),
-                api.obtenerProgramas()
+                api.obtenerSedes(tenant.tenantId),
+                api.obtenerEstudiantes(tenant.tenantId),
+                api.obtenerEventos(tenant.tenantId),
+                api.obtenerImplementos(tenant.tenantId),
+                api.obtenerSolicitudesCompra(tenant.tenantId),
+                api.obtenerMovimientos(tenant.tenantId),
+                api.obtenerProgramas(tenant.tenantId)
             ]);
             setUsuarios(u);
             setConfigNotificaciones(cn);
@@ -137,6 +137,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setMovimientos(m);
             setProgramas(pr);
         } catch (err) {
+            console.error("Error al sincronizar datos:", err);
             setError("Error al sincronizar datos de la academia.");
         } finally {
             setCargando(false);
@@ -149,29 +150,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return (
         <ConfiguracionContext.Provider value={{
-            usuarios, configNotificaciones, configClub: tenant!, cargando, error, 
+            usuarios, configNotificaciones, configClub: tenant!, cargando, error,
             guardarConfiguraciones: async (cn, cc) => {
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
             },
             agregarUsuario: async (d) => { d.tenantId = tenant!.tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); },
-            actualizarUsuario: api.actualizarUsuario,
-            eliminarUsuario: api.eliminarUsuario,
+            actualizarUsuario: async (d, id) => { await api.actualizarUsuario(d, id); setUsuarios(p => p.map(u => u.id === id ? { ...u, ...d } : u)); },
+            eliminarUsuario: async (id) => { await api.eliminarUsuario(id); setUsuarios(p => p.filter(u => u.id !== id)); },
             cargarConfiguracion: cargarTodo
         }}>
             <ProgramasContext.Provider value={{
-                programas, cargando, error, 
+                programas, cargando, error,
                 cargarProgramas: cargarTodo,
-                agregarPrograma: async (p) => { const res = await api.agregarPrograma({...p, tenantId: tenant!.tenantId}); setProgramas(prev => [...prev, res]); return res; },
+                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: tenant!.tenantId }); setProgramas(prev => [...prev, res]); return res; },
                 actualizarPrograma: async (p) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
-                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({...s, tenantId: tenant!.tenantId}); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
-                    <EstudiantesContext.Provider value={{ estudiantes, cargando, error, cargarEstudiantes: cargarTodo, agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId }); setEstudiantes(prev => [...prev, res]); return res; }, actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; }, eliminarEstudiante: api.eliminarEstudiante }}>
-                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({...e, tenantId: tenant!.tenantId}); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
+                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({ ...s, tenantId: tenant!.tenantId }); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
+                    <EstudiantesContext.Provider value={{ estudiantes, cargando, error, cargarEstudiantes: cargarTodo, agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false }); setEstudiantes(prev => [...prev, res]); return res; }, actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; }, eliminarEstudiante: api.eliminarEstudiante }}>
+                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
                             <TiendaContext.Provider value={{ implementos, solicitudesCompra, cargando, error, cargarDatosTienda: cargarTodo, registrarCompra: api.registrarCompra, gestionarSolicitudCompra: api.gestionarSolicitudCompra }}>
-                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: cargarTodo, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({...m, tenantId: tenant!.tenantId}); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
+                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: async (sedeId) => { if (!tenant) return; setCargando(true); try { const m = await api.obtenerMovimientos(tenant.tenantId, sedeId); setMovimientos(m); } catch (e) { setError("Error cargando finanzas"); } finally { setCargando(false); } }, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId }); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
                                     {children}
                                 </FinanzasContext.Provider>
                             </TiendaContext.Provider>

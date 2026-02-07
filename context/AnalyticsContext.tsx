@@ -4,16 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
-interface PuntoCalor {
-    x: number;
-    y: number;
-    tipo: 'click' | 'move';
-    rol: string;
-    ruta: string;
-    hora: number; // 0-23
-    dia: string;
-    elemento?: string; // Texto del botón o link
-}
+import { PuntoCalor } from '../tipos';
 
 interface AnalyticsContextType {
     puntos: PuntoCalor[];

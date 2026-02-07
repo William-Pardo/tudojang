@@ -16,6 +16,10 @@ const VistaFirmaConsentimiento: React.FC = () => {
         enviando,
         enviadoConExito,
         firmaRealizada,
+        metodoFirma,
+        setMetodoFirma,
+        nombreFirma,
+        setNombreFirma,
         canvasRef,
         textoDocumento,
         limpiarFirma,
@@ -36,14 +40,14 @@ const VistaFirmaConsentimiento: React.FC = () => {
             );
         }
         if (enviadoConExito) {
-             return (
+            return (
                 <div className="text-center animate-fade-in">
                     <IconoExitoAnimado className="mx-auto text-green-500" />
                     <h2 className="text-2xl font-black text-green-600 mt-4 uppercase">¡Documento Firmado!</h2>
                     <p className="mt-4 text-gray-700 dark:text-gray-300">El consentimiento informado para <span className="font-bold">{estudiante?.nombres}</span> ha sido registrado exitosamente en nuestro sistema.</p>
                     <p className="mt-2 text-gray-500 dark:text-gray-400 font-medium uppercase text-[10px] tracking-widest">Ya puedes cerrar esta ventana con seguridad.</p>
                 </div>
-             );
+            );
         }
         if (!estudiante) return null;
 
@@ -53,7 +57,7 @@ const VistaFirmaConsentimiento: React.FC = () => {
                     <h2 className="text-2xl font-black text-tkd-dark dark:text-white uppercase tracking-tight">Consentimiento de Riesgos</h2>
                     <p className="mt-1 text-xs text-gray-500 font-bold uppercase tracking-widest">Taekwondo WT - Proceso de Formación</p>
                 </div>
-                
+
                 <div className="p-4 bg-tkd-blue/5 dark:bg-tkd-blue/10 rounded-2xl border border-tkd-blue/20">
                     <h3 className="text-xs font-black text-tkd-blue uppercase tracking-wider mb-2">Instrucciones de Firma</h3>
                     <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-1 font-medium uppercase">
@@ -67,32 +71,69 @@ const VistaFirmaConsentimiento: React.FC = () => {
                     <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed font-medium">{textoDocumento}</p>
                 </div>
 
-                <div>
-                    <div className="flex justify-between items-end mb-2 px-1">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Firma del Tutor / Acudiente</label>
-                        <button onClick={limpiarFirma} className="text-[9px] font-black text-tkd-blue uppercase hover:underline">Borrar y Reintentar</button>
+                <div className="space-y-6">
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <button
+                            type="button"
+                            onClick={() => setMetodoFirma('lienzo')}
+                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${metodoFirma === 'lienzo' ? 'bg-white dark:bg-gray-700 text-tkd-blue shadow-sm' : 'text-gray-400'}`}
+                        >
+                            Dibujo Manual
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMetodoFirma('texto')}
+                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${metodoFirma === 'texto' ? 'bg-white dark:bg-gray-700 text-tkd-blue shadow-sm' : 'text-gray-400'}`}
+                        >
+                            Nombre Digital
+                        </button>
                     </div>
-                    <div className="relative group">
-                        <canvas
-                            ref={canvasRef}
-                            width="500"
-                            height="200"
-                            className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-white cursor-crosshair group-hover:border-tkd-blue transition-colors shadow-sm"
-                        ></canvas>
-                        {!firmaRealizada && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
-                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Firme Aquí</span>
+
+                    {metodoFirma === 'lienzo' ? (
+                        <div>
+                            <div className="flex justify-between items-end mb-2 px-1">
+                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Firma del Tutor / Acudiente</label>
+                                <button type="button" onClick={limpiarFirma} className="text-[9px] font-black text-tkd-blue uppercase hover:underline">Reiniciar</button>
                             </div>
-                        )}
-                    </div>
+                            <div className="relative group">
+                                <canvas
+                                    ref={canvasRef}
+                                    width="500"
+                                    height="200"
+                                    className="w-full border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-2xl bg-white cursor-crosshair group-hover:border-tkd-blue transition-colors shadow-sm"
+                                ></canvas>
+                                {!firmaRealizada && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Firme Aquí</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black uppercase text-gray-400 block px-1">Escribe tu nombre completo:</label>
+                            <input
+                                type="text"
+                                value={nombreFirma}
+                                onChange={(e) => setNombreFirma(e.target.value)}
+                                placeholder="NOMBRE COMPLETO ACUDIENTE"
+                                className="w-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 focus:border-tkd-blue rounded-2xl py-4 px-6 font-bold text-lg outline-none transition-all dark:text-white"
+                            />
+                            <div className="p-10 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2rem] bg-indigo-50/30 dark:bg-indigo-900/10 text-center">
+                                <p className="text-5xl text-indigo-600 dark:text-indigo-400" style={{ fontFamily: '"Dancing Script", cursive' }}>
+                                    {nombreFirma || 'Ejemplo Firma'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                 <button
+                <button
                     onClick={() => enviarFirma()}
-                    disabled={!firmaRealizada || enviando}
+                    disabled={(metodoFirma === 'lienzo' ? !firmaRealizada : nombreFirma.trim().length < 4) || enviando}
                     className="w-full bg-tkd-red text-white py-5 px-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:opacity-90 transition-all shadow-xl disabled:bg-gray-300 flex items-center justify-center gap-3 active:scale-95"
                 >
-                    <IconoFirma className="w-5 h-5"/>
+                    <IconoFirma className="w-5 h-5" />
                     <span>{enviando ? 'Guardando Registro...' : 'Acepto y Firmo el Documento'}</span>
                 </button>
             </>
@@ -103,9 +144,9 @@ const VistaFirmaConsentimiento: React.FC = () => {
         <div className="flex items-center justify-center min-h-screen bg-tkd-gray dark:bg-tkd-dark p-4 sm:p-6">
             <div className="w-full max-w-xl p-8 space-y-8 bg-white dark:bg-gray-950 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-white/5 relative overflow-hidden">
                 <div className="text-center">
-                     <LogoDinamico className="w-20 h-20 mx-auto" />
+                    <LogoDinamico className="w-20 h-20 mx-auto" />
                 </div>
-               {renderContent()}
+                {renderContent()}
             </div>
         </div>
     );

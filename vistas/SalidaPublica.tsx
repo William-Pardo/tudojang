@@ -12,7 +12,7 @@ const VistaSalidaPublica: React.FC = () => {
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const manejarBusqueda = async (e: React.FormEvent) => {
+    const ManejarBusqueda = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!idAlumno.trim()) return;
 
@@ -21,7 +21,21 @@ const VistaSalidaPublica: React.FC = () => {
         setResultado(null);
 
         try {
-            const data = await buscarAsistenciaHoyPorIdAlumno(idAlumno);
+            // Obtener el tenant actual por el host
+            const host = window.location.hostname;
+            let slug = host.split('.')[0];
+            if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
+
+            // Buscar el tenantId real (necesario para la consulta)
+            const { buscarTenantPorSlug } = await import('../servicios/configuracionApi');
+            const tenant = await buscarTenantPorSlug(slug);
+
+            if (!tenant || !tenant.tenantId) {
+                setError("No se pudo identificar la academia. Por favor, usa el enlace correcto.");
+                return;
+            }
+
+            const data = await buscarAsistenciaHoyPorIdAlumno(tenant.tenantId, idAlumno);
             if (data) {
                 setResultado(data);
             } else {
@@ -43,10 +57,10 @@ const VistaSalidaPublica: React.FC = () => {
                     <p className="text-gray-500 text-sm">Ingrese el ID del estudiante para ver su estado</p>
                 </div>
 
-                <form onSubmit={manejarBusqueda} className="space-y-4">
+                <form onSubmit={ManejarBusqueda} className="space-y-4">
                     <div className="relative">
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             placeholder="Ej: 10102030"
                             value={idAlumno}
                             onChange={(e) => setIdAlumno(e.target.value)}
@@ -54,7 +68,7 @@ const VistaSalidaPublica: React.FC = () => {
                         />
                         <IconoBuscar className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
                     </div>
-                    <button 
+                    <button
                         type="submit"
                         disabled={cargando}
                         className="w-full bg-tkd-red text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2"
@@ -75,7 +89,7 @@ const VistaSalidaPublica: React.FC = () => {
                             <span className="text-xs font-black text-blue-500 uppercase">Estudiante</span>
                             <span className="text-lg font-black dark:text-white">{resultado.nombres}</span>
                         </div>
-                        
+
                         <div className="flex flex-col items-center py-4">
                             {resultado.asistencia.estadoEntrega === EstadoEntrega.Listo ? (
                                 <>
@@ -105,7 +119,7 @@ const VistaSalidaPublica: React.FC = () => {
 
                 <div className="text-center pt-4">
                     <p className="text-[10px] text-gray-400 italic">
-                        Sistema de seguridad TaekwondoGa Jog. <br/> Datos encriptados y válidos solo por sesión.
+                        Sistema de seguridad TaekwondoGa Jog. <br /> Datos encriptados y válidos solo por sesión.
                     </p>
                 </div>
             </div>

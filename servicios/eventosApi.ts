@@ -36,12 +36,19 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
     return imagenUrl || '';
 };
 
-export const obtenerEventos = async (): Promise<Evento[]> => {
+export const obtenerEventos = async (tenantId: string): Promise<Evento[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de eventos vacía.");
         return [];
     }
-    const q = query(eventosCollection, orderBy('fechaEvento', 'desc'));
+    const q = query(
+        eventosCollection,
+        where('tenantId', '==', tenantId),
+        orderBy('fechaEvento', 'desc')
+    );
+
+    // Para las solicitudes pendientes, lo ideal sería filtrar por tenantId también si existe, 
+    // pero por ahora filtramos el mapa después de obtenerlas o por eventoId.
     const [eventosSnap, solicitudesSnap] = await Promise.all([
         getDocs(q),
         getDocs(query(solicitudesCollection, where('estado', '==', EstadoSolicitud.Pendiente)))
@@ -126,6 +133,7 @@ export const crearSolicitudInscripcion = async (idEvento: string, numIdentificac
         const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
         return {
             id: `mock-si-${Date.now()}`,
+            tenantId: 'escuela-gajog-001',
             eventoId: idEvento,
             estudiante: {
                 id: estudiante.id,

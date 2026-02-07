@@ -40,9 +40,10 @@ let programasMock: Programa[] = [
     }
 ];
 
-export const obtenerProgramas = async (): Promise<Programa[]> => {
-    if (!isFirebaseConfigured) return [...programasMock];
-    const snapshot = await getDocs(programasCollection);
+export const obtenerProgramas = async (tenantId: string): Promise<Programa[]> => {
+    if (!isFirebaseConfigured) return programasMock.filter(p => p.tenantId === tenantId);
+    const q = query(programasCollection, where('tenantId', '==', tenantId));
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Programa));
 };
 

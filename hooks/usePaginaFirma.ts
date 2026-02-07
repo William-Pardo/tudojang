@@ -22,10 +22,12 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
     const [enviando, setEnviando] = useState(false);
     const [enviadoConExito, setEnviadoConExito] = useState(false);
     const { mostrarNotificacion } = useNotificacion();
-    
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [firmaRealizada, setFirmaRealizada] = useState(false);
-    
+    const [metodoFirma, setMetodoFirma] = useState<'lienzo' | 'texto'>('lienzo');
+    const [nombreFirma, setNombreFirma] = useState('');
+
     const cargarDatos = useCallback(async () => {
         if (!idEstudiante) {
             setError("No se proporcionó un ID de estudiante.");
@@ -38,7 +40,7 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
                 api.obtenerConfiguracionClub(),
                 api.obtenerSedes() // Obtenemos sedes para resolver el precio específico
             ]);
-            
+
             // Buscar la sede específica del alumno
             const sedeAlumno = sedesList.find(s => s.id === estudianteData.sedeId);
             setSede(sedeAlumno || null);
@@ -88,10 +90,10 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || enviadoConExito) return;
-        
+
         const context = canvas.getContext('2d');
-        if(!context) return;
-        
+        if (!context) return;
+
         context.lineCap = 'round';
         context.strokeStyle = '#110e0f';
         context.lineWidth = 3;
@@ -101,11 +103,11 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
         let lastY = 0;
 
         const getCoords = (e: MouseEvent | TouchEvent) => {
-             if (e instanceof TouchEvent) {
+            if (e instanceof TouchEvent) {
                 const rect = canvas.getBoundingClientRect();
-                return { 
-                    offsetX: e.touches[0].clientX - rect.left, 
-                    offsetY: e.touches[0].clientY - rect.top 
+                return {
+                    offsetX: e.touches[0].clientX - rect.left,
+                    offsetY: e.touches[0].clientY - rect.top
                 };
             }
             return { offsetX: e.offsetX, offsetY: e.offsetY };
@@ -128,9 +130,9 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
             context.stroke();
             [lastX, lastY] = [offsetX, offsetY];
         };
-        
+
         const stopDrawing = () => { isDrawing = false; };
-        
+
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
@@ -157,11 +159,41 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
             context.clearRect(0, 0, canvas.width, canvas.height);
             setFirmaRealizada(false);
         }
+        setNombreFirma('');
     };
-    
+
+    const generarImagenDesdeTexto = (texto: string): string => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 200;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+
+        // Fondo blanco
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Texto de la firma
+        ctx.fillStyle = '#000000';
+        ctx.font = '72px "Dancing Script", cursive';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(texto, canvas.width / 2, canvas.height / 2);
+
+        // Línea decorativa abajo
+        ctx.beginPath();
+        ctx.moveTo(50, 160);
+        ctx.lineTo(550, 160);
+        ctx.strokeStyle = '#eeeeee';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        return canvas.toDataURL('image/png');
+    };
+
     const textoDocumento = useMemo(() => {
         if (!estudiante || !configClub) return "Cargando documento...";
-        switch(tipo) {
+        switch (tipo) {
             case 'consentimiento': return plantillas.generarTextoConsentimientoImagen(estudiante, configClub);
             case 'contrato': return plantillas.generarTextoContrato(estudiante, configClub, sede || undefined);
             case 'imagen': return plantillas.generarTextoConsentimientoImagen(estudiante, configClub);
@@ -179,18 +211,38 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
     };
 
     const enviarFirma = async (autorizacionFotos?: boolean) => {
-        if (isCanvasEmpty()) {
+        const esValido = metodoFirma === 'lienzo' ? !isCanvasEmpty() : nombreFirma.trim().length > 3;
+
+        if (!esValido) {
             mostrarNotificacion('La firma es requerida para poder enviar el documento.', 'error');
             return;
         }
-        if (!canvasRef.current || !firmaRealizada || !idEstudiante) return;
+
+        if (!idEstudiante) return;
+
+        // Validación de Seguridad: Opción B debe coincidir con el Tutor
+        if (metodoFirma === 'texto' && estudiante?.tutor) {
+            const nombresTutor = estudiante.tutor.nombres.toLowerCase().trim();
+            const apellidosTutor = estudiante.tutor.apellidos.toLowerCase().trim();
+            const firmaLimpia = nombreFirma.toLowerCase().trim();
+
+            const coincide = firmaLimpia.includes(nombresTutor) || firmaLimpia.includes(apellidosTutor);
+
+            if (!coincide) {
+                mostrarNotificacion('La firma digital debe contener al menos uno de los nombres o apellidos del tutor registrado.', 'error');
+                return;
+            }
+        }
 
         setEnviando(true);
         try {
-            const firmaBase64 = canvasRef.current.toDataURL('image/png');
+            const firmaBase64 = metodoFirma === 'lienzo'
+                ? canvasRef.current!.toDataURL('image/png')
+                : generarImagenDesdeTexto(nombreFirma);
+
             let notificacionMsg = "";
 
-            switch(tipo) {
+            switch (tipo) {
                 case 'consentimiento':
                     await api.guardarFirmaConsentimiento(idEstudiante, firmaBase64);
                     notificacionMsg = "Consentimiento enviado con éxito.";
@@ -205,7 +257,7 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
                     notificacionMsg = "Autorización de imagen guardada exitosamente.";
                     break;
             }
-            
+
             setEnviadoConExito(true);
             mostrarNotificacion(notificacionMsg, "success");
         } catch (err) {
@@ -216,7 +268,7 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
             setEnviando(false);
         }
     };
-    
+
     return {
         estudiante,
         cargando,
@@ -224,6 +276,10 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
         enviando,
         enviadoConExito,
         firmaRealizada,
+        metodoFirma,
+        setMetodoFirma,
+        nombreFirma,
+        setNombreFirma,
         canvasRef,
         textoDocumento,
         limpiarFirma,

@@ -14,6 +14,7 @@ import { RolUsuario, type Usuario } from './tipos';
 import PublicLanding from './vistas/PublicLanding'; // Importar la nueva Landing
 import Login from './vistas/Login';
 import RegistroEscuela from './vistas/RegistroEscuela';
+import CambiarPasswordObligatorio from './vistas/CambiarPasswordObligatorio';
 import VistaConfiguracion from './vistas/Configuracion';
 import VistaAdministracion from './vistas/Administracion';
 import { VistaEstudiantes } from './vistas/Estudiantes';
@@ -133,7 +134,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     );
 };
 
-const AppLayout: React.FC = () => {
+const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     const { usuario, logout } = useAuth();
     const { puntos, heatmapActivo } = useAnalytics();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
@@ -151,6 +152,10 @@ const AppLayout: React.FC = () => {
     }, [theme]);
 
     if (!usuario) return null;
+
+    if (usuario.requiereCambioPassword) {
+        return <CambiarPasswordObligatorio />;
+    }
 
     const toggleMenu = () => setMenuAbierto(!menuAbierto);
     const cerrarMenuSiMovil = () => {
@@ -192,12 +197,12 @@ const AppLayout: React.FC = () => {
                         transition={{ duration: 0.4 }}
                         className="h-full"
                     >
-                        <ReactRouterDOM.Outlet />
+                        {children || <ReactRouterDOM.Outlet />}
                     </motion.div>
                 </div>
                 <Footer />
             </main>
-            <BotonVolverArriba scrollContainerRef={scrollableContainerRef} />
+            <BotonVolverArriba scrollContainerRef={scrollableContainerRef as any} />
             <ModalBusquedaGlobal abierto={busquedaAbierta} onCerrar={() => setBusquedaAbierta(false)} />
             <AsistenteVirtual />
         </div>
@@ -207,34 +212,33 @@ const AppLayout: React.FC = () => {
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
+    const location = ReactRouterDOM.useLocation();
+
+    // Logger de navegación maestro
+    React.useEffect(() => {
+        console.log(`[NAV] Ruta actual: ${location.pathname} | Host: ${window.location.hostname}`);
+    }, [location]);
 
     if (cargandoSesion) {
         return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;
     }
 
-    // LÓGICA DE DETECCIÓN DE DOMINIO RAÍZ VS TENANT
     const host = window.location.hostname;
-    const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
-
-    // Si es dominio raíz y no hay tenant específico en el slug, mostramos la Landing
-    if (isRootDomain && (!tenant || tenant.slug === 'gajog')) {
-        return (
-            <ReactRouterDOM.Routes>
-                <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
-                <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
-                <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" /> : <Login />} />
-                <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
-            </ReactRouterDOM.Routes>
-        );
-    }
-
+    const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'tudojang.web.app' || host === 'localhost' || host === '127.0.0.1';
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
+    const isLanding = isRootDomain && (!tenant || tenant.slug === 'gajog');
 
     return (
         <ReactRouterDOM.Routes>
-            <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to={usuario.rol === RolUsuario.Tutor ? "/mi-perfil" : "/"} replace /> : <Login />} />
-            <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
+            {/* RUTA RAÍZ DINÁMICA */}
+            <ReactRouterDOM.Route
+                path="/"
+                element={isLanding ? <PublicLanding /> : (usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" replace /> : <AppLayout><VistaAdministracion /></AppLayout>)}
+            />
 
+            {/* RUTAS PÚBLICAS (ACCESIBLES DESDE CUALQUIER LUGAR) */}
+            <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" replace /> : <Login />} />
+            <ReactRouterDOM.Route path="/registro" element={<RegistroEscuela />} />
             <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
             <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
             <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
@@ -242,8 +246,8 @@ const AppRoutes: React.FC = () => {
             <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
             <ReactRouterDOM.Route path="/unete/:solicitudId" element={<PasarelaInscripcion />} />
 
+            {/* ÁREA PRIVADA */}
             <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
-                <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
                 <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                 <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
                 <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
@@ -252,6 +256,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
                 <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />
             </ReactRouterDOM.Route>
+
             <ReactRouterDOM.Route path="*" element={<Vista404 />} />
         </ReactRouterDOM.Routes>
     );

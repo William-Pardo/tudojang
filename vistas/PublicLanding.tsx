@@ -1,12 +1,12 @@
 
-// vistas/PublicLanding.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 // Added comment above fix: Included IconoDashboard in the imports from Iconos.tsx
 import { IconoLogoOficial, IconoAprobar, IconoWhatsApp, IconoFirma, IconoCampana, IconoCasa, IconoUsuario, IconoEstudiantes, IconoDashboard } from '../components/Iconos';
 import { PLANES_SAAS } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
+import { guardarCookie } from '../utils/cookieUtils';
 
 const PublicLanding: React.FC = () => {
     return (
@@ -22,12 +22,12 @@ const PublicLanding: React.FC = () => {
                     <a href="#tarifas" className="hover:text-tkd-blue transition-colors">Tarifas</a>
                     <a href="#kicho" className="hover:text-tkd-blue transition-colors">Misión Kicho</a>
                 </div>
-                <Link
-                    to="/registro-escuela"
-                    className="bg-tkd-dark text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-tkd-blue transition-all active:scale-95"
+                <a
+                    href="#/registro"
+                    className="bg-tkd-dark text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-tkd-blue transition-all active:scale-95 inline-block"
                 >
                     Registrar Academia
-                </Link>
+                </a>
             </nav>
 
             {/* HERO SECTION: PUNTO DE CIERRE 1 */}
@@ -53,12 +53,12 @@ const PublicLanding: React.FC = () => {
                             >
                                 Ver Tudojang en Acción (Consultoría Gratuita)
                             </a>
-                            <Link
-                                to="/registro-escuela"
-                                className="bg-white border-2 border-gray-100 text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-tkd-blue transition-all text-center"
+                            <a
+                                href="#/registro"
+                                className="bg-white border-2 border-gray-100 text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-tkd-blue transition-all text-center inline-block"
                             >
                                 Probar 7 días sin costo
-                            </Link>
+                            </a>
                         </div>
                     </motion.div>
 
@@ -154,12 +154,16 @@ const PublicLanding: React.FC = () => {
                                         ))}
                                     </ul>
                                 </div>
-                                <Link
-                                    to="/registro-escuela"
-                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
+                                <button
+                                    onClick={() => {
+                                        console.log("%c >>> PLAN SELECCIONADO: " + plan.id, "background: #0047A0; color: white; font-size: 20px; font-weight: bold;");
+                                        guardarCookie('plan_pendiente', plan.id);
+                                        window.location.hash = "/registro";
+                                    }}
+                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all cursor-pointer relative z-[100] ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
                                 >
                                     Elegir este Plan
-                                </Link>
+                                </button>
                             </div>
                         ))}
                     </div>
