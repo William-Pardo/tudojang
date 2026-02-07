@@ -239,6 +239,7 @@ const AppRoutes: React.FC = () => {
             {/* RUTAS PÚBLICAS (ACCESIBLES DESDE CUALQUIER LUGAR) */}
             <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" replace /> : <Login />} />
             <ReactRouterDOM.Route path="/registro" element={<RegistroEscuela />} />
+            <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
             <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
             <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
             <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
