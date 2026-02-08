@@ -129,9 +129,9 @@ export const COSTOS_ADICIONALES = {
 };
 
 export const CONFIGURACION_WOMPI = {
-    publicKey: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
-    privateKey: "prv_prod_hruawVEOZ8tsoL7NIEgqULsyzCx3QYBB",
-    eventsKey: "prod_events_Sliei3JBPRgw0zFfLFQ17OaGq70lRXhw",
-    integrityKey: "prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm",
+    publicKey: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q",
+    privateKey: "prv_test_VVkIyE0hBvHJpjKf2JJOl2dGoYG6PBXK",
+    eventsKey: "test_events_znXLPPCzTpxVNzn6ITFPEESQwTLwbGzd",
+    integrityKey: "test_integrity_Iq6lRgXaEjqD4YLSoQsvPCvjdUhpNalY",
     webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
 };
