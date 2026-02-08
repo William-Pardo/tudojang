@@ -20,29 +20,29 @@ const ResumenPagos: React.FC<Props> = ({ estudiantes }) => {
   const totalEstudiantes = estudiantes.length;
 
   return (
-    <div className="bg-[#1A2232] p-8 rounded-[2rem] border border-white/5 shadow-2xl h-full">
-      <h2 className="text-[10px] font-black text-white uppercase tracking-[0.3em] mb-10">Distribución de Cartera</h2>
+    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm h-full">
+      <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-8">Distribución de Cartera</h2>
       <ul className="space-y-8">
         {Object.entries(distribucionPagos).map(([estado, cantidad]) => {
           const colors = {
             'AL DÍA': 'bg-green-500',
             'PENDIENTE': 'bg-yellow-500',
-            'VENCIDO': 'bg-gray-700',
+            'VENCIDO': 'bg-red-500',
           };
           const total = totalEstudiantes > 0 ? totalEstudiantes : 1;
           const percentage = (((cantidad as number) / total) * 100).toFixed(1);
 
           return (
             <li key={estado}>
-              <div className="flex justify-between items-end mb-3 px-1">
-                <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.3em]">
+              <div className="flex justify-between items-end mb-2 px-1">
+                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
                   {estado} <span className="text-tkd-blue ml-1">({cantidad})</span>
                 </span>
-                <span className="text-[10px] font-black text-white tracking-widest">
+                <span className="text-xs font-black text-gray-900 dark:text-white">
                   {percentage}%
                 </span>
               </div>
-              <div className="w-full bg-[#0D121F] rounded-full h-1 overflow-hidden">
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ${colors[estado as keyof typeof colors]}`}
                   style={{ width: `${percentage}%` }}
