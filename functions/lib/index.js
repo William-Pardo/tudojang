@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.limpiarDatosPrueba = exports.resetearPasswordAdmin = exports.webhookWompi = exports.obtenerContratoPorToken = exports.firmarContrato = exports.generarLinks = void 0;
+exports.repararRegistroManual = exports.limpiarDatosPrueba = exports.resetearPasswordAdmin = exports.webhookWompi = exports.obtenerContratoPorToken = exports.firmarContrato = exports.generarLinks = void 0;
 const admin = require("firebase-admin");
 admin.initializeApp();
 var generarLinks_1 = require("./contratos/generarLinks");
@@ -15,4 +15,6 @@ var resetPassword_1 = require("./resetPassword");
 Object.defineProperty(exports, "resetearPasswordAdmin", { enumerable: true, get: function () { return resetPassword_1.resetearPasswordAdmin; } });
 var limpiezaDB_1 = require("./limpiezaDB");
 Object.defineProperty(exports, "limpiarDatosPrueba", { enumerable: true, get: function () { return limpiezaDB_1.limpiarDatosPrueba; } });
+var repararRegistro_1 = require("./repararRegistro");
+Object.defineProperty(exports, "repararRegistroManual", { enumerable: true, get: function () { return repararRegistro_1.repararRegistroManual; } });
 //# sourceMappingURL=index.js.map

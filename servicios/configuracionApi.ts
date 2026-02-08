@@ -1,8 +1,10 @@
 // servicios/configuracionApi.ts
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '@/src/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
+import { agregarUsuario } from './usuariosApi';
+import { RolUsuario } from '../tipos';
 
 const KEY_CONF_NOTIF = 'tkd_mock_conf_notif';
 
@@ -81,7 +83,7 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
 /**
  * Crea un nuevo tenant en el sistema (Onboarding)
  */
-export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): Promise<string> => {
+export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>, password: string = 'Cambiar123'): Promise<string> => {
     if (!isFirebaseConfigured) return 'mock-id';
 
     const nuevoTenantId = `tnt-${Date.now()}`;
@@ -102,7 +104,50 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
         pagoNequi: datos.pagoNequi || '', // Guardamos el teléfono del director aquí también por ahora
     };
 
+    // 1. Crear el Tenant en Firestore
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);
+
+    // 2. CREAR USUARIO ADMIN (DIRECTOR) AUTOMÁTICAMENTE
+    try {
+        if (datos.emailClub && datos.representanteLegal) {
+            console.log(">>> Creando usuario admin para:", datos.emailClub);
+            await agregarUsuario({
+                email: datos.emailClub,
+                nombreUsuario: datos.representanteLegal,
+                numeroIdentificacion: '000000000', // Placeholder
+                whatsapp: datos.pagoNequi || '',
+                contrasena: password, // Usar contraseña proporcionada por el usuario
+                rol: RolUsuario.Admin,
+                tenantId: nuevoTenantId,
+                sedeId: 'sede-principal'
+            });
+            console.log(">>> Usuario admin creado con éxito.");
+        }
+    } catch (e: any) {
+        console.error("🔥 Error crítico creando usuario admin:", e);
+
+        // ROLLBACK: Intentar eliminar el tenant si falla la creación del usuario
+        // Nota: Esto puede fallar si las reglas de seguridad no permiten eliminar sin auth,
+        // pero lo intentamos para evitar registros "zombie".
+        try {
+            await deleteDoc(doc(db, 'tenants', nuevoTenantId));
+            console.log("↺ Rollback exitoso: Tenant eliminado para liberar slug.");
+        } catch (rollbackError) {
+            // Silenciamos el error de permisos del rollback para no confundir al usuario
+            // Lo importante es el error original de Auth
+            console.warn("⚠️ No se pudo ejecutar rollback automático (probablemente permisos), pero el error real es el de abajo.");
+        }
+
+        // Relanzar error con mensaje amigable y DIRECTO
+        if (e.code === 'auth/configuration-not-found' || e.message.includes('configuration-not-found')) {
+            throw new Error("⛔ ERROR DE CONFIGURACIÓN FIREBASE: Debes activar 'Email/Password' en la Consola de Firebase > Authentication > Sign-in method.");
+        }
+        if (e.code === 'auth/email-already-in-use') {
+            throw new Error("Este correo ya está registrado como administrador. Usa otro email.");
+        }
+        throw e;
+    }
+
     return nuevoTenantId;
 };
 

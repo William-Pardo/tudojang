@@ -5,10 +5,13 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Added comment above fix: Included IconoDashboard in the imports from Iconos.tsx
 import { IconoLogoOficial, IconoAprobar, IconoWhatsApp, IconoFirma, IconoCampana, IconoCasa, IconoUsuario, IconoEstudiantes, IconoDashboard } from '../components/Iconos';
+import { useAuth } from '../context/AuthContext';
 import { PLANES_SAAS } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
 
 const PublicLanding: React.FC = () => {
+    const { usuario } = useAuth();
+
     return (
         <div className="min-h-screen bg-white text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white overflow-x-hidden">
             {/* NAVBAR ESTRATÉGICO */}
@@ -22,12 +25,24 @@ const PublicLanding: React.FC = () => {
                     <a href="#tarifas" className="hover:text-tkd-blue transition-colors">Tarifas</a>
                     <a href="#kicho" className="hover:text-tkd-blue transition-colors">Misión Kicho</a>
                 </div>
-                <Link
-                    to="/registro-escuela"
-                    className="bg-tkd-dark text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-tkd-blue transition-all active:scale-95"
-                >
-                    Registrar Academia
-                </Link>
+                <div className="flex items-center gap-4">
+                    {!usuario ? (
+                        <Link
+                            to="/login"
+                            className="bg-blue-600 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                        >
+                            Iniciar Sesión
+                        </Link>
+                    ) : (
+                        <Link
+                            to="/"
+                            className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <IconoDashboard className="w-4 h-4" />
+                            Mi Academia
+                        </Link>
+                    )}
+                </div>
             </nav>
 
             {/* HERO SECTION: PUNTO DE CIERRE 1 */}
@@ -54,10 +69,10 @@ const PublicLanding: React.FC = () => {
                                 Ver Tudojang en Acción (Consultoría Gratuita)
                             </a>
                             <Link
-                                to="/registro-escuela"
-                                className="bg-white border-2 border-gray-100 text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-tkd-blue transition-all text-center"
+                                to="/login"
+                                className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl transition-all text-center"
                             >
-                                Probar 7 días sin costo
+                                Iniciar Sesión Ahora
                             </Link>
                         </div>
                     </motion.div>
@@ -137,28 +152,39 @@ const PublicLanding: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {Object.values(PLANES_SAAS).map((plan: any) => (
-                            <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all ${plan.popular ? 'border-tkd-blue bg-white shadow-2xl scale-105 z-10' : 'border-gray-50 bg-gray-50 opacity-80'}`}>
+                            <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all duration-500 hover:shadow-2xl 
+                                ${plan.popular
+                                    ? 'border-blue-600 bg-white shadow-2xl scale-105 z-10 hover:scale-[1.08] hover:-translate-y-4'
+                                    : 'border-gray-100 bg-white shadow-xl hover:border-blue-200 hover:-translate-y-2'
+                                }`}>
                                 <div className="space-y-6">
-                                    {plan.popular && <span className="bg-tkd-blue text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">Más Elegido</span>}
+                                    {plan.popular && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="bg-blue-600 text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                                Más Popular
+                                            </span>
+                                            <div className="w-3 h-3 bg-blue-600 rounded-full animate-ping"></div>
+                                        </div>
+                                    )}
                                     <h4 className="text-2xl font-black uppercase tracking-tight">{plan.nombre}</h4>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-black text-tkd-blue">{formatearPrecio(plan.precio)}</span>
+                                        <span className="text-4xl font-black text-blue-600">{formatearPrecio(plan.precio)}</span>
                                         <span className="text-[10px] font-bold text-gray-400 uppercase">/mes</span>
                                     </div>
                                     <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
-                                        <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4" /> Hasta {plan.limiteEstudiantes} alumnos</li>
-                                        <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4" /> {plan.limiteUsuarios} Instructores</li>
-                                        <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4" /> {plan.limiteSedes} Sedes</li>
+                                        <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-blue-600" /> Hasta {plan.limiteEstudiantes} alumnos</li>
+                                        <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-blue-600" /> {plan.limiteUsuarios} Instructores</li>
+                                        <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-blue-600" /> {plan.limiteSedes} Sedes</li>
                                         {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
-                                            <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-green-500" /> {c}</li>
+                                            <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-blue-500" /> {c}</li>
                                         ))}
                                     </ul>
                                 </div>
                                 <Link
-                                    to="/registro-escuela"
-                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
+                                    to="/login"
+                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all bg-blue-600 text-white shadow-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-95`}
                                 >
-                                    Elegir este Plan
+                                    Iniciar Sesión
                                 </Link>
                             </div>
                         ))}

@@ -5,7 +5,7 @@ import React, { useState, useEffect, RefObject } from 'react';
 import { IconoFlechaArriba } from './Iconos';
 
 interface Props {
-  scrollContainerRef: RefObject<HTMLDivElement>;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
 }
 
 const BotonVolverArriba: React.FC<Props> = ({ scrollContainerRef }) => {

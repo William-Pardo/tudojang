@@ -8,3 +8,4 @@ export { obtenerContratoPorToken } from './contratos/obtenerContratoPorToken';
 export { webhookWompi } from './webhookWompi';
 export { resetearPasswordAdmin } from './resetPassword';
 export { limpiarDatosPrueba } from './limpiezaDB';
+export { repararRegistroManual } from './repararRegistro';
