@@ -54,6 +54,15 @@ const RegistroEscuela: React.FC = () => {
         }
     }, []);
 
+    // Función para generar SHA-256 en el navegador
+    const generarFirmaIntegridad = async (cadena: string) => {
+        const encondedText = new TextEncoder().encode(cadena);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', encondedText);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    };
+
     const onSubmit = async (data: any) => {
         setCargando(true);
         try {
@@ -83,7 +92,13 @@ const RegistroEscuela: React.FC = () => {
             const params = new URLSearchParams(window.location.search);
             const precioPlan = params.get('precio') || '50000'; // Fallback a 50mil si no hay plan
             const montoCentavos = parseInt(precioPlan) * 100;
-            const referencia = `SUSC_${slug.toUpperCase()}_${Date.now()} `; // Formato esperado por Webhook
+            const referencia = `SUSC_${slug.toUpperCase()}_${Date.now()}`; // Formato esperado por Webhook
+            const moneda = 'COP';
+
+            // Generar Firma de Integridad
+            // Fórmula: SHA256(Referencia + MontoEnCentavos + Moneda + SecretoIntegridad)
+            const cadenaConcatenada = `${referencia}${montoCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
+            const firmaIntegridad = await generarFirmaIntegridad(cadenaConcatenada);
 
             // Guardar en local storage para recuperar tras volver de Wompi
             localStorage.setItem('registro_pendiente', JSON.stringify({
@@ -95,9 +110,10 @@ const RegistroEscuela: React.FC = () => {
             // 4. Redirigir a Wompi
             const urlWompi = `https://checkout.wompi.co/p/?` +
                 `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                `currency=COP&` +
+                `currency=${moneda}&` +
                 `amount-in-cents=${montoCentavos}&` +
                 `reference=${referencia}&` +
+                `signature-integrity=${firmaIntegridad}&` +
                 `redirect-url=${window.location.href}`; // Vuelve a esta misma página
 
             window.location.href = urlWompi;
@@ -200,17 +216,6 @@ const RegistroEscuela: React.FC = () => {
                             </p>
                         </div>
 
-                        <div className="flex items-center gap-5 p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 shadow-sm max-w-md hover:shadow-lg transition-shadow">
-                            <div className="bg-white p-4 rounded-2xl shadow-sm text-tkd-red">
-                                <IconoCasa className="w-8 h-8" />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tu Identidad Será:</p>
-                                <p className="text-lg font-black text-tkd-dark uppercase tracking-tight flex items-center gap-1">
-                                    <span className="text-tkd-blue">{slugCalculado || 'tu-academia'}</span>.tudojang.com
-                                </p>
-                            </div>
-                        </div>
                     </div>
 
                     {/* COLUMNA DERECHA: FORMULARIO */}
