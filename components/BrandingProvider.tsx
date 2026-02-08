@@ -166,27 +166,34 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     );
 
     if (estado === 'vencido' && !bypassDev) {
-        return (
-            <TenantContext.Provider value={{ tenant, estaCargado: true, actualizarBranding }}>
-                <div className="min-h-screen bg-white dark:bg-tkd-dark flex flex-col">
-                    <div className="bg-tkd-red text-white py-2 px-4 flex justify-between items-center z-[100] shadow-md">
-                        <div className="flex items-center gap-2">
-                            <IconoAlertaTriangulo className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Aviso del Sistema: Suscripción Vencida o Cuenta Suspendida</span>
+        // SOLUCIÓN: Solo bloqueamos si hay un usuario logueado o estamos en un dominio específico (SaaS)
+        // La Landing Page pública debe ser siempre accesible.
+        const host = window.location.hostname;
+        const isRoot = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
+
+        if (usuario || !isRoot) {
+            return (
+                <TenantContext.Provider value={{ tenant, estaCargado: true, actualizarBranding }}>
+                    <div className="min-h-screen bg-white dark:bg-tkd-dark flex flex-col">
+                        <div className="bg-tkd-red text-white py-2 px-4 flex justify-between items-center z-[100] shadow-md">
+                            <div className="flex items-center gap-2">
+                                <IconoAlertaTriangulo className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Aviso del Sistema: Suscripción Vencida o Cuenta Suspendida</span>
+                            </div>
+                            <button
+                                onClick={() => setBypassDev(true)}
+                                className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase transition-all"
+                            >
+                                Ignorar (Debug)
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setBypassDev(true)}
-                            className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase transition-all"
-                        >
-                            Ignorar (Debug)
-                        </button>
+                        <div className="flex-1 overflow-y-auto">
+                            <VistaPasarelaPagos />
+                        </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
-                        <VistaPasarelaPagos />
-                    </div>
-                </div>
-            </TenantContext.Provider>
-        );
+                </TenantContext.Provider>
+            );
+        }
     }
 
     return (

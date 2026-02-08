@@ -28,15 +28,14 @@ const PublicLanding: React.FC = () => {
                 <div className="flex items-center gap-4">
                     {!usuario ? (
                         <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
                         >
                             <Link
                                 to="/login"
-                                className="bg-blue-600 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
+                                className="bg-blue-600 text-white px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 hover:scale-105 transition-all active:scale-95"
                             >
-                                <IconoDashboard className="w-4 h-4" />
                                 Iniciar Sesión
                             </Link>
                         </motion.div>
@@ -45,7 +44,7 @@ const PublicLanding: React.FC = () => {
                             to="/"
                             className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
                         >
-                            <IconoDashboard className="w-4 h-4" />
+                            <IconoDashboard className="w-4 h-4 text-white" />
                             Mi Academia
                         </Link>
                     )}
@@ -165,10 +164,10 @@ const PublicLanding: React.FC = () => {
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ delay: i * 0.1 }}
-                                whileHover={{ y: -15, scale: plan.popular ? 1.05 : 1.02 }}
-                                className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-shadow duration-300 relative
+                                whileHover={{ y: -12, transition: { duration: 0.2 } }}
+                                className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all duration-300 relative
                                     ${plan.popular
-                                        ? 'border-blue-600 bg-white shadow-2xl z-10'
+                                        ? 'border-blue-600 bg-white shadow-2xl scale-105 z-10'
                                         : 'border-gray-100 bg-white shadow-xl hover:border-blue-200'
                                     }`}
                             >
