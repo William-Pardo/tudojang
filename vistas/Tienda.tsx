@@ -39,7 +39,7 @@ const VistaTienda: React.FC = () => {
   const renderContent = () => {
     if (cargando) return <div className="flex justify-center items-center h-full p-8"><Loader texto="Cargando implementos..." /></div>;
     if (error) return <ErrorState mensaje={error} onReintentar={cargarDatosTienda} />;
-    
+
     if (implementos.length === 0) {
       return <EmptyState Icono={IconoTienda} titulo="Tienda Vacía" mensaje="Actualmente no hay implementos disponibles para la venta." />;
     }
@@ -49,21 +49,26 @@ const VistaTienda: React.FC = () => {
     }
 
     return (
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {implementosFiltrados.map(implemento => {
           const variacionSeleccionada = implemento.variaciones.find(v => v.id === selecciones[implemento.id]);
           return (
-            <div key={implemento.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-2">
-              <img src={implemento.imagenUrl} alt={implemento.nombre} className="w-full h-48 object-cover" />
-              <div className="p-4 flex flex-col flex-grow">
-                <h2 className="text-xl font-bold text-tkd-dark dark:text-white">{implemento.nombre}</h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-1 flex-grow mb-4">{implemento.descripcion}</p>
-                <div className="mt-auto space-y-3">
-                   <select 
-                      id={`select-${implemento.id}`} 
-                      value={selecciones[implemento.id] || ''} 
-                      onChange={(e) => handleSeleccionChange(implemento.id, e.target.value)} 
-                      className="block w-full py-2 px-3 border border-gray-300 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white rounded-md shadow-sm focus:outline-none focus:ring-tkd-blue focus:border-tkd-blue sm:text-sm text-tkd-dark transition-colors"
+            <div key={implemento.id} className="bg-[#1A2232] rounded-[2rem] border border-white/5 overflow-hidden flex flex-col shadow-2xl hover:scale-[1.02] transition-all group">
+              <div className="relative h-64 overflow-hidden">
+                <img src={implemento.imagenUrl} alt={implemento.nombre} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1A2232] to-transparent opacity-60"></div>
+              </div>
+              <div className="p-8 flex flex-col flex-grow">
+                <h2 className="text-xl font-black text-white uppercase tracking-tight">{implemento.nombre}</h2>
+                <p className="text-gray-400 text-[11px] font-medium leading-relaxed mt-3 flex-grow mb-6">{implemento.descripcion}</p>
+                <div className="mt-auto space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest ml-1">Variación / Talla</label>
+                    <select
+                      id={`select-${implemento.id}`}
+                      value={selecciones[implemento.id] || ''}
+                      onChange={(e) => handleSeleccionChange(implemento.id, e.target.value)}
+                      className="block w-full bg-[#0D121F] border border-white/10 text-white rounded-xl px-4 py-3 text-xs font-bold focus:border-tkd-blue outline-none transition-all"
                       aria-label={`Selecciona una variación para ${implemento.nombre}`}
                     >
                       <option value="" disabled>-- Elige una opción --</option>
@@ -73,8 +78,9 @@ const VistaTienda: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                  <button onClick={() => iniciarCompra(implemento, selecciones[implemento.id])} disabled={!variacionSeleccionada || variacionSeleccionada.precio <= 0} className="w-full bg-tkd-blue text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-800 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed inline-flex items-center justify-center space-x-2 shadow-sm hover:shadow-md">
-                      <IconoCarritoAgregar className="w-5 h-5"/><span>Asignar Compra</span>
+                  </div>
+                  <button onClick={() => iniciarCompra(implemento, selecciones[implemento.id])} disabled={!variacionSeleccionada || variacionSeleccionada.precio <= 0} className="w-full bg-[#10B981] text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] shadow-[0_10px_20px_-5px_rgba(16,185,129,0.3)] hover:bg-[#059669] transition-all active:scale-95 disabled:bg-gray-700 disabled:opacity-50 flex items-center justify-center gap-3">
+                    <IconoCarritoAgregar className="w-5 h-5" /><span>Asignar Compra</span>
                   </button>
                 </div>
               </div>
@@ -86,11 +92,14 @@ const VistaTienda: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-tkd-dark dark:text-white">Tienda de Implementos</h1>
-        <button onClick={() => setModalCompartirAbierto(true)} className="bg-green-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-700 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 inline-flex items-center space-x-2 shadow-md hover:shadow-lg">
-          <IconoCompartir className="w-5 h-5" /><span>Compartir Tienda</span>
+    <div className="p-8 sm:p-12 bg-[#0D121F] min-h-screen">
+      <div className="flex flex-wrap gap-4 justify-between items-center mb-12">
+        <div>
+          <h1 className="text-4xl font-black text-white uppercase tracking-tighter">Tienda de Implementos</h1>
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Equipamiento técnico y uniformología oficial</p>
+        </div>
+        <button onClick={() => setModalCompartirAbierto(true)} className="bg-white/5 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-3">
+          <IconoCompartir className="w-4 h-4" /><span>Compartir Tienda</span>
         </button>
       </div>
 

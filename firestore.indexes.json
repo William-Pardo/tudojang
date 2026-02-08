@@ -107,24 +107,10 @@
                 {
                     "fieldPath": "estadoEntrega",
                     "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "asistencia",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "estudianteId",
-                    "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "fecha",
+                    "fieldPath": "__name__",
                     "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "horaEntrada",
-                    "order": "DESCENDING"
                 }
             ]
         },
@@ -138,10 +124,6 @@
                 },
                 {
                     "fieldPath": "apellidos",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "nombres",
                     "order": "ASCENDING"
                 },
                 {

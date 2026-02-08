@@ -37,6 +37,7 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
 };
 
 export const obtenerEventos = async (tenantId: string): Promise<Evento[]> => {
+    if (!tenantId) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de eventos vacía.");
         return [];
@@ -168,6 +169,7 @@ export const crearSolicitudInscripcion = async (idEvento: string, numIdentificac
 };
 
 export const obtenerSolicitudesPorEvento = async (idEvento: string): Promise<SolicitudInscripcion[]> => {
+    if (!idEvento) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de solicitudes vacía.");
         return [];

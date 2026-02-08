@@ -14,6 +14,7 @@ let movimientosMock: MovimientoFinanciero[] = [
 ];
 
 export const obtenerMovimientos = async (tenantId: string, sedeId?: string): Promise<MovimientoFinanciero[]> => {
+    if (!tenantId) return [];
     if (!isFirebaseConfigured) {
         let filtrados = [...movimientosMock];
         // Filter by tenant in mock

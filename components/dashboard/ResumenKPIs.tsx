@@ -6,25 +6,32 @@ import { EstadoPago } from '../../tipos';
 import { IconoEstudiantes, IconoAprobar, IconoTienda } from '../Iconos';
 import { formatearPrecio } from '../../utils/formatters';
 
-const CardKPI: React.FC<{ titulo: string; valor: string | number; icono: React.ReactNode; color: string; tendencia?: string }> = ({ titulo, valor, icono, color, tendencia }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm flex items-center space-x-4 border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all">
-        <div className={`p-3 rounded-full ${color}`}>
-            {icono}
-        </div>
-        <div className="flex-grow">
-            <p className="text-xs text-gray-700 dark:text-gray-400 font-bold uppercase tracking-wider">{titulo}</p>
-            <p className="text-2xl font-black text-tkd-dark dark:text-white">{valor}</p>
-            {tendencia && <p className="text-xs font-bold mt-1 text-green-700 dark:text-green-500">{tendencia}</p>}
-        </div>
+const CardKPI: React.FC<{ titulo: string; valor: string | number; icono: React.ReactNode; colorIcono: string; colorBgIcono: string; tendencia?: string }> = ({ titulo, valor, icono, colorIcono, colorBgIcono, tendencia }) => (
+  <div className="bg-[#1A2232] p-8 rounded-[1.8rem] flex items-center gap-6 border border-white/5 shadow-2xl hover:scale-[1.02] transition-all">
+    <div className={`w-16 h-16 rounded-full ${colorBgIcono} flex items-center justify-center shadow-lg`}>
+      {React.isValidElement(icono) ? React.cloneElement(icono as React.ReactElement<any>, { className: `w-7 h-7 ${colorIcono}` }) : icono}
     </div>
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">{titulo}</span>
+      </div>
+      <div className="text-3xl font-black text-white mt-1">{valor}</div>
+      {tendencia && (
+        <div className="mt-1 flex items-center gap-1">
+          <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">{tendencia}</span>
+        </div>
+      )}
+    </div>
+  </div>
 );
 
 interface Props {
   estudiantes: Estudiante[];
   finanzas: {
-      ingresos: number;
-      egresos: number;
-      balance: number;
+    ingresos: number;
+    egresos: number;
+    balance: number;
   };
 }
 
@@ -42,27 +49,31 @@ const ResumenKPIs: React.FC<Props> = ({ estudiantes, finanzas }) => {
       <CardKPI
         titulo="Estudiantes"
         valor={statsEstudiantes.totalEstudiantes}
-        icono={<IconoEstudiantes className="w-6 h-6 text-blue-600" />}
-        color="bg-blue-100 dark:bg-blue-900/50"
+        icono={<IconoEstudiantes />}
+        colorIcono="text-blue-400"
+        colorBgIcono="bg-blue-500/10"
         tendencia={`${statsEstudiantes.activos} al día`}
       />
       <CardKPI
         titulo="Ingresos"
         valor={formatearPrecio(finanzas.ingresos)}
-        icono={<IconoAprobar className="w-6 h-6 text-green-600" />}
-        color="bg-green-100 dark:bg-green-900/50"
+        icono={<IconoAprobar />}
+        colorIcono="text-green-400"
+        colorBgIcono="bg-green-500/10"
       />
       <CardKPI
         titulo="Egresos"
         valor={formatearPrecio(finanzas.egresos)}
-        icono={<IconoTienda className="w-6 h-6 text-red-600" />}
-        color="bg-red-100 dark:bg-red-900/50"
+        icono={<IconoTienda />}
+        colorIcono="text-red-400"
+        colorBgIcono="bg-red-500/10"
       />
       <CardKPI
         titulo="Cuentas por Cobrar"
         valor={formatearPrecio(statsEstudiantes.deudaTotal)}
-        icono={<span className="text-2xl font-bold text-orange-600">$</span>}
-        color="bg-orange-100 dark:bg-orange-900/50"
+        icono={<span className="text-2xl font-black">$</span>}
+        colorIcono="text-orange-400"
+        colorBgIcono="bg-orange-500/10"
       />
     </div>
   );

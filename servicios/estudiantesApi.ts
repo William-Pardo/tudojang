@@ -34,6 +34,7 @@ const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'con
 };
 
 export const obtenerEstudiantes = async (tenantId: string): Promise<Estudiante[]> => {
+    if (!tenantId) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
         return [

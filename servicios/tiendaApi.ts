@@ -19,6 +19,7 @@ const implementosCollection = collection(db, 'implementos');
 const solicitudesCompraCollection = collection(db, 'solicitudesCompra');
 
 export const obtenerImplementos = async (tenantId: string): Promise<Implemento[]> => {
+    if (!tenantId) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de implementos de prueba.");
         const mockImplementos: Implemento[] = [
@@ -120,6 +121,7 @@ export const crearSolicitudCompra = async (numIdentificacion: string, implemento
 };
 
 export const obtenerSolicitudesCompra = async (tenantId: string): Promise<SolicitudCompra[]> => {
+    if (!tenantId) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de solicitudes de compra vacía.");
         return [];
