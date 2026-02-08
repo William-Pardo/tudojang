@@ -1,6 +1,6 @@
 // servicios/pushService.ts
 import { getToken } from 'firebase/messaging';
-import { db, isFirebaseConfigured, firebaseConfig, messaging } from '@/src/config';
+import { messaging } from '../firebase/config';
 import { guardarTokenNotificacionUsuario } from './usuariosApi';
 import type { Usuario } from '../tipos';
 

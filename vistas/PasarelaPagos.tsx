@@ -2,36 +2,35 @@
 // vistas/PasarelaPagos.tsx
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTenant } from '../components/BrandingProvider';
-import { PLANES_SAAS, WOMPI_CONFIG } from '../constantes';
+import { useTenant } from '../components/BrandingProvider'; 
+import { PLANES_SAAS } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
 import { IconoAprobar, IconoEstudiantes, IconoUsuario, IconoCasa } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
-import { abrirCheckoutWompi } from '../servicios/wompiService';
 
 const VistaPasarelaPagos: React.FC = () => {
-    const { tenant } = useTenant();
+    const { tenant } = useTenant(); 
     const [periodoAnual, setPeriodoAnual] = useState(true);
     const [planSeleccionado, setPlanSeleccionado] = useState<'starter' | 'growth' | 'pro'>(tenant?.plan as any || 'growth');
 
-    const irAWompi = async () => {
+    const irAWompi = () => {
         const planObj = (PLANES_SAAS as any)[planSeleccionado];
         const mesesACobrar = periodoAnual ? 10 : 1;
         const montoBase = planObj.precio * mesesACobrar;
         const montoEnCentavos = montoBase * 100;
-
+        
         const periodoStr = periodoAnual ? 'ANUAL' : 'MENSUAL';
         const referenciaTecnica = `SUSC_${planSeleccionado.toUpperCase()}_${periodoStr}_${tenant?.tenantId}_${Date.now()}`;
 
-        await abrirCheckoutWompi({
-            referencia: referenciaTecnica,
-            montoEnPesos: montoBase,
-            email: tenant?.emailClub || '',
-            nombreCompleto: tenant?.nombreClub || '',
-            telefono: tenant?.pagoNequi || '',
-            esSimulacion: WOMPI_CONFIG.MODO_TEST,
-            redirectUrl: `${window.location.origin}/#/aliant-control`
-        });
+        // NOTA: Aquí se usa la public-key del dueño de la plataforma Tudojang
+        const urlWompi = `https://checkout.wompi.co/p/?` + 
+            `public-key=pub_test_XXXXXXXXXXXX&` + 
+            `currency=COP&` +
+            `amount-in-cents=${montoEnCentavos}&` +
+            `reference=${referenciaTecnica}&` +
+            `redirect-url=${window.location.origin}/#/aliant-control`;
+
+        window.location.href = urlWompi;
     };
 
     return (
@@ -45,16 +44,9 @@ const VistaPasarelaPagos: React.FC = () => {
                 </div>
                 <div>
                     <h1 className="text-5xl font-black text-tkd-blue tracking-tighter mb-1">TUDOJANG</h1>
-                    <div className="flex items-center justify-center gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">
-                            {tenant?.nombreClub || 'Gestión Técnica Profesional'}
-                        </p>
-                        {WOMPI_CONFIG.MODO_TEST && (
-                            <span className="bg-tkd-red/10 text-tkd-red px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-tkd-red/20 animate-pulse">
-                                Sandbox
-                            </span>
-                        )}
-                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">
+                        {tenant?.nombreClub || 'Gestión Técnica Profesional'}
+                    </p>
                 </div>
             </header>
 
@@ -62,13 +54,13 @@ const VistaPasarelaPagos: React.FC = () => {
                 {/* SELECTOR DE PERIODO */}
                 <div className="flex flex-col items-center gap-4">
                     <div className="bg-gray-100 p-1.5 rounded-2xl flex items-center shadow-inner">
-                        <button
+                        <button 
                             onClick={() => setPeriodoAnual(false)}
                             className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!periodoAnual ? 'bg-white text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
                         >
                             Mensual
                         </button>
-                        <button
+                        <button 
                             onClick={() => setPeriodoAnual(true)}
                             className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${periodoAnual ? 'bg-white text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
                         >
@@ -77,8 +69,8 @@ const VistaPasarelaPagos: React.FC = () => {
                     </div>
                     <AnimatePresence>
                         {periodoAnual && (
-                            <motion.span
-                                initial={{ opacity: 0, y: -10 }}
+                            <motion.span 
+                                initial={{ opacity: 0, y: -10 }} 
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest"
@@ -93,14 +85,15 @@ const VistaPasarelaPagos: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Added comment above fix: explicitly cast plan as any to fix 'unknown' property access errors. */}
                     {Object.values(PLANES_SAAS).map((plan: any) => (
-                        <motion.div
+                        <motion.div 
                             key={plan.id}
                             whileHover={{ y: -10 }}
                             onClick={() => setPlanSeleccionado(plan.id as any)}
-                            className={`cursor-pointer rounded-[3rem] p-8 border-4 transition-all relative flex flex-col ${planSeleccionado === plan.id
-                                ? 'border-tkd-blue bg-white shadow-2xl z-10'
+                            className={`cursor-pointer rounded-[3rem] p-8 border-4 transition-all relative flex flex-col ${
+                                planSeleccionado === plan.id 
+                                ? 'border-tkd-blue bg-white shadow-2xl z-10' 
                                 : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
-                                }`}
+                            }`}
                         >
                             {plan.popular && (
                                 <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-tkd-red text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg">
@@ -138,8 +131,9 @@ const VistaPasarelaPagos: React.FC = () => {
                                 ))}
                             </ul>
 
-                            <div className={`mt-auto w-8 h-8 rounded-full border-2 mx-auto flex items-center justify-center transition-all ${planSeleccionado === plan.id ? 'border-tkd-blue bg-tkd-blue shadow-lg' : 'border-gray-300'
-                                }`}>
+                            <div className={`mt-auto w-8 h-8 rounded-full border-2 mx-auto flex items-center justify-center transition-all ${
+                                planSeleccionado === plan.id ? 'border-tkd-blue bg-tkd-blue shadow-lg' : 'border-gray-300'
+                            }`}>
                                 {planSeleccionado === plan.id && <IconoAprobar className="w-5 h-5 text-white" />}
                             </div>
                         </motion.div>
@@ -159,7 +153,7 @@ const VistaPasarelaPagos: React.FC = () => {
                             <div className="text-right">
                                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Total a Pagar:</p>
                                 <AnimatePresence mode="wait">
-                                    <motion.p
+                                    <motion.p 
                                         key={planSeleccionado + periodoAnual}
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
@@ -171,7 +165,7 @@ const VistaPasarelaPagos: React.FC = () => {
                             </div>
                         </div>
 
-                        <button
+                        <button 
                             onClick={irAWompi}
                             className="w-full bg-tkd-red hover:bg-red-700 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4"
                         >
@@ -193,7 +187,7 @@ const VistaPasarelaPagos: React.FC = () => {
                     </div>
 
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
-                        Transacción procesada por Wompi Colombia. <br />
+                        Transacción procesada por Wompi Colombia. <br/>
                         Tu cuenta será reactivada instantáneamente tras la confirmación del banco.
                     </p>
                 </div>

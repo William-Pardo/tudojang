@@ -1,295 +1,155 @@
 
-// vistas/RegistroEscuela.tsx - VERSIÓN SIMPLIFICADA SIN SLUGS
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+// vistas/RegistroEscuela.tsx
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { motion } from 'framer-motion';
-import { registrarNuevaEscuela } from '../servicios/configuracionApi';
-import { IconoLogoOficial, IconoEnviar, IconoExitoAnimado, IconoCopiar } from '../components/Iconos';
+import { buscarTenantPorSlug, registrarNuevaEscuela } from '../servicios/configuracionApi';
+import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado, IconoInformacion } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
+import { DATOS_RECAUDO_MASTER } from '../constantes';
 import FormInputError from '../components/FormInputError';
-import { useAuth } from '../context/AuthContext';
 
 const schema = yup.object({
-    nombreClub: yup.string().min(3, 'Mínimo 3 letras.').required('El nombre de la academia es obligatorio.'),
-    nombreDirector: yup.string().min(6, 'Ingresa nombre y apellido.').required('El nombre del director es obligatorio.'),
-    telefonoDirector: yup.string().min(10, 'Formato inválido.').required('El teléfono es obligatorio.'),
+    nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
     email: yup.string().email('Email inválido.').required('El email es obligatorio.'),
+    slug: yup.string()
+        .matches(/^[a-z0-9-]+$/, 'Solo letras minúsculas, números y guiones.')
+        .min(3, 'Mínimo 3 caracteres.')
+        .required('El nombre de la URL es obligatorio.'),
 }).required();
 
 const RegistroEscuela: React.FC = () => {
-    const [finalizado, setFinalizado] = useState(false);
+    const [paso, setPaso] = useState<'formulario' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
     const { mostrarNotificacion } = useNotificacion();
-    const [contrasenaCopiada, setContrasenaCopiada] = useState(false);
-    const [datosRegistro, setDatosRegistro] = useState<any>(null);
-    const { login } = useAuth();
-
-    const { register, handleSubmit, formState: { errors } } = useForm({
-        resolver: yupResolver(schema),
-        mode: 'onChange'
+    const { register, handleSubmit, formState: { errors }, watch } = useForm({
+        resolver: yupResolver(schema)
     });
+
+    const slugDeseado = watch('slug');
 
     const onSubmit = async (data: any) => {
         setCargando(true);
         try {
-            console.log('📝 Iniciando registro simplificado...');
+            const existe = await buscarTenantPorSlug(data.slug);
+            if (existe) {
+                mostrarNotificacion("Este nombre de URL ya está ocupado. Elige otro.", "error");
+                setCargando(false);
+                return;
+            }
 
-            // Generar contraseña aleatoria segura
-            const generarPassword = () => {
-                const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
-                let password = '';
-                for (let i = 0; i < 12; i++) {
-                    password += chars.charAt(Math.floor(Math.random() * chars.length));
-                }
-                return password;
-            };
-
-            const passwordGenerada = generarPassword();
-
-            // Generar tenantId automático basado en timestamp
-            const timestamp = Date.now();
-            const tenantId = `tnt-${timestamp}`;
-
-            // Preparar datos para registro
-            const datosEscuela = {
+            await registrarNuevaEscuela({
                 nombreClub: data.nombreClub,
-                representanteLegal: data.nombreDirector,
-                emailClub: data.email,
-                pagoNequi: data.telefonoDirector,
-                tenantId: tenantId,
-                slug: tenantId,
-                plan: 'starter',
-                limiteEstudiantes: 50,
-                limiteUsuarios: 2,
-                limiteSedes: 1,
-                estadoSuscripcion: 'activo' as const,
-                valorMensualidad: 140000,
-            };
-
-            console.log('🚀 Registrando escuela:', datosEscuela);
-
-            // Registrar escuela (esto también crea el usuario en Auth)
-            await registrarNuevaEscuela(datosEscuela, passwordGenerada);
-
-            console.log('✅ Registro completado exitosamente');
-
-            // Guardar datos para mostrar
-            setDatosRegistro({
-                email: data.email,
-                password: passwordGenerada,
-                nombreClub: data.nombreClub
+                slug: data.slug,
+                emailClub: data.email
             });
 
-            setFinalizado(true);
-            mostrarNotificacion('¡Escuela registrada con éxito!', 'success');
-
-        } catch (error: any) {
-            console.error('❌ Error en registro:', error);
-            mostrarNotificacion(error.message || 'Error al registrar la escuela', 'error');
+            setPaso('exito');
+        } catch (error) {
+            mostrarNotificacion("Error al procesar el registro.", "error");
         } finally {
             setCargando(false);
         }
     };
 
-    const copiarPassword = () => {
-        if (datosRegistro?.password) {
-            navigator.clipboard.writeText(datosRegistro.password);
-            setContrasenaCopiada(true);
-            mostrarNotificacion('Contraseña copiada al portapapeles', 'success');
-        }
-    };
-
-    const irAlDashboard = async () => {
-        if (!datosRegistro) return;
-
-        try {
-            // Hacer login automático
-            await login(datosRegistro.email, datosRegistro.password);
-            // El AuthContext redirigirá automáticamente al dashboard
-        } catch (error: any) {
-            console.error('Error en login automático:', error);
-            mostrarNotificacion('Error al iniciar sesión. Por favor, inicia sesión manualmente.', 'error');
-        }
-    };
-
-    if (finalizado && datosRegistro) {
+    if (paso === 'exito') {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-tkd-dark via-gray-900 to-tkd-dark flex items-center justify-center p-4">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl w-full max-w-2xl p-12 text-center space-y-8"
-                >
+            <div className="min-h-screen bg-white dark:bg-tkd-dark flex items-center justify-center p-6">
+                <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-[3rem] p-12 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.1)] text-center space-y-8 border border-gray-100 dark:border-gray-800 animate-fade-in">
                     <IconoExitoAnimado className="mx-auto text-green-500" />
-
-                    <div className="space-y-4">
-                        <h1 className="text-4xl font-black uppercase text-gray-900 dark:text-white tracking-tight">
-                            ¡Bienvenido a Tudojang!
-                        </h1>
-                        <p className="text-lg text-gray-600 dark:text-gray-300 font-bold">
-                            Tu academia <span className="text-tkd-blue">{datosRegistro.nombreClub}</span> ha sido creada exitosamente
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-black uppercase text-tkd-dark dark:text-white tracking-tighter">¡Reserva Exitosa!</h2>
+                        <p className="text-sm text-gray-500 leading-relaxed uppercase font-bold tracking-tight px-4">
+                            Hemos reservado la URL <br/> <span className="text-tkd-blue">"{slugDeseado}.tudojang.com"</span> <br/> para tu academia.
                         </p>
                     </div>
-
-                    <div className="bg-gradient-to-br from-tkd-blue/10 to-tkd-red/10 p-8 rounded-3xl border-2 border-tkd-blue/20 space-y-6">
-                        <div className="space-y-2">
-                            <p className="text-xs font-black uppercase text-gray-500 tracking-widest">
-                                Tus Credenciales de Acceso
-                            </p>
-                            <div className="space-y-3">
-                                <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Email</p>
-                                    <p className="text-lg font-black text-gray-900 dark:text-white">{datosRegistro.email}</p>
-                                </div>
-                                <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-black uppercase text-gray-400 mb-1">Contraseña Temporal</p>
-                                    <p className="text-2xl font-black text-tkd-blue font-mono tracking-wider">
-                                        {datosRegistro.password}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={copiarPassword}
-                            className={`w-full py-4 rounded-2xl font-black uppercase text-sm transition-all flex items-center justify-center gap-3 ${contrasenaCopiada
-                                    ? 'bg-green-500 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                                }`}
-                        >
-                            <IconoCopiar className="w-5 h-5" />
-                            {contrasenaCopiada ? '¡Copiada!' : 'Copiar Contraseña'}
-                        </button>
+                    <div className="p-8 bg-blue-50/50 dark:bg-blue-900/10 rounded-[2.5rem] border border-blue-100 dark:border-blue-800 text-left">
+                        <p className="text-[10px] font-black uppercase text-tkd-blue mb-4 tracking-[0.2em]">Próximos Pasos de Activación:</p>
+                        <ul className="text-[11px] font-black text-gray-700 dark:text-gray-300 space-y-3 uppercase">
+                            <li className="flex gap-3"><span className="text-tkd-blue">01.</span> Realiza el pago de tu plan elegido.</li>
+                            <li className="flex gap-3"><span className="text-tkd-blue">02.</span> Envía el comprobante a nuestro WhatsApp.</li>
+                            <li className="flex gap-3"><span className="text-tkd-blue">03.</span> Recibirás tus credenciales de acceso.</li>
+                        </ul>
                     </div>
-
-                    <div className="space-y-4">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">
-                            💡 Guarda esta contraseña. Podrás cambiarla después en Configuración.
-                        </p>
-
-                        <button
-                            onClick={irAlDashboard}
-                            disabled={!contrasenaCopiada}
-                            className={`w-full py-6 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl transition-all ${contrasenaCopiada
-                                    ? 'bg-tkd-blue text-white hover:bg-blue-800 hover:scale-[1.02] active:scale-95 cursor-pointer'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed grayscale'
-                                }`}
-                        >
-                            {contrasenaCopiada ? 'Entrar a mi Academia 🚀' : 'Copia la contraseña para continuar'}
-                        </button>
-                    </div>
-                </motion.div>
+                    <a 
+                        href={`https://wa.me/57${DATOS_RECAUDO_MASTER.whatsappSoporte}?text=Hola! Acabo de registrar mi academia ${slugDeseado}. Envío el comprobante para activación.`}
+                        target="_blank"
+                        className="block w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95"
+                    >
+                        Enviar Comprobante
+                    </a>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-tkd-dark via-gray-900 to-tkd-dark flex items-center justify-center p-4">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl w-full max-w-2xl p-12"
-            >
-                <div className="text-center mb-10">
-                    <IconoLogoOficial className="w-20 h-20 mx-auto mb-6 text-tkd-blue" />
-                    <h1 className="text-4xl font-black uppercase text-gray-900 dark:text-white tracking-tight mb-3">
-                        Crea tu Academia
-                    </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">
-                        Gestión profesional de Taekwondo
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    {/* Nombre de la Academia */}
-                    <div>
-                        <label className="text-xs font-black uppercase text-gray-500 dark:text-gray-400 block mb-2 ml-2 tracking-widest">
-                            Nombre de tu Academia
-                        </label>
-                        <input
-                            {...register('nombreClub')}
-                            type="text"
-                            placeholder="Ej: Taekwondo Ga Jog"
-                            className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-4 text-base font-bold text-gray-900 dark:text-white uppercase outline-none focus:border-tkd-blue transition-all"
-                        />
-                        {errors.nombreClub && <FormInputError mensaje={errors.nombreClub.message || ''} />}
+        <div className="min-h-screen bg-white dark:bg-tkd-dark flex items-center justify-center p-6 transition-colors duration-500">
+            <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-20 items-center animate-fade-in">
+                <div className="space-y-10">
+                    <div className="w-20 h-20 bg-tkd-blue/5 rounded-3xl flex items-center justify-center border border-tkd-blue/10">
+                        <IconoLogoOficial className="w-12 h-12" />
                     </div>
-
-                    {/* Nombre del Director */}
-                    <div>
-                        <label className="text-xs font-black uppercase text-gray-500 dark:text-gray-400 block mb-2 ml-2 tracking-widest">
-                            Nombre del Director
-                        </label>
-                        <input
-                            {...register('nombreDirector')}
-                            type="text"
-                            placeholder="Nombre completo"
-                            className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-4 text-base font-bold text-gray-900 dark:text-white outline-none focus:border-tkd-blue transition-all"
-                        />
-                        {errors.nombreDirector && <FormInputError mensaje={errors.nombreDirector.message || ''} />}
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="text-xs font-black uppercase text-gray-500 dark:text-gray-400 block mb-2 ml-2 tracking-widest">
-                            Email de Acceso
-                        </label>
-                        <input
-                            {...register('email')}
-                            type="email"
-                            placeholder="director@tuacademia.com"
-                            className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-4 text-base font-bold text-gray-900 dark:text-white outline-none focus:border-tkd-blue transition-all"
-                        />
-                        {errors.email && <FormInputError mensaje={errors.email.message || ''} />}
-                    </div>
-
-                    {/* Teléfono */}
-                    <div>
-                        <label className="text-xs font-black uppercase text-gray-500 dark:text-gray-400 block mb-2 ml-2 tracking-widest">
-                            Teléfono / WhatsApp
-                        </label>
-                        <input
-                            {...register('telefonoDirector')}
-                            type="tel"
-                            placeholder="3001234567"
-                            className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-4 text-base font-bold text-gray-900 dark:text-white outline-none focus:border-tkd-blue transition-all"
-                        />
-                        {errors.telefonoDirector && <FormInputError mensaje={errors.telefonoDirector.message || ''} />}
-                    </div>
-
-                    {/* Botón de Registro */}
-                    <button
-                        type="submit"
-                        disabled={cargando}
-                        className="w-full bg-tkd-blue text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-blue-800 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {cargando ? (
-                            <>
-                                <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Creando Academia...
-                            </>
-                        ) : (
-                            <>
-                                <IconoEnviar className="w-6 h-6" />
-                                Crear Mi Academia
-                            </>
-                        )}
-                    </button>
-
-                    {/* Link al Login */}
-                    <div className="text-center pt-4">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">
-                            ¿Ya tienes una cuenta?{' '}
-                            <Link to="/login" className="text-tkd-blue hover:text-blue-800 font-black uppercase">
-                                Inicia Sesión
-                            </Link>
+                    <div className="space-y-4">
+                        <h1 className="text-5xl md:text-6xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">
+                            Crea tu <br/> <span className="text-tkd-blue">Dojang Digital</span>
+                        </h1>
+                        <p className="text-gray-400 text-lg font-bold uppercase leading-tight tracking-tight max-w-sm">
+                            La plataforma definitiva para escalar la gestión de tu escuela de Taekwondo.
                         </p>
                     </div>
-                </form>
-            </motion.div>
+                    <div className="flex items-center gap-5 p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm max-w-sm">
+                        <div className="bg-tkd-red/10 p-3 rounded-2xl">
+                            <IconoCasa className="w-8 h-8 text-tkd-red" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Identidad en la Red:</p>
+                            <p className="text-sm font-black text-tkd-blue uppercase tracking-tight">{slugDeseado ? `${slugDeseado}.tudojang.com` : 'nombre.tudojang.com'}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-900 p-10 md:p-12 rounded-[3.5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.08)] border border-gray-50 dark:border-gray-800 space-y-8">
+                    <div className="text-center lg:text-left">
+                        <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white tracking-tight">Formulario de Alta</h2>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Registra los datos maestros de tu dojang</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-2 tracking-widest">Nombre de la Institución</label>
+                            <input {...register('nombreClub')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all" placeholder="EJ: CLUB DRAGONES DEL SUR" />
+                            <FormInputError mensaje={errors.nombreClub?.message} />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-2 tracking-widest">Correo del Director</label>
+                            <input {...register('email')} type="email" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all" placeholder="DIRECTOR@DOJANG.COM" />
+                            <FormInputError mensaje={errors.email?.message} />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-tkd-blue block mb-2 ml-2 tracking-widest">Nombre Corto (Para tu URL)</label>
+                            <div className="relative group">
+                                <input {...register('slug')} className="w-full bg-blue-50/50 dark:bg-blue-900/20 border-2 border-transparent focus:border-tkd-blue rounded-2xl p-5 text-sm font-black text-tkd-blue outline-none lowercase transition-all" placeholder="mi-escuela" />
+                                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 uppercase tracking-widest">.tudojang.com</span>
+                            </div>
+                            <FormInputError mensaje={errors.slug?.message} />
+                            <p className="text-[9px] text-gray-400 font-bold mt-3 uppercase px-2 leading-relaxed opacity-60">Este nombre será tu acceso directo y marca digital única en el sistema.</p>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            disabled={cargando}
+                            className="w-full bg-tkd-dark text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:bg-tkd-blue transition-all flex items-center justify-center gap-4 disabled:bg-gray-200 disabled:text-gray-400 hover:scale-[1.02] active:scale-95"
+                        >
+                            {cargando ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-5 h-5" />}
+                            Reservar mi Entorno
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     );
 };

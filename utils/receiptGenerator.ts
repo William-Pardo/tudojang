@@ -1,6 +1,6 @@
 
 // utils/receiptGenerator.ts
-// import { jsPDF } from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { ConfiguracionClub } from '../tipos';
 import { formatearPrecio, formatearFecha } from './formatters';
@@ -13,7 +13,7 @@ export const generarReciboPagoPdf = async (
     const container = document.createElement('div');
     container.style.position = 'fixed';
     container.style.top = '0';
-    container.style.left = '-2000px';
+    container.style.left = '-2000px'; 
     container.style.width = '540px';
     container.style.height = '960px';
     container.style.backgroundColor = 'white';
@@ -94,21 +94,21 @@ export const generarReciboPagoPdf = async (
 
     try {
         const canvas = await html2canvas(container, {
-            scale: 3,
+            scale: 3, 
             useCORS: true,
             backgroundColor: '#ffffff'
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: [108, 192]
+        });
 
-        // const pdf = new jsPDF({
-        //     orientation: 'portrait',
-        //     unit: 'mm',
-        //     format: [108, 192]
-        // });
-
-        // pdf.addImage(imgData, 'JPEG', 0, 0, 108, 192);
-        // pdf.save(`Recibo_${profesorNombre.replace(' ', '_')}_${pago.periodo.replace(' ', '_')}.pdf`);
+        pdf.addImage(imgData, 'JPEG', 0, 0, 108, 192);
+        pdf.save(`Recibo_${profesorNombre.replace(' ', '_')}_${pago.periodo.replace(' ', '_')}.pdf`);
     } finally {
         document.body.removeChild(container);
     }

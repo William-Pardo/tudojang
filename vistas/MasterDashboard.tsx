@@ -7,9 +7,9 @@ import { obtenerMisiones, crearMisionKicho, inyectarEstudiantesKicho, obtenerReg
 import { escucharTicketsActivos, actualizarTicket } from '../servicios/soporteApi';
 import { enviarNotificacion } from '../servicios/api';
 import { ConfiguracionClub, MisionKicho, RegistroTemporal, TicketSoporte, EtapaSoporte } from '../tipos';
-import {
-    IconoLogoOficial, IconoAprobar, IconoRechazar, IconoDashboard,
-    IconoInformacion, IconoCasa, IconoEstudiantes, IconoUsuario,
+import { 
+    IconoLogoOficial, IconoAprobar, IconoRechazar, IconoDashboard, 
+    IconoInformacion, IconoCasa, IconoEstudiantes, IconoUsuario, 
     IconoCampana, IconoEnviar, IconoFirma, IconoAgregar, IconoCerrar, IconoGuardar,
     IconoWhatsApp
 } from '../components/Iconos';
@@ -24,7 +24,7 @@ const VistaMasterDashboard: React.FC = () => {
     const [tickets, setTickets] = useState<TicketSoporte[]>([]);
     const [cargando, setCargando] = useState(true);
     const [tabActiva, setTabActiva] = useState<'ecosistema' | 'kicho-central' | 'soporte-premium' | 'ux-analytics'>('soporte-premium');
-
+    
     // UI States
     const [modalNuevaMision, setModalNuevaMision] = useState(false);
     const [misionAProcesar, setMisionAProcesar] = useState<MisionKicho | null>(null);
@@ -48,14 +48,14 @@ const VistaMasterDashboard: React.FC = () => {
             const [dataT, dataM] = await Promise.all([obtenerTodosLosTenants(), obtenerMisiones()]);
             setTenants(dataT);
             setMisiones(dataM);
-        } catch (e: any) {
+        } catch (e) {
             mostrarNotificacion("Error al cargar ecosistema global", "error");
         } finally {
             setCargando(false);
         }
     };
 
-    useEffect(() => {
+    useEffect(() => { 
         cargarDatos();
         const desSuscribirTickets = escucharTicketsActivos(setTickets);
         return () => desSuscribirTickets();
@@ -75,7 +75,7 @@ const VistaMasterDashboard: React.FC = () => {
                 nombreMision: nuevaMision.nombre.toUpperCase(),
                 fechaExpiracion: fechaExp,
             });
-
+            
             const club = tenants.find(t => t.tenantId === nuevaMision.tenantId);
             if (club?.emailClub) {
                 await enviarNotificacion('Email', club.emailClub, `Maestro ${club.representanteLegal}, se ha habilitado el Protocolo KICHO para su dojang.`);
@@ -84,18 +84,18 @@ const VistaMasterDashboard: React.FC = () => {
             mostrarNotificacion("Misión enviada exitosamente al dojang", "success");
             setModalNuevaMision(false);
             cargarDatos();
-        } catch (e: any) {
+        } catch (e) {
             mostrarNotificacion("Fallo en la creación del formulario", "error");
         }
     };
 
-    const handleCambiarEstadoTenant = async (id: string, actual: ConfiguracionClub['estadoSuscripcion']) => {
+    const handleCambiarEstadoTenant = async (id: string, actual: any) => {
         const nuevo = actual === 'activo' ? 'suspendido' : 'activo';
         try {
             await cambiarEstadoSuscripcionTenant(id, nuevo);
             setTenants(prev => prev.map(t => t.tenantId === id ? { ...t, estadoSuscripcion: nuevo } : t));
             mostrarNotificacion(`Estado de academia actualizado a ${nuevo}`, "success");
-        } catch (e: any) { mostrarNotificacion("Error al cambiar estado", "error"); }
+        } catch (e) { mostrarNotificacion("Error al cambiar estado", "error"); }
     };
 
     const abrirHomologador = async (mision: MisionKicho) => {
@@ -113,7 +113,7 @@ const VistaMasterDashboard: React.FC = () => {
             mostrarNotificacion("Protocolo finalizado. Datos inyectados al núcleo oficial.", "success");
             setMisionAProcesar(null);
             cargarDatos();
-        } catch (e: any) { mostrarNotificacion("Error en proceso de inyección", "error"); }
+        } catch (e) { mostrarNotificacion("Error en proceso de inyección", "error"); }
         finally { setProcesandoInyeccion(false); }
     };
 
@@ -150,7 +150,7 @@ const VistaMasterDashboard: React.FC = () => {
                         <h1 className="text-4xl font-black uppercase tracking-tighter">Aliant <span className="text-tkd-blue">Control Tower</span></h1>
                     </div>
                 </div>
-
+                
                 <div className="flex items-center bg-white dark:bg-white/5 p-1 rounded-2xl border border-gray-200 dark:border-white/10 overflow-x-auto no-scrollbar shadow-sm">
                     {[
                         { id: 'soporte-premium', label: 'Soporte Master' },
@@ -204,21 +204,21 @@ const VistaMasterDashboard: React.FC = () => {
                                                     <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed font-medium italic">"{t.resumenIA.split('\n').slice(-2).join(' ')}"</p>
                                                 </div>
                                             </div>
-
+                                            
                                             <div className="flex flex-col sm:flex-row md:flex-col gap-3 justify-center min-w-[180px]">
-                                                <button
+                                                <button 
                                                     onClick={() => avanzarEtapaSoporte(t)}
                                                     className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-blue-800 transition-all flex items-center justify-center gap-2"
                                                 >
                                                     <IconoAprobar className="w-4 h-4" /> Avanzar Etapa
                                                 </button>
-                                                <button
+                                                <button 
                                                     onClick={() => activarSalaVideo(t)}
                                                     className="bg-tkd-dark text-white dark:bg-white/10 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-tkd-red transition-all flex items-center justify-center gap-2"
                                                 >
                                                     <IconoWhatsApp className="w-4 h-4 text-tkd-red" /> Iniciar Video
                                                 </button>
-                                                <button
+                                                <button 
                                                     onClick={() => cerrarTicket(t)}
                                                     className="text-gray-400 hover:text-green-500 font-black uppercase text-[9px] tracking-widest pt-2 transition-colors"
                                                 >
@@ -276,7 +276,7 @@ const VistaMasterDashboard: React.FC = () => {
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-4">
                                                 <span className={`text-[10px] font-black uppercase ${t.estadoSuscripcion === 'activo' ? 'text-green-600 dark:text-green-400' : 'text-tkd-red'}`}>{t.estadoSuscripcion}</span>
-                                                <button
+                                                <button 
                                                     onClick={() => handleCambiarEstadoTenant(t.tenantId, t.estadoSuscripcion)}
                                                     className={`w-12 h-6 rounded-full relative transition-colors ${t.estadoSuscripcion === 'activo' ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-700'}`}
                                                 >
@@ -303,7 +303,7 @@ const VistaMasterDashboard: React.FC = () => {
                                 <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Gestión Global de Captura de Datos</p>
                             </div>
                         </div>
-                        <button
+                        <button 
                             onClick={() => setModalNuevaMision(true)}
                             className="bg-tkd-blue text-white dark:bg-white dark:text-tkd-blue px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-3"
                         >
@@ -347,7 +347,7 @@ const VistaMasterDashboard: React.FC = () => {
                                                 <h4 className="font-black uppercase text-sm">{m.nombreMision}</h4>
                                             </div>
                                         </div>
-                                        <button
+                                        <button 
                                             onClick={() => abrirHomologador(m)}
                                             className="bg-tkd-blue text-white px-6 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg hover:bg-blue-800 transition-all"
                                         >
@@ -397,7 +397,7 @@ const VistaMasterDashboard: React.FC = () => {
             <AnimatePresence>
                 {modalNuevaMision && (
                     <div className="fixed inset-0 z-[200] bg-tkd-dark/90 dark:bg-black/95 backdrop-blur-md flex items-center justify-center p-6">
-                        <motion.div
+                        <motion.div 
                             initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             className="bg-white dark:bg-gray-900 w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border border-gray-100 dark:border-white/10"
                         >
@@ -411,13 +411,13 @@ const VistaMasterDashboard: React.FC = () => {
                             <form onSubmit={handleCrearMision} className="p-10 space-y-8 overflow-y-auto">
                                 <fieldset className="border border-tkd-blue/20 p-6 rounded-2xl bg-blue-50/20 dark:bg-blue-900/5 space-y-6">
                                     <legend className="text-sm font-black uppercase text-tkd-blue px-3 bg-white dark:bg-gray-900 ml-4">Configuración del Protocolo</legend>
-
+                                    
                                     <div>
                                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dojang Destino</label>
-                                        <select
+                                        <select 
                                             required
-                                            value={nuevaMision.tenantId}
-                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNuevaMision({ ...nuevaMision, tenantId: e.target.value })}
+                                            value={nuevaMision.tenantId} 
+                                            onChange={e => setNuevaMision({...nuevaMision, tenantId: e.target.value})}
                                             className={selectClasses}
                                         >
                                             <option value="">Elegir Dojang...</option>
@@ -427,10 +427,10 @@ const VistaMasterDashboard: React.FC = () => {
 
                                     <div>
                                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Título de Campaña</label>
-                                        <input
+                                        <input 
                                             type="text" required
                                             value={nuevaMision.nombre}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNuevaMision({ ...nuevaMision, nombre: e.target.value })}
+                                            onChange={e => setNuevaMision({...nuevaMision, nombre: e.target.value})}
                                             className={inputClasses}
                                             placeholder="EJ: CENSO DE APERTURA JUNIO 2024"
                                         />
@@ -439,19 +439,19 @@ const VistaMasterDashboard: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-6">
                                         <div>
                                             <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Fecha Cierre</label>
-                                            <input
+                                            <input 
                                                 type="date" required
                                                 value={nuevaMision.fechaVencimiento}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNuevaMision({ ...nuevaMision, fechaVencimiento: e.target.value })}
+                                                onChange={e => setNuevaMision({...nuevaMision, fechaVencimiento: e.target.value})}
                                                 className={inputClasses}
                                             />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Hora Cierre</label>
-                                            <input
+                                            <input 
                                                 type="time" required
                                                 value={nuevaMision.horaVencimiento}
-                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNuevaMision({ ...nuevaMision, horaVencimiento: e.target.value })}
+                                                onChange={e => setNuevaMision({...nuevaMision, horaVencimiento: e.target.value})}
                                                 className={inputClasses}
                                             />
                                         </div>
@@ -468,7 +468,7 @@ const VistaMasterDashboard: React.FC = () => {
 
                             <footer className="p-8 border-t border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50 dark:bg-gray-800/30">
                                 <button type="button" onClick={() => setModalNuevaMision(false)} className="px-6 py-2 text-xs font-black uppercase text-gray-400 hover:text-tkd-red transition-all">Cancelar</button>
-                                <button
+                                <button 
                                     onClick={handleCrearMision}
                                     className="bg-tkd-blue text-white px-10 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 active:scale-95 transition-all flex items-center gap-3"
                                 >
@@ -491,7 +491,7 @@ const VistaMasterDashboard: React.FC = () => {
                                 </div>
                                 <button onClick={() => setMisionAProcesar(null)} className="p-3 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"><IconoCerrar className="w-8 h-8 text-gray-400" /></button>
                             </header>
-
+                            
                             <div className="flex-1 overflow-y-auto p-10 space-y-8 no-scrollbar">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="bg-gray-50 dark:bg-white/5 p-8 rounded-3xl border border-gray-100 dark:border-white/5 space-y-4 text-center">
@@ -543,7 +543,7 @@ const VistaMasterDashboard: React.FC = () => {
                                     <IconoInformacion className="w-6 h-6 text-tkd-blue" />
                                     <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest max-w-sm">La inyección masiva crea automáticamente los contratos iniciales y perfiles técnicos.</p>
                                 </div>
-                                <button
+                                <button 
                                     onClick={ejecutarInyeccionAliant}
                                     disabled={procesandoInyeccion || registrosAProcesar.length === 0}
                                     className="bg-tkd-red text-white px-12 py-6 rounded-3xl font-black uppercase text-xs tracking-[0.3em] shadow-2xl hover:bg-red-700 transition-all flex items-center gap-4 active:scale-95 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:text-gray-400"

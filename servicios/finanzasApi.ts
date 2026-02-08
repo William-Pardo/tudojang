@@ -1,7 +1,7 @@
 
 // servicios/finanzasApi.ts
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/src/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { TipoMovimiento, CategoriaFinanciera, type MovimientoFinanciero } from '../tipos';
 
 const finanzasCollection = collection(db, 'finanzas');
@@ -13,25 +13,20 @@ let movimientosMock: MovimientoFinanciero[] = [
     { id: '2', tenantId: 'escuela-gajog-001', tipo: TipoMovimiento.Egreso, categoria: CategoriaFinanciera.Arriendo, monto: 1200000, descripcion: 'Pago local Junio', fecha: new Date().toISOString().split('T')[0], sedeId: '1' }
 ];
 
-export const obtenerMovimientos = async (tenantId: string, sedeId?: string): Promise<MovimientoFinanciero[]> => {
-    if (!tenantId) return [];
+export const obtenerMovimientos = async (sedeId?: string): Promise<MovimientoFinanciero[]> => {
     if (!isFirebaseConfigured) {
         let filtrados = [...movimientosMock];
-        // Filter by tenant in mock
-        filtrados = filtrados.filter(m => m.tenantId === tenantId);
-
         if (sedeId && sedeId !== 'todas') {
             filtrados = filtrados.filter(m => m.sedeId === sedeId);
         }
         return filtrados.sort((a, b) => b.fecha.localeCompare(a.fecha));
     }
-
-    let q = query(finanzasCollection, where('tenantId', '==', tenantId), orderBy('fecha', 'desc'));
-
+    
+    let q = query(finanzasCollection, orderBy('fecha', 'desc'));
     if (sedeId && sedeId !== 'todas') {
-        q = query(finanzasCollection, where('tenantId', '==', tenantId), where('sedeId', '==', sedeId), orderBy('fecha', 'desc'));
+        q = query(finanzasCollection, where('sedeId', '==', sedeId), orderBy('fecha', 'desc'));
     }
-
+    
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MovimientoFinanciero));
 };

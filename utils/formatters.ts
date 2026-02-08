@@ -27,18 +27,3 @@ export const generarUrlAbsoluta = (rutaApp: string): string => {
     // Construimos la URL con el hash para que el Router lo reconozca al abrirse desde afuera
     return `${base}#${cleanRoute}`;
 };
-
-/**
- * Convierte un texto en un slug amigable para URL.
- */
-export const slugify = (text: string): string => {
-    return text
-        .toString()
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, '-')           // Reemplaza espacios con -
-        .replace(/[^\w-]+/g, '')         // Elimina caracteres no alfanuméricos
-        .replace(/--+/g, '-')           // Reemplaza múltiples - con uno solo
-        .replace(/^-+/, '')             // Elimina - al inicio
-        .replace(/-+$/, '');            // Elimina - al final
-};

@@ -12,33 +12,33 @@ interface Props {
 const ResumenPagos: React.FC<Props> = ({ estudiantes }) => {
 
   const distribucionPagos = useMemo(() => ({
-    'AL DÍA': estudiantes.filter(e => e.estadoPago === EstadoPago.AlDia).length,
-    'PENDIENTE': estudiantes.filter(e => e.estadoPago === EstadoPago.Pendiente).length,
-    'VENCIDO': estudiantes.filter(e => e.estadoPago === EstadoPago.Vencido).length,
+    'Al día': estudiantes.filter(e => e.estadoPago === EstadoPago.AlDia).length,
+    'Pendiente': estudiantes.filter(e => e.estadoPago === EstadoPago.Pendiente).length,
+    'Vencido': estudiantes.filter(e => e.estadoPago === EstadoPago.Vencido).length,
   }), [estudiantes]);
-
+  
   const totalEstudiantes = estudiantes.length;
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm h-full">
-      <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-8">Distribución de Cartera</h2>
-      <ul className="space-y-8">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700">
+      <h2 className="text-lg font-black text-tkd-dark dark:text-white uppercase tracking-tight mb-6">Distribución de Cartera</h2>
+      <ul className="space-y-5">
         {Object.entries(distribucionPagos).map(([estado, cantidad]) => {
           const colors = {
-            'AL DÍA': 'bg-green-500',
-            'PENDIENTE': 'bg-yellow-500',
-            'VENCIDO': 'bg-red-500',
+            'Al día': 'bg-green-500',
+            'Pendiente': 'bg-yellow-500',
+            'Vencido': 'bg-red-500',
           };
           const total = totalEstudiantes > 0 ? totalEstudiantes : 1;
           const percentage = (((cantidad as number) / total) * 100).toFixed(1);
-
+          
           return (
             <li key={estado}>
               <div className="flex justify-between items-end mb-2 px-1">
-                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                  {estado} <span className="text-tkd-blue ml-1">({cantidad})</span>
+                <span className="text-[10px] font-black uppercase text-gray-700 dark:text-gray-400 tracking-wider">
+                  {estado} <span className="ml-1 text-tkd-blue">({cantidad})</span>
                 </span>
-                <span className="text-xs font-black text-gray-900 dark:text-white">
+                <span className="text-xs font-black text-tkd-dark dark:text-white">
                   {percentage}%
                 </span>
               </div>

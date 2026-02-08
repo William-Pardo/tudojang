@@ -1,19 +1,21 @@
+
 // App.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-import './src/config';
+import './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
+import { DataProvider } from './context/DataContext'; 
 import { NotificacionProvider } from './context/NotificacionContext';
-import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
+import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext'; 
 import BrandingProvider, { useTenant } from './components/BrandingProvider';
 import { RolUsuario, type Usuario } from './tipos';
 
-import PublicLanding from './vistas/PublicLanding'; // Importar la nueva Landing
+import PublicLanding from './vistas/PublicLanding';
 import Login from './vistas/Login';
-import RegistroEscuela from './vistas/RegistroEscuela';
+import RegistroEscuela from './vistas/RegistroEscuela'; 
+import PasarelaInscripcion from './vistas/PasarelaInscripcion'; // Importación nueva
 import VistaConfiguracion from './vistas/Configuracion';
 import VistaAdministracion from './vistas/Administracion';
 import { VistaEstudiantes } from './vistas/Estudiantes';
@@ -26,19 +28,18 @@ import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
 
-// Vistas de Firma de Documentos
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
 import VistaFirmaImagen from './vistas/FirmaImagen';
-import PasarelaInscripcion from './vistas/PasarelaInscripcion';
+import CensoPublico from './vistas/CensoPublico';
 
 import Footer from './components/Footer';
 import NotificacionToast from './components/NotificacionToast';
 import BotonVolverArriba from './components/BotonVolverArriba';
 import ModalBusquedaGlobal from './components/ModalBusquedaGlobal';
 import LogoDinamico from './components/LogoDinamico';
-import AsistenteVirtual from './components/AsistenteVirtual';
-import HeatmapOverlay from './components/HeatmapOverlay';
+import AsistenteVirtual from './components/AsistenteVirtual'; 
+import HeatmapOverlay from './components/HeatmapOverlay'; 
 import {
     IconoCampana, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
@@ -59,72 +60,45 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     ];
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => enlace.roles.includes(usuario.rol));
-    const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20'; // Ancho reducido para PC colapsado
+    const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
 
-    // Estilo adaptativo para PC: centrado perfecto si está cerrado
     const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
         const isActive = location.pathname === ruta;
         const isPC = window.innerWidth >= 768;
-
         let baseClasses = `flex items-center transition-all duration-300 uppercase font-black text-[11px] tracking-[0.2em] w-full text-white`;
 
         if (isPC) {
-            // DISEÑO PC: Ocupa todo el ancho, borde rojo si activo, sin padding lateral si cerrado para centrar icono
-            return `${baseClasses} py-5 border-r-4 ${estaAbierta ? 'px-8 gap-4' : 'px-0 justify-center'} ${isActive
-                ? 'bg-white/10 border-tkd-red'
-                : 'bg-transparent border-transparent hover:bg-white/5 opacity-80 hover:opacity-100'}`;
+            return `${baseClasses} py-5 border-r-4 ${estaAbierta ? 'px-8 gap-4' : 'px-0 justify-center'} ${isActive ? 'bg-white/10 border-tkd-red' : 'bg-transparent border-transparent hover:bg-white/5 opacity-80 hover:opacity-100'}`;
         } else {
-            // DISEÑO MÓVIL: Mantiene burbujas
-            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border ${isActive
-                ? 'bg-white/20 border-white/30'
-                : 'bg-white/5 border-white/5 opacity-80'}`;
+            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
         }
     };
 
     return (
         <aside className={`bg-tkd-blue text-white flex flex-col fixed inset-y-0 left-0 z-40 h-screen transition-all duration-500 ease-in-out md:relative md:translate-x-0 ${sidebarWidthClass} ${estaAbierta ? 'translate-x-0' : '-translate-x-full shadow-2xl'}`}>
-            {/* Header: Logo ajustable */}
             <div className={`flex items-center justify-center h-28 border-b border-white/10 transition-all ${estaAbierta ? 'p-8' : 'p-2'}`}>
                 <LogoDinamico className={estaAbierta ? "h-16 w-auto" : "h-10 w-10"} />
             </div>
-
-            {/* Navegación Principal: Solo Iconos si está cerrado en PC */}
             <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
                 {enlacesVisibles.map((enlace) => (
-                    <ReactRouterDOM.Link
-                        key={enlace.ruta}
-                        to={enlace.ruta}
-                        onClick={onCerrar}
-                        className={getButtonStyle(enlace.ruta)}
-                        title={!estaAbierta ? enlace.texto : undefined}
-                    >
+                    <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
                         <enlace.icono className="w-5 h-5 flex-shrink-0" />
                         <span className={`${estaAbierta ? 'block' : 'hidden'}`}>{enlace.texto}</span>
                     </ReactRouterDOM.Link>
                 ))}
             </nav>
-
-            {/* Acciones Inferiores: Mi Perfil arriba, Logout abajo */}
             <div className="border-t border-white/10 flex flex-col">
                 {esMaster && (
-                    <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className={getButtonStyle('/aliant-control')} title={!estaAbierta ? 'Consola Aliant' : undefined}>
+                    <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className={getButtonStyle('/aliant-control')}>
                         <IconoAprobar className="w-5 h-5 flex-shrink-0" />
                         <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Consola Aliant</span>
                     </ReactRouterDOM.Link>
                 )}
-
-                {/* MI PERFIL */}
-                <ReactRouterDOM.Link to="/mi-perfil" onClick={onCerrar} className={getButtonStyle('/mi-perfil')} title={!estaAbierta ? 'Mi Perfil' : undefined}>
+                <ReactRouterDOM.Link to="/mi-perfil" onClick={onCerrar} className={getButtonStyle('/mi-perfil')}>
                     <IconoUsuario className="w-5 h-5 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Mi Perfil</span>
                 </ReactRouterDOM.Link>
-
-                {/* CERRAR SESIÓN */}
-                <button
-                    onClick={onLogout}
-                    className={getButtonStyle('/logout', true)}
-                    title={!estaAbierta ? 'Cerrar Sesión' : undefined}
-                >
+                <button onClick={onLogout} className={getButtonStyle('/logout', true)}>
                     <IconoLogout className="w-5 h-5 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
                 </button>
@@ -135,7 +109,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
 
 const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
-    const { puntos, heatmapActivo } = useAnalytics();
+    const { puntos, heatmapActivo } = useAnalytics(); 
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
@@ -149,34 +123,27 @@ const AppLayout: React.FC = () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
     }, [theme]);
-
-    if (!usuario) return null;
-
-    const toggleMenu = () => setMenuAbierto(!menuAbierto);
-    const cerrarMenuSiMovil = () => {
-        if (window.innerWidth < 1024) setMenuAbierto(false);
-    };
-
+    
+    if(!usuario) return null;
+    
     return (
         <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950">
             <HeatmapOverlay puntos={puntos} activo={heatmapActivo} />
-
-            {menuAbierto && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={cerrarMenuSiMovil}></div>}
-            <BarraLateral usuario={usuario} onLogout={logout} estaAbierta={menuAbierto} onCerrar={cerrarMenuSiMovil} />
-
+            {menuAbierto && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setMenuAbierto(false)}></div>}
+            <BarraLateral usuario={usuario} onLogout={logout} estaAbierta={menuAbierto} onCerrar={() => setMenuAbierto(false)} />
             <main className="flex-1 flex flex-col overflow-hidden">
                 <header className="flex items-center justify-between h-20 px-8 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/5 z-20">
-                    <button onClick={toggleMenu} className="p-3 rounded-2xl text-gray-400 hover:text-tkd-dark focus:outline-none dark:hover:text-white transition-all hover:bg-gray-50 dark:hover:bg-white/5">
+                    <button onClick={() => setMenuAbierto(!menuAbierto)} className="p-3 rounded-2xl text-gray-400 hover:text-tkd-dark transition-all hover:bg-gray-50 dark:hover:bg-white/5">
                         <IconoMenu className="w-6 h-6" />
                     </button>
                     <div className="flex items-center space-x-4">
                         {usuario.rol !== RolUsuario.Tutor && (
-                            <button onClick={() => setBusquedaAbierta(true)} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
-                                <IconoBuscar className="w-5 h-5" />
+                            <button onClick={() => setBusquedaAbierta(true)} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+                               <IconoBuscar className="w-5 h-5"/>
                             </button>
                         )}
-                        <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-all">
-                            {theme === 'light' ? <IconoLuna className="w-5 h-5" /> : <IconoSol className="w-5 h-5" />}
+                        <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+                            {theme === 'light' ? <IconoLuna className="w-5 h-5"/> : <IconoSol className="w-5 h-5" />}
                         </button>
                         <div className="h-8 w-px bg-gray-100 dark:bg-white/10 mx-2"></div>
                         <div className="text-right hidden sm:block">
@@ -186,12 +153,7 @@ const AppLayout: React.FC = () => {
                     </div>
                 </header>
                 <div className="flex-1 overflow-y-auto" ref={scrollableContainerRef}>
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4 }}
-                        className="h-full"
-                    >
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="h-full">
                         <ReactRouterDOM.Outlet />
                     </motion.div>
                 </div>
@@ -207,45 +169,47 @@ const AppLayout: React.FC = () => {
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
+    
+    if (cargandoSesion) return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;
 
-    if (cargandoSesion) {
-        return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;
+    const host = window.location.hostname;
+    const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
+
+    if (isRootDomain && (!tenant || tenant.slug === 'gajog')) {
+        return (
+            <ReactRouterDOM.Routes>
+                <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
+                <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
+                <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" /> : <Login />} />
+                <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
+            </ReactRouterDOM.Routes>
+        );
     }
 
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
     return (
         <ReactRouterDOM.Routes>
-            {/* 1. ALWAYS PUBLIC ROUTES */}
-            <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" replace /> : <Login />} />
+            <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to={usuario.rol === RolUsuario.Tutor ? "/mi-perfil" : "/"} replace /> : <Login />} />
             <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
-
+            <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
+            <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
             <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
             <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
             <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
             <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
             <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
-            <ReactRouterDOM.Route path="/unete/:solicitudId" element={<PasarelaInscripcion />} />
 
-            {/* 2. THE DYNAMIC ROOT & PROTECTED ROUTES */}
-            <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Outlet />}>
-                {/* The Home Route: Landing for guests, Dashboard for admins, Profile for tutors */}
-                <ReactRouterDOM.Route path="/" element={
-                    !usuario ? <PublicLanding /> :
-                        (usuario.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />)
-                } />
-
-                {/* Protected Modules (Redirect to / if not logged in) */}
-                <ReactRouterDOM.Route path="/estudiantes" element={usuario ? <VistaEstudiantes /> : <ReactRouterDOM.Navigate to="/" />} />
-                <ReactRouterDOM.Route path="/tienda" element={usuario ? <VistaTienda /> : <ReactRouterDOM.Navigate to="/" />} />
-                <ReactRouterDOM.Route path="/eventos" element={usuario ? <VistaEventos /> : <ReactRouterDOM.Navigate to="/" />} />
-                <ReactRouterDOM.Route path="/notificaciones" element={usuario ? <VistaNotificaciones /> : <ReactRouterDOM.Navigate to="/" />} />
-                <ReactRouterDOM.Route path="/mi-perfil" element={usuario ? <VistaMiPerfil /> : <ReactRouterDOM.Navigate to="/" />} />
+            <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
+                <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
+                <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
+                <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
+                <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
+                <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />
+                <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
                 <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
                 <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />
             </ReactRouterDOM.Route>
-
-            {/* 3. FINAL FALLBACK */}
             <ReactRouterDOM.Route path="*" element={<Vista404 />} />
         </ReactRouterDOM.Routes>
     );
@@ -255,16 +219,16 @@ const App: React.FC = () => {
     return (
         <ReactRouterDOM.HashRouter>
             <NotificacionProvider>
-                <AuthProvider>
-                    <BrandingProvider>
+                <BrandingProvider>
+                    <AuthProvider>
                         <AnalyticsProvider>
                             <DataProvider>
                                 <NotificacionToast />
                                 <AppRoutes />
                             </DataProvider>
                         </AnalyticsProvider>
-                    </BrandingProvider>
-                </AuthProvider>
+                    </AuthProvider>
+                </BrandingProvider>
             </NotificacionProvider>
         </ReactRouterDOM.HashRouter>
     );

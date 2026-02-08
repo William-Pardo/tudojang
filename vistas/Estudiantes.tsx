@@ -84,7 +84,7 @@ export const VistaEstudiantes: React.FC = () => {
     // Timer para el banner global
     useEffect(() => {
         if (!misionActiva) return;
-        const interval: NodeJS.Timeout = setInterval(() => {
+        const interval = setInterval(() => {
             const diff = new Date(misionActiva.fechaExpiracion).getTime() - new Date().getTime();
             if (diff <= 0) { setCountdown('EXPIRADA'); clearInterval(interval); return; }
             const h = Math.floor(diff / (1000 * 60 * 60));
@@ -97,7 +97,7 @@ export const VistaEstudiantes: React.FC = () => {
     const renderDirectorio = () => {
         if (cargando) return <TablaEstudiantesSkeleton />;
         if (error) return <ErrorState mensaje={error} onReintentar={cargarEstudiantes} />;
-
+        
         const tieneEstudiantes = estudiantes.length > 0;
         const filtrosSinResultados = tieneEstudiantes && estudiantesFiltrados.length === 0;
 
@@ -108,7 +108,7 @@ export const VistaEstudiantes: React.FC = () => {
             return (
                 <div className="animate-fade-in space-y-4">
                     <FiltrosEstudiantes filtroNombre={filtroNombre} setFiltroNombre={setFiltroNombre} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} filtroEstado={filtroEstado} setFiltroEstado={setFiltroEstado} />
-
+                    
                     <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
                         <div>
                             {estudiantesFiltrados.length > 0 ? (
@@ -125,7 +125,7 @@ export const VistaEstudiantes: React.FC = () => {
             );
         }
         return (
-            <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
+             <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
                 <div className="flex flex-col gap-4 max-w-xs mx-auto">
                     <button onClick={() => abrirFormulario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2">
                         <IconoAgregar className="w-5 h-5" /><span>Agregar Uno a Uno</span>
@@ -158,75 +158,55 @@ export const VistaEstudiantes: React.FC = () => {
     ].filter(t => t.visible);
 
     return (
-        <div className="p-4 sm:p-12 space-y-10 bg-tkd-gray dark:bg-gray-950 min-h-screen animate-fade-in">
+        <div className="p-4 sm:p-8 space-y-8">
             {/* BANNER GLOBAL DE MISIÓN KICHO ACTIVA */}
             <AnimatePresence>
                 {misionActiva && activeTab !== 'kicho' && (
-                    <motion.div
+                    <motion.div 
                         initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
-                        className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/5 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm"
+                        className="bg-tkd-blue/10 border border-tkd-blue/20 p-4 rounded-[1.5rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm"
                     >
-                        <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 bg-tkd-blue/10 text-tkd-blue border border-tkd-blue/20 rounded-2xl flex items-center justify-center shadow-inner"><IconoCampana className="w-6 h-6 animate-pulse" /></div>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-tkd-blue text-white rounded-xl flex items-center justify-center shadow-lg"><IconoCampana className="w-5 h-5 animate-bounce" /></div>
                             <div>
-                                <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.3em]">Protocolo de Onboarding Activo</p>
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">Tus alumnos están enviando sus datos. Revisa la pestaña Misión KICHO.</p>
+                                <p className="text-[10px] font-black uppercase text-tkd-blue tracking-widest">Protocolo de Onboarding Activo</p>
+                                <p className="text-xs font-bold text-gray-600 dark:text-gray-300">Tus alumnos están enviando sus datos. Revisa la pestaña Misión KICHO.</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <div className="w-px h-10 bg-gray-100 dark:bg-white/5 hidden sm:block"></div>
-                            <button onClick={() => setActiveTab('kicho')} className="text-[10px] font-black uppercase text-tkd-dark dark:text-white hover:text-tkd-blue transition-colors tracking-widest flex items-center gap-2 group">
-                                Gestionar Registro <span className="group-hover:translate-x-1 transition-transform">→</span>
-                            </button>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-tkd-red/10 text-tkd-red px-4 py-1.5 rounded-full text-[10px] font-black uppercase border border-tkd-red/20">{countdown}</div>
+                            <button onClick={() => setActiveTab('kicho')} className="text-xs font-black uppercase text-tkd-blue hover:underline">Gestionar Registro →</button>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <header className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center">
+            <header className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                 <div>
-                    <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Hub de Estudiantes</h1>
-                    <p className="text-[10px] font-black text-gray-500 mt-2 uppercase tracking-[0.4em]">Gestión centralizada de la base técnica</p>
+                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Hub de Estudiantes</h1>
+                    <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
                 </div>
-
-                {(activeTab === 'directorio' || activeTab === 'kicho') && (
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="mr-4 hidden lg:flex items-center gap-3 px-5 py-2.5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
-                            <div className="w-2 h-2 bg-tkd-blue rounded-full animate-pulse"></div>
-                            <span className="text-[9px] font-black uppercase text-tkd-blue tracking-widest">
-                                Trial: {estudiantes.length}/15 Alumnos
-                            </span>
-                        </div>
-                        <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-50 text-green-600 dark:bg-green-600/10 dark:text-green-500 p-3.5 rounded-2xl hover:bg-green-600 hover:text-white transition-all border border-green-100 dark:border-green-500/20 shadow-sm" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
-                        <button
-                            disabled={estudiantes.length >= 15}
-                            onClick={() => setModalImportMasivaAbierto(true)}
-                            className="bg-white dark:bg-gray-800 text-tkd-blue px-6 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-sm border border-gray-100 dark:border-gray-700"
-                        >
-                            <IconoInformacion className="w-4 h-4" /><span>Importar CSV</span>
-                        </button>
-                        <button
-                            disabled={estudiantes.length >= 15}
-                            onClick={() => abrirFormulario()}
-                            className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
-                        >
-                            <IconoAgregar className="w-4 h-4" /><span>Nuevo Alumno</span>
-                        </button>
+                
+                {activeTab === 'directorio' && (
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition-all shadow-lg" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
+                        <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"><IconoInformacion className="w-4 h-4" /><span>Importar CSV</span></button>
+                        <button onClick={() => abrirFormulario()} className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"><IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span></button>
                     </div>
                 )}
             </header>
 
             {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
-            <div className="bg-white dark:bg-gray-800 p-2 rounded-full md:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as TabId)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-4 px-8 py-4 md:py-3.5 rounded-full md:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-lg scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                        <button 
+                            key={tab.id} 
+                            onClick={() => setActiveTab(tab.id as TabId)} 
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             title={tab.label}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 transition-colors ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span className="hidden md:inline">{tab.label}</span>
                             {tab.id === 'kicho' && <div className="w-2 h-2 bg-tkd-red rounded-full animate-pulse flex-shrink-0"></div>}
                         </button>

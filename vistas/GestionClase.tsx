@@ -16,7 +16,7 @@ const VistaGestionClase: React.FC = () => {
     const { usuario } = useAuth();
     const { sedes } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
-
+    
     const [sedeSeleccionadaId, setSedeSeleccionadaId] = useState<string>(usuario?.sedeId || '');
     const [asistencias, setAsistencias] = useState<any[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -27,10 +27,10 @@ const VistaGestionClase: React.FC = () => {
     const esAdministrativo = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor;
 
     useEffect(() => {
-        if (!sedeSeleccionadaId || !usuario?.tenantId) return;
+        if (!sedeSeleccionadaId) return;
 
         setCargando(true);
-        const desSuscribir = escucharAsistenciasActivasSede(usuario.tenantId, sedeSeleccionadaId, async (data) => {
+        const desSuscribir = escucharAsistenciasActivasSede(sedeSeleccionadaId, async (data) => {
             try {
                 const dataConEstudiante = await Promise.all(data.map(async (a) => {
                     const est = await obtenerEstudiantePorId(a.estudianteId);
@@ -45,7 +45,7 @@ const VistaGestionClase: React.FC = () => {
         });
 
         return () => desSuscribir();
-    }, [sedeSeleccionadaId, usuario?.tenantId, mostrarNotificacion]);
+    }, [sedeSeleccionadaId, mostrarNotificacion]);
 
     useEffect(() => {
         if (esAdministrativo && !sedeSeleccionadaId && sedes.length > 0) {
@@ -57,15 +57,15 @@ const VistaGestionClase: React.FC = () => {
         setProcesandoId(asist.id);
         try {
             await actualizarEstadoEntrega(asist.id, EstadoEntrega.Listo);
-
+            
             const index = Math.floor(Math.random() * FRASES_SALIDA.length);
             const mensaje = FRASES_SALIDA[index].replace("[ESTUDIANTE]", asist.estudiante.nombres);
-
+            
             const tel = asist.estudiante.tutor?.telefono;
             if (tel) {
                 window.open(`https://wa.me/57${tel}?text=${encodeURIComponent(mensaje)}`, '_blank');
             }
-
+            
             mostrarNotificacion(`${asist.estudiante.nombres} marcado como listo`, "success");
         } catch (error) {
             mostrarNotificacion("Error al actualizar estado", "error");
@@ -99,7 +99,7 @@ const VistaGestionClase: React.FC = () => {
                         </div>
                         <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">{asistencias.length} Alumnos presentes</p>
                     </div>
-                    <button
+                    <button 
                         onClick={() => setEscanerAbierto(true)}
                         className="p-4 bg-tkd-blue text-white rounded-2xl shadow-lg hover:bg-blue-800 transition-all active:scale-95 group"
                         title="Abrir Cámara para Escaneo"
@@ -115,7 +115,7 @@ const VistaGestionClase: React.FC = () => {
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-tkd-blue">
                                 <IconoCasa className="w-5 h-5" />
                             </div>
-                            <select
+                            <select 
                                 value={sedeSeleccionadaId}
                                 onChange={(e) => setSedeSeleccionadaId(e.target.value)}
                                 className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl pl-12 pr-10 py-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner appearance-none cursor-pointer transition-all"
@@ -123,7 +123,7 @@ const VistaGestionClase: React.FC = () => {
                                 {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
                             </select>
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 transition-transform group-hover:translate-y-[-40%]">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
                             </div>
                         </div>
                     </div>
@@ -135,8 +135,8 @@ const VistaGestionClase: React.FC = () => {
                     <div className="py-12 flex justify-center"><Loader texto="Conectando al dojang..." /></div>
                 ) : asistencias.length === 0 ? (
                     <div className="text-center py-20 bg-gray-50/50 dark:bg-gray-800/30 rounded-[3rem] border-4 border-dashed border-gray-100 dark:border-gray-700">
-                        <p className="text-gray-400 font-black uppercase text-xs tracking-widest">No hay alumnos registrados <br /> en esta sede hoy.</p>
-                        <button
+                        <p className="text-gray-400 font-black uppercase text-xs tracking-widest">No hay alumnos registrados <br/> en esta sede hoy.</p>
+                        <button 
                             onClick={() => setEscanerAbierto(true)}
                             className="mt-6 text-tkd-blue font-black uppercase text-[10px] tracking-widest hover:underline"
                         >
@@ -154,17 +154,18 @@ const VistaGestionClase: React.FC = () => {
                                     <p className="text-[10px] text-gray-500 font-bold uppercase">ID: {a.estudiante.numeroIdentificacion}</p>
                                 </div>
                             </div>
-                            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${a.estadoEntrega === EstadoEntrega.Listo
-                                    ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-500/20'
-                                    : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
-                                }`}>
+                            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${
+                                a.estadoEntrega === EstadoEntrega.Listo 
+                                ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-500/20' 
+                                : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
+                            }`}>
                                 {a.estadoEntrega}
                             </span>
                         </div>
 
                         <div className="flex gap-3">
                             {a.estadoEntrega === EstadoEntrega.EnClase ? (
-                                <button
+                                <button 
                                     onClick={() => handleMarcarListo(a)}
                                     disabled={procesandoId === a.id}
                                     className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-green-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:bg-gray-300"
@@ -173,7 +174,7 @@ const VistaGestionClase: React.FC = () => {
                                     Notificar Salida
                                 </button>
                             ) : (
-                                <button
+                                <button 
                                     onClick={() => setModalEntrega({ asist: a, est: a.estudiante })}
                                     disabled={procesandoId === a.id}
                                     className="flex-1 bg-tkd-blue text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:bg-gray-300"
@@ -188,9 +189,9 @@ const VistaGestionClase: React.FC = () => {
             </div>
 
             {escanerAbierto && (
-                <EscanerAsistencia
-                    sedeId={sedeSeleccionadaId}
-                    onClose={() => setEscanerAbierto(false)}
+                <EscanerAsistencia 
+                    sedeId={sedeSeleccionadaId} 
+                    onClose={() => setEscanerAbierto(false)} 
                 />
             )}
 
@@ -203,7 +204,7 @@ const VistaGestionClase: React.FC = () => {
                         </div>
 
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-6">Confirme que la persona que recoge a <span className="font-black text-tkd-blue">{modalEntrega.est.nombres}</span> está autorizada:</p>
-
+                        
                         <div className="space-y-4 mb-10">
                             <p className="text-[10px] font-black text-tkd-red uppercase tracking-widest ml-1">Personas Autorizadas:</p>
                             <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-[1.5rem] border border-gray-100 dark:border-gray-700 shadow-inner">

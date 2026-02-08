@@ -1,7 +1,8 @@
+
 // servicios/censoApi.ts
 import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/src/config';
-import type { MisionKicho, RegistroTemporal, Estudiante, PagoRegistro } from '../tipos';
+import { db, isFirebaseConfigured } from '../firebase/config';
+import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
 
 /**
@@ -53,7 +54,7 @@ export const obtenerMisionActivaTenant = async (tenantId: string): Promise<Misio
 /**
  * REGISTRAR ASPIRANTE DESDE FORMULARIO PÚBLICO
  */
-export const registrarAspirantePublico = async (misionId: string, tenantId: string, datos: RegistroTemporal['datos']): Promise<void> => {
+export const registrarAspirantePublico = async (misionId: string, tenantId: string, datos: any): Promise<void> => {
     if (!isFirebaseConfigured) return;
     const nuevoRegistro = {
         misionId,
@@ -63,14 +64,14 @@ export const registrarAspirantePublico = async (misionId: string, tenantId: stri
         datos
     };
     await addDoc(collection(db, 'registros_temporales'), nuevoRegistro);
-
+    
     // Incrementar contador en la misión
     try {
         const misionRef = doc(db, 'misiones_kicho', misionId);
         await updateDoc(misionRef, {
             registrosRecibidos: increment(1)
         });
-    } catch (e: any) {
+    } catch (e) {
         console.warn("Misión ID no encontrada o inválida para incremento.");
     }
 };
@@ -78,7 +79,7 @@ export const registrarAspirantePublico = async (misionId: string, tenantId: stri
 /**
  * TENANT: Cambia el estado interno de un registro temporal
  */
-export const validarRegistroTemporal = async (id: string, estado: RegistroTemporal['estado']): Promise<void> => {
+export const validarRegistroTemporal = async (id: string, estado: 'verificado' | 'rechazado'): Promise<void> => {
     if (!isFirebaseConfigured) return;
     await updateDoc(doc(db, 'registros_temporales', id), { estado });
 };
@@ -101,14 +102,14 @@ export const legalizarLoteKicho = async (misionId: string, firmaBase64: string):
  */
 export const inyectarEstudiantesKicho = async (misionId: string, registros: RegistroTemporal[]): Promise<void> => {
     if (!isFirebaseConfigured) return;
-
+    
     const batch = writeBatch(db);
     const hoy = new Date().toISOString().split('T')[0];
 
     registros.forEach(reg => {
         const estRef = doc(collection(db, 'estudiantes'));
         const { datos } = reg;
-
+        
         const payload: Omit<Estudiante, 'id'> = {
             tenantId: reg.tenantId,
             nombres: datos.nombres.toUpperCase().trim(),
@@ -138,7 +139,7 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
                 correo: datos.tutorEmail || ''
             } : undefined
         };
-
+        
         batch.set(estRef, payload);
         batch.update(doc(db, 'registros_temporales', reg.id), { estado: 'procesado' });
     });
@@ -151,48 +152,5 @@ export const obtenerRegistrosMision = async (misionId: string): Promise<Registro
     if (!isFirebaseConfigured) return [];
     const q = query(collection(db, 'registros_temporales'), where("misionId", "==", misionId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as RegistroTemporal));
-};
-
-/**
- * PREMIUM: Crea una solicitud de inscripción para un nuevo alumno
- */
-export const crearSolicitudInscripcion = async (tenantId: string, datos: Partial<RegistroTemporal['datos']>, monto: number): Promise<string> => {
-    if (!isFirebaseConfigured) return 'mock-ins-123';
-    const nuevaSolicitud = {
-        tenantId,
-        misionId: 'inscripcion_premium',
-        fechaRegistro: new Date().toISOString(),
-        estado: 'pendiente_pago',
-        pago: {
-            monto,
-            metodo: 'otros'
-        },
-        datos
-    };
-    const docRef = await addDoc(collection(db, 'registros_temporales'), nuevaSolicitud);
-    return docRef.id;
-};
-
-/**
- * PREMIUM: Sube soporte de pago y pasa a verificación
- */
-export const subirSoportePago = async (id: string, soporteUrl: string, metodo: PagoRegistro['metodo']): Promise<void> => {
-    if (!isFirebaseConfigured) return;
-    await updateDoc(doc(db, 'registros_temporales', id), {
-        estado: 'por_verificar',
-        'pago.soporteUrl': soporteUrl,
-        'pago.metodo': metodo,
-        'pago.fechaPago': new Date().toISOString()
-    });
-};
-
-/**
- * PREMIUM: Obtiene una solicitud por su ID (para el Smart Link)
- */
-export const obtenerSolicitudInscripcion = async (id: string): Promise<RegistroTemporal | null> => {
-    if (!isFirebaseConfigured) return null;
-    const snap = await getDoc(doc(db, 'registros_temporales', id));
-    if (!snap.exists()) return null;
-    return { id: snap.id, ...snap.data() } as RegistroTemporal;
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroTemporal));
 };

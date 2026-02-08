@@ -1,7 +1,7 @@
 
 // components/HeatmapOverlay.tsx
 import React, { useEffect, useRef } from 'react';
-
+// Added comment above fix: Use centralized PuntoCalor from tipos.ts to ensure type compatibility with context.
 import { PuntoCalor } from '../tipos';
 
 interface Props {
@@ -28,15 +28,15 @@ const HeatmapOverlay: React.FC<Props> = ({ puntos, activo }) => {
 
         const render = () => {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+            
             puntos.forEach(p => {
                 const absX = (p.x / 100) * canvas.width;
                 const absY = (p.y / 100) * canvas.height;
                 const radio = p.tipo === 'click' ? 40 : 25;
-
+                
                 // Crear gradiente radial para efecto de "calor"
                 const grad = ctx.createRadialGradient(absX, absY, 0, absX, absY, radio);
-
+                
                 if (p.tipo === 'click') {
                     // Clics: Rojo intenso a transparente
                     grad.addColorStop(0, 'rgba(255, 0, 0, 0.6)');

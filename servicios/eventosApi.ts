@@ -1,20 +1,20 @@
 
 // servicios/eventosApi.ts
-import {
-    collection,
-    getDocs,
-    doc,
-    getDoc,
-    addDoc,
-    updateDoc,
-    deleteDoc,
-    query,
-    where,
+import { 
+    collection, 
+    getDocs, 
+    doc, 
+    getDoc, 
+    addDoc, 
+    updateDoc, 
+    deleteDoc, 
+    query, 
+    where, 
     writeBatch,
     orderBy
 } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, isFirebaseConfigured } from '@/src/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { EstadoPago, EstadoSolicitud } from '../tipos';
 import type { Estudiante, Evento, SolicitudInscripcion } from '../tipos';
 import { obtenerEstudiantePorId, obtenerEstudiantePorNumIdentificacion } from './estudiantesApi';
@@ -36,25 +36,17 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
     return imagenUrl || '';
 };
 
-export const obtenerEventos = async (tenantId: string): Promise<Evento[]> => {
-    if (!tenantId) return [];
+export const obtenerEventos = async (): Promise<Evento[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de eventos vacía.");
         return [];
     }
-    const q = query(
-        eventosCollection,
-        where('tenantId', '==', tenantId),
-        orderBy('fechaEvento', 'desc')
-    );
-
-    // Para las solicitudes pendientes, lo ideal sería filtrar por tenantId también si existe, 
-    // pero por ahora filtramos el mapa después de obtenerlas o por eventoId.
+    const q = query(eventosCollection, orderBy('fechaEvento', 'desc'));
     const [eventosSnap, solicitudesSnap] = await Promise.all([
         getDocs(q),
         getDocs(query(solicitudesCollection, where('estado', '==', EstadoSolicitud.Pendiente)))
     ]);
-
+    
     const solicitudesPendientesMap = new Map<string, number>();
     solicitudesSnap.forEach(doc => {
         const solicitud = doc.data() as SolicitudInscripcion;
@@ -96,7 +88,7 @@ export const obtenerEventoPorId = async (idEvento: string): Promise<Evento> => {
 };
 
 export const agregarEvento = async (nuevoEventoData: Omit<Evento, 'id'>): Promise<Evento> => {
-    if (!isFirebaseConfigured) {
+     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Agregando evento.");
         return { id: `mock-evt-${Date.now()}`, ...nuevoEventoData } as Evento;
     }
@@ -108,7 +100,7 @@ export const agregarEvento = async (nuevoEventoData: Omit<Evento, 'id'>): Promis
 };
 
 export const actualizarEvento = async (eventoActualizado: Evento): Promise<Evento> => {
-    if (!isFirebaseConfigured) {
+     if (!isFirebaseConfigured) {
         return eventoActualizado;
     }
     const { id, ...data } = eventoActualizado;
@@ -120,7 +112,7 @@ export const actualizarEvento = async (eventoActualizado: Evento): Promise<Event
 };
 
 export const eliminarEvento = async (idEvento: string): Promise<void> => {
-    if (!isFirebaseConfigured) {
+     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Eliminando evento.");
         return;
     }
@@ -129,24 +121,23 @@ export const eliminarEvento = async (idEvento: string): Promise<void> => {
 };
 
 export const crearSolicitudInscripcion = async (idEvento: string, numIdentificacion: string): Promise<SolicitudInscripcion> => {
-    if (!isFirebaseConfigured) {
+     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Creando solicitud de inscripción.");
         const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
         return {
             id: `mock-si-${Date.now()}`,
-            tenantId: 'escuela-gajog-001',
             eventoId: idEvento,
             estudiante: {
-                id: estudiante.id,
-                nombres: estudiante.nombres,
-                apellidos: estudiante.apellidos,
+              id: estudiante.id,
+              nombres: estudiante.nombres,
+              apellidos: estudiante.apellidos,
             },
             fechaSolicitud: new Date().toISOString(),
             estado: EstadoSolicitud.Pendiente
         };
     }
     const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
-
+    
     const q = query(solicitudesCollection, where("eventoId", "==", idEvento), where("estudiante.id", "==", estudiante.id));
     const existing = await getDocs(q);
     if (!existing.empty) {
@@ -163,13 +154,12 @@ export const crearSolicitudInscripcion = async (idEvento: string, numIdentificac
         fechaSolicitud: new Date().toISOString(),
         estado: EstadoSolicitud.Pendiente,
     };
-
+    
     const docRef = await addDoc(solicitudesCollection, nuevaSolicitudData);
     return { id: docRef.id, ...nuevaSolicitudData } as unknown as SolicitudInscripcion;
 };
 
 export const obtenerSolicitudesPorEvento = async (idEvento: string): Promise<SolicitudInscripcion[]> => {
-    if (!idEvento) return [];
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de solicitudes vacía.");
         return [];
@@ -194,7 +184,7 @@ export const gestionarSolicitud = async (idSolicitud: string, nuevoEstado: Estad
     }
 
     const solicitud = solicitudSnap.data() as SolicitudInscripcion;
-
+    
     const batch = writeBatch(db);
     batch.update(solicitudDocRef, { estado: nuevoEstado });
 
@@ -203,7 +193,7 @@ export const gestionarSolicitud = async (idSolicitud: string, nuevoEstado: Estad
             obtenerEventoPorId(solicitud.eventoId),
             obtenerEstudiantePorId(solicitud.estudiante.id)
         ]);
-
+        
         const estudianteDocRef = doc(db, 'estudiantes', solicitud.estudiante.id);
         const nuevoSaldo = estudiante.saldoDeudor + evento.valor;
         const nuevoEstadoPago = (estudiante.estadoPago === EstadoPago.AlDia && evento.valor > 0)

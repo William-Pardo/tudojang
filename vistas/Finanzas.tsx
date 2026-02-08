@@ -28,7 +28,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
     const [filtroSede, setFiltroSede] = useState('todas');
     const [filtroFechaInicio, setFiltroFechaInicio] = useState('');
     const [filtroFechaFin, setFiltroFechaFin] = useState('');
-
+    
     const [vistaAnalitica, setVistaAnalitica] = useState(initialView === 'analitica');
     const [modalAbierto, setModalAbierto] = useState(false);
     const [movimientoEnEdicion, setMovimientoEnEdicion] = useState<MovimientoFinanciero | null>(null);
@@ -50,7 +50,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
     const movimientosFiltrados = useMemo(() => {
         return movimientos.filter(m => {
             const fechaValida = (!filtroFechaInicio || m.fecha >= filtroFechaInicio) &&
-                (!filtroFechaFin || m.fecha <= filtroFechaFin);
+                                (!filtroFechaFin || m.fecha <= filtroFechaFin);
             return fechaValida;
         });
     }, [movimientos, filtroFechaInicio, filtroFechaFin]);
@@ -67,7 +67,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             }
             setModalAbierto(false);
             setMovimientoEnEdicion(null);
-        } catch (err: any) {
+        } catch (err) {
             mostrarNotificacion("Error al procesar", "error");
         } finally {
             setCargandoAccion(false);
@@ -82,7 +82,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             mostrarNotificacion("Eliminado correctamente", "success");
             setModalEliminarAbierto(false);
             setMovimientoAEliminar(null);
-        } catch (err: any) {
+        } catch (err) {
             mostrarNotificacion("Error al eliminar", "error");
         } finally {
             setCargandoAccion(false);
@@ -91,57 +91,54 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
 
     if (cargando && movimientos.length === 0) return <div className="p-8"><Loader texto="Cargando finanzas..." /></div>;
 
-    const selectClasses = "w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-none rounded-xl text-gray-900 dark:text-white shadow-inner focus:ring-2 focus:ring-tkd-blue outline-none transition-all text-sm font-black uppercase";
+    const selectClasses = "w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 shadow-sm focus:ring-tkd-blue focus:border-tkd-blue outline-none transition-colors text-sm font-bold";
 
     return (
-        <div className={`space-y-10 animate-fade-in ${!isSubView ? 'p-4 sm:p-12 bg-tkd-gray dark:bg-gray-950 min-h-screen' : ''}`}>
+        <div className={`space-y-8 animate-fade-in ${!isSubView ? 'p-4 sm:p-8' : ''}`}>
             {!isSubView && (
-                <div className="flex flex-col sm:flex-row gap-6 justify-between items-start sm:items-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                     <div>
-                        <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Libro de Tesorería</h1>
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Sincronización de flujos y balance operativo</p>
+                        <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Libro de Tesorería</h1>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 p-1 rounded-full md:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                        <div className="flex flex-row gap-1 p-0.5">
-                            <button
-                                onClick={() => setVistaAnalitica(false)}
-                                className={`px-8 py-3 rounded-full md:rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${!vistaAnalitica ? 'bg-tkd-dark text-white shadow-lg scale-[1.02]' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                            >
-                                <IconoMenu className="w-4 h-4" /> Diario
-                            </button>
-                            <button
-                                onClick={() => setVistaAnalitica(true)}
-                                className={`px-8 py-3 rounded-full md:rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${vistaAnalitica ? 'bg-tkd-blue text-white shadow-lg scale-[1.02]' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                            >
-                                <IconoDashboard className="w-4 h-4" /> Analíticas
-                            </button>
-                        </div>
+                    <div className="flex items-center bg-white dark:bg-gray-800 p-1 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                        <button 
+                            onClick={() => setVistaAnalitica(false)}
+                            className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-2 ${!vistaAnalitica ? 'bg-tkd-dark text-white shadow-lg' : 'text-gray-400 hover:text-tkd-blue'}`}
+                        >
+                            <IconoMenu className="w-4 h-4" /> Diario
+                        </button>
+                        <button 
+                            onClick={() => setVistaAnalitica(true)}
+                            className={`px-6 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-2 ${vistaAnalitica ? 'bg-tkd-blue text-white shadow-lg' : 'text-gray-400 hover:text-tkd-blue'}`}
+                        >
+                            <IconoDashboard className="w-4 h-4" /> Analíticas
+                        </button>
                     </div>
                 </div>
             )}
 
             {/* Barra de Filtros */}
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-2 ml-1 tracking-widest">Sede / Dojang</label>
-                    <select value={filtroSede} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFiltroSede(e.target.value)} className={selectClasses}>
+                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-1 tracking-widest">Sede / Dojang</label>
+                    <select value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} className={selectClasses}>
                         <option value="todas">Todas las Sedes</option>
                         {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-2 ml-1 tracking-widest">Fecha Inicio</label>
-                    <input type="date" value={filtroFechaInicio} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroFechaInicio(e.target.value)} className={selectClasses} />
+                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-1 tracking-widest">Fecha Inicio</label>
+                    <input type="date" value={filtroFechaInicio} onChange={(e) => setFiltroFechaInicio(e.target.value)} className={selectClasses} />
                 </div>
                 <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-2 ml-1 tracking-widest">Fecha Fin</label>
-                    <input type="date" value={filtroFechaFin} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltroFechaFin(e.target.value)} className={selectClasses} />
+                    <label className="text-[10px] uppercase font-black text-gray-400 block mb-1 tracking-widest">Fecha Fin</label>
+                    <input type="date" value={filtroFechaFin} onChange={(e) => setFiltroFechaFin(e.target.value)} className={selectClasses} />
                 </div>
-                <div className="flex gap-3">
-                    <button onClick={() => { setMovimientoEnEdicion(null); setModalAbierto(true); }} className="flex-grow bg-tkd-blue text-white py-4 rounded-xl font-black uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-3">
+                <div className="flex gap-2">
+                    <button onClick={() => { setMovimientoEnEdicion(null); setModalAbierto(true); }} className="flex-grow bg-tkd-blue text-white py-2 rounded-md font-semibold text-sm hover:bg-blue-800 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 h-[38px]">
                         <IconoAgregar className="w-4 h-4" /> Registrar
                     </button>
-                    <button className="bg-green-50 text-green-600 dark:bg-green-600/10 dark:text-green-500 p-4 rounded-xl border border-green-100 dark:border-green-600/20 hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Exportar CSV">
+                    <button className="bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition-all shadow-sm flex items-center justify-center h-[38px] w-[38px]" title="Exportar CSV">
                         <IconoExportar className="w-5 h-5" />
                     </button>
                 </div>

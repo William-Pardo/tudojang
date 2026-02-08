@@ -1,8 +1,9 @@
+
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, auth, isFirebaseConfigured } from '@/src/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
 import type { Usuario } from '../tipos';
 
@@ -27,10 +28,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Si no hay configuración de Firebase, no hacer nada con onAuthStateChanged
     if (!isFirebaseConfigured) {
-      setCargandoSesion(false);
-      return;
+        setCargandoSesion(false);
+        return;
     }
-
+      
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -40,8 +41,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
+            // Added comment above fix: Spread userData to include all required properties (numeroIdentificacion, whatsapp, tenantId) in Usuario state.
             setUsuario({
               id: firebaseUser.uid,
+              email: firebaseUser.email!,
               ...userData
             } as Usuario);
           } else {
@@ -50,9 +53,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUsuario(null);
           }
         } catch (e) {
-          console.error("Error al obtener perfil de usuario:", e);
-          await apiCerrarSesion();
-          setUsuario(null);
+            console.error("Error al obtener perfil de usuario:", e);
+            await apiCerrarSesion();
+            setUsuario(null);
         }
       } else {
         // Usuario ha cerrado sesión

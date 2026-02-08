@@ -11,7 +11,7 @@ export const useDashboard = () => {
     const { eventos, cargando: cargandoEventos, error: errorEventos, cargarEventos } = useEventos();
     const { solicitudesCompra, cargando: cargandoTienda, error: errorTienda, gestionarSolicitudCompra, cargarDatosTienda } = useTienda();
     const { movimientos, cargando: cargandoFinanzas, cargarMovimientos } = useFinanzas();
-
+    
     const { mostrarNotificacion } = useNotificacion();
     const [cargandoAccion, setCargandoAccion] = useState<Record<string, boolean>>({});
     const [filtros, setFiltros] = useState({
@@ -30,11 +30,11 @@ export const useDashboard = () => {
         cargarDatosTienda();
         cargarMovimientos();
     }, [cargarEstudiantes, cargarEventos, cargarDatosTienda, cargarMovimientos]);
-
+    
     const datosFiltrados = useMemo(() => {
         let estudiantesFiltrados = [...estudiantes];
         let movimientosFiltrados = [...movimientos];
-
+        
         // Filtro por Sede (Afecta Estudiantes y Finanzas)
         if (filtros.sedeId !== 'todas') {
             estudiantesFiltrados = estudiantesFiltrados.filter(e => e.sedeId === filtros.sedeId);
@@ -45,7 +45,7 @@ export const useDashboard = () => {
         if (filtros.grupo !== 'todos') {
             estudiantesFiltrados = estudiantesFiltrados.filter(e => e.grupo === filtros.grupo);
         }
-
+        
         // Filtro por fecha de ingreso para estudiantes y fecha de registro para movimientos
         if (filtros.fechaInicio) {
             estudiantesFiltrados = estudiantesFiltrados.filter(e => e.fechaIngreso >= filtros.fechaInicio);
@@ -63,7 +63,7 @@ export const useDashboard = () => {
         const ingresos = movimientosFiltrados
             .filter(m => m.tipo === TipoMovimiento.Ingreso)
             .reduce((acc, m) => acc + m.monto, 0);
-
+            
         const egresos = movimientosFiltrados
             .filter(m => m.tipo === TipoMovimiento.Egreso)
             .reduce((acc, m) => acc + m.monto, 0);
@@ -78,15 +78,15 @@ export const useDashboard = () => {
     const manejarGestionCompra = async (solicitud: SolicitudCompra, nuevoEstado: EstadoSolicitudCompra) => {
         setCargandoAccion(prev => ({ ...prev, [solicitud.id]: true }));
         try {
-            const estudianteActualizado = await gestionarSolicitudCompra(solicitud.id, nuevoEstado);
-            if (estudianteActualizado) {
-                await cargarEstudiantes();
-            }
-            mostrarNotificacion("Solicitud de compra gestionada.", "success");
-        } catch (error: any) {
-            mostrarNotificacion(`No se pudo procesar la solicitud: ${error instanceof Error ? error.message : "Error desconocido"}`, "error");
+          const estudianteActualizado = await gestionarSolicitudCompra(solicitud.id, nuevoEstado);
+          if (estudianteActualizado) {
+              await cargarEstudiantes();
+          }
+          mostrarNotificacion("Solicitud de compra gestionada.", "success");
+        } catch (error) {
+          mostrarNotificacion(`No se pudo procesar la solicitud: ${error instanceof Error ? error.message : "Error desconocido"}`, "error");
         } finally {
-            setCargandoAccion(prev => ({ ...prev, [solicitud.id]: false }));
+          setCargandoAccion(prev => ({ ...prev, [solicitud.id]: false }));
         }
     };
 
@@ -102,7 +102,7 @@ export const useDashboard = () => {
             sedeId: 'todas'
         });
     };
-
+    
     const filtrosActivos = filtros.fechaInicio !== '' || filtros.fechaFin !== '' || filtros.grupo !== 'todos' || filtros.sedeId !== 'todas';
 
     return {

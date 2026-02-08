@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-
+// Added comment above fix: Import centralized PuntoCalor from tipos.ts to resolve type mismatch.
 import { PuntoCalor } from '../tipos';
 
 interface AnalyticsContextType {
@@ -26,6 +26,7 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const yPct = (y / window.innerHeight) * 100;
         const ahora = new Date();
 
+        // Added comment above fix: Ensure required 'intensidad' property is provided to solve PuntoCalor type error.
         const nuevoPunto: PuntoCalor = {
             x: xPct,
             y: yPct,
@@ -34,7 +35,8 @@ export const AnalyticsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             ruta: location.pathname,
             hora: ahora.getHours(),
             dia: ahora.toLocaleDateString('es-CO', { weekday: 'long' }),
-            elemento: elemento?.substring(0, 30) // Limitar texto del botón
+            elemento: elemento?.substring(0, 30), // Limitar texto del botón
+            intensidad: 1
         };
 
         setPuntos(prev => {

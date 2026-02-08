@@ -1,6 +1,6 @@
 // servicios/notificacionesApi.ts
 import { collection, addDoc, getDocs, query, orderBy, doc, updateDoc, where, writeBatch } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/src/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import type { NotificacionHistorial } from '../tipos';
 import { TipoNotificacion } from '../tipos';
 
@@ -12,51 +12,24 @@ import { TipoNotificacion } from '../tipos';
  * @param mensaje - El contenido del mensaje.
  */
 export const enviarNotificacion = (canal: 'WhatsApp' | 'Email', destinatario: string, mensaje: string): Promise<void> => {
-    // TODAS LAS NOTIFICACIONES SE MANEJAN AHORA EN EL SERVIDOR (FIREBASE FUNCTIONS)
-    // ESTA FUNCIÓN QUEDA COMO PROMISE SILENCIOSA EN EL FRONTEND PARA EVITAR POPUPS.
     return new Promise(resolve => {
         setTimeout(() => {
-            console.log(`[NOTIFICACIÓN SILENCIOSA] ${canal} a ${destinatario}: ${mensaje}`);
+            console.log(`--- NOTIFICACIÓN SIMULADA ---`);
+            console.log(`Canal: ${canal}`);
+            console.log(`Destinatario: ${destinatario}`);
+            console.log(`Mensaje: ${mensaje}`);
+            console.log(`-----------------------------`);
+            // En una app real, aquí se abriría una URL de WhatsApp o se llamaría a una API de email.
+            if (canal === 'WhatsApp' && /^\d+$/.test(destinatario)) {
+                const telefonoLimpio = destinatario.replace(/\s+/g, '');
+                window.open(`https://wa.me/57${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
+            } else if (canal === 'Email') {
+                window.open(`mailto:${destinatario}?subject=Notificación de TaekwondoGa Jog&body=${encodeURIComponent(mensaje)}`, '_blank');
+            }
+            // La notificación al usuario (Toast) se maneja ahora en el componente que llama a esta función.
             resolve();
-        }, 100);
+        }, 300);
     });
-};
-
-/**
- * PREMIUM: Envía los 3 links de legalización por WhatsApp tras la inscripción exitosa.
- */
-export const dispararLegalizacionPrivada = async (telefono: string, nombreAlumno: string, registroId: string): Promise<void> => {
-    const mensaje = `🥋 *BIENVENIDO A TUDOJANG*\n\nHola, hemos procesado la inscripción de *${nombreAlumno}*.\n\nPor favor, completa la firma de los 3 documentos legales obligatorios para finalizar el proceso técnico:\n\n1️⃣ *Contrato de Servicios:*\n${window.location.origin}/#/contrato/${registroId}\n\n2️⃣ *Consentimiento de Riesgos:*\n${window.location.origin}/#/firma/${registroId}\n\n3️⃣ *Autorización de Imagen:*\n${window.location.origin}/#/imagen/${registroId}\n\n_Este es un proceso automatizado de seguridad._`;
-    await enviarNotificacion('WhatsApp', telefono, mensaje);
-};
-
-/**
- * PREMIUM: Envía notificación formal de apertura de suscripción con el nuevo slug.
- */
-export const dispararNotificacionNuevaEscuela = async (email: string, slug: string, nombreClub: string): Promise<void> => {
-    const mensaje = `
-🥋 *¡BIENVENIDO A LA ÉLITE DIGITAL, ${nombreClub.toUpperCase()}!*
-
-Es un honor confirmar que tu ecosistema de gestión de artes marciales ha sido desplegado con éxito.
-
-*Detalles de tu nueva membresía:*
-🌐 *Dominio Adquirido:* https://${slug}.tudojang.com
-👤 *Nombre de la Escuela:* ${nombreClub}
-🚀 *Estado:* Activo (Periodo de Lanzamiento)
-
-Desde este momento, tienes el control total de tu academia en la palma de tu mano. Tu legado ahora cuenta con una infraestructura de clase mundial.
-
-*Próximos pasos:*
-1. Ingresa a tu nuevo portal.
-2. Configura tus sedes y programas.
-3. Comienza a registrar a tus alumnos.
-
-¡El camino a la excelencia digital comienza hoy!
-
-Atentamente,
-*Equipo de Expansión Tudojang*
-    `.trim();
-    await enviarNotificacion('Email', email, mensaje);
 };
 
 
@@ -81,18 +54,37 @@ export const guardarNotificacionEnHistorial = async (notificacion: Omit<Notifica
  * Obtiene el historial de notificaciones enviadas.
  * @returns Una lista de notificaciones, ordenadas por fecha descendente.
  */
-export const obtenerHistorialNotificaciones = async (tenantId: string): Promise<NotificacionHistorial[]> => {
+export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHistorial[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo historial de notificaciones de prueba.");
         return [
-            // ... (mocks shortened for brevity)
+            {
+                id: '2',
+                fecha: new Date().toISOString(),
+                estudianteId: '2',
+                estudianteNombre: 'Sofia Gómez',
+                tutorNombre: 'Carlos Gómez',
+                destinatario: 'carlos.gomez@email.com',
+                canal: 'Email',
+                tipo: TipoNotificacion.RecordatorioPago,
+                mensaje: 'Hola Carlos, te recordamos amablemente que el pago de la mensualidad para Sofia por un valor de $180.000 está próximo a vencer. Agradecemos tu puntualidad. Equipo TaekwondoGa Jog.',
+                leida: false,
+            },
+            {
+                id: '1',
+                fecha: new Date(Date.now() - 86400000).toISOString(),
+                estudianteId: '1',
+                estudianteNombre: 'Juan Pérez',
+                tutorNombre: 'Ana Pérez',
+                destinatario: '3001112233',
+                canal: 'WhatsApp',
+                tipo: TipoNotificacion.Bienvenida,
+                mensaje: '¡Bienvenido a TaekwondoGa Jog, Juan! Estamos muy felices de tenerte con nosotros. Esperamos que disfrutes cada clase y aprendas mucho. ¡Nos vemos en el dojang!',
+                leida: true,
+            }
         ];
     }
-    const q = query(
-        historialCollection,
-        where('tenantId', '==', tenantId),
-        orderBy('fecha', 'desc')
-    );
+    const q = query(historialCollection, orderBy('fecha', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificacionHistorial));
 };
@@ -113,18 +105,14 @@ export const marcarNotificacionComoLeida = async (idNotificacion: string): Promi
 /**
  * Marca todas las notificaciones no leídas como leídas.
  */
-export const marcarTodasComoLeidas = async (tenantId: string): Promise<void> => {
+export const marcarTodasComoLeidas = async (): Promise<void> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Marcando todas las notificaciones como leídas.");
         return;
     }
-    const q = query(
-        historialCollection,
-        where('tenantId', '==', tenantId),
-        where('leida', '==', false)
-    );
+    const q = query(historialCollection, where('leida', '==', false));
     const snapshot = await getDocs(q);
-
+    
     if (snapshot.empty) {
         return;
     }
@@ -133,6 +121,6 @@ export const marcarTodasComoLeidas = async (tenantId: string): Promise<void> => 
     snapshot.docs.forEach(doc => {
         batch.update(doc.ref, { leida: true });
     });
-
+    
     await batch.commit();
 };

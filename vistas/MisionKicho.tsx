@@ -8,12 +8,11 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho } from '../servicios/censoApi';
 import { useEstudiantes } from '../context/DataContext';
 import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
-import {
-    IconoLogoOficial, IconoWhatsApp, IconoCopiar, IconoAprobar,
-    IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
-    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoTienda
+import { 
+    IconoLogoOficial, IconoWhatsApp, IconoCopiar, IconoAprobar, 
+    IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion, 
+    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar
 } from '../components/Iconos';
-import { dispararLegalizacionPrivada } from '../servicios/notificacionesApi';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
@@ -65,13 +64,13 @@ const VistaMisionKicho: React.FC = () => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
     const { mostrarNotificacion } = useNotificacion();
-
+    
     const [mision, setMision] = useState<MisionKicho | null>(null);
     const [registros, setRegistros] = useState<RegistroTemporal[]>([]);
     const [cargando, setCargando] = useState(true);
     const [activando, setActivando] = useState(false);
     const [showExitoModal, setShowExitoModal] = useState(false);
-
+    
     const [mostrarFirma, setMostrarFirma] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [dibujando, setDibujando] = useState(false);
@@ -85,7 +84,7 @@ const VistaMisionKicho: React.FC = () => {
                 const r = await obtenerRegistrosMision(m.id);
                 setRegistros(r);
             }
-        } catch (e: any) {
+        } catch (e) {
             mostrarNotificacion("Error al sincronizar Misión KICHO", "error");
         } finally {
             setCargando(false);
@@ -100,15 +99,10 @@ const VistaMisionKicho: React.FC = () => {
         if (!usuario) return;
         setActivando(true);
         try {
+            // Generar fecha de expiración: Ahora + 72 horas
             const expDate = new Date();
             expDate.setHours(expDate.getHours() + 72);
-
-            if (estudiantes.length >= 15) {
-                mostrarNotificacion("Límite de Trial Alcanzado (15 alumnos). Mejora tu plan para cargar más.", "warning");
-                setActivando(false);
-                return;
-            }
-
+            
             await crearMisionKicho({
                 tenantId: usuario.tenantId,
                 nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",
@@ -117,7 +111,7 @@ const VistaMisionKicho: React.FC = () => {
 
             setShowExitoModal(true);
             await cargarDatos();
-        } catch (e: any) {
+        } catch (e) {
             mostrarNotificacion("No se pudo activar el protocolo automático.", "error");
         } finally {
             setActivando(false);
@@ -129,21 +123,16 @@ const VistaMisionKicho: React.FC = () => {
         mostrarNotificacion("Link copiado. ¡Pégalo en WhatsApp!", "success");
     };
 
-    const handleValidar = async (regId: string, estado: RegistroTemporal['estado']) => {
+    const handleValidar = async (regId: string, estado: 'verificado' | 'rechazado') => {
         try {
             await validarRegistroTemporal(regId, estado);
             setRegistros(prev => prev.map(r => r.id === regId ? { ...r, estado } : r));
-            mostrarNotificacion(`Registro ${estado.replace('_', ' ')}`, "success");
-
-            const reg = registros.find(r => r.id === regId);
-            if (estado === 'verificado' && reg && reg.misionId === 'inscripcion_premium') {
-                await dispararLegalizacionPrivada(reg.datos.telefono, reg.datos.nombres, reg.id);
-            }
-        } catch (e: any) { mostrarNotificacion("Error al procesar", "error"); }
+            mostrarNotificacion(`Registro ${estado}`, "success");
+        } catch (e) { mostrarNotificacion("Error al procesar", "error"); }
     };
 
     const iniciarLegalizacion = () => {
-        const todosProcesados = registros.every(r => r.estado !== 'pendiente' && r.estado !== 'por_verificar');
+        const todosProcesados = registros.every(r => r.estado !== 'pendiente');
         if (!todosProcesados) {
             mostrarNotificacion("Revisa todos los registros antes de legalizar el lote.", "warning");
             return;
@@ -159,11 +148,12 @@ const VistaMisionKicho: React.FC = () => {
             mostrarNotificacion("¡Lote Legalizado! Datos en cola de inyección.", "success");
             setMision(null);
             setMostrarFirma(false);
-        } catch (e: any) { mostrarNotificacion("Error en firma", "error"); }
+        } catch (e) { mostrarNotificacion("Error en firma", "error"); }
     };
 
     if (cargando) return <Loader texto="Escaneando Protocolos..." />;
 
+    // LÓGICA DE ONBOARDING: Si no hay misión y el club es nuevo (< 10 alumnos)
     if (!mision) {
         const esNuevo = estudiantes.length < 10;
         return (
@@ -181,7 +171,7 @@ const VistaMisionKicho: React.FC = () => {
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                                <button
+                                <button 
                                     onClick={handleActivarKichoAuto}
                                     disabled={activando}
                                     className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
@@ -201,26 +191,27 @@ const VistaMisionKicho: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <EmptyState
-                        Icono={IconoLogoOficial}
-                        titulo="Sin Misiones Activas"
+                    <EmptyState 
+                        Icono={IconoLogoOficial} 
+                        titulo="Sin Misiones Activas" 
                         mensaje="No tienes un protocolo de captura de datos activo. Si necesitas realizar un censo masivo, contacta con Aliant Master Control."
                     />
                 )}
-
+                
+                {/* MODAL DE ÉXITO AL ACTIVAR */}
                 <AnimatePresence>
                     {showExitoModal && (
                         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
-                            <motion.div
+                            <motion.div 
                                 initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
                                 className="bg-white dark:bg-gray-900 rounded-[4rem] p-12 text-center max-w-md shadow-[0_0_100px_rgba(31,62,144,0.3)] border border-white/10"
                             >
                                 <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
                                 <h2 className="text-3xl font-black uppercase text-gray-900 dark:text-white mt-6 tracking-tighter">¡Protocolo Iniciado!</h2>
                                 <p className="text-gray-500 mt-4 font-bold uppercase text-xs tracking-widest leading-relaxed">
-                                    Tienes **72 horas** para completar la captura. <br /> El QR de registro ya está disponible.
+                                    Tienes **72 horas** para completar la captura. <br/> El QR de registro ya está disponible.
                                 </p>
-                                <button
+                                <button 
                                     onClick={() => setShowExitoModal(false)}
                                     className="mt-10 w-full bg-tkd-blue text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all"
                                 >
@@ -275,13 +266,6 @@ const VistaMisionKicho: React.FC = () => {
                             Muestra este QR en la entrada de tu dojang o envíalo por el grupo de padres. Los datos aparecerán a la derecha en tiempo real.
                         </p>
                     </div>
-
-                    <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-[2rem] border border-purple-100 dark:border-purple-800 flex gap-4">
-                        <IconoTienda className="w-6 h-6 text-purple-500 flex-shrink-0" />
-                        <p className="text-[10px] font-bold text-purple-800 dark:text-purple-200 uppercase leading-relaxed">
-                            <span className="font-black">MODO PREMIUM:</span> Los alumnos que usen el link de pago aparecerán aquí como <span className="text-purple-600">Pendiente de Pago</span>. Una vez apruebes su soporte, se les habilitará su formulario.
-                        </p>
-                    </div>
                 </div>
 
                 {/* PANEL DERECHO: LISTADO DE CAPTURA */}
@@ -293,7 +277,7 @@ const VistaMisionKicho: React.FC = () => {
                                 <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Validando {registros.length} registros capturados</p>
                             </div>
                             {usuario?.rol === RolUsuario.Admin && (
-                                <button
+                                <button 
                                     onClick={iniciarLegalizacion}
                                     className="px-8 py-4 bg-tkd-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95 flex items-center gap-2"
                                 >
@@ -316,51 +300,25 @@ const VistaMisionKicho: React.FC = () => {
                                     {registros.map(reg => (
                                         <tr key={reg.id} className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors ${reg.estado === 'rechazado' ? 'opacity-30 grayscale' : ''}`}>
                                             <td className="px-10 py-6">
-                                                <div className="flex items-center gap-4">
-                                                    {reg.pago?.soporteUrl && (
-                                                        <a href={reg.pago.soporteUrl} target="_blank" rel="noreferrer" className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 group relative">
-                                                            <img src={reg.pago.soporteUrl} alt="Soporte" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                                <IconoInformacion className="w-4 h-4 text-white" />
-                                                            </div>
-                                                        </a>
-                                                    )}
-                                                    <div>
-                                                        <div className="font-black text-sm uppercase text-gray-900 dark:text-white">{reg.datos.nombres || 'PAGANDO...'} {reg.datos.apellidos || ''}</div>
-                                                        <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">F. REG: {reg.fechaRegistro.split('T')[0]}</div>
-                                                    </div>
-                                                </div>
+                                                <div className="font-black text-sm uppercase text-gray-900 dark:text-white">{reg.datos.nombres} {reg.datos.apellidos}</div>
+                                                <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">F. NAC: {reg.datos.fechaNacimiento}</div>
                                             </td>
                                             <td className="px-6 py-6">
-                                                <div className="text-[10px] font-black uppercase text-tkd-blue">{reg.datos.tutorNombre || 'ALUMNO NUEVO'}</div>
+                                                <div className="text-[10px] font-black uppercase text-tkd-blue">{reg.datos.tutorNombre || 'MAYOR DE EDAD'}</div>
                                                 <div className="text-[9px] text-gray-400 uppercase font-bold">{reg.datos.telefono}</div>
                                             </td>
                                             <td className="px-6 py-6">
-                                                <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border ${reg.estado === 'verificado' || reg.estado === 'pago_validado' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                    reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' :
-                                                        reg.estado === 'pendiente_pago' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                                            reg.estado === 'por_verificar' ? 'bg-orange-100 text-orange-700 border-orange-200 animate-pulse' :
-                                                                'bg-gray-100 text-gray-500 border-gray-200'
-                                                    }`}>
-                                                    {reg.estado.replace('_', ' ')}
+                                                <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border ${
+                                                    reg.estado === 'verificado' ? 'bg-green-100 text-green-700 border-green-200' : 
+                                                    reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                                                }`}>
+                                                    {reg.estado}
                                                 </span>
                                             </td>
                                             <td className="px-10 py-6 text-right">
                                                 <div className="flex justify-end gap-3">
-                                                    {reg.estado === 'por_verificar' && (
-                                                        <button
-                                                            onClick={() => handleValidar(reg.id, 'pago_validado')}
-                                                            className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-md font-black text-[9px] uppercase tracking-widest flex items-center gap-2"
-                                                        >
-                                                            <IconoAprobar className="w-4 h-4" /> Aprobar Pago
-                                                        </button>
-                                                    )}
-                                                    {(reg.estado === 'pendiente' || reg.estado === 'verificado') && (
-                                                        <>
-                                                            <button onClick={() => handleValidar(reg.id, 'verificado')} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Aprobar para Inyección"><IconoAprobar className="w-5 h-5" /></button>
-                                                            <button onClick={() => handleValidar(reg.id, 'rechazado')} className="p-3 bg-red-50 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm" title="Rechazar Registro"><IconoRechazar className="w-5 h-5" /></button>
-                                                        </>
-                                                    )}
+                                                    <button onClick={() => handleValidar(reg.id, 'verificado')} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Aprobar para Inyección"><IconoAprobar className="w-5 h-5" /></button>
+                                                    <button onClick={() => handleValidar(reg.id, 'rechazado')} className="p-3 bg-red-50 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm" title="Rechazar Registro"><IconoRechazar className="w-5 h-5" /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -375,11 +333,11 @@ const VistaMisionKicho: React.FC = () => {
                 </div>
             </div>
 
-            {/* MODAL DE FIRMA LEGALIZACIÓN */}
+            {/* MODAL DE FIRMA LEGALIZACIÓN (ESTILO NUEVO ESTUDIANTE) */}
             <AnimatePresence>
                 {mostrarFirma && (
                     <div className="fixed inset-0 z-[200] bg-tkd-dark/95 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-                        <motion.div
+                        <motion.div 
                             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                             className="bg-white dark:bg-gray-900 rounded-[3.5rem] p-12 max-w-md w-full shadow-2xl border border-white/5 space-y-8"
                         >
@@ -398,12 +356,12 @@ const VistaMisionKicho: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Firma del Director</label>
                                 <div className="relative">
-                                    <canvas
-                                        ref={canvasRef}
+                                    <canvas 
+                                        ref={canvasRef} 
                                         width={400} height={200}
                                         onMouseDown={() => setDibujando(true)}
                                         onMouseUp={() => setDibujando(false)}
-                                        onMouseMove={(e: React.MouseEvent<HTMLCanvasElement>) => {
+                                        onMouseMove={(e) => {
                                             if (!dibujando || !canvasRef.current) return;
                                             const ctx = canvasRef.current.getContext('2d');
                                             const rect = canvasRef.current.getBoundingClientRect();
@@ -417,10 +375,10 @@ const VistaMisionKicho: React.FC = () => {
                                         }}
                                         className="w-full h-44 bg-gray-50 dark:bg-gray-800 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-crosshair shadow-inner"
                                     />
-                                    <button
+                                    <button 
                                         onClick={() => {
                                             const ctx = canvasRef.current?.getContext('2d');
-                                            if (ctx) { ctx.clearRect(0, 0, 400, 200); ctx.beginPath(); }
+                                            if (ctx) { ctx.clearRect(0,0,400,200); ctx.beginPath(); }
                                         }}
                                         className="absolute bottom-4 right-4 text-[8px] font-black uppercase bg-white/80 dark:bg-black/50 px-3 py-1 rounded-full text-gray-500"
                                     >

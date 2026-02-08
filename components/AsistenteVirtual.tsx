@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconoLogoOficial, IconoCerrar, IconoEnviar, IconoAprobar, IconoInformacion, IconoWhatsApp } from './Iconos';
-import { consultarSabonimVirtual, getRemainingQueries, buscarRespuestaLocal } from '../servicios/soporteService';
+import { consultarSabonimVirtual, getRemainingQueries } from '../servicios/soporteService';
 import { crearTicketSoporte, escucharMiTicketActivo } from '../servicios/soporteApi';
 import { useAuth } from '../context/AuthContext';
 import { TicketSoporte, EtapaSoporte } from '../tipos';
@@ -40,7 +40,7 @@ const AsistenteVirtual: React.FC = () => {
     }, [historial, cargando]);
 
     const manejarEnviar = async () => {
-        if (!mensaje.trim() || cargando) return;
+        if (!mensaje.trim() || cargando || restantes <= 0) return;
 
         const miPregunta = mensaje;
         setMensaje('');
@@ -48,26 +48,10 @@ const AsistenteVirtual: React.FC = () => {
         setCargando(true);
         setMostrarBtnEscalar(false);
 
-        // --- STAGE 1: Búsqueda Local (Costo $0) ---
-        const respuestaLocal = buscarRespuestaLocal(miPregunta);
-        if (respuestaLocal) {
-            setHistorial(prev => [...prev, { texto: `${respuestaLocal} (Respuesta inmediata de base técnica)`, soyYo: false }]);
-            setCargando(false);
-            return;
-        }
-
-        // --- STAGE 2: Gemini API (Costo Optimizado) ---
-        if (restantes <= 0) {
-            setHistorial(prev => [...prev, { texto: "Tudojang ha alcanzado su límite de cortesía diario. El servicio se restablecerá mañana.", soyYo: false }]);
-            setCargando(false);
-            return;
-        }
-
         const contextoPrevio = historial.slice(-3).map(h => h.texto).join(' | ');
         const respuestaRaw = await consultarSabonimVirtual(miPregunta, contextoPrevio);
-
+        
         let respuestaLimpia = respuestaRaw;
-        // --- STAGE 3: Escalado Detectado por IA ---
         if (respuestaRaw.includes('[ESCALAR_SOPORTE_MASTER]')) {
             respuestaLimpia = respuestaRaw.replace('[ESCALAR_SOPORTE_MASTER]', '').trim();
             setMostrarBtnEscalar(true);
@@ -99,7 +83,7 @@ const AsistenteVirtual: React.FC = () => {
         }
     };
 
-    const EtapasVisuales: React.FC = () => {
+    const EtapasVisuales = () => {
         if (!miTicket) return null;
         const etapas = [
             { id: 1, label: 'Recibido' },
@@ -127,10 +111,9 @@ const AsistenteVirtual: React.FC = () => {
                 </div>
                 {miTicket.salaVideoUrl && (
                     <div className="mt-4 animate-bounce">
-                        <a
-                            href={miTicket.salaVideoUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                        <a 
+                            href={miTicket.salaVideoUrl} 
+                            target="_blank" 
                             className="w-full bg-tkd-red text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl"
                         >
                             <IconoWhatsApp className="w-3.5 h-3.5" /> Entrar a Sala de Video
@@ -145,7 +128,7 @@ const AsistenteVirtual: React.FC = () => {
         <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
             <AnimatePresence>
                 {abierto && (
-                    <motion.div
+                    <motion.div 
                         initial={{ opacity: 0, y: 20, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.9 }}
@@ -185,7 +168,7 @@ const AsistenteVirtual: React.FC = () => {
                             ))}
                             {mostrarBtnEscalar && (
                                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="pt-2">
-                                    <button
+                                    <button 
                                         onClick={solicitarEscalado}
                                         className="w-full bg-tkd-dark text-white p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/20 hover:bg-blue-900 transition-all shadow-xl flex items-center justify-center gap-2"
                                     >
@@ -209,15 +192,15 @@ const AsistenteVirtual: React.FC = () => {
                         {/* Input */}
                         <div className="p-4 border-t dark:border-gray-800 bg-white dark:bg-gray-900">
                             <div className="relative">
-                                <input
+                                <input 
                                     value={mensaje}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMensaje(e.target.value)}
-                                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && manejarEnviar()}
+                                    onChange={(e) => setMensaje(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && manejarEnviar()}
                                     placeholder={restantes > 0 ? "Describa su inquietud..." : "Límite IA excedido"}
                                     disabled={restantes <= 0 || cargando}
                                     className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 pl-5 pr-14 text-[11px] font-bold dark:text-white outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner"
                                 />
-                                <button
+                                <button 
                                     onClick={manejarEnviar}
                                     disabled={!mensaje.trim() || cargando || restantes <= 0}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 text-tkd-blue hover:scale-110 transition-transform disabled:opacity-30"
@@ -230,7 +213,7 @@ const AsistenteVirtual: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            <motion.button
+            <motion.button 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setAbierto(!abierto)}

@@ -49,7 +49,7 @@ export const useGestionEstudiantes = () => {
             return pasaFiltroNombre && pasaFiltroGrupo && pasaFiltroEstado;
         });
     }, [estudiantes, filtroNombre, filtroGrupo, filtroEstado, error]);
-
+    
     useEffect(() => {
         setCurrentPage(1);
     }, [filtroNombre, filtroGrupo, filtroEstado]);
@@ -57,7 +57,7 @@ export const useGestionEstudiantes = () => {
     const totalPages = Math.ceil(estudiantesFiltrados.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    const estudiantesPaginados = useMemo(() =>
+    const estudiantesPaginados = useMemo(() => 
         estudiantesFiltrados.slice(startIndex, endIndex),
         [estudiantesFiltrados, currentPage, startIndex, endIndex]
     );
@@ -78,7 +78,7 @@ export const useGestionEstudiantes = () => {
         setEstudianteEnEdicion(estudiante);
         setModalFormularioAbierto(true);
     };
-
+    
     const cerrarFormulario = () => {
         setModalFormularioAbierto(false);
         setEstudianteEnEdicion(null);
@@ -87,13 +87,13 @@ export const useGestionEstudiantes = () => {
     const guardarEstudiante = async (datosEstudiante: Estudiante) => {
         setCargandoAccion(true);
         try {
-            if (datosEstudiante.id) {
+            if (datosEstudiante.id) { 
                 await actualizarEstudiante(datosEstudiante);
                 mostrarNotificacion("Estudiante actualizado correctamente.", "success");
-            } else {
+            } else { 
                 const nuevoEstudiante = await agregarEstudiante(datosEstudiante);
                 mostrarNotificacion("Estudiante creado correctamente.", "success");
-
+                
                 const canal = nuevoEstudiante.tutor?.telefono ? 'WhatsApp' : 'Email';
                 const destinatario = nuevoEstudiante.tutor?.telefono || nuevoEstudiante.tutor?.correo;
 
@@ -112,7 +112,7 @@ export const useGestionEstudiantes = () => {
                 }
             }
             cerrarFormulario();
-        } catch (error: any) {
+        } catch(error) {
             mostrarNotificacion("No se pudo guardar el estudiante.", "error");
             throw error;
         } finally {
@@ -137,13 +137,13 @@ export const useGestionEstudiantes = () => {
             await eliminarEstudiante(estudianteAEliminar.id);
             mostrarNotificacion("Estudiante dado de baja.", "success");
             cerrarConfirmacion();
-        } catch (error: any) {
+        } catch(error) {
             mostrarNotificacion("No se pudo eliminar el estudiante.", "error");
         } finally {
             setCargandoAccion(false);
         }
     };
-
+    
     const handleShareLink = async (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => {
         const url = generarUrlAbsoluta(`/${tipo}/${idEstudiante}`);
         const estudiante = estudiantes.find(e => e.id === idEstudiante);
@@ -156,7 +156,7 @@ export const useGestionEstudiantes = () => {
         };
 
         const mensajeCompleto = `${textos[tipo]}\n\n${url}`;
-
+        
         try {
             // Caso 1: Navegador móvil con soporte nativo de compartir
             if (navigator.share) {
@@ -170,21 +170,21 @@ export const useGestionEstudiantes = () => {
                 // Caso 2: Navegador de escritorio (Fallback manual)
                 await navigator.clipboard.writeText(mensajeCompleto);
                 mostrarNotificacion("Enlace copiado al portapapeles. ¡Pégalo en WhatsApp!", "success");
-
+                
                 // Intentar abrir WhatsApp Web automáticamente si es posible
                 if (estudiante?.tutor?.telefono) {
                     const tel = estudiante.tutor.telefono.replace(/\s+/g, '');
                     window.open(`https://wa.me/57${tel}?text=${encodeURIComponent(mensajeCompleto)}`, '_blank');
                 }
             }
-        } catch (err: any) {
+        } catch (err) {
             // Error al compartir (usuario canceló o bloqueo de portapapeles)
             console.error("Error al compartir:", err);
             // Re-intento silencioso de copia
             try {
                 await navigator.clipboard.writeText(url);
                 mostrarNotificacion("Se copió solo la URL. Pégala en el chat.", "info");
-            } catch (copyErr: any) {
+            } catch (copyErr) {
                 mostrarNotificacion("No se pudo copiar el enlace. Intenta de nuevo.", "error");
             }
         }
@@ -207,14 +207,14 @@ export const useGestionEstudiantes = () => {
             mostrarNotificacion("No hay estudiantes para exportar.", "info");
             return;
         }
-
+    
         const headers = [
             'Nombres', 'Apellidos', 'NumeroIdentificacion', 'FechaNacimiento', 'Grupo',
             'Correo', 'Telefono', 'EstadoPago', 'SaldoDeudor',
             'ConsentimientoRiesgos', 'ContratoServicios', 'AutorizaFotos', 'DocImagenFirmado',
             'TutorNombres', 'TutorApellidos', 'TutorIdentificacion', 'TutorCorreo', 'TutorTelefono'
         ];
-
+    
         const escapeCSV = (value: any): string => {
             if (value === null || value === undefined) return '';
             const str = String(value);
@@ -223,7 +223,7 @@ export const useGestionEstudiantes = () => {
             }
             return str;
         };
-
+    
         const csvRows = [
             headers.join(','),
             ...estudiantesFiltrados.map(e => ([
@@ -247,7 +247,7 @@ export const useGestionEstudiantes = () => {
                 escapeCSV(e.tutor?.telefono),
             ].join(',')))
         ];
-
+    
         const csvContent = csvRows.join('\n');
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -261,7 +261,7 @@ export const useGestionEstudiantes = () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         mostrarNotificacion("Exportación a CSV completada.", "success");
-
+    
     }, [estudiantesFiltrados, mostrarNotificacion]);
 
     return {

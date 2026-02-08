@@ -1,10 +1,8 @@
-
-// vistas/Dashboard.tsx
 import React from 'react';
 import { useDashboard } from '../hooks/useDashboard';
 import { useSedes } from '../context/DataContext';
 
-// Componentes
+// Componentes con estilos actualizados
 import SolicitudesCompraPendientes from '../components/dashboard/SolicitudesCompraPendientes';
 import FiltrosDashboard from '../components/dashboard/FiltrosDashboard';
 import ResumenKPIs from '../components/dashboard/ResumenKPIs';
@@ -24,7 +22,6 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
         error,
         solicitudesCompra,
         filtros,
-        filtrosActivos,
         datosFiltrados,
         cargandoAccion,
         recargarTodo,
@@ -36,49 +33,78 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
     const { sedes } = useSedes();
 
     if (cargando) {
-        return <div className="flex justify-center items-center min-h-screen bg-tkd-gray dark:bg-gray-950 p-8"><Loader texto="Cargando resumen..." /></div>;
+        return (
+            <div className="flex justify-center items-center h-[60vh]">
+                <Loader texto="Sincronizando Consola Maestra..." />
+            </div>
+        );
     }
-
+    
     if (error) {
-        return <div className="p-8 bg-tkd-gray dark:bg-gray-950 min-h-screen"><ErrorState mensaje={error} onReintentar={recargarTodo} /></div>;
+        return <div className="p-8"><ErrorState mensaje={error} onReintentar={recargarTodo} /></div>;
     }
 
     return (
-        <div className={`space-y-12 animate-fade-in ${!isSubView ? 'p-8 sm:p-12 bg-tkd-gray dark:bg-gray-950 min-h-screen' : ''}`}>
+        <div className={`space-y-10 animate-fade-in ${!isSubView ? 'p-6 sm:p-10' : ''}`}>
             {!isSubView && (
-                <div className="mb-12">
-                    <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Centro de Administración</h1>
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Monitoreo de salud financiera y operativa</p>
-                </div>
+                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Dashboard</h1>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Estado General de la Academia</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Servidor Online</span>
+                    </div>
+                </header>
             )}
 
-            <SolicitudesCompraPendientes
-                solicitudes={solicitudesCompra}
+            {/* Alertas Críticas (Solicitudes de Tienda) */}
+            <SolicitudesCompraPendientes 
+                solicitudes={solicitudesCompra} 
                 onGestionar={manejarGestionCompra}
                 cargandoAccion={cargandoAccion}
             />
 
-            <FiltrosDashboard
-                filtros={filtros}
-                sedes={sedes}
-                onFiltroChange={handleFiltroChange}
-                onLimpiarFiltros={limpiarFiltros}
-            />
+            {/* Panel de Filtros Técnicos */}
+            <div className="animate-slide-in-right">
+                <FiltrosDashboard 
+                    filtros={filtros}
+                    sedes={sedes}
+                    onFiltroChange={handleFiltroChange}
+                    onLimpiarFiltros={limpiarFiltros}
+                />
+            </div>
 
-            <ResumenKPIs
-                estudiantes={datosFiltrados.estudiantesFiltrados}
-                finanzas={datosFiltrados.finanzas}
-            />
+            {/* Núcleo de KPIs */}
+            <section className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                <ResumenKPIs 
+                    estudiantes={datosFiltrados.estudiantesFiltrados} 
+                    finanzas={datosFiltrados.finanzas}
+                />
+            </section>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <ProximosEventos eventos={datosFiltrados.eventosParaMostrar} />
+            {/* Grid de Análisis Profundo */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div className="lg:col-span-2 space-y-10">
+                    <div className="tkd-card p-1">
+                        <ProximosEventos eventos={datosFiltrados.eventosParaMostrar} />
+                    </div>
                 </div>
-
-                <div className="h-full">
-                    <ResumenPagos estudiantes={datosFiltrados.estudiantesFiltrados} />
+                
+                <div className="space-y-10">
+                    <div className="tkd-card p-1">
+                        <ResumenPagos estudiantes={datosFiltrados.estudiantesFiltrados} />
+                    </div>
+                    <div className="tkd-card p-1">
+                        <AccesosDirectos />
+                    </div>
                 </div>
             </div>
+
+            <footer className="pt-10 text-center">
+                <p className="text-[9px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em]">Tudojang Core Visual Engine v4.0</p>
+            </footer>
         </div>
     );
 };

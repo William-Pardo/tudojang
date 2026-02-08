@@ -35,52 +35,47 @@ export const DATOS_RECAUDO_MASTER = {
     whatsappSoporte: "3007654321",
 };
 
-export const WOMPI_CONFIG = {
-    // LLAVES PÚBLICAS (Sandbox para que puedas usarlo sin verificar cuenta real)
-    PUB_KEY_SANDBOX: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q",
-    PUB_KEY_PROD: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q", // Reemplazamos temporalmente con sandbox para evitar bloqueos
-    MODO_TEST: true, // DEJAMOS EN TRUE COMO SOLICITASTE
-};
-
 export const CONFIGURACION_POR_DEFECTO = {
-    tenantId: 'escuela-gajog-001',
-    diaCobroMensual: 1,
-    diasAnticipoRecordatorio: 5,
-    diasGraciaSuspension: 10,
-    frecuenciaSyncHoras: 24,
-    frecuenciaQueryApiDias: 8,
+  tenantId: 'escuela-gajog-001',
+  diaCobroMensual: 1,
+  diasAnticipoRecordatorio: 5,
+  diasGraciaSuspension: 10,
+  frecuenciaSyncHoras: 24,
+  frecuenciaQueryApiDias: 8,
 };
 
 export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
-    tenantId: 'escuela-nuevo-001',
-    slug: '',
-    nombreClub: 'Nueva Academia',
-    nit: '',
-    representanteLegal: '',
-    ccRepresentante: '',
-    lugarFirma: 'Bogotá D.C.',
-    duracionContratoMeses: 12,
-    valorMensualidad: 140000,
-    metodoPago: 'Transferencia Directa',
-    pagoNequi: '',
-    pagoDaviplata: '',
-    pagoBreB: '',
-    pagoBanco: '',
-    diasSuspension: 30,
-    direccionClub: '',
-    colorPrimario: '#FFFFFF',
-    colorSecundario: '#0047A0',
-    colorAcento: '#CD2E3A',
-    emailClub: '',
-    estadoSuscripcion: 'activo' as const,
-    fechaVencimiento: '2025-12-31',
-    plan: 'starter',
-    limiteEstudiantes: 50,
-    limiteUsuarios: 2,
-    limiteSedes: 1,
+  tenantId: 'escuela-gajog-001',
+  slug: 'gajog',
+  nombreClub: 'Taekwondo Ga Jog',
+  nit: '900.123.456-7',
+  representanteLegal: 'CARLOS ANDRÉS PÉREZ',
+  ccRepresentante: '1.020.333.444',
+  lugarFirma: 'Bogotá D.C.',
+  duracionContratoMeses: 12,
+  valorMensualidad: 180000,
+  // Added comment above fix: Added required valorInscripcion and moraPorcentaje properties.
+  valorInscripcion: 50000,
+  moraPorcentaje: 5,
+  metodoPago: 'Transferencia Directa',
+  pagoNequi: '3001234567',
+  pagoDaviplata: '',
+  pagoBreB: '',
+  pagoBanco: 'Bancolombia Ahorros #123-456789-01',
+  diasSuspension: 30,
+  direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
+  colorPrimario: '#FFFFFF',
+  colorSecundario: '#0047A0',
+  colorAcento: '#CD2E3A',
+  emailClub: 'academia@gajog.com',
+  estadoSuscripcion: 'activo' as const,
+  fechaVencimiento: '2025-12-31',
+  plan: 'starter',
+  limiteEstudiantes: 50,
+  limiteUsuarios: 2,
+  limiteSedes: 1,
 };
 
-// ... (El resto de las constantes se mantienen: ADMIN_WHATSAPP, FRASES_SALIDA, BASE_CONOCIMIENTO_PQRS) ...
 export const ADMIN_WHATSAPP = "3001234567";
 
 export const FRASES_SALIDA = [
@@ -91,14 +86,7 @@ export const FRASES_SALIDA = [
 ];
 
 export const BASE_CONOCIMIENTO_PQRS = [
-    { id: "pagos-1", pregunta: "¿Cuáles son los medios de pago?", respuesta: "Aceptamos Nequi, Daviplata y Bancolombia. Puedes ver los números en Configuración > Pagos." },
-    { id: "pagos-2", pregunta: "¿Cómo reportar un pago?", respuesta: "Sube el comprobante en la sección de Finanzas o envíalo por WhatsApp al administrador." },
-    { id: "mora-1", pregunta: "¿Cobran recargos por mora?", respuesta: "Sí, el sistema aplica recargos automáticos tras pasar los días de gracia. El valor puede ser fijo o un porcentaje según el tipo de clase." },
-    { id: "asistencia-1", pregunta: "¿Cómo tomo asistencia?", respuesta: "Escanea el código QR del carnet del alumno desde el botón 'Escanear' en el Dashboard." },
-    { id: "tienda-1", pregunta: "¿Puedo cambiar los precios de la tienda?", respuesta: "El administrador puede ajustar precios, agregar o eliminar productos desde el Panel de Control en cualquier momento." },
-    { id: "inscripcion-1", pregunta: "¿Cómo es el proceso de inscripción para alumnos nuevos?", respuesta: "Es un proceso seguro: Pagas primero, el Sabonim verifica tu pago y luego se te habilita el formulario para tus datos y firmas legales." },
-    { id: "estudiantes-1", pregunta: "¿Cómo firmo los contratos?", respuesta: "El sistema envía un link automático por WhatsApp al tutor. También puedes generarlo en la ficha del estudiante > Documentos." },
-    { id: "carnet-1", pregunta: "¿Cómo genero carnet?", respuesta: "Ve al módulo 'Carnetización', selecciona los alumnos y dale a 'Generar Lote PDF'." }
+    { id: "pagos-1", pregunta: "¿Cuáles son los medios de pago?", respuesta: "Aceptamos transferencias por Nequi, Daviplata o Bancolombia. Por favor, enviar siempre el comprobante para legalizar el pago." }
 ];
 
 export const PLANES_SAAS = {
@@ -138,25 +126,4 @@ export const COSTOS_ADICIONALES = {
     estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes' },
     instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor' },
     sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede' }
-};
-
-/**
- * Lógica de beneficios especiales para partners fundadores.
- * Permite aplicar capacidades superiores sobre planes básicos.
- */
-export const obtenerBeneficiosCortesia = (slug: string) => {
-    const slugLimpio = slug.toLowerCase().trim();
-
-    // BENEFICIO FUNDADOR: Ga Jog
-    // Recibe Plan Growth al precio de Starter
-    if (slugLimpio === 'gajog') {
-        return {
-            nombreCortesia: "Beneficio Partner Fundador",
-            mensaje: "¡Gracias por inspirar Tudojang! Disfrutas de capacidades Growth al precio de Starter por tiempo vitalicio.",
-            upgradePlanId: 'growth',
-            precioEspecial: 160000 // Precio de Starter
-        };
-    }
-
-    return null;
 };

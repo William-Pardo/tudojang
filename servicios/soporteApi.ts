@@ -1,7 +1,7 @@
 
 // servicios/soporteApi.ts
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, onSnapshot, orderBy } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '@/src/config';
+import { db, isFirebaseConfigured } from '../firebase/config';
 import { type TicketSoporte, EtapaSoporte } from '../tipos';
 
 const ticketsCollection = collection(db, 'tickets_soporte');
@@ -33,7 +33,7 @@ export const actualizarTicket = async (id: string, cambios: Partial<TicketSoport
 export const escucharTicketsActivos = (callback: (tickets: TicketSoporte[]) => void) => {
     if (!isFirebaseConfigured) {
         callback([]);
-        return () => { };
+        return () => {};
     }
 
     const q = query(ticketsCollection, where("estado", "!=", "resuelto"), orderBy("fechaCreacion", "desc"));
@@ -46,7 +46,7 @@ export const escucharTicketsActivos = (callback: (tickets: TicketSoporte[]) => v
 export const escucharMiTicketActivo = (userId: string, callback: (ticket: TicketSoporte | null) => void) => {
     if (!isFirebaseConfigured) {
         callback(null);
-        return () => { };
+        return () => {};
     }
 
     const q = query(ticketsCollection, where("userId", "==", userId), where("estado", "!=", "resuelto"));

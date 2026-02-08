@@ -4,36 +4,36 @@ import { EstadoPago } from '../../tipos';
 import { IconoEstudiantes, IconoAprobar, IconoTienda } from '../Iconos';
 import { formatearPrecio } from '../../utils/formatters';
 
-const CardKPI: React.FC<{
-  titulo: string;
-  valor: string | number;
-  icono: React.ReactNode;
-  color: string;
-  tendencia?: string
+const CardKPI: React.FC<{ 
+    titulo: string; 
+    valor: string | number; 
+    icono: React.ReactNode; 
+    color: string; 
+    tendencia?: string 
 }> = ({ titulo, valor, icono, color, tendencia }) => (
-  <div className="bg-white dark:bg-white/5 p-8 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 flex items-center space-x-6 hover:shadow-premium transition-all duration-500 group">
-    <div className={`p-4 rounded-2xl ${color} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}>
-      {icono}
+    <div className="bg-white dark:bg-white/5 p-8 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 flex items-center space-x-6 hover:shadow-premium transition-all duration-500 group">
+        <div className={`p-4 rounded-2xl ${color} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}>
+            {icono}
+        </div>
+        <div className="flex-grow">
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] mb-1">{titulo}</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">{valor}</p>
+            {tendencia && (
+                <p className="text-[10px] font-black mt-2 text-green-600 dark:text-green-400 uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-current animate-pulse"></span>
+                    {tendencia}
+                </p>
+            )}
+        </div>
     </div>
-    <div className="flex-grow">
-      <p className="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-[0.2em] mb-1">{titulo}</p>
-      <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter leading-none">{valor}</p>
-      {tendencia && (
-        <p className="text-[10px] font-black mt-2 text-green-600 dark:text-green-400 uppercase tracking-widest flex items-center gap-1">
-          <span className="w-1 h-1 rounded-full bg-current animate-pulse"></span>
-          {tendencia}
-        </p>
-      )}
-    </div>
-  </div>
 );
 
 interface Props {
   estudiantes: Estudiante[];
   finanzas: {
-    ingresos: number;
-    egresos: number;
-    balance: number;
+      ingresos: number;
+      egresos: number;
+      balance: number;
   };
 }
 

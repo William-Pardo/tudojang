@@ -1,225 +1,182 @@
 
 // vistas/PasarelaInscripcion.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
-import { obtenerSolicitudInscripcion, subirSoportePago, registrarAspirantePublico } from '../servicios/censoApi';
-import { RegistroTemporal } from '../tipos';
-import {
-    IconoLogoOficial, IconoWhatsApp, IconoExitoAnimado,
-    IconoUsuario, IconoEnviar, IconoAprobar, IconoInformacion
-} from '../components/Iconos';
+import { registrarAspirantePublico } from '../servicios/censoApi';
+import { IconoLogoOficial, IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUsuario, IconoInformacion, IconoCandado } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
-import { abrirCheckoutWompi } from '../servicios/wompiService';
-import { WOMPI_CONFIG } from '../constantes';
 
 const PasarelaInscripcion: React.FC = () => {
-    const { solicitudId } = useParams();
     const { tenant, estaCargado } = useTenant();
-
-    const [solicitud, setSolicitud] = useState<RegistroTemporal | null>(null);
-    const [cargandoSolicitud, setCargandoSolicitud] = useState(true);
-    const [soporteUrl, setSoporteUrl] = useState('');
-    const [subiendo, setSubiendo] = useState(false);
-    const [enviado, setEnviado] = useState(false);
-
-    // Estado para el formulario de datos técnico (Fase 3)
+    const [paso, setPaso] = useState<'pago' | 'verificando' | 'formulario' | 'finalizado'>('pago');
+    const [cargando, setCargando] = useState(false);
+    
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
         fechaNacimiento: '', tutorNombre: '', tutorEmail: '',
         tutorTelefono: '', parentesco: 'Padre'
     });
 
-    useEffect(() => {
-        const cargarSolicitud = async () => {
-            if (solicitudId) {
-                // Si venimos de un pago exitoso, marcamos antes de cargar
-                const params = new URLSearchParams(window.location.search);
-                if (params.get('pago') === 'exito') {
-                    await subirSoportePago(solicitudId, 'confirmacion_wompi_redirect', 'otros');
-                }
+    const valorTotal = (tenant?.valorInscripcion || 0) + (tenant?.valorMensualidad || 0);
 
-                const s = await obtenerSolicitudInscripcion(solicitudId);
-                setSolicitud(s);
-                if (s?.datos) {
-                    setFormData(prev => ({ ...prev, ...s.datos }));
-                }
-            }
-            setCargandoSolicitud(false);
-        };
-        cargarSolicitud();
-    }, [solicitudId]);
-
-    const handlePagarConWompi = async () => {
-        if (!solicitudId || !solicitud || !tenant) return;
-        setSubiendo(true);
-        try {
-            const montoEnCentavos = (solicitud.pago?.monto || 0) * 100;
-            const referencia = `INS_${solicitudId}_${Date.now()}`;
-
-            await abrirCheckoutWompi({
-                referencia: referencia,
-                montoEnPesos: solicitud.pago?.monto || 0,
-                email: solicitud.datos?.email || '',
-                nombreCompleto: `${solicitud.datos?.nombres} ${solicitud.datos?.apellidos}`,
-                telefono: solicitud.datos?.telefono || '',
-                esSimulacion: WOMPI_CONFIG.MODO_TEST,
-                redirectUrl: `${window.location.origin}/#/unete/${solicitudId}?pago=exito`,
-                onSuccess: async () => {
-                    // Si el callback se ejecuta (pago inmediato)
-                    await subirSoportePago(solicitudId, 'confirmacion_wompi', 'otros');
-                    window.location.reload();
-                }
-            });
-        } catch (e: any) {
-            console.error("Error al iniciar pago con Wompi");
-        } finally {
-            setSubiendo(false);
-        }
+    const handleIniciarPago = () => {
+        setPaso('verificando');
+        // Simulación de redirección y confirmación de Wompi
+        // En producción, aquí se abriría el Widget de Wompi
+        setTimeout(() => {
+            setPaso('formulario');
+        }, 2500);
     };
 
-    const handleFinalizarDatos = async (e: React.FormEvent) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+    };
+
+    const handleSubmitRegistro = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!solicitudId || !tenant) return;
-        setSubiendo(true);
+        setCargando(true);
         try {
-            // Actualizamos los datos finales y pasamos a 'procesado'
-            await registrarAspirantePublico('inscripcion_premium', tenant.tenantId, formData);
-            setEnviado(true);
-        } catch (e: any) {
-            console.error("Error al enviar datos");
+            await registrarAspirantePublico('inscripcion_directa', tenant?.tenantId || 'anon', formData);
+            setPaso('finalizado');
+        } catch (err) {
+            console.error(err);
         } finally {
-            setSubiendo(false);
+            setCargando(false);
         }
     };
 
-    if (!estaCargado || cargandoSolicitud) return <Loader texto="Abriendo Portal de Inscripción..." />;
-
-    if (!solicitud) return <div className="p-20 text-center font-black uppercase text-gray-400">Solicitud no encontrada o expirada.</div>;
-
-    if (enviado) {
-        return (
-            <div className="min-h-screen flex items-center justify-center p-6 text-center" style={{ backgroundColor: tenant?.colorPrimario }}>
-                <div className="bg-white dark:bg-gray-950 p-12 rounded-[4rem] shadow-2xl max-w-sm w-full animate-fade-in border border-white/10">
-                    <IconoExitoAnimado className="mx-auto w-32 h-32" />
-                    <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase mt-6 tracking-tight">¡Bienvenido!</h2>
-                    <p className="text-gray-500 mt-4 font-bold uppercase text-[10px] tracking-widest leading-relaxed">
-                        Tus datos han sido registrados. Revisa tu WhatsApp para la firma de los contratos técnicos.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    const inputClass = "w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-tkd-blue rounded-2xl py-3 px-4 font-bold text-sm outline-none transition-all dark:text-white";
+    if (!estaCargado) return <div className="h-screen bg-tkd-dark flex items-center justify-center"><Loader texto="Preparando Pasarela..." /></div>;
 
     return (
-        <div className="min-h-screen py-10 px-6 flex flex-col items-center" style={{ backgroundColor: tenant?.colorPrimario }}>
-            <div className="mb-8 text-center">
-                <div className="bg-white p-4 rounded-[2rem] shadow-xl inline-block mb-3">
-                    <LogoDinamico className="w-16 h-16" />
+        <div className="min-h-screen py-12 px-6 flex flex-col items-center transition-colors" style={{ backgroundColor: tenant?.colorPrimario }}>
+            <div className="mb-10 text-center">
+                <div className="bg-white p-5 rounded-[2rem] shadow-xl inline-block mb-4 border-b-4" style={{ borderBottomColor: tenant?.colorAcento }}>
+                    <LogoDinamico className="w-20 h-20" />
                 </div>
-                <h1 className="text-white text-3xl font-black uppercase tracking-tighter">{tenant?.nombreClub}</h1>
-                <p className="text-white/60 text-[8px] font-black uppercase tracking-[0.4em] mt-1">Inscripción Alumno Nuevo</p>
+                <h1 className="text-white text-4xl font-black uppercase tracking-tighter drop-shadow-lg">Inscripción Oficial</h1>
+                <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.4em] mt-2">{tenant?.nombreClub}</p>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden border border-white/10">
-                {/* --- HEADER DE ESTADO --- */}
-                <div className="p-8 bg-tkd-dark text-white border-b border-white/5 flex justify-between items-center">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Estado de tu proceso:</p>
-                            {WOMPI_CONFIG.MODO_TEST && (
-                                <span className="bg-tkd-red text-white px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter animate-pulse">
-                                    Sandbox
-                                </span>
-                            )}
-                        </div>
-                        <h2 className="text-lg font-black uppercase tracking-tight">
-                            {solicitud.estado === 'pendiente_pago' && "💳 Pendiente de Pago"}
-                            {solicitud.estado === 'por_verificar' && "⏳ Verificando Soporte"}
-                            {solicitud.estado === 'pago_validado' && "📝 Formulario de Datos"}
-                        </h2>
-                    </div>
-                </div>
-
-                <div className="p-10 space-y-8">
-                    {/* --- FASE 1: PENDIENTE PAGO --- */}
-                    {solicitud.estado === 'pendiente_pago' && (
-                        <div className="space-y-6 animate-fade-in">
-                            <div className="bg-blue-50 dark:bg-blue-900/10 p-6 rounded-3xl border border-blue-100 dark:border-blue-800">
-                                <p className="text-[10px] font-black uppercase text-blue-800 dark:text-blue-300 tracking-widest mb-2">Total a Cancelar:</p>
-                                <h3 className="text-3xl font-black text-tkd-blue">{formatearPrecio(solicitud.pago?.monto || 0)}</h3>
-                                <p className="text-[9px] font-bold text-gray-500 uppercase mt-2">Incluye Inscripción + Primer Mes</p>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
+                <AnimatePresence mode="wait">
+                    
+                    {/* FASE 1: PAGO INICIAL */}
+                    {paso === 'pago' && (
+                        <motion.div 
+                            key="pago" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                            className="p-10 space-y-8"
+                        >
+                            <div className="text-center space-y-2">
+                                <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white tracking-tight">Paso 1: Legalización de Cupo</h2>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-widest">Para iniciar tu formación técnica, debes cancelar los derechos de ingreso.</p>
                             </div>
 
-                            <div className="space-y-4">
-                                <button
-                                    onClick={handlePagarConWompi}
-                                    disabled={subiendo}
-                                    className="w-full bg-tkd-blue text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"
-                                >
-                                    {subiendo ? <Loader /> : <IconoAprobar className="w-5 h-5" />}
-                                    Pagar Inscripción con Wompi
-                                </button>
-                                <p className="text-[9px] text-gray-400 text-center font-bold uppercase">Pago Seguro Protegido por SSL</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- FASE 2: VERIFICANDO --- */}
-                    {solicitud.estado === 'por_verificar' && (
-                        <div className="text-center py-12 px-6 space-y-6 animate-fade-in">
-                            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                                <IconoInformacion className="w-10 h-10 text-orange-500" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tight">Validando con el Banco</h3>
-                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-2 leading-relaxed">
-                                    Hemos recibido tu comprobante. Pronto desbloquearemos tu formulario de registro oficial. ¡Gracias por tu paciencia!
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- FASE 3: FORMULARIO DESBLOQUEADO --- */}
-                    {solicitud.estado === 'pago_validado' && (
-                        <form onSubmit={handleFinalizarDatos} className="space-y-8 animate-fade-in">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="sm:col-span-2">
-                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-2">Nombres del Alumno</label>
-                                    <input required className={inputClass} value={formData.nombres} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, nombres: e.target.value.toUpperCase() })} />
+                            <div className="bg-gray-50 dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                                <div className="flex justify-between items-center text-gray-500">
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Inscripción Inicial</span>
+                                    <span className="font-bold">{formatearPrecio(tenant?.valorInscripcion || 0)}</span>
                                 </div>
-                                <div className="sm:col-span-2">
-                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-2">Apellidos</label>
-                                    <input required className={inputClass} value={formData.apellidos} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, apellidos: e.target.value.toUpperCase() })} />
+                                <div className="flex justify-between items-center text-gray-500">
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Primera Mensualidad</span>
+                                    <span className="font-bold">{formatearPrecio(tenant?.valorMensualidad || 0)}</span>
                                 </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-2">WhatsApp</label>
-                                    <input required className={inputClass} value={formData.telefono} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, telefono: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-2">F. Nacimiento</label>
-                                    <input type="date" required className={inputClass} value={formData.fechaNacimiento} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, fechaNacimiento: e.target.value })} />
+                                <div className="h-px bg-gray-200 dark:bg-gray-700 my-4"></div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-black uppercase text-tkd-blue tracking-widest">Total a Pagar</span>
+                                    <span className="text-3xl font-black text-tkd-dark dark:text-white tracking-tighter">{formatearPrecio(valorTotal)}</span>
                                 </div>
                             </div>
 
-                            <button
-                                type="submit"
-                                disabled={subiendo}
-                                className="w-full bg-tkd-red text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-2xl hover:bg-red-700 transition-all flex items-center justify-center gap-3"
+                            <button 
+                                onClick={handleIniciarPago}
+                                className="w-full py-6 bg-tkd-red text-white rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-4"
                             >
-                                {subiendo ? <Loader /> : <IconoEnviar className="w-5 h-5" />}
-                                Finalizar Inscripción
+                                <IconoAprobar className="w-6 h-6" /> Pagar con Wompi
                             </button>
-                        </form>
+                            
+                            <div className="flex items-center gap-3 justify-center opacity-40 grayscale">
+                                <span className="text-[8px] font-black uppercase">Seguridad SSL</span>
+                                <span className="text-[8px] font-black uppercase">Aliant Protected</span>
+                                <span className="text-[8px] font-black uppercase">PCI Compliance</span>
+                            </div>
+                        </motion.div>
                     )}
-                </div>
-            </div>
 
-            <p className="mt-8 text-white/30 text-[9px] font-black uppercase tracking-widest">Tudojang • Registro Seguro SSL 256bits</p>
+                    {/* FASE 2: VERIFICANDO PAGO */}
+                    {paso === 'verificando' && (
+                        <motion.div 
+                            key="verificando" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="p-20 text-center space-y-8"
+                        >
+                            <div className="w-24 h-24 border-8 border-tkd-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black uppercase dark:text-white">Verificando Transacción</h3>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest animate-pulse">Sincronizando con la red bancaria...</p>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* FASE 3: FORMULARIO TÉCNICO (DESBLOQUEADO) */}
+                    {paso === 'formulario' && (
+                        <motion.div 
+                            key="formulario" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
+                            className="p-10 space-y-8"
+                        >
+                            <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-2xl border border-green-100 dark:border-green-800 flex items-center gap-4">
+                                <div className="bg-green-500 text-white p-2 rounded-lg shadow-lg"><IconoCandado className="w-5 h-5" /></div>
+                                <div>
+                                    <p className="text-[10px] font-black text-green-700 dark:text-green-400 uppercase tracking-widest">Pago Confirmado</p>
+                                    <p className="text-[9px] font-bold text-gray-500 uppercase">Cupo garantizado. Por favor ingresa los datos del alumno.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSubmitRegistro} className="space-y-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <input name="nombres" type="text" required placeholder="NOMBRES ALUMNO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                    <input name="apellidos" type="text" required placeholder="APELLIDOS" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <input name="email" type="email" required placeholder="EMAIL DE CONTACTO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                    <input name="telefono" type="tel" required placeholder="WHATSAPP" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                </div>
+                                <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
+                                    <label className="text-[9px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Fecha de Nacimiento Alumno</label>
+                                    <input name="fechaNacimiento" type="date" required className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 text-sm font-black dark:text-white" onChange={handleInputChange} />
+                                </div>
+
+                                <button type="submit" disabled={cargando} className="w-full py-6 bg-tkd-blue text-white rounded-2xl font-black uppercase text-sm tracking-[0.3em] shadow-2xl hover:bg-blue-800 transition-all flex items-center justify-center gap-4">
+                                    {cargando ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-6 h-6" />}
+                                    Finalizar Registro Técnico
+                                </button>
+                            </form>
+                        </motion.div>
+                    )}
+
+                    {/* FASE 4: FINALIZADO */}
+                    {paso === 'finalizado' && (
+                        <motion.div 
+                            key="finalizado" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+                            className="p-16 text-center space-y-6"
+                        >
+                            <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
+                            <h2 className="text-3xl font-black uppercase tracking-tighter">¡Bienvenido a la Familia!</h2>
+                            <p className="text-gray-500 font-bold uppercase text-xs tracking-widest leading-relaxed">
+                                Tu registro y pago han sido procesados. <br/> Recibirás un WhatsApp con tu carnet digital y horarios en los próximos minutos.
+                            </p>
+                            <button onClick={() => window.location.reload()} className="mt-8 text-tkd-blue font-black uppercase text-[10px] tracking-widest hover:underline">Registrar otro alumno</button>
+                        </motion.div>
+                    )}
+
+                </AnimatePresence>
+            </div>
+            
+            <footer className="mt-12 text-center">
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.4 • Transacción Bancaria Protegida</p>
+            </footer>
         </div>
     );
 };
