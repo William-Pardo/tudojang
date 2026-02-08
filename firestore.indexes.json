@@ -43,38 +43,6 @@
             ]
         },
         {
-            "collectionGroup": "estudiantes",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "tenantId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "apellidos",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "nombres",
-                    "order": "ASCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "eventos",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "tenantId",
-                    "order": "ASCENDING"
-                },
-                {
-                    "fieldPath": "fechaEvento",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
             "collectionGroup": "solicitudesInscripcion",
             "queryScope": "COLLECTION",
             "fields": [
@@ -111,20 +79,6 @@
                     "order": "ASCENDING"
                 },
                 {
-                    "fieldPath": "fecha",
-                    "order": "DESCENDING"
-                }
-            ]
-        },
-        {
-            "collectionGroup": "finanzas",
-            "queryScope": "COLLECTION",
-            "fields": [
-                {
-                    "fieldPath": "tenantId",
-                    "order": "ASCENDING"
-                },
-                {
                     "fieldPath": "sedeId",
                     "order": "ASCENDING"
                 },
@@ -138,6 +92,10 @@
             "collectionGroup": "asistencia",
             "queryScope": "COLLECTION",
             "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
                 {
                     "fieldPath": "sedeId",
                     "order": "ASCENDING"
@@ -166,6 +124,64 @@
                 },
                 {
                     "fieldPath": "horaEntrada",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "estudiantes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "apellidos",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nombres",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "eventos",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fechaEvento",
+                    "order": "DESCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "finanzas",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fecha",
+                    "order": "DESCENDING"
+                },
+                {
+                    "fieldPath": "__name__",
                     "order": "DESCENDING"
                 }
             ]

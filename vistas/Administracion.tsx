@@ -31,11 +31,10 @@ const VistaAdministracion: React.FC = () => {
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as AdminTab)}
-                        className={`flex-shrink-0 flex items-center justify-center gap-2 px-6 md:px-8 py-3 md:py-2.5 rounded-full md:rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                            activeTab === tab.id 
-                            ? 'bg-tkd-dark text-white shadow-lg scale-[1.02]' 
-                            : 'text-gray-400 hover:text-tkd-blue'
-                        }`}
+                        className={`flex-shrink-0 flex items-center justify-center gap-2 px-6 md:px-8 py-3 md:py-2.5 rounded-full md:rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id
+                                ? 'bg-white text-tkd-dark shadow-xl scale-[1.02] border border-white'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
                         title={tab.label}
                     >
                         <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
