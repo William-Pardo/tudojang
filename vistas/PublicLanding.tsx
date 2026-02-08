@@ -153,7 +153,7 @@ const PublicLanding: React.FC = () => {
                                 </div>
                                 <div className="mt-8 space-y-4">
                                     <Link
-                                        to="/registro-escuela"
+                                        to={`/registro-escuela?plan=${plan.id}&precio=${plan.precio}`}
                                         className={`w-full py-4 block rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
                                     >
                                         Elegir este Plan
