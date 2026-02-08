@@ -49,29 +49,30 @@ const VistaTienda: React.FC = () => {
     }
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
         {implementosFiltrados.map(implemento => {
           const variacionSeleccionada = implemento.variaciones.find(v => v.id === selecciones[implemento.id]);
           return (
-            <div key={implemento.id} className="bg-[#1A2232] rounded-[2rem] border border-white/5 overflow-hidden flex flex-col shadow-2xl hover:scale-[1.02] transition-all group">
-              <div className="relative h-64 overflow-hidden">
+            <div key={implemento.id} className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-white/5 overflow-hidden flex flex-col shadow-sm hover:shadow-2xl hover:scale-[1.01] transition-all group relative">
+              <div className="relative h-72 overflow-hidden">
                 <img src={implemento.imagenUrl} alt={implemento.nombre} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1A2232] to-transparent opacity-60"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                <div className="absolute top-5 right-5 px-4 py-1.5 bg-tkd-blue/90 backdrop-blur-md rounded-full text-[9px] font-black uppercase text-white tracking-widest">{implemento.categoria}</div>
               </div>
-              <div className="p-8 flex flex-col flex-grow">
-                <h2 className="text-xl font-black text-white uppercase tracking-tight">{implemento.nombre}</h2>
-                <p className="text-gray-400 text-[11px] font-medium leading-relaxed mt-3 flex-grow mb-6">{implemento.descripcion}</p>
-                <div className="mt-auto space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest ml-1">Variación / Talla</label>
+              <div className="p-10 flex flex-col flex-grow">
+                <h2 className="text-2xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-tight">{implemento.nombre}</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-medium leading-relaxed mt-4 flex-grow mb-8">{implemento.descripcion}</p>
+                <div className="mt-auto space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1 block">Configuración de Implemento</label>
                     <select
                       id={`select-${implemento.id}`}
                       value={selecciones[implemento.id] || ''}
                       onChange={(e) => handleSeleccionChange(implemento.id, e.target.value)}
-                      className="block w-full bg-[#0D121F] border border-white/10 text-white rounded-xl px-4 py-3 text-xs font-bold focus:border-tkd-blue outline-none transition-all"
+                      className="block w-full bg-gray-50 dark:bg-gray-900 border-none text-tkd-dark dark:text-white rounded-2xl px-5 py-4 text-xs font-black uppercase shadow-inner focus:ring-2 focus:ring-tkd-blue outline-none transition-all cursor-pointer appearance-none"
                       aria-label={`Selecciona una variación para ${implemento.nombre}`}
                     >
-                      <option value="" disabled>-- Elige una opción --</option>
+                      <option value="" disabled>-- Seleccione Especificación --</option>
                       {implemento.variaciones.map(v => (
                         <option key={v.id} value={v.id}>
                           {v.descripcion} ({v.precio > 0 ? formatearPrecio(v.precio) : 'Consultar'})
@@ -79,8 +80,8 @@ const VistaTienda: React.FC = () => {
                       ))}
                     </select>
                   </div>
-                  <button onClick={() => iniciarCompra(implemento, selecciones[implemento.id])} disabled={!variacionSeleccionada || variacionSeleccionada.precio <= 0} className="w-full bg-[#10B981] text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] shadow-[0_10px_20px_-5px_rgba(16,185,129,0.3)] hover:bg-[#059669] transition-all active:scale-95 disabled:bg-gray-700 disabled:opacity-50 flex items-center justify-center gap-3">
-                    <IconoCarritoAgregar className="w-5 h-5" /><span>Asignar Compra</span>
+                  <button onClick={() => iniciarCompra(implemento, selecciones[implemento.id])} disabled={!variacionSeleccionada || variacionSeleccionada.precio <= 0} className="w-full bg-green-500 text-white py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-[0_15px_30px_-10px_rgba(34,197,94,0.4)] hover:bg-green-600 transition-all active:scale-95 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:opacity-50 flex items-center justify-center gap-3">
+                    <IconoCarritoAgregar className="w-6 h-6" /><span>Asignar a Estudiante</span>
                   </button>
                 </div>
               </div>
@@ -92,14 +93,14 @@ const VistaTienda: React.FC = () => {
   };
 
   return (
-    <div className="p-8 sm:p-12 bg-[#0D121F] min-h-screen">
-      <div className="flex flex-wrap gap-4 justify-between items-center mb-12">
+    <div className="p-4 sm:p-12 bg-tkd-gray dark:bg-gray-950 min-h-screen animate-fade-in">
+      <div className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center mb-12">
         <div>
-          <h1 className="text-4xl font-black text-white uppercase tracking-tighter">Tienda de Implementos</h1>
+          <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Tienda de Implementos</h1>
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Equipamiento técnico y uniformología oficial</p>
         </div>
-        <button onClick={() => setModalCompartirAbierto(true)} className="bg-white/5 text-green-400 border border-green-500/20 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center gap-3">
-          <IconoCompartir className="w-4 h-4" /><span>Compartir Tienda</span>
+        <button onClick={() => setModalCompartirAbierto(true)} className="w-full md:w-auto bg-white dark:bg-gray-800 text-green-500 border border-gray-100 dark:border-white/10 px-8 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-green-500 hover:text-white transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95">
+          <IconoCompartir className="w-5 h-5" /><span>Compartir Catálogo</span>
         </button>
       </div>
 

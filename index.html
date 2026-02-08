@@ -12,22 +12,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400..700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            'tkd-blue': 'var(--color-secundario, #0047A0)',
-            'tkd-red': 'var(--color-acento, #CD2E3A)',
-            'tkd-dark': 'var(--color-primario, #111111)',
-            'tkd-gray': '#F8F9FA',
-          }
-        }
-      }
-    }
-  </script>
   <script>
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');

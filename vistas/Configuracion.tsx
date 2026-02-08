@@ -17,16 +17,16 @@ import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import Loader from '../components/Loader';
 
-const ModalFormPrograma: React.FC<{ 
-    programa: Partial<Programa> | null, 
-    onCerrar: () => void, 
-    onGuardar: (datos: any) => void 
+const ModalFormPrograma: React.FC<{
+    programa: Partial<Programa> | null,
+    onCerrar: () => void,
+    onGuardar: (datos: any) => void
 }> = ({ programa, onCerrar, onGuardar }) => {
     const [nombre, setNombre] = useState(programa?.nombre || '');
     const [tipo, setTipo] = useState(programa?.tipoCobro || TipoCobroPrograma.Recurrente);
     const [valor, setValor] = useState(programa?.valor || 0);
     const [horario, setHorario] = useState(programa?.horario || '');
-    
+
     const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all placeholder:text-gray-300";
     const selectStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner appearance-none cursor-pointer";
 
@@ -43,7 +43,7 @@ const ModalFormPrograma: React.FC<{
                         <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Nombre Descriptivo</label>
                         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Poomsae Avanzado" className={inputStyle} />
                     </div>
-                    
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="relative">
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Modalidad</label>
@@ -52,7 +52,7 @@ const ModalFormPrograma: React.FC<{
                                 <option value={TipoCobroPrograma.Unico}>Taller Corto</option>
                             </select>
                             <div className="absolute right-4 bottom-4 pointer-events-none text-gray-400">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                             </div>
                         </div>
                         <div>
@@ -68,7 +68,7 @@ const ModalFormPrograma: React.FC<{
                 </div>
 
                 <div className="space-y-3 pt-4">
-                    <button 
+                    <button
                         onClick={() => onGuardar({ ...programa, nombre, tipoCobro: tipo, valor, horario })}
                         className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95"
                     >
@@ -81,12 +81,12 @@ const ModalFormPrograma: React.FC<{
     );
 };
 
-const ModalPagoCheckout: React.FC<{ 
-    item: any, 
+const ModalPagoCheckout: React.FC<{
+    item: any,
     tipo: 'addon' | 'plan',
-    tenantId: string, 
-    onCerrar: () => void, 
-    onExito: (datos: any) => void 
+    tenantId: string,
+    onCerrar: () => void,
+    onExito: (datos: any) => void
 }> = ({ item, tipo, tenantId, onCerrar, onExito }) => {
     const [paso, setPaso] = useState<'checkout' | 'procesando' | 'exito'>('checkout');
     const { mostrarNotificacion } = useNotificacion();
@@ -95,7 +95,7 @@ const ModalPagoCheckout: React.FC<{
         setPaso('procesando');
         try {
             await new Promise(r => setTimeout(r, 2500));
-            
+
             if (tipo === 'addon') {
                 const mapeoCampos: Record<string, any> = {
                     'estudiantes': 'limiteEstudiantes',
@@ -109,7 +109,7 @@ const ModalPagoCheckout: React.FC<{
                 await actualizarPlanClub(tenantId, item);
                 onExito({ tipo: 'plan', plan: item });
             }
-            
+
             setPaso('exito');
         } catch (error) {
             mostrarNotificacion("La transacción fue rechazada por el banco.", "error");
@@ -163,7 +163,7 @@ const ModalPagoCheckout: React.FC<{
                         <div className="space-y-2">
                             <h3 className="text-3xl font-black uppercase text-green-600 tracking-tighter">¡Listo!</h3>
                             <p className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase leading-relaxed">
-                                Tu licencia ha sido actualizada <br/> exitosamente por el sistema.
+                                Tu licencia ha sido actualizada <br /> exitosamente por el sistema.
                             </p>
                         </div>
                         <button onClick={onCerrar} className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs">Regresar al Panel</button>
@@ -180,7 +180,7 @@ const ModalGenerarContrato: React.FC<{ usuario: Usuario, sedes: Sede[], onCerrar
     const [modalidadOtro, setModalidadOtro] = useState(usuario.contrato?.tipoVinculacionOtro || '');
     const [fechaInicio, setFechaInicio] = useState(usuario.contrato?.fechaInicio || new Date().toISOString().split('T')[0]);
     const [lugar, setLugar] = useState(usuario.contrato?.lugarEjecucion || "");
-    
+
     const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all";
 
     return (
@@ -203,7 +203,7 @@ const ModalGenerarContrato: React.FC<{ usuario: Usuario, sedes: Sede[], onCerrar
                             <select value={modalidad} onChange={e => setModalidad(e.target.value as any)} className={`${inputStyle} appearance-none cursor-pointer`}>
                                 {Object.values(TipoVinculacionColaborador).map(v => <option key={v} value={v}>{v}</option>)}
                             </select>
-                            <div className="absolute right-3 bottom-3 pointer-events-none text-gray-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></div>
+                            <div className="absolute right-3 bottom-3 pointer-events-none text-gray-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg></div>
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-1 block tracking-widest">Fecha de Inicio</label>
@@ -220,21 +220,21 @@ const ModalGenerarContrato: React.FC<{ usuario: Usuario, sedes: Sede[], onCerrar
 
                     <div className="relative">
                         <label className="text-[9px] font-black uppercase text-gray-400 mb-1 ml-1 block tracking-widest">Lugar de Ejecución</label>
-                        <select 
-                            value={lugar} 
-                            onChange={e => setLugar(e.target.value)} 
+                        <select
+                            value={lugar}
+                            onChange={e => setLugar(e.target.value)}
                             className={`${inputStyle} appearance-none cursor-pointer`}
                         >
                             <option value="">Seleccione Sede...</option>
                             {sedes.map(s => <option key={s.id} value={s.nombre}>{s.nombre} ({s.ciudad})</option>)}
                             <option value="Dojang Externo">Dojang Externo / Evento</option>
                         </select>
-                        <div className="absolute right-3 bottom-3 pointer-events-none text-gray-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg></div>
+                        <div className="absolute right-3 bottom-3 pointer-events-none text-gray-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg></div>
                     </div>
                 </div>
 
                 <div className="space-y-3 pt-4">
-                    <button 
+                    <button
                         onClick={() => onGenerar({ valorPago: monto, tipoVinculacion: modalidad, tipoVinculacionOtro: modalidadOtro, fechaInicio, lugarEjecucion: lugar, firmado: false })}
                         className="w-full bg-tkd-blue text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-blue-800 transition-all active:scale-95"
                     >
@@ -248,19 +248,19 @@ const ModalGenerarContrato: React.FC<{ usuario: Usuario, sedes: Sede[], onCerrar
 };
 
 const VistaConfiguracion: React.FC = () => {
-    const { 
+    const {
         usuarios, cargando, cargarConfiguracion,
         localConfigClub, localConfigNotificaciones, cargandoAccion,
         modalUsuarioAbierto, usuarioEnEdicion, abrirFormularioUsuario, cerrarFormularioUsuario, guardarUsuarioHandler,
         modalConfirmacionAbierto, usuarioAEliminar, abrirConfirmacionEliminar, cerrarConfirmacion, confirmarEliminacion,
         handleConfigChange, guardarConfiguracionesHandler, setLocalConfigClub
     } = useGestionConfiguracion();
-    
+
     const { programas, agregarPrograma, actualizarPrograma, eliminarPrograma } = useProgramas();
     const { sedes, agregarSede, actualizarSede, eliminarSede } = useSedes();
     const { estudiantes } = useEstudiantes();
     const { mostrarNotificacion } = useNotificacion();
-    
+
     const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
     const [usuarioParaContrato, setUsuarioParaContrato] = useState<Usuario | null>(null);
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
@@ -276,7 +276,7 @@ const VistaConfiguracion: React.FC = () => {
         try {
             await actualizarUsuario({ contrato: datosContrato, estadoContrato: 'Pendiente' }, usuarioParaContrato.id);
             const url = generarUrlAbsoluta(`/contrato-colaborador/${usuarioParaContrato.id}`);
-            
+
             if (navigator.share) {
                 await navigator.share({
                     title: 'Contrato ' + localConfigClub.nombreClub,
@@ -287,7 +287,7 @@ const VistaConfiguracion: React.FC = () => {
                 await navigator.clipboard.writeText(url);
                 mostrarNotificacion("Enlace de contrato copiado al portapapeles.", "success");
             }
-            
+
             setUsuarioParaContrato(null);
             cargarConfiguracion();
         } catch (e) {
@@ -362,20 +362,20 @@ const VistaConfiguracion: React.FC = () => {
     const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner";
 
     return (
-        <div className="p-4 sm:p-8 space-y-10 animate-fade-in">
+        <div className="p-4 sm:p-12 space-y-10 bg-tkd-gray dark:bg-gray-950 min-h-screen animate-fade-in shadow-inner">
             <header className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Centro de Control</h1>
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mt-2">Configuración Global y Parámetros del Dojang</p>
+                    <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Centro de Control</h1>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Configuración Global y Parámetros del Dojang</p>
                 </div>
-                <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="w-full md:w-auto bg-tkd-blue text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="w-full md:w-auto bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-blue-800">
                     <IconoGuardar className="w-5 h-5" /> Guardar Cambios
                 </button>
             </header>
 
             <div className="relative">
-                <div className="bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
-                    <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
+                <div className="bg-white dark:bg-gray-800 p-1 rounded-full md:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
+                    <div className="flex flex-row overflow-x-auto no-scrollbar gap-1 p-0.5">
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
                             { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
@@ -384,10 +384,10 @@ const VistaConfiguracion: React.FC = () => {
                             { id: 'alertas', label: 'Alertas', icon: IconoCampana },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
                         ].map(tab => (
-                            <button 
+                            <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-6 py-4 md:py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-4 px-8 py-3.5 md:py-3 rounded-full md:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-lg scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                                 title={tab.label}
                             >
                                 <tab.icon className="w-5 h-5 md:w-4 md:h-4" />
@@ -397,7 +397,7 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 </div>
             </div>
-            
+
             {activeTab === 'branding' && (
                 <div className="space-y-8 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
@@ -505,13 +505,13 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="p-8 border-b dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
                         <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Equipo Técnico y Administrativo</h2>
                         <button onClick={() => abrirFormularioUsuario()} className="w-full sm:w-auto bg-tkd-blue text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center justify-center gap-2">
-                             <IconoAgregar className="w-4 h-4" /> Nuevo Miembro
+                            <IconoAgregar className="w-4 h-4" /> Nuevo Miembro
                         </button>
                     </div>
                     <div className="p-4 sm:p-8">
-                        <TablaUsuarios 
-                            usuarios={usuarios} 
-                            onEditar={abrirFormularioUsuario} 
+                        <TablaUsuarios
+                            usuarios={usuarios}
+                            onEditar={abrirFormularioUsuario}
                             onEliminar={abrirConfirmacionEliminar}
                             onGestionarContrato={(u) => setUsuarioParaContrato(u)}
                         />
@@ -526,7 +526,7 @@ const VistaConfiguracion: React.FC = () => {
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Sedes / Ubicaciones</h2>
                             <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Sucursales activas para tu licencia ({sedes.length} / {localConfigClub.limiteSedes})</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => { setSedeEdit(null); setModalSedeAbierto(true); }}
                             disabled={sedes.length >= localConfigClub.limiteSedes}
                             className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all disabled:bg-gray-300"
@@ -558,7 +558,7 @@ const VistaConfiguracion: React.FC = () => {
                                             <IconoWhatsApp className="w-3.5 h-3.5" /> {s.telefono}
                                         </p>
                                     </div>
-                                    
+
                                     {/* Muestra el precio específico si existe */}
                                     <div className="pt-4 border-t dark:border-gray-700">
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Clase:</p>
@@ -572,9 +572,9 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
 
                     {modalSedeAbierto && (
-                        <FormularioSede 
-                            abierto={modalSedeAbierto} 
-                            onCerrar={() => setModalSedeAbierto(false)} 
+                        <FormularioSede
+                            abierto={modalSedeAbierto}
+                            onCerrar={() => setModalSedeAbierto(false)}
                             onGuardar={handleGuardarSede}
                             sedeActual={sedeEdit}
                             cargando={false}
@@ -590,7 +590,7 @@ const VistaConfiguracion: React.FC = () => {
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Catálogo de Modalidades</h2>
                             <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Defina servicios con costos y horarios independientes</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }}
                             className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
                         >
@@ -611,7 +611,7 @@ const VistaConfiguracion: React.FC = () => {
                                             <button onClick={() => eliminarPrograma(p.id)} className="p-2 text-gray-400 hover:text-tkd-red transition-all"><IconoEliminar className="w-5 h-5" /></button>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <span className={`inline-block text-[9px] font-black uppercase px-3 py-1 rounded-full mb-3 ${p.tipoCobro === TipoCobroPrograma.Recurrente ? 'bg-tkd-blue/10 text-tkd-blue' : 'bg-tkd-red/10 text-tkd-red'}`}>
                                             {p.tipoCobro === TipoCobroPrograma.Recurrente ? 'Suscripción Mensual' : 'Pago por Taller'}
@@ -633,7 +633,7 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
                         ))}
 
-                        <button 
+                        <button
                             onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }}
                             className="bg-gray-50 dark:bg-gray-900/50 border-4 border-dashed border-gray-200 dark:border-gray-800 rounded-[3rem] p-10 flex flex-col items-center justify-center text-center gap-6 hover:border-tkd-blue hover:bg-tkd-blue/5 transition-all group min-h-[320px] shadow-inner"
                         >
@@ -648,9 +648,9 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
 
                     {modalProgramaAbierto && (
-                        <ModalFormPrograma 
-                            programa={programaEdit} 
-                            onCerrar={() => setModalProgramaAbierto(false)} 
+                        <ModalFormPrograma
+                            programa={programaEdit}
+                            onCerrar={() => setModalProgramaAbierto(false)}
                             onGuardar={handleGuardarPrograma}
                         />
                     )}
@@ -735,20 +735,20 @@ const VistaConfiguracion: React.FC = () => {
             )}
 
             {itemAPagar && (
-                <ModalPagoCheckout 
-                    item={itemAPagar.item} 
+                <ModalPagoCheckout
+                    item={itemAPagar.item}
                     tipo={itemAPagar.tipo}
-                    tenantId={localConfigClub.tenantId} 
-                    onCerrar={() => setItemAPagar(null)} 
+                    tenantId={localConfigClub.tenantId}
+                    onCerrar={() => setItemAPagar(null)}
                     onExito={handleExitoPago}
                 />
             )}
 
             {usuarioParaContrato && (
-                <ModalGenerarContrato 
-                    usuario={usuarioParaContrato} 
+                <ModalGenerarContrato
+                    usuario={usuarioParaContrato}
                     sedes={sedes}
-                    onCerrar={() => setUsuarioParaContrato(null)} 
+                    onCerrar={() => setUsuarioParaContrato(null)}
                     onGenerar={handleGenerarContrato}
                 />
             )}

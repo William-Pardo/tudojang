@@ -158,24 +158,24 @@ export const VistaEstudiantes: React.FC = () => {
     ].filter(t => t.visible);
 
     return (
-        <div className="p-4 sm:p-12 space-y-10 bg-[#0D121F] min-h-screen text-white">
+        <div className="p-4 sm:p-12 space-y-10 bg-tkd-gray dark:bg-gray-950 min-h-screen animate-fade-in">
             {/* BANNER GLOBAL DE MISIÓN KICHO ACTIVA */}
             <AnimatePresence>
                 {misionActiva && activeTab !== 'kicho' && (
                     <motion.div
                         initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
-                        className="bg-[#1A2232] border border-white/5 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl"
+                        className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-white/5 p-5 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm"
                     >
                         <div className="flex items-center gap-5">
                             <div className="w-12 h-12 bg-tkd-blue/10 text-tkd-blue border border-tkd-blue/20 rounded-2xl flex items-center justify-center shadow-inner"><IconoCampana className="w-6 h-6 animate-pulse" /></div>
                             <div>
                                 <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.3em]">Protocolo de Onboarding Activo</p>
-                                <p className="text-xs font-medium text-gray-400 mt-1">Tus alumnos están enviando sus datos. Revisa la pestaña Misión KICHO.</p>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">Tus alumnos están enviando sus datos. Revisa la pestaña Misión KICHO.</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-6">
-                            <div className="w-px h-10 bg-white/5 hidden sm:block"></div>
-                            <button onClick={() => setActiveTab('kicho')} className="text-[10px] font-black uppercase text-white hover:text-tkd-blue transition-colors tracking-widest flex items-center gap-2 group">
+                            <div className="w-px h-10 bg-gray-100 dark:bg-white/5 hidden sm:block"></div>
+                            <button onClick={() => setActiveTab('kicho')} className="text-[10px] font-black uppercase text-tkd-dark dark:text-white hover:text-tkd-blue transition-colors tracking-widest flex items-center gap-2 group">
                                 Gestionar Registro <span className="group-hover:translate-x-1 transition-transform">→</span>
                             </button>
                         </div>
@@ -185,30 +185,30 @@ export const VistaEstudiantes: React.FC = () => {
 
             <header className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center">
                 <div>
-                    <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">Hub de Estudiantes</h1>
+                    <h1 className="text-4xl font-black text-tkd-dark dark:text-white uppercase tracking-tighter leading-none">Hub de Estudiantes</h1>
                     <p className="text-[10px] font-black text-gray-500 mt-2 uppercase tracking-[0.4em]">Gestión centralizada de la base técnica</p>
                 </div>
 
                 {(activeTab === 'directorio' || activeTab === 'kicho') && (
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        <div className="mr-4 hidden lg:flex items-center gap-3 px-5 py-2.5 bg-[#1A2232] rounded-2xl border border-white/5">
+                        <div className="mr-4 hidden lg:flex items-center gap-3 px-5 py-2.5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm">
                             <div className="w-2 h-2 bg-tkd-blue rounded-full animate-pulse"></div>
                             <span className="text-[9px] font-black uppercase text-tkd-blue tracking-widest">
                                 Trial: {estudiantes.length}/15 Alumnos
                             </span>
                         </div>
-                        <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-[#10B981]/10 text-[#10B981] p-3.5 rounded-2xl hover:bg-[#10B981] hover:text-white transition-all border border-[#10B981]/20 shadow-xl" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
+                        <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-50 text-green-600 dark:bg-green-600/10 dark:text-green-500 p-3.5 rounded-2xl hover:bg-green-600 hover:text-white transition-all border border-green-100 dark:border-green-500/20 shadow-sm" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
                         <button
                             disabled={estudiantes.length >= 15}
                             onClick={() => setModalImportMasivaAbierto(true)}
-                            className="bg-white text-tkd-blue px-6 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-gray-100 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                            className="bg-white dark:bg-gray-800 text-tkd-blue px-6 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-sm border border-gray-100 dark:border-gray-700"
                         >
                             <IconoInformacion className="w-4 h-4" /><span>Importar CSV</span>
                         </button>
                         <button
                             disabled={estudiantes.length >= 15}
                             onClick={() => abrirFormulario()}
-                            className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-[0_15px_30px_-10px_rgba(0,71,160,0.5)] hover:bg-blue-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                            className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
                         >
                             <IconoAgregar className="w-4 h-4" /><span>Nuevo Alumno</span>
                         </button>
@@ -217,16 +217,16 @@ export const VistaEstudiantes: React.FC = () => {
             </header>
 
             {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
-            <div className="bg-[#1A2232] p-2 rounded-[2.2rem] shadow-2xl border border-white/5 w-full md:w-fit overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 p-2 rounded-full md:rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as TabId)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-4 px-8 py-4 md:py-3.5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === tab.id ? 'bg-white text-[#1A2232] shadow-2xl scale-[1.02] z-10' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}
+                            className={`flex-shrink-0 flex items-center justify-center gap-4 px-8 py-4 md:py-3.5 rounded-full md:rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-lg scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             title={tab.label}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 transition-colors ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span className="hidden md:inline">{tab.label}</span>
                             {tab.id === 'kicho' && <div className="w-2 h-2 bg-tkd-red rounded-full animate-pulse flex-shrink-0"></div>}
                         </button>
