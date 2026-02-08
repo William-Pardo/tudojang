@@ -2,10 +2,14 @@
 export default {
     content: [
         "./index.html",
-        "./src/**/*.{js,ts,jsx,tsx}",
+        "./*.{js,ts,jsx,tsx}",
         "./vistas/**/*.{js,ts,jsx,tsx}",
         "./components/**/*.{js,ts,jsx,tsx}",
+        "./hooks/**/*.{js,ts,jsx,tsx}",
+        "./context/**/*.{js,ts,jsx,tsx}",
+        "./servicios/**/*.{js,ts,jsx,tsx}",
         "./App.tsx",
+        "./index.tsx"
     ],
     darkMode: 'class',
     theme: {

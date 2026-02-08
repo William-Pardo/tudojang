@@ -136,9 +136,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setSolicitudesCompra(sc);
             setMovimientos(m);
             setProgramas(pr);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error al sincronizar datos:", err);
-            setError("Error al sincronizar datos de la academia.");
+            setError(`Error al sincronizar datos de la academia: ${err.message || 'Error desconocido'}`);
         } finally {
             setCargando(false);
         }
@@ -154,8 +154,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             const m = await api.obtenerMovimientos(tenant.tenantId, sedeId);
             setMovimientos(m);
-        } catch (e) {
-            setError("Error cargando finanzas");
+        } catch (err: any) {
+            console.error("Error cargando finanzas:", err);
+            setError(`Error cargando finanzas: ${err.message || 'Error desconocido'}`);
         } finally {
             setCargando(false);
         }

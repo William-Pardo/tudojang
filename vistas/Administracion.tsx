@@ -24,14 +24,14 @@ const VistaAdministracion: React.FC = () => {
             </header>
 
             {/* BARRA DE PESTAÑAS: SEGMENTED CONTROL / NEUMORFISMO SUAVE */}
-            <div className="bg-white dark:bg-gray-800 p-1 rounded-full md:rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm w-full md:w-fit overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm w-full md:w-fit overflow-hidden">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1 p-0.5">
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as AdminTab)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-4 px-8 py-3 rounded-full md:rounded-xl text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id
-                                ? 'bg-tkd-dark text-white shadow-lg scale-[1.02] z-10'
+                            className={`flex-shrink-0 flex items-center justify-center gap-4 px-10 py-4 rounded-[1.5rem] text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id
+                                ? 'bg-tkd-dark text-white shadow-xl scale-[1.02] z-10'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
