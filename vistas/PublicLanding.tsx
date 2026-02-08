@@ -27,12 +27,19 @@ const PublicLanding: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-4">
                     {!usuario ? (
-                        <Link
-                            to="/login"
-                            className="bg-blue-600 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95"
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
                         >
-                            Iniciar Sesión
-                        </Link>
+                            <Link
+                                to="/login"
+                                className="bg-blue-600 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
+                            >
+                                <IconoDashboard className="w-4 h-4" />
+                                Iniciar Sesión
+                            </Link>
+                        </motion.div>
                     ) : (
                         <Link
                             to="/"
@@ -151,12 +158,20 @@ const PublicLanding: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {Object.values(PLANES_SAAS).map((plan: any) => (
-                            <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all duration-500 hover:shadow-2xl 
-                                ${plan.popular
-                                    ? 'border-blue-600 bg-white shadow-2xl scale-105 z-10 hover:scale-[1.08] hover:-translate-y-4'
-                                    : 'border-gray-100 bg-white shadow-xl hover:border-blue-200 hover:-translate-y-2'
-                                }`}>
+                        {Object.values(PLANES_SAAS).map((plan: any, i: number) => (
+                            <motion.div
+                                key={plan.id}
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: i * 0.1 }}
+                                whileHover={{ y: -15, scale: plan.popular ? 1.05 : 1.02 }}
+                                className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-shadow duration-300 relative
+                                    ${plan.popular
+                                        ? 'border-blue-600 bg-white shadow-2xl z-10'
+                                        : 'border-gray-100 bg-white shadow-xl hover:border-blue-200'
+                                    }`}
+                            >
                                 <div className="space-y-6">
                                     {plan.popular && (
                                         <div className="flex justify-between items-center">
@@ -182,11 +197,11 @@ const PublicLanding: React.FC = () => {
                                 </div>
                                 <Link
                                     to="/login"
-                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all bg-blue-600 text-white shadow-xl hover:bg-blue-700 hover:scale-[1.02] active:scale-95`}
+                                    className="mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all bg-blue-600 text-white shadow-xl hover:bg-blue-700 active:scale-95"
                                 >
                                     Iniciar Sesión
                                 </Link>
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                     <div className="text-center pt-10">
