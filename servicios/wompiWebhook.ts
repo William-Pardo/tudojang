@@ -35,14 +35,6 @@ export const webhookWompi = functions.https.onRequest(async (req, res) => {
                 });
                 console.log(`Suscripción activada para: ${slug}`);
             }
-            else if (tipo === 'SHOP') {
-                // CASO 2: Un alumno pagó un implemento
-                // Aquí podrías actualizar el saldo del alumno a $0 automáticamente
-                await admin.firestore().collection('estudiantes').doc(id).update({
-                    estadoPago: 'Al día',
-                    saldoDeudor: 0
-                });
-            }
         }
     }
 

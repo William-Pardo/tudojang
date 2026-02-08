@@ -30,18 +30,8 @@ const PasarelaInscripcion: React.FC = () => {
 
     const valorTotal = (tenant?.valorInscripcion || 0) + (tenant?.valorMensualidad || 0);
 
-    const handleIniciarPago = () => {
-        const montoEnCentavos = valorTotal * 100;
-        const referenciaTecnica = `INSCR_${tenant?.slug.toUpperCase()}_${tenant?.tenantId}_${Date.now()}`;
-
-        const urlWompi = `https://checkout.wompi.co/p/?` +
-            `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-            `currency=COP&` +
-            `amount-in-cents=${montoEnCentavos}&` +
-            `reference=${referenciaTecnica}&` +
-            `redirect-url=${window.location.href}?status=verificando`;
-
-        window.location.href = urlWompi;
+    const handleNotificarPago = () => {
+        setPaso('formulario');
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -77,7 +67,7 @@ const PasarelaInscripcion: React.FC = () => {
             <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
                 <AnimatePresence mode="wait">
 
-                    {/* FASE 1: PAGO INICIAL */}
+                    {/* FASE 1: PAGO INICIAL (MANUAL) */}
                     {paso === 'pago' && (
                         <motion.div
                             key="pago" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -85,65 +75,69 @@ const PasarelaInscripcion: React.FC = () => {
                         >
                             <div className="text-center space-y-2">
                                 <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white tracking-tight">Paso 1: Legalización de Cupo</h2>
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-widest">Para iniciar tu formación técnica, debes cancelar los derechos de ingreso.</p>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-widest">Realiza el pago a través de los medios oficiales de la academia.</p>
                             </div>
 
-                            <div className="bg-gray-50 dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 space-y-4">
-                                <div className="flex justify-between items-center text-gray-500">
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Inscripción Inicial</span>
-                                    <span className="font-bold">{formatearPrecio(tenant?.valorInscripcion || 0)}</span>
+                            <div className="bg-gray-50 dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 space-y-6">
+                                <div className="space-y-4">
+                                    {tenant?.pagoNequi && (
+                                        <div className="flex justify-between items-center text-gray-500">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-[#E71D73]">Nequi</span>
+                                            <span className="font-bold text-tkd-dark dark:text-white">{tenant.pagoNequi}</span>
+                                        </div>
+                                    )}
+                                    {tenant?.pagoBanco && (
+                                        <div className="flex flex-col gap-1 text-gray-500">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-tkd-blue">Banco / Transferencia</span>
+                                            <span className="font-bold text-tkd-dark dark:text-white text-xs leading-relaxed">{tenant.pagoBanco}</span>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex justify-between items-center text-gray-500">
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Primera Mensualidad</span>
-                                    <span className="font-bold">{formatearPrecio(tenant?.valorMensualidad || 0)}</span>
-                                </div>
+
                                 <div className="h-px bg-gray-200 dark:bg-gray-700 my-4"></div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-black uppercase text-tkd-blue tracking-widest">Total a Pagar</span>
-                                    <span className="text-3xl font-black text-tkd-dark dark:text-white tracking-tighter">{formatearPrecio(valorTotal)}</span>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-gray-400">
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Inscripción Inicial</span>
+                                        <span className="font-bold text-xs">{formatearPrecio(tenant?.valorInscripcion || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-gray-400">
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Primera Mensualidad</span>
+                                        <span className="font-bold text-xs">{formatearPrecio(tenant?.valorMensualidad || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <span className="text-xs font-black uppercase text-tkd-blue tracking-widest">Total a Pagar</span>
+                                        <span className="text-3xl font-black text-tkd-dark dark:text-white tracking-tighter">{formatearPrecio(valorTotal)}</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <button
-                                onClick={handleIniciarPago}
-                                className="w-full py-6 bg-tkd-red text-white rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-4"
+                                onClick={handleNotificarPago}
+                                className="w-full py-6 bg-tkd-dark text-white rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl hover:bg-black transition-all active:scale-95 flex items-center justify-center gap-4"
                             >
-                                <IconoAprobar className="w-6 h-6" /> Pagar con Wompi
+                                <IconoAprobar className="w-6 h-6" /> Ya realicé el pago
                             </button>
 
-                            <div className="flex items-center gap-3 justify-center opacity-40 grayscale">
-                                <span className="text-[8px] font-black uppercase">Seguridad SSL</span>
-                                <span className="text-[8px] font-black uppercase">Aliant Protected</span>
-                                <span className="text-[8px] font-black uppercase">PCI Compliance</span>
+                            <div className="text-center">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-relaxed">
+                                    Una vez notificado el pago, podrás completar los datos <br /> del registro técnico del alumno.
+                                </p>
                             </div>
                         </motion.div>
                     )}
 
-                    {/* FASE 2: VERIFICANDO PAGO */}
-                    {paso === 'verificando' && (
-                        <motion.div
-                            key="verificando" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="p-20 text-center space-y-8"
-                        >
-                            <div className="w-24 h-24 border-8 border-tkd-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
-                            <div className="space-y-2">
-                                <h3 className="text-xl font-black uppercase dark:text-white">Verificando Transacción</h3>
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest animate-pulse">Sincronizando con la red bancaria...</p>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* FASE 3: FORMULARIO TÉCNICO (DESBLOQUEADO) */}
+                    {/* FASE 2: FORMULARIO TÉCNICO */}
                     {paso === 'formulario' && (
                         <motion.div
                             key="formulario" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
                             className="p-10 space-y-8"
                         >
-                            <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-2xl border border-green-100 dark:border-green-800 flex items-center gap-4">
-                                <div className="bg-green-500 text-white p-2 rounded-lg shadow-lg"><IconoCandado className="w-5 h-5" /></div>
+                            <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-4">
+                                <div className="bg-tkd-blue text-white p-2 rounded-lg shadow-lg"><IconoInformacion className="w-5 h-5" /></div>
                                 <div>
-                                    <p className="text-[10px] font-black text-green-700 dark:text-green-400 uppercase tracking-widest">Pago Confirmado</p>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase">Cupo garantizado. Por favor ingresa los datos del alumno.</p>
+                                    <p className="text-[10px] font-black text-tkd-blue dark:text-blue-400 uppercase tracking-widest">Información de Registro</p>
+                                    <p className="text-[9px] font-bold text-gray-500 uppercase text-left">Por favor ingresa los datos oficiales del alumno. <br /> El administrador verificará tu pago posteriormente.</p>
                                 </div>
                             </div>
 
@@ -169,16 +163,16 @@ const PasarelaInscripcion: React.FC = () => {
                         </motion.div>
                     )}
 
-                    {/* FASE 4: FINALIZADO */}
+                    {/* FASE 3: FINALIZADO */}
                     {paso === 'finalizado' && (
                         <motion.div
                             key="finalizado" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                             className="p-16 text-center space-y-6"
                         >
                             <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
-                            <h2 className="text-3xl font-black uppercase tracking-tighter">¡Bienvenido a la Familia!</h2>
+                            <h2 className="text-3xl font-black uppercase tracking-tighter text-tkd-dark dark:text-white">¡Registro Solicitado!</h2>
                             <p className="text-gray-500 font-bold uppercase text-xs tracking-widest leading-relaxed">
-                                Tu registro y pago han sido procesados. <br /> Recibirás un WhatsApp con tu carnet digital y horarios en los próximos minutos.
+                                Tus datos han sido enviados a la academia. <br /> Una vez que el Sabonim verifique tu pago, <br /> recibirás una notificación oficial por WhatsApp.
                             </p>
                             <button onClick={() => window.location.reload()} className="mt-8 text-tkd-blue font-black uppercase text-[10px] tracking-widest hover:underline">Registrar otro alumno</button>
                         </motion.div>
@@ -188,7 +182,7 @@ const PasarelaInscripcion: React.FC = () => {
             </div>
 
             <footer className="mt-12 text-center">
-                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.4 • Transacción Bancaria Protegida</p>
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.4 • Registro Técnico Protegido</p>
             </footer>
         </div>
     );
