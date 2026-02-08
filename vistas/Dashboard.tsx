@@ -44,10 +44,10 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
     }
 
     return (
-        <div className={`space-y-8 animate-fade-in ${!isSubView ? 'p-8 sm:p-12' : ''} bg-[#0D121F] min-h-screen text-white`}>
+        <div className={`space-y-12 animate-fade-in ${!isSubView ? 'p-8 sm:p-12 bg-[#0D121F] min-h-screen text-white' : ''}`}>
             {!isSubView && (
                 <div className="mb-12">
-                    <h1 className="text-4xl font-black text-white uppercase tracking-tighter">Centro de Administración</h1>
+                    <h1 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">Centro de Administración</h1>
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mt-2">Monitoreo de salud financiera y operativa</p>
                 </div>
             )}

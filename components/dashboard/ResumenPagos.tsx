@@ -20,8 +20,8 @@ const ResumenPagos: React.FC<Props> = ({ estudiantes }) => {
   const totalEstudiantes = estudiantes.length;
 
   return (
-    <div className="bg-[#1A2232] p-8 rounded-[1.8rem] border border-white/5 shadow-2xl h-full">
-      <h2 className="text-xs font-black text-white uppercase tracking-[0.3em] mb-8">Distribución de Cartera</h2>
+    <div className="bg-[#1A2232] p-8 rounded-[2rem] border border-white/5 shadow-2xl h-full">
+      <h2 className="text-[10px] font-black text-white uppercase tracking-[0.3em] mb-10">Distribución de Cartera</h2>
       <ul className="space-y-8">
         {Object.entries(distribucionPagos).map(([estado, cantidad]) => {
           const colors = {
@@ -35,14 +35,14 @@ const ResumenPagos: React.FC<Props> = ({ estudiantes }) => {
           return (
             <li key={estado}>
               <div className="flex justify-between items-end mb-3 px-1">
-                <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">
-                  {estado} <span className="ml-1 text-tkd-blue">({cantidad})</span>
+                <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.3em]">
+                  {estado} <span className="text-tkd-blue ml-1">({cantidad})</span>
                 </span>
                 <span className="text-[10px] font-black text-white tracking-widest">
                   {percentage}%
                 </span>
               </div>
-              <div className="w-full bg-[#0D121F] rounded-full h-1.5 overflow-hidden">
+              <div className="w-full bg-[#0D121F] rounded-full h-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ${colors[estado as keyof typeof colors]}`}
                   style={{ width: `${percentage}%` }}

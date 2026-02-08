@@ -18,11 +18,11 @@ interface Props {
 
 const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onLimpiarFiltros }) => {
   return (
-    <div className="bg-[#1A2232] p-8 rounded-[1.8rem] border border-white/5 shadow-2xl">
-      <h3 className="text-xs font-black uppercase text-tkd-blue mb-6 tracking-[0.3em]">Filtros de Análisis</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
-        <div className="space-y-2">
-          <label htmlFor="sedeId" className="block text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">
+    <div className="bg-[#1A2232] p-8 rounded-[2rem] border border-white/5 shadow-2xl">
+      <h3 className="text-[10px] font-black uppercase text-tkd-blue mb-8 tracking-[0.3em]">Filtros de Análisis</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 items-end">
+        <div className="space-y-3">
+          <label htmlFor="sedeId" className="block text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] ml-1">
             Sede / Dojang
           </label>
           <select
@@ -30,7 +30,7 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             id="sedeId"
             value={filtros.sedeId}
             onChange={onFiltroChange}
-            className="w-full bg-[#0D121F] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold focus:border-tkd-blue outline-none transition-all"
+            className="w-full bg-[#0D121F] border border-white/5 rounded-2xl px-6 py-4 text-white text-[11px] font-bold focus:border-tkd-blue outline-none transition-all cursor-pointer hover:bg-[#151b2b]"
           >
             <option value="todas">Todas las sedes</option>
             {sedes.map(s => (
@@ -38,8 +38,8 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             ))}
           </select>
         </div>
-        <div className="space-y-2">
-          <label htmlFor="grupo" className="block text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">
+        <div className="space-y-3">
+          <label htmlFor="grupo" className="block text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] ml-1">
             Grupo de Edad
           </label>
           <select
@@ -47,7 +47,7 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             id="grupo"
             value={filtros.grupo}
             onChange={onFiltroChange}
-            className="w-full bg-[#0D121F] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold focus:border-tkd-blue outline-none transition-all"
+            className="w-full bg-[#0D121F] border border-white/5 rounded-2xl px-6 py-4 text-white text-[11px] font-bold focus:border-tkd-blue outline-none transition-all cursor-pointer hover:bg-[#151b2b]"
           >
             <option value="todos">Todos los grupos</option>
             {Object.values(GrupoEdad).map(g => (
@@ -55,8 +55,8 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             ))}
           </select>
         </div>
-        <div className="space-y-2">
-          <label htmlFor="fechaInicio" className="block text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">
+        <div className="space-y-3">
+          <label htmlFor="fechaInicio" className="block text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] ml-1">
             Ingreso Desde
           </label>
           <input
@@ -65,11 +65,11 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             id="fechaInicio"
             value={filtros.fechaInicio}
             onChange={onFiltroChange}
-            className="w-full bg-[#0D121F] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold focus:border-tkd-blue outline-none transition-all"
+            className="w-full bg-[#0D121F] border border-white/5 rounded-2xl px-6 py-4 text-white text-[11px] font-bold focus:border-tkd-blue outline-none transition-all h-[52px]"
           />
         </div>
-        <div className="space-y-2">
-          <label htmlFor="fechaFin" className="block text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">
+        <div className="space-y-3">
+          <label htmlFor="fechaFin" className="block text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] ml-1">
             Ingreso Hasta
           </label>
           <input
@@ -78,13 +78,13 @@ const FiltrosDashboard: React.FC<Props> = ({ filtros, sedes, onFiltroChange, onL
             id="fechaFin"
             value={filtros.fechaFin}
             onChange={onFiltroChange}
-            className="w-full bg-[#0D121F] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold focus:border-tkd-blue outline-none transition-all"
+            className="w-full bg-[#0D121F] border border-white/5 rounded-2xl px-6 py-4 text-white text-[11px] font-bold focus:border-tkd-blue outline-none transition-all h-[52px]"
           />
         </div>
-        <div>
+        <div className="h-full flex items-end">
           <button
             onClick={onLimpiarFiltros}
-            className="w-full bg-gray-500/10 text-gray-400 border border-white/5 py-3.5 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-500/20 transition-all hover:text-white"
+            className="w-full bg-white/5 text-gray-400 border border-white/5 h-[52px] rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/10 hover:text-white transition-all shadow-xl"
           >
             Limpiar Filtros
           </button>
