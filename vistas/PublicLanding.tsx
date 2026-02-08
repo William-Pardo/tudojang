@@ -62,7 +62,7 @@ const PublicLanding: React.FC = () => {
                             Software de Gestión para Líderes de Artes Marciales
                         </div>
                         <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.9]">
-                            Automatice su Cobranza y <span className="text-tkd-blue">Proteja su Academia</span>
+                            Automatice su Cobranza y <span className="text-[#0047A0]">Proteja su Academia</span>
                         </h1>
                         <p className="text-lg text-gray-500 font-medium uppercase leading-relaxed max-w-md">
                             Delegue la gestión operativa y legal en Tudojang. La única plataforma en Colombia que automatiza sus cobros por WhatsApp y formaliza sus matrículas con firma digital válida.
@@ -70,13 +70,13 @@ const PublicLanding: React.FC = () => {
                         <div className="flex flex-col sm:flex-row gap-4">
                             <a
                                 href="https://wa.me/573007654321?text=Deseo%20una%20consultoría%20para%20implementar%20Tudojang"
-                                className="bg-tkd-red text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
+                                className="bg-[#CD2E3A] text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
                             >
                                 Ver Tudojang en Acción (Consultoría Gratuita)
                             </a>
                             <Link
                                 to="/login"
-                                className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 shadow-xl transition-all text-center"
+                                className="bg-[#0047A0] text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-800 shadow-xl transition-all text-center"
                             >
                                 Iniciar Sesión Ahora
                             </Link>
@@ -135,13 +135,13 @@ const PublicLanding: React.FC = () => {
                             }
                         ].map((feat, i) => (
                             <div key={i} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all space-y-6">
-                                <div className="w-16 h-16 bg-tkd-blue/5 rounded-2xl flex items-center justify-center text-tkd-blue">
+                                <div className="w-16 h-16 bg-[#0047A0]/10 rounded-2xl flex items-center justify-center text-[#0047A0]">
                                     <feat.icon className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-xl font-black uppercase tracking-tight">{feat.title}</h3>
+                                <h3 className="text-xl font-black uppercase tracking-tight text-[#111111]">{feat.title}</h3>
                                 <p className="text-sm text-gray-500 font-medium leading-relaxed uppercase">{feat.text}</p>
-                                {feat.title === "Certeza Jurídica" && <p className="text-[8px] font-bold text-tkd-blue opacity-50 uppercase tracking-widest">Cumplimiento Normativo Colombia</p>}
-                                {feat.title === "Cobranza sin Fricción" && <p className="text-[8px] font-bold text-tkd-blue opacity-50 uppercase tracking-widest">Integración Segura Wompi</p>}
+                                {feat.title === "Certeza Jurídica" && <p className="text-[8px] font-bold text-[#0047A0] opacity-50 uppercase tracking-widest">Cumplimiento Normativo Colombia</p>}
+                                {feat.title === "Cobranza sin Fricción" && <p className="text-[8px] font-bold text-[#0047A0] opacity-50 uppercase tracking-widest">Integración Segura Wompi</p>}
                             </div>
                         ))}
                     </div>
@@ -182,21 +182,21 @@ const PublicLanding: React.FC = () => {
                                     )}
                                     <h4 className="text-2xl font-black uppercase tracking-tight">{plan.nombre}</h4>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-black text-blue-600">{formatearPrecio(plan.precio)}</span>
+                                        <span className="text-4xl font-black text-[#0047A0]">{formatearPrecio(plan.precio)}</span>
                                         <span className="text-[10px] font-bold text-gray-400 uppercase">/mes</span>
                                     </div>
                                     <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
-                                        <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-blue-600" /> Hasta {plan.limiteEstudiantes} alumnos</li>
-                                        <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-blue-600" /> {plan.limiteUsuarios} Instructores</li>
-                                        <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-blue-600" /> {plan.limiteSedes} Sedes</li>
+                                        <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-[#0047A0]" /> Hasta {plan.limiteEstudiantes} alumnos</li>
+                                        <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-[#0047A0]" /> {plan.limiteUsuarios} Instructores</li>
+                                        <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-[#0047A0]" /> {plan.limiteSedes} Sedes</li>
                                         {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
-                                            <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-blue-500" /> {c}</li>
+                                            <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-[#0047A0]" /> {c}</li>
                                         ))}
                                     </ul>
                                 </div>
                                 <Link
                                     to="/login"
-                                    className="mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all bg-blue-600 text-white shadow-xl hover:bg-blue-700 active:scale-95"
+                                    className="mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all bg-[#0047A0] text-white shadow-xl hover:bg-blue-800 active:scale-95"
                                 >
                                     Iniciar Sesión
                                 </Link>
@@ -213,24 +213,24 @@ const PublicLanding: React.FC = () => {
             </section>
 
             {/* MISIÓN KICHO: REFUERZO DE COMPRA */}
-            <section id="kicho" className="py-24 bg-tkd-blue text-white px-6 sm:px-12 relative overflow-hidden">
+            <section id="kicho" className="py-24 bg-[#0047A0] text-white px-6 sm:px-12 relative overflow-hidden">
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative z-10">
                     <div className="space-y-8">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
-                            <IconoCampana className="w-8 h-8 text-tkd-red" />
+                            <IconoCampana className="w-8 h-8 text-[#CD2E3A]" />
                         </div>
                         <h2 className="text-5xl font-black uppercase tracking-tighter">Protocolo Kicho: <br /> Onboarding 72h</h2>
-                        <p className="text-gray-400 text-lg font-medium leading-relaxed uppercase tracking-tight">
+                        <p className="text-blue-100 text-lg font-medium leading-relaxed uppercase tracking-tight">
                             ¿Múltiples sedes o cientos de alumnos? Nuestro protocolo de inyección rápida asegura cero interrupción de sus clases. Usted autorice, nosotros automatizamos el registro masivo por QR.
                         </p>
                     </div>
                     <div className="bg-white/5 p-12 rounded-[4rem] border border-white/10 backdrop-blur-sm text-center">
-                        <div className="text-6xl font-black text-tkd-red mb-2">3 Días</div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Migración Total Aliant</p>
+                        <div className="text-6xl font-black text-[#CD2E3A] mb-2">3 Días</div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">Migración Total Aliant</p>
                         <div className="h-px bg-white/10 my-8"></div>
                         <a
                             href="https://wa.me/573007654321?text=Deseo%20activar%20una%20Misión%20Kicho%20para%20mi%20escuela"
-                            className="inline-block bg-white text-tkd-blue px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 shadow-2xl transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
+                            className="inline-block bg-white text-[#0047A0] px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 shadow-2xl transition-all hover:scale-[1.02] active:scale-95 whitespace-nowrap"
                         >
                             Agendar Protocolo Kicho (72h)
                         </a>
