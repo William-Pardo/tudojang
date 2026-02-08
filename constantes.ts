@@ -36,44 +36,44 @@ export const DATOS_RECAUDO_MASTER = {
 };
 
 export const CONFIGURACION_POR_DEFECTO = {
-  tenantId: 'escuela-gajog-001',
-  diaCobroMensual: 1,
-  diasAnticipoRecordatorio: 5,
-  diasGraciaSuspension: 10,
-  frecuenciaSyncHoras: 24,
-  frecuenciaQueryApiDias: 8,
+    tenantId: 'escuela-gajog-001',
+    diaCobroMensual: 1,
+    diasAnticipoRecordatorio: 5,
+    diasGraciaSuspension: 10,
+    frecuenciaSyncHoras: 24,
+    frecuenciaQueryApiDias: 8,
 };
 
 export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
-  tenantId: 'escuela-gajog-001',
-  slug: 'gajog',
-  nombreClub: 'Taekwondo Ga Jog',
-  nit: '900.123.456-7',
-  representanteLegal: 'CARLOS ANDRÉS PÉREZ',
-  ccRepresentante: '1.020.333.444',
-  lugarFirma: 'Bogotá D.C.',
-  duracionContratoMeses: 12,
-  valorMensualidad: 180000,
-  // Added comment above fix: Added required valorInscripcion and moraPorcentaje properties.
-  valorInscripcion: 50000,
-  moraPorcentaje: 5,
-  metodoPago: 'Transferencia Directa',
-  pagoNequi: '3001234567',
-  pagoDaviplata: '',
-  pagoBreB: '',
-  pagoBanco: 'Bancolombia Ahorros #123-456789-01',
-  diasSuspension: 30,
-  direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
-  colorPrimario: '#FFFFFF',
-  colorSecundario: '#0047A0',
-  colorAcento: '#CD2E3A',
-  emailClub: 'academia@gajog.com',
-  estadoSuscripcion: 'activo' as const,
-  fechaVencimiento: '2025-12-31',
-  plan: 'starter',
-  limiteEstudiantes: 50,
-  limiteUsuarios: 2,
-  limiteSedes: 1,
+    tenantId: 'escuela-gajog-001',
+    slug: 'gajog',
+    nombreClub: 'Taekwondo Ga Jog',
+    nit: '900.123.456-7',
+    representanteLegal: 'CARLOS ANDRÉS PÉREZ',
+    ccRepresentante: '1.020.333.444',
+    lugarFirma: 'Bogotá D.C.',
+    duracionContratoMeses: 12,
+    valorMensualidad: 180000,
+    // Added comment above fix: Added required valorInscripcion and moraPorcentaje properties.
+    valorInscripcion: 50000,
+    moraPorcentaje: 5,
+    metodoPago: 'Transferencia Directa',
+    pagoNequi: '3001234567',
+    pagoDaviplata: '',
+    pagoBreB: '',
+    pagoBanco: 'Bancolombia Ahorros #123-456789-01',
+    diasSuspension: 30,
+    direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
+    colorPrimario: '#FFFFFF',
+    colorSecundario: '#0047A0',
+    colorAcento: '#CD2E3A',
+    emailClub: 'academia@gajog.com',
+    estadoSuscripcion: 'activo' as const,
+    fechaVencimiento: '2025-12-31',
+    plan: 'starter',
+    limiteEstudiantes: 50,
+    limiteUsuarios: 2,
+    limiteSedes: 1,
 };
 
 export const ADMIN_WHATSAPP = "3001234567";
@@ -126,4 +126,12 @@ export const COSTOS_ADICIONALES = {
     estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes' },
     instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor' },
     sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede' }
+};
+
+export const CONFIGURACION_WOMPI = {
+    publicKey: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
+    privateKey: "prv_prod_hruawVEOZ8tsoL7NIEgqULsyzCx3QYBB",
+    eventsKey: "prod_events_Sliei3JBPRgw0zFfLFQ17OaGq70lRXhw",
+    integrityKey: "prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm",
+    webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
 };

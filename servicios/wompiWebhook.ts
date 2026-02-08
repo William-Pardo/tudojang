@@ -7,9 +7,13 @@ import * as admin from 'firebase-admin';
 
 // admin.initializeApp(); // Solo en entorno real de funciones
 
+// CONFIGURACIÓN DE SEGURIDAD (Se usarían estas llaves en el entorno de funciones):
+// const INTEGRITY_KEY = "prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm";
+// const EVENTS_KEY = "prod_events_Sliei3JBPRgw0zFfLFQ17OaGq70lRXhw";
+
 export const webhookWompi = functions.https.onRequest(async (req, res) => {
     // 1. Validar que el evento venga de Wompi (Seguridad)
-    // Wompi envía una firma para asegurar que nadie más llame a esta URL
+    // Se debe validar el header 'x-wompi-signature' usando la EVENTS_KEY
     const evento = req.body;
 
     if (evento.event === 'transaction.updated') {
@@ -30,7 +34,7 @@ export const webhookWompi = functions.https.onRequest(async (req, res) => {
                     )
                 });
                 console.log(`Suscripción activada para: ${slug}`);
-            } 
+            }
             else if (tipo === 'SHOP') {
                 // CASO 2: Un alumno pagó un implemento
                 // Aquí podrías actualizar el saldo del alumno a $0 automáticamente

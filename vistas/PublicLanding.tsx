@@ -18,61 +18,62 @@ const PublicLanding: React.FC = () => {
                     <span className="font-black text-xl tracking-tighter uppercase italic">Tudojang</span>
                 </div>
                 <div className="hidden md:flex items-center gap-8 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    <a href="#caracteristicas" className="hover:text-tkd-blue transition-colors">Características</a>
-                    <a href="#tarifas" className="hover:text-tkd-blue transition-colors">Tarifas</a>
-                    <a href="#kicho" className="hover:text-tkd-blue transition-colors">Misión Kicho</a>
+                    <a href="#caracteristicas" className="hover:text-tkd-blue transition-colors">Diferenciales</a>
+                    <a href="#tarifas" className="hover:text-tkd-blue transition-colors">Inversión</a>
+                    <a href="#kicho" className="hover:text-tkd-blue transition-colors">Protocolo Kicho</a>
                 </div>
-                <Link 
-                    to="/registro-escuela" 
-                    className="bg-tkd-dark text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-tkd-blue transition-all active:scale-95"
+                <Link
+                    to="/login"
+                    className="bg-tkd-blue text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95"
                 >
-                    Registrar Academia
+                    Entrar a mi Academia
                 </Link>
             </nav>
 
             {/* HERO SECTION: PUNTO DE CIERRE 1 */}
             <section className="relative pt-32 pb-20 px-6 sm:px-12 overflow-hidden">
                 <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }}
                         className="space-y-8"
                     >
                         <div className="inline-block bg-tkd-blue/10 text-tkd-blue px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                            El Futuro de la Gestión Marcial
+                            Software Técnico para Academias en Colombia
                         </div>
                         <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.9]">
-                            Transforma <br/> tu <span className="text-tkd-blue">Dojang</span>
+                            Recupere su tiempo <br /> y asegure su <span className="text-tkd-blue">Recaudo</span>
                         </h1>
                         <p className="text-lg text-gray-500 font-medium uppercase leading-relaxed max-w-md">
-                            La plataforma SaaS diseñada por Sabonims para automatizar tus cobros, legalizar tus alumnos y controlar tus clases en tiempo real.
+                            Gestione cobranzas por WhatsApp con IA, formalice contratos digitales con validez legal y controle su academia con autoridad técnica.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <Link 
-                                to="/registro-escuela" 
-                                className="bg-tkd-red text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
+                            <a
+                                href="https://wa.me/573007654321?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang.%20Agendemos%20una%20consultoría"
+                                target="_blank"
+                                className="bg-tkd-red text-white px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.1em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
                             >
-                                Empezar Gratis Hoy
-                            </Link>
-                            <a 
-                                href="#tarifas" 
+                                Ver Tudojang en Acción (Consultoría Gratuita)
+                            </a>
+                            <Link
+                                to="/registro-escuela"
                                 className="bg-white border-2 border-gray-100 text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-tkd-blue transition-all text-center"
                             >
-                                Ver Planes
-                            </a>
+                                Iniciar prueba sin costo
+                            </Link>
                         </div>
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
                         className="relative"
                     >
                         <div className="bg-gray-100 rounded-[3rem] aspect-square lg:aspect-video flex items-center justify-center p-12 shadow-inner border border-gray-200">
-                             <IconoLogoOficial className="w-64 h-64 opacity-10" />
-                             <div className="absolute inset-0 flex items-center justify-center">
-                                 <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl border border-gray-100 animate-bounce-slow">
-                                     <IconoDashboard className="w-16 h-16 text-tkd-blue" />
-                                 </div>
-                             </div>
+                            <IconoLogoOficial className="w-64 h-64 opacity-10" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl border border-gray-100 animate-bounce-slow">
+                                    <IconoDashboard className="w-16 h-16 text-tkd-blue" />
+                                </div>
+                            </div>
                         </div>
                         {/* Flotantes de UI */}
                         <div className="absolute -top-10 -right-10 bg-green-500 text-white p-6 rounded-3xl shadow-2xl animate-pulse">
@@ -89,26 +90,26 @@ const PublicLanding: React.FC = () => {
             <section id="caracteristicas" className="py-24 bg-gray-50 px-6 sm:px-12">
                 <div className="max-w-7xl mx-auto space-y-20">
                     <div className="text-center space-y-4">
-                        <h2 className="text-4xl font-black uppercase tracking-tighter">Potencia tu Ecosistema</h2>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">3 Pilares de Crecimiento Técnico</p>
+                        <h2 className="text-4xl font-black uppercase tracking-tighter">Potencia su Ecosistema</h2>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Respaldo Administrativo y Legal</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                         {[
-                            { 
-                                icon: IconoWhatsApp, 
-                                title: "Cobranza Pro", 
-                                text: "Recordatorios automáticos por WhatsApp con IA Gemini. Reduce el retraso en mensualidades en un 40%." 
+                            {
+                                icon: IconoWhatsApp,
+                                title: "Cobranza Diplomática con IA",
+                                text: "Recupere mensualidades sin confrontaciones. Nuestra IA gestiona recordatorios por WhatsApp de forma respetuosa, manteniendo la armonía con los padres."
                             },
-                            { 
-                                icon: IconoFirma, 
-                                title: "Legal Tech", 
-                                text: "Contratos de matrícula y consentimientos de riesgos con firma digital oficial. Cero papeles en el dojang." 
+                            {
+                                icon: IconoFirma,
+                                title: "Seguridad Jurídica Integral",
+                                text: "Matrículas y consentimientos con firma digital válida en Colombia. Documentación trazable que protege su escuela ante cualquier eventualidad legal."
                             },
-                            { 
-                                icon: IconoCampana, 
-                                title: "Monitor Real-Time", 
-                                text: "Carnets con QR para alumnos. Control de asistencia y salida sincronizado con el móvil de los padres." 
+                            {
+                                icon: IconoCampana,
+                                title: "Control Operativo en Vivo",
+                                text: "Asistencias por QR y alertas en tiempo real. Brinde tranquilidad total a los padres mientras mantiene el registro técnico exhaustivo de cada alumno."
                             }
                         ].map((feat, i) => (
                             <div key={i} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all space-y-6">
@@ -127,8 +128,8 @@ const PublicLanding: React.FC = () => {
             <section id="tarifas" className="py-24 px-6 sm:px-12">
                 <div className="max-w-6xl mx-auto space-y-16">
                     <div className="text-center">
-                        <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para tu Academia</h2>
-                        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes escalables según el tamaño de tu escuela</p>
+                        <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
+                        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento de su escuela</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -138,7 +139,7 @@ const PublicLanding: React.FC = () => {
                                     {plan.popular && <span className="bg-tkd-blue text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">Más Elegido</span>}
                                     <h4 className="text-2xl font-black uppercase tracking-tight">{plan.nombre}</h4>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-black text-tkd-blue">{formatearPrecio(plan.precio)}</span>
+                                        <span className="text-41 font-black text-tkd-blue">{formatearPrecio(plan.precio)}</span>
                                         <span className="text-[10px] font-bold text-gray-400 uppercase">/mes</span>
                                     </div>
                                     <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
@@ -150,56 +151,70 @@ const PublicLanding: React.FC = () => {
                                         ))}
                                     </ul>
                                 </div>
-                                <Link 
-                                    to="/registro-escuela" 
-                                    className={`mt-10 w-full py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
-                                >
-                                    Elegir este Plan
-                                </Link>
+                                <div className="mt-8 space-y-4">
+                                    <Link
+                                        to="/registro-escuela"
+                                        className={`w-full py-4 block rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
+                                    >
+                                        Elegir este Plan
+                                    </Link>
+                                </div>
                             </div>
                         ))}
+                    </div>
+                    <div className="text-center mt-12 bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
+                        <p className="text-sm font-black uppercase text-tkd-blue tracking-tight">
+                            "Con solo 1 o 2 mensualidades recuperadas que antes se perdían en mora, Tudojang se paga solo."
+                        </p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Inversión operativa con protección de datos y pagos seguros</p>
                     </div>
                 </div>
             </section>
 
             {/* MISIÓN KICHO: REFUERZO DE COMPRA */}
-            <section id="kicho" className="py-24 bg-tkd-dark text-white px-6 sm:px-12 relative overflow-hidden">
+            <section id="kicho" className="py-24 bg-tkd-blue text-white px-6 sm:px-12 relative overflow-hidden">
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative z-10">
                     <div className="space-y-8">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
                             <IconoCampana className="w-8 h-8 text-tkd-red" />
                         </div>
-                        <h2 className="text-5xl font-black uppercase tracking-tighter">Misión Kicho: <br/> Onboarding 72h</h2>
-                        <p className="text-gray-400 text-lg font-medium leading-relaxed uppercase tracking-tight">
-                            ¿Tienes muchos alumnos por registrar? Activa el protocolo Kicho. Generamos un QR masivo, tus alumnos ingresan sus datos y tú solo auditas. <br/> **Subimos a toda tu escuela en un solo fin de semana.**
+                        <h2 className="text-5xl font-black uppercase tracking-tighter">Protocolo de <br /> Misión Kicho</h2>
+                        <p className="text-white/80 text-lg font-medium leading-relaxed uppercase tracking-tight">
+                            Active Tudojang en su academia en solo 72 horas sin interrumpir sus clases. Migramos su base de datos y formalizamos a sus alumnos bajo un despliegue técnico profesional.
                         </p>
                     </div>
-                    <div className="bg-white/5 p-12 rounded-[4rem] border border-white/10 backdrop-blur-sm text-center">
-                         <div className="text-6xl font-black text-tkd-red mb-2">0h</div>
-                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Digitación Requerida</p>
-                         <div className="h-px bg-white/10 my-8"></div>
-                         <Link to="/registro-escuela" className="text-tkd-blue font-black uppercase tracking-widest text-sm hover:underline">Activar mi Onboarding →</Link>
+                    <div className="bg-black/10 p-12 rounded-[4rem] border border-white/10 backdrop-blur-sm text-center">
+                        <div className="text-6xl font-black text-tkd-red mb-2">72h</div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Activación Completa</p>
+                        <div className="h-px bg-white/10 my-8"></div>
+                        <a
+                            href="https://wa.me/573007654321?text=Deseo%20activar%20la%20Misión%20Kicho%20en%20mi%20academia"
+                            target="_blank"
+                            className="bg-white text-tkd-blue px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-gray-100 transition-all inline-block"
+                        >
+                            Agendar Misión Kicho (Onboarding 72h)
+                        </a>
                     </div>
                 </div>
-                <div className="absolute top-0 right-0 w-96 h-96 bg-tkd-blue/20 rounded-full blur-[150px]"></div>
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-[150px]"></div>
             </section>
 
             {/* FINAL CTA: PUNTO DE CIERRE 3 */}
             <section className="py-32 px-6 text-center space-y-10">
                 <div className="max-w-2xl mx-auto space-y-6">
-                    <h2 className="text-5xl font-black uppercase tracking-tighter">¿Aún tienes dudas, Sabonim?</h2>
+                    <h2 className="text-5xl font-black uppercase tracking-tighter">¿Aún posee dudas, Sabonim?</h2>
                     <p className="text-gray-500 font-bold uppercase text-xs tracking-widest leading-loose">
-                        Sabemos que cada escuela es un mundo. Habla con un consultor técnico <br/> experto en Taekwondo para configurar tu entorno ideal.
+                        Sabemos que cada escuela representa un legado único. Hable con un consultor técnico <br /> Sabonim para configurar su entorno ideal bajo las normas colombianas.
                     </p>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-center gap-6">
-                    <a 
-                        href="https://wa.me/573007654321?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang%20para%20mi%20academia"
+                    <a
+                        href="https://wa.me/573007654321?text=Hola!%20Deseo%20hablar%20con%20un%20consultor%20sobre%20Tudojang"
                         target="_blank"
                         className="bg-green-600 text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-green-700 transition-all flex items-center justify-center gap-4"
                     >
                         <IconoWhatsApp className="w-6 h-6" />
-                        Hablar con Soporte
+                        Hablar con un Consultor Técnico Sabonim
                     </a>
                 </div>
             </section>

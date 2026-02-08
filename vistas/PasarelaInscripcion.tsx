@@ -8,12 +8,20 @@ import { IconoLogoOficial, IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUs
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
+import { CONFIGURACION_WOMPI } from '../constantes';
 
 const PasarelaInscripcion: React.FC = () => {
     const { tenant, estaCargado } = useTenant();
     const [paso, setPaso] = useState<'pago' | 'verificando' | 'formulario' | 'finalizado'>('pago');
     const [cargando, setCargando] = useState(false);
-    
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('status') === 'verificando') {
+            setPaso('formulario');
+        }
+    }, []);
+
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
         fechaNacimiento: '', tutorNombre: '', tutorEmail: '',
@@ -23,12 +31,17 @@ const PasarelaInscripcion: React.FC = () => {
     const valorTotal = (tenant?.valorInscripcion || 0) + (tenant?.valorMensualidad || 0);
 
     const handleIniciarPago = () => {
-        setPaso('verificando');
-        // Simulación de redirección y confirmación de Wompi
-        // En producción, aquí se abriría el Widget de Wompi
-        setTimeout(() => {
-            setPaso('formulario');
-        }, 2500);
+        const montoEnCentavos = valorTotal * 100;
+        const referenciaTecnica = `INSCR_${tenant?.slug.toUpperCase()}_${tenant?.tenantId}_${Date.now()}`;
+
+        const urlWompi = `https://checkout.wompi.co/p/?` +
+            `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
+            `currency=COP&` +
+            `amount-in-cents=${montoEnCentavos}&` +
+            `reference=${referenciaTecnica}&` +
+            `redirect-url=${window.location.href}?status=verificando`;
+
+        window.location.href = urlWompi;
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -63,10 +76,10 @@ const PasarelaInscripcion: React.FC = () => {
 
             <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
                 <AnimatePresence mode="wait">
-                    
+
                     {/* FASE 1: PAGO INICIAL */}
                     {paso === 'pago' && (
-                        <motion.div 
+                        <motion.div
                             key="pago" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
                             className="p-10 space-y-8"
                         >
@@ -91,13 +104,13 @@ const PasarelaInscripcion: React.FC = () => {
                                 </div>
                             </div>
 
-                            <button 
+                            <button
                                 onClick={handleIniciarPago}
                                 className="w-full py-6 bg-tkd-red text-white rounded-2xl font-black uppercase text-sm tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-4"
                             >
                                 <IconoAprobar className="w-6 h-6" /> Pagar con Wompi
                             </button>
-                            
+
                             <div className="flex items-center gap-3 justify-center opacity-40 grayscale">
                                 <span className="text-[8px] font-black uppercase">Seguridad SSL</span>
                                 <span className="text-[8px] font-black uppercase">Aliant Protected</span>
@@ -108,7 +121,7 @@ const PasarelaInscripcion: React.FC = () => {
 
                     {/* FASE 2: VERIFICANDO PAGO */}
                     {paso === 'verificando' && (
-                        <motion.div 
+                        <motion.div
                             key="verificando" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                             className="p-20 text-center space-y-8"
                         >
@@ -122,7 +135,7 @@ const PasarelaInscripcion: React.FC = () => {
 
                     {/* FASE 3: FORMULARIO TÉCNICO (DESBLOQUEADO) */}
                     {paso === 'formulario' && (
-                        <motion.div 
+                        <motion.div
                             key="formulario" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }}
                             className="p-10 space-y-8"
                         >
@@ -158,14 +171,14 @@ const PasarelaInscripcion: React.FC = () => {
 
                     {/* FASE 4: FINALIZADO */}
                     {paso === 'finalizado' && (
-                        <motion.div 
+                        <motion.div
                             key="finalizado" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                             className="p-16 text-center space-y-6"
                         >
                             <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
                             <h2 className="text-3xl font-black uppercase tracking-tighter">¡Bienvenido a la Familia!</h2>
                             <p className="text-gray-500 font-bold uppercase text-xs tracking-widest leading-relaxed">
-                                Tu registro y pago han sido procesados. <br/> Recibirás un WhatsApp con tu carnet digital y horarios en los próximos minutos.
+                                Tu registro y pago han sido procesados. <br /> Recibirás un WhatsApp con tu carnet digital y horarios en los próximos minutos.
                             </p>
                             <button onClick={() => window.location.reload()} className="mt-8 text-tkd-blue font-black uppercase text-[10px] tracking-widest hover:underline">Registrar otro alumno</button>
                         </motion.div>
@@ -173,7 +186,7 @@ const PasarelaInscripcion: React.FC = () => {
 
                 </AnimatePresence>
             </div>
-            
+
             <footer className="mt-12 text-center">
                 <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.4 • Transacción Bancaria Protegida</p>
             </footer>
