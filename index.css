@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
   --color-primario: #111111;
@@ -18,9 +18,16 @@ body {
   font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #F8F9FA;
+  color: #111111;
 }
 
-/* Utilidad para ocultar scrollbar pero permitir scroll */
+.dark body {
+  background-color: #050505;
+  color: #FFFFFF;
+}
+
+/* Scrollbar invisible pero funcional */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -30,9 +37,47 @@ body {
   scrollbar-width: none;
 }
 
+/* Sistema de Tarjetas Hardware Premium */
+.tkd-card {
+  @apply bg-white dark:bg-white/5 rounded-[2.5rem] border border-gray-100 dark:border-white/10 shadow-soft transition-all duration-500 overflow-hidden;
+}
+
+.tkd-card:hover {
+  @apply shadow-premium -translate-y-1 border-gray-200 dark:border-white/20;
+}
+
+/* Tipografía extrema para títulos marciales */
+.font-black {
+  font-weight: 900;
+}
+
+.tracking-tighter {
+  letter-spacing: -0.05em;
+}
+
+/* Micro-interacciones de botones */
+.btn-premium {
+  @apply relative overflow-hidden transition-all duration-300 active:scale-95 disabled:opacity-50 disabled:grayscale;
+}
+
+/* Estados de carga */
+.animate-pulse-slow {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes slideInRight {
   from {
-    transform: translateX(100%);
+    transform: translateX(30px);
     opacity: 0;
   }
 
@@ -42,19 +87,10 @@ body {
   }
 }
 
-.animate-slide-in-right {
-  animation: slideInRight 0.3s ease-out forwards;
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* Accesibilidad: Oculta visualmente pero mantiene accesible para lectores de pantalla */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
+.animate-slide-in-right {
+  animation: slideInRight 0.4s ease-out forwards;
 }
