@@ -39,25 +39,33 @@ const RegistroEscuela: React.FC = () => {
 
     // Detectar retorno de Wompi
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const wompiId = params.get('id');
-        const env = params.get('env');
+        // En un HashRouter, los parámetros pueden quedar en search o en el hash
+        const getParam = (name: string) => {
+            const searchParams = new URLSearchParams(window.location.search);
+            if (searchParams.has(name)) return searchParams.get(name);
+
+            const hashParts = window.location.hash.split('?');
+            if (hashParts.length > 1) {
+                const hashParams = new URLSearchParams(hashParts[1]);
+                return hashParams.get(name);
+            }
+            return null;
+        };
+
+        const wompiId = getParam('id');
         const pendingReg = localStorage.getItem('registro_pendiente');
 
         if (wompiId && pendingReg) {
             setPaso('procesando');
-            // Simulamos verificación del pago exitoso (En prod se consultaría a la API de Wompi)
             setTimeout(async () => {
                 const datos = JSON.parse(pendingReg);
                 setDatosTemporales(datos);
                 setPaso('exito');
                 localStorage.removeItem('registro_pendiente');
-
-                // La activación y el email de bienvenida son manejados por el Webhook de Wompi
                 console.log('Pago detectado. Esperando confirmación del webhook...');
             }, 2000);
         }
-    }, []);
+    }, [window.location.search, window.location.hash]);
 
     // Función para generar SHA-256 en el navegador
     const generarFirmaIntegridad = async (cadena: string) => {
@@ -114,13 +122,17 @@ const RegistroEscuela: React.FC = () => {
             }));
 
             // 4. Redirigir a Wompi
+            // Limpiamos la URL de retorno para remover parámetros previos y evitar el doble "?"
+            const [baseHash] = window.location.hash.split('?');
+            const urlRetorno = window.location.origin + window.location.pathname + baseHash;
+
             const urlWompi = `https://checkout.wompi.co/p/?` +
                 `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
                 `currency=${moneda}&` +
                 `amount-in-cents=${montoCentavos}&` +
                 `reference=${referencia}&` +
                 `signature:integrity=${firmaIntegridad}&` +
-                `redirect-url=${encodeURIComponent(window.location.href)}`;
+                `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
             window.location.href = urlWompi;
 
