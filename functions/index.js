@@ -50,70 +50,95 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
   const evento = req.body;
   console.log("Evento Wompi recibido v1:", JSON.stringify(evento));
 
-  if (evento.event === 'transaction.updated' && evento.data.transaction.status === 'APPROVED') {
+  if (evento.event === 'transaction.updated') {
     const transaction = evento.data.transaction;
-    const referencia = transaction.reference; // Ej: SUSC_SLUG_TNTID
+    console.log(`Transacción ${transaction.id} con estado: ${transaction.status}`);
 
-    if (referencia && referencia.startsWith('SUSC_')) {
-      const parts = referencia.split('_');
-      const tenantId = parts[2];
+    if (transaction.status === 'APPROVED') {
+      const referencia = transaction.reference;
+      console.log(`Referencia recibida: ${referencia}`);
 
-      try {
-        const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
-        const tenantSnap = await tenantRef.get();
+      if (referencia && referencia.startsWith('SUSC_')) {
+        const parts = referencia.split('_');
+        const tenantId = parts[2];
 
-        if (tenantSnap.exists) {
-          const tenantData = tenantSnap.data();
+        try {
+          const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
+          const tenantSnap = await tenantRef.get();
 
-          // 1. Activar Tenant
-          await tenantRef.update({
-            estadoSuscripcion: 'activo',
-            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
-          });
+          if (tenantSnap.exists) {
+            const tenantData = tenantSnap.data();
+            console.log(`Procesando activación para tenant: ${tenantId}`);
 
-          // 2. Crear/Actualizar Usuario Auth
-          let user;
-          try {
-            user = await admin.auth().createUser({
-              uid: tenantId,
-              email: tenantData.emailClub,
-              password: tenantData.passwordTemporal,
-              displayName: tenantData.nombreClub
+            // 1. Activar Tenant
+            await tenantRef.update({
+              estadoSuscripcion: 'activo',
+              fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
             });
-          } catch (e) {
-            if (e.code === 'auth/email-already-exists') {
-              user = await admin.auth().getUserByEmail(tenantData.emailClub);
-              await admin.auth().updateUser(user.uid, {
-                password: tenantData.passwordTemporal
+
+            // 2. Crear/Actualizar Usuario Auth
+            let user;
+            try {
+              user = await admin.auth().createUser({
+                uid: tenantId,
+                email: tenantData.emailClub,
+                password: tenantData.passwordTemporal,
+                displayName: tenantData.nombreClub
               });
-            } else { throw e; }
+              console.log("Usuario Auth creado nuevo");
+            } catch (e) {
+              if (e.code === 'auth/email-already-exists') {
+                user = await admin.auth().getUserByEmail(tenantData.emailClub);
+                await admin.auth().updateUser(user.uid, {
+                  password: tenantData.passwordTemporal
+                });
+                console.log("Usuario Auth actualizado existente");
+              } else { throw e; }
+            }
+
+            // 3. Crear Perfil Firestore
+            await admin.firestore().collection('usuarios').doc(user.uid).set({
+              id: user.uid,
+              email: tenantData.emailClub,
+              nombreUsuario: tenantData.nombreClub,
+              rol: 'Admin',
+              tenantId: tenantId,
+              estadoContrato: 'Activo'
+            });
+
+            console.log(`Registro completado exitosamente para ${tenantData.emailClub}`);
+
+            // 4. Email de bienvenida (Backend)
+            try {
+              await resend.emails.send({
+                from: "Tudojang Academia <info@tudojang.com>",
+                to: [tenantData.emailClub],
+                subject: "🥋 Tu Academia está activada",
+                html: `
+                  <div style="font-family: sans-serif; padding: 20px;">
+                    <h1>¡Felicidades Sabonim!</h1>
+                    <p>Tu pago ha sido procesado exitosamente en modo Sandbox.</p>
+                    <p><strong>Academia:</strong> ${tenantData.nombreClub}</p>
+                    <p><strong>Tu clave de acceso:</strong> ${tenantData.passwordTemporal}</p>
+                    <p>Ya puedes entrar en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
+                  </div>
+                `
+              });
+              console.log("Email enviado desde backend");
+            } catch (emailErr) {
+              console.error("Error enviando email desde backend:", emailErr);
+            }
+          } else {
+            console.warn(`Tenant con ID ${tenantId} no existe en Firestore`);
           }
-
-          // 3. Crear Perfil Firestore
-          await admin.firestore().collection('usuarios').doc(user.uid).set({
-            id: user.uid,
-            email: tenantData.emailClub,
-            nombreUsuario: tenantData.nombreClub,
-            rol: 'Admin',
-            tenantId: tenantId,
-            estadoContrato: 'Activo'
-          });
-
-          console.log(`Registro completado exitosamente para ${tenantData.emailClub}`);
-
-          // 4. Email opcional (Backend)
-          await resend.emails.send({
-            from: "Tudojang Academia <info@tudojang.com>",
-            to: [tenantData.emailClub],
-            subject: "🥋 Tu Academia está activada",
-            text: `Hola Sabonim, tu pago ha sido procesado. Ya puedes entrar con tu clave temporal: ${tenantData.passwordTemporal}`
-          });
+        } catch (err) {
+          console.error("Error crítico procesando webhook:", err);
         }
-      } catch (err) {
-        console.error("Error procesando webhook v1:", err);
       }
+    } else {
+      console.log(`La transacción no fue aprobada (Estado: ${transaction.status})`);
     }
   }
 
-  res.status(200).send('OK');
+  res.status(200).send('Webhook Procesado');
 });
