@@ -4,7 +4,7 @@ const { Resend } = require("resend");
 
 admin.initializeApp();
 
-const resend = new Resend("re_d2452b45-37a2-4294-93c0-e3a51c323d47");
+const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
 
 /**
  * Cloud Function: Enviar email de bienvenida
