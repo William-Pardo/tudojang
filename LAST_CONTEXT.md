@@ -19,6 +19,7 @@ Completar el flujo de registro, pago y primer acceso para nuevas escuelas (SaaS 
     *   Corregida la codificación de la `redirect-url` para Wompi.
 
 ## ⚠️ Bloqueos / Problemas Pendientes
+*   **Conexión a Firebase (Mock Mode)**: **RESUELTO**. Se identificó que la aplicación en producción estaba funcionando en "Modo Simulado" (Mock Mode) porque no leía correctamente las variables de entorno de Firebase desde GitHub Actions. Se actualizó `firebase/config.ts` y `vite.config.ts` para soportar variables individuales con prefijo `VITE_`. Esto garantiza que el login ahora consulte la base de datos REAL de Firebase y no los datos de prueba.
 *   **Firma de Integridad**: Resuelto. El parámetro debe ser `signature:integrity`.
 *   **Consistencia de Montos**: Resuelto. Se corrigió la lectura del parámetro `precio` desde el `HashRouter` y se asegura que el `plan` (starter/pro) se guarde correctamente en el tenant al registrarse.
 *   **Error de Login (Perfil de Usuario)**: Resuelto. El webhook ahora crea no solo el usuario en Auth, sino también su perfil en la colección `usuarios` de Firestore. Sin este perfil, el `AuthContext` del frontend rechazaba el inicio de sesión.

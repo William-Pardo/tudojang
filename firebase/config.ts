@@ -7,42 +7,46 @@ import { getMessaging } from 'firebase/messaging';
 
 const firebaseConfigString = process.env.FIREBASE_CONFIG;
 
+// Soporte para variables individuales (útil en CI/CD como GitHub Actions)
+const individualConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
+};
+
 let firebaseConfig;
 export let isFirebaseConfigured = false;
 
-if (firebaseConfigString && firebaseConfigString !== 'undefined' && firebaseConfigString !== '{"apiKey":"xxxxxxxxxxxxxxxxxxxxxxxxxx","authDomain":"xxxxxxxx.firebaseapp.com","projectId":"xxxxxxxx","storageBucket":"xxxxxxxx.appspot.com","messagingSenderId":"000000000000","appId":"1:000000000000:web:0000000000000000000000"}') {
+// Intentar cargar por JSON string primero
+if (firebaseConfigString && firebaseConfigString !== 'undefined' && firebaseConfigString.includes('{')) {
   try {
-    // Intenta analizar la configuración del entorno.
     firebaseConfig = JSON.parse(firebaseConfigString);
     isFirebaseConfigured = true;
   } catch (e) {
-    console.error("Error al analizar la variable de entorno FIREBASE_CONFIG. Asegúrese de que sea un JSON válido. Se utilizará una configuración de respaldo.", e);
-    // Usar placeholders si la variable está mal formada
-    firebaseConfig = {
-      apiKey: "invalid-config",
-      authDomain: "invalid-config",
-      projectId: "invalid-config",
-      storageBucket: "invalid-config",
-      messagingSenderId: "invalid-config",
-      appId: "invalid-config"
-    };
-    isFirebaseConfigured = false;
+    console.error("Error al analizar FIREBASE_CONFIG JSON", e);
   }
-} else {
-  // Si la variable de entorno no está definida, se usa una configuración de respaldo
-  // para permitir que la aplicación se cargue sin errores.
-  if (!firebaseConfigString || firebaseConfigString === 'undefined') {
-      console.warn("ADVERTENCIA: La configuración de Firebase no está definida. Se utilizará una configuración de respaldo. La aplicación no se conectará a los servicios de Firebase hasta que se proporcione una configuración válida.");
-  }
+}
+
+// Si no se cargó por JSON, intentar por variables individuales
+if (!isFirebaseConfigured && individualConfig.apiKey && individualConfig.apiKey !== 'undefined') {
+  firebaseConfig = individualConfig;
+  isFirebaseConfigured = true;
+}
+
+// Configuración de respaldo (Mock Mode)
+if (!isFirebaseConfigured) {
+  console.warn("ADVERTENCIA: La configuración de Firebase no está definida. Se utilizará una configuración de respaldo (MODO SIMULADO).");
   firebaseConfig = {
-      apiKey: "xxxxxxxxxxxxxxxxxxxxxxxxxx",
-      authDomain: "xxxxxxxx.firebaseapp.com",
-      projectId: "xxxxxxxx",
-      storageBucket: "xxxxxxxx.appspot.com",
-      messagingSenderId: "000000000000",
-      appId: "1:000000000000:web:0000000000000000000000"
+    apiKey: "xxxxxxxxxxxxxxxxxxxxxxxxxx",
+    authDomain: "xxxxxxxx.firebaseapp.com",
+    projectId: "xxxxxxxx",
+    storageBucket: "xxxxxxxx.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "1:000000000000:web:0000000000000000000000"
   };
-  isFirebaseConfigured = false;
 }
 
 
