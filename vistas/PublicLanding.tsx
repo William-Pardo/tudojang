@@ -1,7 +1,7 @@
 
 // vistas/PublicLanding.tsx
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Added comment above fix: Included IconoDashboard in the imports from Iconos.tsx
 import { IconoLogoOficial, IconoAprobar, IconoWhatsApp, IconoFirma, IconoCampana, IconoCasa, IconoUsuario, IconoEstudiantes, IconoDashboard } from '../components/Iconos';
@@ -10,6 +10,7 @@ import { formatearPrecio } from '../utils/formatters';
 
 const PublicLanding: React.FC = () => {
     const [cicloFacturacion, setCicloFacturacion] = React.useState<'mensual' | 'anual'>('anual');
+    const [planSeleccionado, setPlanSeleccionado] = React.useState<string | null>(null);
 
     return (
         <div className="min-h-screen bg-white text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white overflow-x-hidden">
@@ -162,27 +163,62 @@ const PublicLanding: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         {Object.values(PLANES_SAAS).map((plan: any) => {
                             const precioFinal = cicloFacturacion === 'anual' ? plan.precio * 10 : plan.precio; // 12 meses pagando solo 10
+                            const esActivo = planSeleccionado === plan.id;
 
                             return (
-                                <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all ${plan.popular ? 'border-tkd-blue bg-white shadow-2xl scale-105 z-10 relative' : 'border-gray-50 bg-gray-50 opacity-80 hover:opacity-100'}`}>
-                                    <div className="space-y-6">
-                                        {plan.popular && (
-                                            <div className="absolute -top-5 left-0 right-0 flex justify-center">
-                                                <span className="bg-tkd-red text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                                                    Recomendado
-                                                </span>
-                                            </div>
-                                        )}
-                                        <h4 className="text-2xl font-black uppercase tracking-tight text-tkd-blue/60">{plan.nombre}</h4>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-4xl font-black text-tkd-blue flex items-start">
-                                                <span className="text-xl mr-1">$</span>
-                                                {formatearPrecio(precioFinal).replace('$', '')}
+                                <motion.div
+                                    key={plan.id}
+                                    layout // Mantiene la fluidez del layout al cambiar estados
+                                    onClick={() => setPlanSeleccionado(plan.id)}
+                                    initial={false}
+                                    animate={{
+                                        // Efecto de elevación y escala física
+                                        scale: esActivo ? 1.05 : 0.98,
+                                        y: esActivo ? -10 : 0
+                                    }}
+                                    transition={{
+                                        type: 'spring',
+                                        stiffness: 300,
+                                        damping: 20
+                                    }}
+                                    className={`cursor-pointer rounded-[3rem] p-10 border-4 transition-all relative flex flex-col ${esActivo
+                                        // CLASES DE RESALTO CRÍTICO: Borde azul, fondo blanco, sombra extrema y z-index superior
+                                        ? 'border-tkd-blue bg-white shadow-[0_40px_80px_-15px_rgba(31,62,144,0.25)] z-10'
+                                        // ESTADO INACTIVO: Borde gris sutil y opacidad reducida
+                                        : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
+                                        }`}
+                                >
+                                    {/* Etiqueta de Recomendado */}
+                                    {plan.popular && (
+                                        <div className="absolute -top-5 left-0 right-0 flex justify-center z-20">
+                                            <span className="bg-tkd-red text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                                                Recomendado
                                             </span>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-6">
+                                        <h4 className="text-2xl font-black uppercase tracking-tight text-tkd-blue/60">{plan.nombre}</h4>
+
+                                        {/* Animación de cambio de precios (Anual/Mensual) */}
+                                        <div className="flex items-baseline gap-1">
+                                            <AnimatePresence mode="wait">
+                                                <motion.span
+                                                    key={cicloFacturacion}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="text-4xl font-black text-tkd-blue flex items-start"
+                                                >
+                                                    <span className="text-xl mr-1">$</span>
+                                                    {formatearPrecio(precioFinal).replace('$', '')}
+                                                </motion.span>
+                                            </AnimatePresence>
                                             <span className="text-[10px] font-bold text-gray-400 uppercase">
                                                 /{cicloFacturacion === 'anual' ? 'año' : 'mes'}
                                             </span>
                                         </div>
+
                                         <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
                                             <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-tkd-blue/40" /> Hasta {plan.limiteEstudiantes} alumnos</li>
                                             <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteUsuarios} Instructores</li>
@@ -192,16 +228,24 @@ const PublicLanding: React.FC = () => {
                                             ))}
                                         </ul>
                                     </div>
+
                                     <div className="mt-8 space-y-4 flex flex-col items-center">
-                                        {/* Botón Circular de Selección */}
+                                        {/* Check de validación visual inferior (Solo visible en activo) */}
                                         <Link
                                             to={`/registro-escuela?plan=${plan.id}&precio=${precioFinal}`}
-                                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all ${plan.popular ? 'bg-tkd-blue border-tkd-blue text-white' : 'border-gray-200 text-gray-200 hover:border-tkd-blue hover:text-tkd-blue'}`}
+                                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${esActivo ? 'border-tkd-blue bg-tkd-blue shadow-lg scale-110' : 'border-gray-300 hover:border-tkd-blue'
+                                                }`}
                                         >
-                                            <IconoAprobar className="w-6 h-6" />
+                                            <IconoAprobar className={`w-6 h-6 transition-colors ${esActivo ? 'text-white' : 'text-gray-300'}`} />
                                         </Link>
+
+                                        {/* Nuevo Atributo "Elegir Plan" */}
+                                        <span className={`text-[10px] uppercase tracking-widest transition-all duration-300 ${esActivo ? 'text-red-600 font-bold scale-105' : 'text-gray-400 font-medium'
+                                            }`}>
+                                            Elegir este plan
+                                        </span>
                                     </div>
-                                </div>
+                                </motion.div>
                             );
                         })}
                     </div>
