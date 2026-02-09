@@ -84,8 +84,8 @@ const RegistroEscuela: React.FC = () => {
                 emailClub: data.email,
                 telefono: data.telefono,
                 passwordTemporal: passwordTemporal, // Se guarda para mostrarla tras el pago
-                estadoSuscripcion: 'pendiente_pago'
-            });
+                estadoSuscripcion: 'pendiente_pago' as any
+            } as any);
 
             // 3. Preparar datos para Wompi
             // Obtener precio del plan desde URL o default
@@ -113,7 +113,7 @@ const RegistroEscuela: React.FC = () => {
                 `currency=${moneda}&` +
                 `amount-in-cents=${montoCentavos}&` +
                 `reference=${referencia}&` +
-                `signature-integrity=${firmaIntegridad}&` +
+                `signature=${firmaIntegridad}&` +
                 `redirect-url=${window.location.href}`; // Vuelve a esta misma página
 
             window.location.href = urlWompi;
