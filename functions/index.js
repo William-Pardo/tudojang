@@ -2,6 +2,9 @@ const { onRequest, onCall } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const logger = require("firebase-functions/logger");
 const { Resend } = require("resend");
+const admin = require("firebase-admin");
+
+admin.initializeApp();
 
 setGlobalOptions({ maxInstances: 10 });
 
@@ -441,4 +444,49 @@ exports.notificarCambioPassword = onCall(async (request) => {
     logger.error("Error en notificarCambioPassword:", error);
     throw new Error(`Error al enviar notificación: ${error.message}`);
   }
+});
+
+/**
+ * Cloud Function: Webhook para recibir notificaciones de Wompi
+ */
+exports.webhookWompi = onRequest(async (req, res) => {
+  const evento = req.body;
+
+  // TODO: Validar firma de Wompi usando 'x-wompi-signature' y events events secret
+
+  if (evento.event === 'transaction.updated') {
+    const { data } = evento;
+    const transaction = data.transaction;
+
+    // Solo procesar si el pago es APROBADO
+    if (transaction.status === 'APPROVED') {
+      const referencia = transaction.reference; // Ej: "SUSC_gajog_id123"
+      if (referencia) {
+        const parts = referencia.split('_');
+        if (parts.length >= 3) {
+          const tipo = parts[0];
+          const slug = parts[1];
+          const id = parts[2];
+
+          if (tipo === 'SUSC') {
+            // CASO 1: Es el pago de la suscripción de una escuela
+            try {
+              await admin.firestore().collection('tenants').doc(id).update({
+                estadoSuscripcion: 'activo',
+                fechaVencimiento: admin.firestore.Timestamp.fromDate(
+                  new Date(Date.now() + 31 * 24 * 60 * 60 * 1000) // Sumar 31 días
+                )
+              });
+              logger.info(`Suscripción activada para: ${slug}`);
+            } catch (error) {
+              logger.error(`Error activando suscripción para ${slug}:`, error);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Responder a Wompi que recibiste el mensaje correctamente
+  res.status(200).send('OK');
 });
