@@ -531,9 +531,16 @@ exports.webhookWompi = onRequest(async (req, res) => {
 
               // 5. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
               try {
-                await resend.emails.send({
+                const emailDestino = tenantData.emailClub || transaction.customer_email;
+                if (!emailDestino) {
+                  logger.warn("No se encontró email para enviar bienvenida");
+                  return;
+                }
+
+                logger.info(`Enviando bienvenida a: ${emailDestino}`);
+                const { data, error } = await resend.emails.send({
                   from: "Tudojang Academia <info@tudojang.com>",
-                  to: [tenantData.emailClub],
+                  to: [emailDestino],
                   subject: `¡Bienvenido a Tudojang, ${tenantData.nombreClub}!`,
                   html: `
                       <!DOCTYPE html>
@@ -548,22 +555,28 @@ exports.webhookWompi = onRequest(async (req, res) => {
                             <div style="background: #f8f9fa; border-left: 4px solid #0047A0; padding: 20px; margin: 30px 0;">
                               <div style="margin: 15px 0;">
                                 <div style="font-size: 12px; font-weight: 700; color: #666;">CORREO</div>
-                                <div style="font-size: 16px; color: #0047A0;">${tenantData.emailClub}</div>
+                                <div style="font-size: 16px; color: #0047A0;">${emailDestino}</div>
                               </div>
                               <div style="margin: 15px 0;">
                                 <div style="font-size: 12px; font-weight: 700; color: #666;">CONTRASEÑA TEMPORAL</div>
                                 <div style="font-size: 16px; color: #0047A0; font-family: monospace;">${tenantData.passwordTemporal}</div>
                               </div>
                             </div>
-                            <center><a href="https://tudojang.web.app/#/login" style="background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900;">INICIAR SESIÓN</a></center>
+                            <center><a href="https://tudojang.com/#/login" style="background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900;">INICIAR SESIÓN</a></center>
                           </div>
                         </div>
                       </body>
                       </html>
                     `,
                 });
+
+                if (error) {
+                  logger.error("Error de Resend en Webhook:", error);
+                } else {
+                  logger.info("Email de bienvenida enviado exitosamente:", data);
+                }
               } catch (emailError) {
-                logger.error("Error enviando email en Webhook:", emailError);
+                logger.error("Excepción enviando email en Webhook:", emailError);
               }
 
             } catch (error) {

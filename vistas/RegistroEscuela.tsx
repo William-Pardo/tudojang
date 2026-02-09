@@ -62,6 +62,20 @@ const RegistroEscuela: React.FC = () => {
                 setDatosTemporales(datos);
                 setPaso('exito');
                 localStorage.removeItem('registro_pendiente');
+
+                // ENVIAR EMAIL DESDE FRONTEND (Fallback)
+                // Se envía aquí para que el usuario reciba algo inmediato si el webhook tarda
+                try {
+                    await enviarEmailBienvenida({
+                        email: datos.email,
+                        nombreClub: datos.nombreClub,
+                        passwordTemporal: datos.password,
+                        slug: datos.slug
+                    });
+                } catch (e) {
+                    console.error("Error enviando email desde frontend:", e);
+                }
+
                 console.log('Pago detectado. Esperando confirmación del webhook...');
             }, 2000);
         }
