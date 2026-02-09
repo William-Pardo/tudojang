@@ -53,19 +53,8 @@ const RegistroEscuela: React.FC = () => {
                 setPaso('exito');
                 localStorage.removeItem('registro_pendiente');
 
-                // Enviar email de bienvenida con las credenciales
-                try {
-                    await enviarEmailBienvenida({
-                        email: datos.email,
-                        nombreClub: datos.nombreClub || 'Academia',
-                        passwordTemporal: datos.password,
-                        slug: datos.slug
-                    });
-                    console.log('Email de bienvenida enviado exitosamente');
-                } catch (error) {
-                    console.error('Error al enviar email de bienvenida:', error);
-                    // No bloqueamos el flujo si falla el email
-                }
+                // La activación y el email de bienvenida son manejados por el Webhook de Wompi
+                console.log('Pago detectado. Esperando confirmación del webhook...');
             }, 2000);
         }
     }, []);

@@ -469,17 +469,83 @@ exports.webhookWompi = onRequest(async (req, res) => {
           const id = parts[2];
 
           if (tipo === 'SUSC') {
-            // CASO 1: Es el pago de la suscripción de una escuela
             try {
-              await admin.firestore().collection('tenants').doc(id).update({
+              // 1. Obtener datos del tenant
+              const tenantRef = admin.firestore().collection('tenants').doc(id);
+              const tenantSnap = await tenantRef.get();
+
+              if (!tenantSnap.exists) {
+                logger.error(`Tenant no encontrado: ${id}`);
+                return;
+              }
+              const tenantData = tenantSnap.data();
+
+              // 2. Activar suscripción
+              await tenantRef.update({
                 estadoSuscripcion: 'activo',
                 fechaVencimiento: admin.firestore.Timestamp.fromDate(
-                  new Date(Date.now() + 31 * 24 * 60 * 60 * 1000) // Sumar 31 días
+                  new Date(Date.now() + 31 * 24 * 60 * 60 * 1000)
                 )
               });
               logger.info(`Suscripción activada para: ${slug}`);
+
+              // 3. Crear usuario Auth
+              try {
+                await admin.auth().createUser({
+                  uid: id,
+                  email: tenantData.emailClub,
+                  password: tenantData.passwordTemporal,
+                  displayName: tenantData.nombreClub,
+                });
+                logger.info(`Usuario Auth creado para: ${tenantData.emailClub}`);
+              } catch (authError) {
+                // Si ya existe, solo logueamos warning
+                if (authError.code === 'auth/uid-already-exists' || authError.code === 'auth/email-already-exists') {
+                  logger.warn(`El usuario ${tenantData.emailClub} ya existe.`);
+                } else {
+                  throw authError;
+                }
+              }
+
+              // 4. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
+              try {
+                await resend.emails.send({
+                  from: "Tudojang Academia <info@tudojang.com>",
+                  to: [tenantData.emailClub],
+                  subject: `¡Bienvenido a Tudojang, ${tenantData.nombreClub}!`,
+                  html: `
+                      <!DOCTYPE html>
+                      <html>
+                      <body style="font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa;">
+                        <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+                          <div style="background: linear-gradient(135deg, #0047A0 0%, #003580 100%); padding: 40px 30px; text-align: center; color: white;">
+                            <h1 style="margin: 0; font-size: 28px; text-transform: uppercase;">🥋 TUDOJANG</h1>
+                          </div>
+                          <div style="padding: 40px 30px;">
+                            <p style="font-size: 18px; color: #333;"><strong>¡Bienvenido, Sabonim!</strong><br>Su academia <strong>${tenantData.nombreClub}</strong> está activa.</p>
+                            <div style="background: #f8f9fa; border-left: 4px solid #0047A0; padding: 20px; margin: 30px 0;">
+                              <div style="margin: 15px 0;">
+                                <div style="font-size: 12px; font-weight: 700; color: #666;">CORREO</div>
+                                <div style="font-size: 16px; color: #0047A0;">${tenantData.emailClub}</div>
+                              </div>
+                              <div style="margin: 15px 0;">
+                                <div style="font-size: 12px; font-weight: 700; color: #666;">CONTRASEÑA TEMPORAL</div>
+                                <div style="font-size: 16px; color: #0047A0; font-family: monospace;">${tenantData.passwordTemporal}</div>
+                              </div>
+                            </div>
+                            <center><a href="https://tudojang.web.app/#/login" style="background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900;">INICIAR SESIÓN</a></center>
+                          </div>
+                        </div>
+                      </body>
+                      </html>
+                    `,
+                });
+              } catch (emailError) {
+                logger.error("Error enviando email en Webhook:", emailError);
+              }
+
             } catch (error) {
-              logger.error(`Error activando suscripción para ${slug}:`, error);
+              logger.error(`Error procesando suscripción para ${slug}:`, error);
             }
           }
         }
