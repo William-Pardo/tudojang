@@ -489,36 +489,45 @@ exports.webhookWompi = onRequest(async (req, res) => {
               });
               logger.info(`Suscripción activada para: ${slug}`);
 
-              // 3. Crear usuario Auth
+              // 3. Obtener o crear usuario Auth
+              let userRecord;
               try {
-                await admin.auth().createUser({
+                // Primero intentamos crear el usuario con el ID que elegimos (tnt-...)
+                userRecord = await admin.auth().createUser({
                   uid: id,
                   email: tenantData.emailClub,
                   password: tenantData.passwordTemporal,
                   displayName: tenantData.nombreClub,
                 });
-                logger.info(`Usuario Auth creado para: ${tenantData.emailClub}`);
+                logger.info(`Usuario Auth creado (nuevo): ${id}`);
               } catch (authError) {
-                // Si ya existe, solo logueamos warning
-                if (authError.code === 'auth/uid-already-exists' || authError.code === 'auth/email-already-exists') {
-                  logger.warn(`El usuario ${tenantData.emailClub} ya existe.`);
+                if (authError.code === 'auth/email-already-exists' || authError.code === 'auth/uid-already-exists') {
+                  // Si el email ya existe, lo buscamos para obtener su UID real y actualizamos su password
+                  userRecord = await admin.auth().getUserByEmail(tenantData.emailClub);
+                  await admin.auth().updateUser(userRecord.uid, {
+                    password: tenantData.passwordTemporal,
+                    displayName: tenantData.nombreClub
+                  });
+                  logger.info(`Usuario Auth actualizado (existente): ${userRecord.uid}`);
                 } else {
                   throw authError;
                 }
               }
 
-              // 4. Crear perfil de usuario en Firestore (Requerido para login)
-              await admin.firestore().collection('usuarios').doc(id).set({
-                id: id,
+              const finalUid = userRecord.uid;
+
+              // 4. Crear perfil de usuario en Firestore (Asegurando coincidencia con finalUid)
+              await admin.firestore().collection('usuarios').doc(finalUid).set({
+                id: finalUid,
                 email: tenantData.emailClub,
                 nombreUsuario: tenantData.nombreClub,
                 numeroIdentificacion: '0',
                 whatsapp: tenantData.telefono || '',
                 rol: 'Admin',
-                tenantId: id,
+                tenantId: id, // El tenantId siempre es el del registro actual
                 estadoContrato: 'Sin configurar'
               });
-              logger.info(`Perfil Firestore creado para: ${id}`);
+              logger.info(`Perfil Firestore creado para UID: ${finalUid}`);
 
               // 5. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
               try {

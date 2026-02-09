@@ -236,11 +236,13 @@ const RegistroEscuela: React.FC = () => {
                         </a>
 
                         {passwordCopiada && (
-                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 text-left">
-                                <p className="text-[10px] font-black uppercase text-yellow-700 mb-2">⚠️ Importante</p>
+                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 text-left space-y-2">
+                                <p className="text-[10px] font-black uppercase text-yellow-700">⚠️ Importante</p>
                                 <p className="text-[9px] text-yellow-600 leading-relaxed">
-                                    Usa <strong>{datosTemporales.email}</strong> y la contraseña que copiaste para iniciar sesión.
-                                    El sistema te pedirá cambiarla en tu primer acceso.
+                                    Estamos terminando de configurar tu academia. <strong>Espera 10 segundos</strong> después de copiar la contraseña antes de intentar iniciar sesión para asegurar que tu perfil esté listo.
+                                </p>
+                                <p className="text-[9px] text-yellow-600 leading-relaxed">
+                                    Usa <strong>{datosTemporales.email}</strong> y la contraseña que copiaste.
                                 </p>
                             </div>
                         )}
