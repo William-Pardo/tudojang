@@ -8,6 +8,24 @@ interface EnviarBienvenidaParams {
     slug: string;
 }
 
+interface EnviarConfirmacionPagoParams {
+    email: string;
+    nombreClub: string;
+    montoPagado: number; // En centavos
+    referenciaPago?: string;
+}
+
+interface EnviarRecuperacionPasswordParams {
+    email: string;
+    nombreClub?: string;
+    resetLink: string;
+}
+
+interface NotificarCambioPasswordParams {
+    email: string;
+    nombreClub?: string;
+}
+
 /**
  * Envía un email de bienvenida con las credenciales temporales
  * usando Cloud Functions y Resend
@@ -23,5 +41,52 @@ export const enviarEmailBienvenida = async (params: EnviarBienvenidaParams): Pro
         console.error('Error al enviar email de bienvenida:', error);
         // No lanzamos el error para no bloquear el flujo si falla el email
         // El usuario ya tiene la contraseña en pantalla
+    }
+};
+
+/**
+ * Envía un email de confirmación de pago exitoso
+ */
+export const enviarEmailConfirmacionPago = async (params: EnviarConfirmacionPagoParams): Promise<void> => {
+    try {
+        const functions = getFunctions();
+        const enviarConfirmacion = httpsCallable(functions, 'enviarConfirmacionPago');
+
+        const result = await enviarConfirmacion(params);
+        console.log('Email de confirmación de pago enviado:', result.data);
+    } catch (error) {
+        console.error('Error al enviar confirmación de pago:', error);
+    }
+};
+
+/**
+ * Envía un email de recuperación de contraseña con enlace de reset
+ */
+export const enviarEmailRecuperacionPassword = async (params: EnviarRecuperacionPasswordParams): Promise<void> => {
+    try {
+        const functions = getFunctions();
+        const enviarRecuperacion = httpsCallable(functions, 'enviarRecuperacionPassword');
+
+        const result = await enviarRecuperacion(params);
+        console.log('Email de recuperación enviado:', result.data);
+    } catch (error) {
+        console.error('Error al enviar email de recuperación:', error);
+        throw error; // En este caso sí lanzamos el error porque el usuario necesita saber si falló
+    }
+};
+
+/**
+ * Notifica al usuario que su contraseña fue cambiada exitosamente
+ */
+export const notificarCambioPassword = async (params: NotificarCambioPasswordParams): Promise<void> => {
+    try {
+        const functions = getFunctions();
+        const notificar = httpsCallable(functions, 'notificarCambioPassword');
+
+        const result = await notificar(params);
+        console.log('Notificación de cambio de password enviada:', result.data);
+    } catch (error) {
+        console.error('Error al notificar cambio de password:', error);
+        // No bloqueamos el flujo si falla la notificación
     }
 };

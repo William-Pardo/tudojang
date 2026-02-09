@@ -13,19 +13,19 @@ const resend = new Resend("re_d2452b45-37a2-4294-93c0-e3a51c323d47");
  * Llamada desde el frontend después de un registro exitoso
  */
 exports.enviarBienvenidaTudojang = onCall(async (request) => {
-    const { email, nombreClub, passwordTemporal, slug } = request.data;
+  const { email, nombreClub, passwordTemporal, slug } = request.data;
 
-    // Validación de parámetros
-    if (!email || !nombreClub || !passwordTemporal || !slug) {
-        throw new Error("Faltan parámetros requeridos");
-    }
+  // Validación de parámetros
+  if (!email || !nombreClub || !passwordTemporal || !slug) {
+    throw new Error("Faltan parámetros requeridos");
+  }
 
-    try {
-        const { data, error } = await resend.emails.send({
-            from: "Tudojang Academia <onboarding@tudojang.com>",
-            to: [email],
-            subject: `¡Bienvenido a Tudojang, ${nombreClub}!`,
-            html: `
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [email],
+      subject: `¡Bienvenido a Tudojang, ${nombreClub}!`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -197,17 +197,248 @@ exports.enviarBienvenidaTudojang = onCall(async (request) => {
         </body>
         </html>
       `,
-        });
+    });
 
-        if (error) {
-            logger.error("Error enviando email con Resend:", error);
-            throw new Error(`Error al enviar email: ${error.message}`);
-        }
-
-        logger.info("Email de bienvenida enviado exitosamente", { email, emailId: data.id });
-        return { success: true, emailId: data.id };
-    } catch (error) {
-        logger.error("Error en enviarBienvenidaTudojang:", error);
-        throw new Error(`Error al enviar email de bienvenida: ${error.message}`);
+    if (error) {
+      logger.error("Error enviando email con Resend:", error);
+      throw new Error(`Error al enviar email: ${error.message}`);
     }
+
+    logger.info("Email de bienvenida enviado exitosamente", { email, emailId: data.id });
+    return { success: true, emailId: data.id };
+  } catch (error) {
+    logger.error("Error en enviarBienvenidaTudojang:", error);
+    throw new Error(`Error al enviar email de bienvenida: ${error.message}`);
+  }
+});
+
+/**
+ * Cloud Function: Enviar email de confirmación de pago exitoso
+ */
+exports.enviarConfirmacionPago = onCall(async (request) => {
+  const { email, nombreClub, montoPagado, referenciaPago } = request.data;
+
+  if (!email || !nombreClub || !montoPagado) {
+    throw new Error("Faltan parámetros requeridos");
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [email],
+      subject: "✅ Pago Confirmado - Tudojang",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 40px 30px; text-align: center; color: white; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
+            .content { padding: 40px 30px; }
+            .success-icon { font-size: 64px; text-align: center; margin-bottom: 20px; }
+            .amount-box { background: #f0fdf4; border-left: 4px solid #10B981; padding: 20px; margin: 30px 0; border-radius: 8px; }
+            .amount { font-size: 32px; font-weight: 900; color: #059669; }
+            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🥋 PAGO CONFIRMADO</h1>
+            </div>
+            <div class="content">
+              <div class="success-icon">✅</div>
+              <h2 style="text-align: center; color: #0047A0;">¡Pago Procesado Exitosamente!</h2>
+              <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                Hola <strong>${nombreClub}</strong>,<br><br>
+                Hemos recibido y confirmado tu pago. Tu suscripción a Tudojang está ahora completamente activa.
+              </p>
+              <div class="amount-box">
+                <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase; font-weight: 700;">Monto Pagado</p>
+                <div class="amount">$${(montoPagado / 100).toLocaleString('es-CO')}</div>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Referencia: ${referenciaPago || 'N/A'}</p>
+              </div>
+              <p style="color: #666; font-size: 14px;">
+                Puedes iniciar sesión en tu academia digital en cualquier momento desde 
+                <a href="https://tudojang.web.app/#/login" style="color: #0047A0; font-weight: 700;">tudojang.web.app</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p><strong>Tudojang SaaS Core 2026</strong></p>
+              <p>Sistema de Gestión para Academias de Taekwondo</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      logger.error("Error enviando confirmación de pago:", error);
+      throw new Error(`Error al enviar email: ${error.message}`);
+    }
+
+    logger.info("Email de confirmación de pago enviado", { email, emailId: data.id });
+    return { success: true, emailId: data.id };
+  } catch (error) {
+    logger.error("Error en enviarConfirmacionPago:", error);
+    throw new Error(`Error al enviar confirmación de pago: ${error.message}`);
+  }
+});
+
+/**
+ * Cloud Function: Enviar email de restauración de contraseña
+ */
+exports.enviarRecuperacionPassword = onCall(async (request) => {
+  const { email, nombreClub, resetLink } = request.data;
+
+  if (!email || !resetLink) {
+    throw new Error("Faltan parámetros requeridos");
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [email],
+      subject: "🔐 Recuperación de Contraseña - Tudojang",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #CD2E3A 0%, #A02329 100%); padding: 40px 30px; text-align: center; color: white; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
+            .content { padding: 40px 30px; }
+            .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .cta-button { display: inline-block; background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900; text-transform: uppercase; margin: 20px 0; }
+            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 RECUPERACIÓN DE CONTRASEÑA</h1>
+            </div>
+            <div class="content">
+              <p style="color: #666; font-size: 16px; line-height: 1.6;">
+                Hola${nombreClub ? ` <strong>${nombreClub}</strong>` : ""},<br><br>
+                Recibimos una solicitud para restablecer la contraseña de tu cuenta en Tudojang.
+              </p>
+              <div class="warning-box">
+                <p style="margin: 0; font-size: 14px; color: #856404; font-weight: 700;">⚠️ Importante</p>
+                <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
+                  Este enlace es válido por <strong>1 hora</strong>. Si no solicitaste este cambio, ignora este mensaje.
+                </p>
+              </div>
+              <center>
+                <a href="${resetLink}" class="cta-button">Restablecer Contraseña</a>
+              </center>
+              <p style="color: #999; font-size: 12px; margin-top: 30px;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                <span style="color: #0047A0; word-break: break-all;">${resetLink}</span>
+              </p>
+            </div>
+            <div class="footer">
+              <p><strong>Tudojang SaaS Core 2026</strong></p>
+              <p>Si no solicitaste este cambio, contacta a soporte@tudojang.com</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      logger.error("Error enviando recuperación de password:", error);
+      throw new Error(`Error al enviar email: ${error.message}`);
+    }
+
+    logger.info("Email de recuperación enviado", { email, emailId: data.id });
+    return { success: true, emailId: data.id };
+  } catch (error) {
+    logger.error("Error en enviarRecuperacionPassword:", error);
+    throw new Error(`Error al enviar recuperación: ${error.message}`);
+  }
+});
+
+/**
+ * Cloud Function: Notificar cambio de contraseña exitoso
+ */
+exports.notificarCambioPassword = onCall(async (request) => {
+  const { email, nombreClub } = request.data;
+
+  if (!email) {
+    throw new Error("Email es requerido");
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [email],
+      subject: "✅ Contraseña Actualizada - Tudojang",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #0047A0 0%, #003580 100%); padding: 40px 30px; text-align: center; color: white; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
+            .content { padding: 40px 30px; }
+            .success-icon { font-size: 64px; text-align: center; margin-bottom: 20px; }
+            .info-box { background: #e0f2fe; border-left: 4px solid #0047A0; padding: 20px; margin: 20px 0; border-radius: 8px; }
+            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔒 CONTRASEÑA ACTUALIZADA</h1>
+            </div>
+            <div class="content">
+              <div class="success-icon">✅</div>
+              <p style="color: #666; font-size: 16px; line-height: 1.6; text-align: center;">
+                Hola${nombreClub ? ` <strong>${nombreClub}</strong>` : ""},<br><br>
+                Tu contraseña ha sido actualizada exitosamente.
+              </p>
+              <div class="info-box">
+                <p style="margin: 0; font-size: 14px; color: #0369a1; font-weight: 700;">🛡️ Seguridad</p>
+                <p style="margin: 10px 0 0 0; font-size: 13px; color: #0369a1;">
+                  Si no realizaste este cambio, contacta inmediatamente a nuestro equipo de soporte.
+                </p>
+              </div>
+              <p style="color: #666; font-size: 14px; text-align: center;">
+                Puedes iniciar sesión con tu nueva contraseña en:<br>
+                <a href="https://tudojang.web.app/#/login" style="color: #0047A0; font-weight: 700;">tudojang.web.app</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p><strong>Tudojang SaaS Core 2026</strong></p>
+              <p>Soporte: soporte@tudojang.com</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      logger.error("Error enviando notificación de cambio:", error);
+      throw new Error(`Error al enviar email: ${error.message}`);
+    }
+
+    logger.info("Notificación de cambio de password enviada", { email, emailId: data.id });
+    return { success: true, emailId: data.id };
+  } catch (error) {
+    logger.error("Error en notificarCambioPassword:", error);
+    throw new Error(`Error al enviar notificación: ${error.message}`);
+  }
 });
