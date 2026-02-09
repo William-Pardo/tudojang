@@ -9,6 +9,8 @@ import { PLANES_SAAS } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
 
 const PublicLanding: React.FC = () => {
+    const [cicloFacturacion, setCicloFacturacion] = React.useState<'mensual' | 'anual'>('anual');
+
     return (
         <div className="min-h-screen bg-white text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white overflow-x-hidden">
             {/* NAVBAR ESTRATÉGICO */}
@@ -127,40 +129,81 @@ const PublicLanding: React.FC = () => {
             {/* TARIFAS: PUNTO DE CIERRE 2 */}
             <section id="tarifas" className="py-24 px-6 sm:px-12">
                 <div className="max-w-6xl mx-auto space-y-16">
-                    <div className="text-center">
-                        <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
-                        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento de su escuela</p>
+                    <div className="text-center space-y-6">
+                        <div>
+                            <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
+                            <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento de su escuela</p>
+                        </div>
+
+                        {/* Toggle Mensual / Anual */}
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gray-100 p-1.5 rounded-2xl inline-flex relative">
+                                <button
+                                    onClick={() => setCicloFacturacion('mensual')}
+                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'mensual' ? 'bg-white text-tkd-dark shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    Mensual
+                                </button>
+                                <button
+                                    onClick={() => setCicloFacturacion('anual')}
+                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'anual' ? 'bg-white text-tkd-blue shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    Anual (Ahorra 2 Meses)
+                                </button>
+                            </div>
+                            {cicloFacturacion === 'anual' && (
+                                <span className="bg-green-100 text-green-600 px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                    ¡Bonificación por pago anual activada!
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {Object.values(PLANES_SAAS).map((plan: any) => (
-                            <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all ${plan.popular ? 'border-tkd-blue bg-white shadow-2xl scale-105 z-10' : 'border-gray-50 bg-gray-50 opacity-80'}`}>
-                                <div className="space-y-6">
-                                    {plan.popular && <span className="bg-tkd-blue text-white px-6 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">Más Elegido</span>}
-                                    <h4 className="text-2xl font-black uppercase tracking-tight">{plan.nombre}</h4>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-41 font-black text-tkd-blue">{formatearPrecio(plan.precio)}</span>
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase">/mes</span>
+                        {Object.values(PLANES_SAAS).map((plan: any) => {
+                            const precioFinal = cicloFacturacion === 'anual' ? plan.precio * 10 : plan.precio; // 12 meses pagando solo 10
+
+                            return (
+                                <div key={plan.id} className={`rounded-[3rem] p-10 border-4 flex flex-col justify-between transition-all ${plan.popular ? 'border-tkd-blue bg-white shadow-2xl scale-105 z-10 relative' : 'border-gray-50 bg-gray-50 opacity-80 hover:opacity-100'}`}>
+                                    <div className="space-y-6">
+                                        {plan.popular && (
+                                            <div className="absolute -top-5 left-0 right-0 flex justify-center">
+                                                <span className="bg-tkd-red text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                                                    Recomendado
+                                                </span>
+                                            </div>
+                                        )}
+                                        <h4 className="text-2xl font-black uppercase tracking-tight text-tkd-blue/60">{plan.nombre}</h4>
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-4xl font-black text-tkd-blue flex items-start">
+                                                <span className="text-xl mr-1">$</span>
+                                                {formatearPrecio(precioFinal).replace('$', '')}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                                /{cicloFacturacion === 'anual' ? 'año' : 'mes'}
+                                            </span>
+                                        </div>
+                                        <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
+                                            <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-tkd-blue/40" /> Hasta {plan.limiteEstudiantes} alumnos</li>
+                                            <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteUsuarios} Instructores</li>
+                                            <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteSedes} Sedes</li>
+                                            {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
+                                                <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-green-500" /> {c}</li>
+                                            ))}
+                                        </ul>
                                     </div>
-                                    <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
-                                        <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4" /> Hasta {plan.limiteEstudiantes} alumnos</li>
-                                        <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4" /> {plan.limiteUsuarios} Instructores</li>
-                                        <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4" /> {plan.limiteSedes} Sedes</li>
-                                        {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
-                                            <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-green-500" /> {c}</li>
-                                        ))}
-                                    </ul>
+                                    <div className="mt-8 space-y-4 flex flex-col items-center">
+                                        {/* Botón Circular de Selección */}
+                                        <Link
+                                            to={`/registro-escuela?plan=${plan.id}&precio=${precioFinal}`}
+                                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all ${plan.popular ? 'bg-tkd-blue border-tkd-blue text-white' : 'border-gray-200 text-gray-200 hover:border-tkd-blue hover:text-tkd-blue'}`}
+                                        >
+                                            <IconoAprobar className="w-6 h-6" />
+                                        </Link>
+                                    </div>
                                 </div>
-                                <div className="mt-8 space-y-4">
-                                    <Link
-                                        to={`/registro-escuela?plan=${plan.id}&precio=${plan.precio}`}
-                                        className={`w-full py-4 block rounded-2xl font-black uppercase text-[10px] tracking-widest text-center transition-all ${plan.popular ? 'bg-tkd-blue text-white shadow-xl hover:bg-blue-800' : 'bg-tkd-dark text-white hover:bg-tkd-blue'}`}
-                                    >
-                                        Elegir este Plan
-                                    </Link>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     <div className="text-center mt-12 bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
                         <p className="text-sm font-black uppercase text-tkd-blue tracking-tight">

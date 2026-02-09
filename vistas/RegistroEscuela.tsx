@@ -66,12 +66,12 @@ const RegistroEscuela: React.FC = () => {
     const onSubmit = async (data: any) => {
         setCargando(true);
         try {
-            const slug = generarSlug(data.nombreClub);
+            let slug = generarSlug(data.nombreClub);
             const existe = await buscarTenantPorSlug(slug);
+
+            // Si el slug ya existe, no bloqueamos, sino que le agregamos un sufijo único
             if (existe) {
-                mostrarNotificacion("El nombre de la academia genera una URL ya ocupada. Intenta variarlo un poco.", "error");
-                setCargando(false);
-                return;
+                slug = `${slug}-${Math.random().toString(36).slice(-4)}`;
             }
 
             // 1. Generar contraseña temporal segura
