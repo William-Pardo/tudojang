@@ -15,7 +15,7 @@ const NotificacionToast: React.FC = () => {
   const { toasts, ocultarNotificacion } = useNotificacion();
 
   if (!toasts.length) return null;
-  
+
   const toastConfig = {
     success: {
       bg: 'bg-green-50 dark:bg-green-900/50',
@@ -45,13 +45,13 @@ const NotificacionToast: React.FC = () => {
 
 
   return (
-    <div className="fixed top-5 right-5 z-[100] w-full max-w-sm space-y-3">
+    <div className="fixed top-24 right-5 z-[9999] w-full max-w-sm space-y-3 pointer-events-none">
       {toasts.map((toast) => {
         const config = toastConfig[toast.tipo];
         return (
           <div
             key={toast.id}
-            className={`relative flex items-start w-full p-4 border-l-4 rounded-r-lg shadow-lg animate-slide-in-right ${config.bg} ${config.border}`}
+            className={`relative flex items-start w-full p-4 border-l-4 rounded-r-lg shadow-2xl animate-slide-in-right pointer-events-auto ${config.bg} ${config.border}`}
             role="alert"
           >
             <div className={`flex-shrink-0 ${config.iconColor}`}>

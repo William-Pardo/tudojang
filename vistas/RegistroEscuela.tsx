@@ -161,9 +161,10 @@ const RegistroEscuela: React.FC = () => {
 
             window.location.href = urlWompi;
 
-        } catch (error) {
-            console.error(error);
-            mostrarNotificacion("Error al preparar el registro. Intenta de nuevo.", "error");
+        } catch (error: any) {
+            console.error("Error en el proceso de registro:", error);
+            const mensaje = error.message || "Error al preparar el registro.";
+            mostrarNotificacion(`Error: ${mensaje}`, "error");
             setCargando(false);
         }
     };
