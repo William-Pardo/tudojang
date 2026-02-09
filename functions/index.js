@@ -142,3 +142,20 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
 
   res.status(200).send('Webhook Procesado');
 });
+
+// Función para probar el envío de emails manualmente
+exports.testEmailResend = functions.https.onCall(async (data, context) => {
+  const { toEmail } = data;
+  try {
+    const result = await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [toEmail || "gengepardo@gmail.com"],
+      subject: "🚀 Prueba de Sistema - Tudojang",
+      html: "<h1>¡Funciona!</h1><p>Si recibes este correo, la configuración de <b>info@tudojang.com</b> y Resend es correcta.</p>"
+    });
+    return { success: true, id: result.id };
+  } catch (error) {
+    console.error("Error en prueba de email:", error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
