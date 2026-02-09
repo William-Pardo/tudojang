@@ -8,6 +8,7 @@ import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
 import { CONFIGURACION_WOMPI } from '../constantes';
+import { enviarEmailBienvenida } from '../servicios/emailService';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -27,6 +28,7 @@ const RegistroEscuela: React.FC = () => {
     const [paso, setPaso] = useState<'formulario' | 'procesando' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
     const [datosTemporales, setDatosTemporales] = useState<any>(null); // Datos tras volver de Wompi
+    const [passwordCopiada, setPasswordCopiada] = useState(false); // Control para habilitar login
     const { mostrarNotificacion } = useNotificacion();
     const { register, handleSubmit, formState: { errors }, watch } = useForm({
         resolver: yupResolver(schema)
@@ -45,11 +47,25 @@ const RegistroEscuela: React.FC = () => {
         if (wompiId && pendingReg) {
             setPaso('procesando');
             // Simulamos verificación del pago exitoso (En prod se consultaría a la API de Wompi)
-            setTimeout(() => {
+            setTimeout(async () => {
                 const datos = JSON.parse(pendingReg);
                 setDatosTemporales(datos);
                 setPaso('exito');
                 localStorage.removeItem('registro_pendiente');
+
+                // Enviar email de bienvenida con las credenciales
+                try {
+                    await enviarEmailBienvenida({
+                        email: datos.email,
+                        nombreClub: datos.nombreClub || 'Academia',
+                        passwordTemporal: datos.password,
+                        slug: datos.slug
+                    });
+                    console.log('Email de bienvenida enviado exitosamente');
+                } catch (error) {
+                    console.error('Error al enviar email de bienvenida:', error);
+                    // No bloqueamos el flujo si falla el email
+                }
             }, 2000);
         }
     }, []);
@@ -104,7 +120,8 @@ const RegistroEscuela: React.FC = () => {
             localStorage.setItem('registro_pendiente', JSON.stringify({
                 slug,
                 email: data.email,
-                password: passwordTemporal
+                password: passwordTemporal,
+                nombreClub: data.nombreClub
             }));
 
             // 4. Redirigir a Wompi
@@ -150,6 +167,12 @@ const RegistroEscuela: React.FC = () => {
     }
 
     if (paso === 'exito' && datosTemporales) {
+        const copiarPassword = () => {
+            navigator.clipboard.writeText(datosTemporales.password);
+            setPasswordCopiada(true);
+            mostrarNotificacion('Contraseña copiada al portapapeles', 'success');
+        };
+
         return (
             <div className="min-h-screen bg-white font-sans selection:bg-tkd-blue selection:text-white">
                 {navbar}
@@ -171,25 +194,54 @@ const RegistroEscuela: React.FC = () => {
                                     <p className="text-[9px] font-bold text-gray-400 uppercase">Usuario / Email</p>
                                     <p className="text-sm font-black text-tkd-dark">{datosTemporales.email}</p>
                                 </div>
-                                <div className="bg-white p-4 rounded-xl border border-blue-100 relative group cursor-pointer" onClick={() => navigator.clipboard.writeText(datosTemporales.password)}>
+                                <div className="bg-white p-4 rounded-xl border border-blue-100 relative">
                                     <p className="text-[9px] font-bold text-gray-400 uppercase">Contraseña Temporal</p>
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center mt-2">
                                         <p className="text-xl font-mono font-black text-tkd-blue tracking-wider">{datosTemporales.password}</p>
-                                        <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase font-bold group-hover:bg-tkd-blue group-hover:text-white transition-colors">Copiar</span>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Botón de Copiar - CRÍTICO para habilitar login */}
+                            <button
+                                onClick={copiarPassword}
+                                disabled={passwordCopiada}
+                                className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-all ${passwordCopiada
+                                    ? 'bg-green-500 text-white cursor-default'
+                                    : 'bg-tkd-red text-white hover:bg-red-700 active:scale-95'
+                                    }`}
+                            >
+                                {passwordCopiada ? '✓ Contraseña Copiada' : '📋 Copiar Contraseña'}
+                            </button>
+
                             <p className="text-[9px] text-gray-400 text-center leading-tight pt-2">
-                                Copia esta contraseña ahora. Podrás cambiarla <br /> después de iniciar sesión.
+                                {passwordCopiada
+                                    ? 'Ahora puedes iniciar sesión con tu nueva cuenta'
+                                    : 'Debes copiar la contraseña para continuar'}
                             </p>
                         </div>
 
+                        {/* Botón de Login - Solo habilitado después de copiar */}
                         <a
-                            href="/#/login"
-                            className="block w-full bg-tkd-dark text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-tkd-blue transition-all hover:scale-[1.02] active:scale-95 text-xs"
+                            href={passwordCopiada ? "/#/login" : "#"}
+                            onClick={(e) => !passwordCopiada && e.preventDefault()}
+                            className={`block w-full py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl text-xs transition-all ${passwordCopiada
+                                ? 'bg-tkd-dark text-white hover:bg-tkd-blue hover:scale-[1.02] active:scale-95 cursor-pointer'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                                }`}
                         >
-                            Iniciar Sesión
+                            {passwordCopiada ? 'Iniciar Sesión Ahora' : '🔒 Copia la Contraseña Primero'}
                         </a>
+
+                        {passwordCopiada && (
+                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 text-left">
+                                <p className="text-[10px] font-black uppercase text-yellow-700 mb-2">⚠️ Importante</p>
+                                <p className="text-[9px] text-yellow-600 leading-relaxed">
+                                    Usa <strong>{datosTemporales.email}</strong> y la contraseña que copiaste para iniciar sesión.
+                                    El sistema te pedirá cambiarla en tu primer acceso.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
