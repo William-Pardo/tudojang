@@ -19,7 +19,7 @@ Completar el flujo de registro, pago y primer acceso para nuevas escuelas (SaaS 
     *   Corregida la codificación de la `redirect-url` para Wompi.
 
 ## ⚠️ Bloqueos / Problemas Pendientes
-*   **Firma de Integridad**: Wompi reportaba "Firma de integridad requerida no enviada" a pesar de incluir el parámetro `signature`. Se aplicó una corrección en la codificación de la URL.
+*   **Firma de Integridad**: Wompi reportaba "Firma de integridad requerida no enviada". Se identificó que para el Web Checkout Redirect, el parámetro debe llamarse exactamente **`signature:integrity`** (con los dos puntos) cuando la cuenta tiene la integridad activa. Se aplicó este cambio.
 *   **Credenciales**: Se requiere confirmar que las llaves en `constantes.ts` (Sandbox) correspondan a las del dashboard "Modo Pruebas" de la cuenta "Aliant".
 *   **Despliegue**: Se actualizó `deploy.yml` para excluir reglas de Storage inexistentes, facilitando el despliegue por GitHub Actions.
 
