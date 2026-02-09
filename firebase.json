@@ -8,6 +8,14 @@
     ],
     "rewrites": [
       {
+        "source": "/api/webhookWompi",
+        "function": "webhookWompi"
+      },
+      {
+        "source": "/api/enviarBienvenidaTudojang",
+        "function": "enviarBienvenidaTudojang"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

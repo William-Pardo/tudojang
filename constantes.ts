@@ -133,5 +133,5 @@ export const CONFIGURACION_WOMPI = {
     privateKey: "prv_test_VVkIyE0hBvHJpjKf2JJOl2dGoYG6PBXK",
     eventsKey: "test_events_znXLPPCzTpxVNzn6ITFPEESQwTLwbGzd",
     integrityKey: "test_integrity_Iq6lRgXaEjqD4YLSoQsvPCvjdUhpNalY",
-    webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
+    webhookUrl: "https://tudojang.com/api/webhookWompi"
 };

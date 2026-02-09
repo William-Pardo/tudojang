@@ -1,453 +1,119 @@
-const { onRequest, onCall } = require("firebase-functions/v2/https");
-const { setGlobalOptions } = require("firebase-functions/v2");
-const logger = require("firebase-functions/logger");
-const { Resend } = require("resend");
+const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const { Resend } = require("resend");
 
 admin.initializeApp();
 
-setGlobalOptions({ maxInstances: 10 });
-
-// Inicializar Resend con la API Key
 const resend = new Resend("re_d2452b45-37a2-4294-93c0-e3a51c323d47");
 
 /**
- * Cloud Function: Enviar email de bienvenida con credenciales temporales
- * Llamada desde el frontend después de un registro exitoso
+ * Cloud Function: Enviar email de bienvenida
+ * v1 onCall maneja CORS automáticamente
  */
-exports.enviarBienvenidaTudojang = onCall(async (request) => {
-  const { email, nombreClub, passwordTemporal, slug } = request.data;
+exports.enviarBienvenidaTudojang = functions.https.onCall(async (data, context) => {
+  const { email, nombreClub, passwordTemporal, slug } = data;
 
-  // Validación de parámetros
-  if (!email || !nombreClub || !passwordTemporal || !slug) {
-    throw new Error("Faltan parámetros requeridos");
+  if (!email || !nombreClub || !passwordTemporal) {
+    throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros requeridos');
   }
 
   try {
-    logger.info(`Llamada a enviarBienvenidaTudojang para: ${email}`);
-    const { data, error } = await resend.emails.send({
+    console.log(`Enviando bienvenida v1 a: ${email}`);
+    const result = await resend.emails.send({
       from: "Tudojang Academia <info@tudojang.com>",
       to: [email],
       subject: `¡Bienvenido a Tudojang, ${nombreClub}!`,
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; }
-            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #0047A0 0%, #003580 100%); padding: 40px 30px; text-align: center; color: white; }
-            .content { padding: 40px 30px; line-height: 1.6; color: #333; }
-            .credentials { background: #f8f9fa; border-left: 4px solid #0047A0; padding: 20px; margin: 20px 0; border-radius: 8px; }
-            .button { display: inline-block; padding: 16px 40px; background-color: #CD2E3A; color: white; text-decoration: none; border-radius: 8px; font-weight: 900; margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><h1>🥋 TUDOJANG</h1></div>
-            <div class="content">
-              <p>¡Bienvenido a la plataforma líder en gestión de Taekwondo!</p>
-              <p>Tu academia <strong>${nombreClub}</strong> ha sido registrada con éxito. Aquí tienes tus credenciales:</p>
-              <div class="credentials">
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Contraseña Temporal:</strong> <code>${passwordTemporal}</code></p>
-              </div>
-              <p>Por seguridad, el sistema te pedirá cambiar tu contraseña al entrar.</p>
-              <center><a href="https://tudojang.com/#/login" class="button">INICIAR SESIÓN</a></center>
-            </div>
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h1 style="color: #0047A0;">🥋 ¡Bienvenido a Tudojang!</h1>
+          <p>Tu academia <strong>${nombreClub}</strong> está lista para empezar.</p>
+          <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Usuario:</strong> ${email}</p>
+            <p><strong>Clave Temporal:</strong> <code>${passwordTemporal}</code></p>
           </div>
-        </body>
-        </html>
-      `,
+          <p>Puedes iniciar sesión en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
+        </div>
+      `
     });
-
-    if (error) {
-      logger.error("Error enviando email con Resend:", error);
-      throw new Error(`Error al enviar email: ${error.message}`);
-    }
-
-    logger.info("Email de bienvenida enviado exitosamente", { email, emailId: data.id });
-    return { success: true, id: data.id };
+    return { success: true, id: result.id };
   } catch (error) {
-    logger.error("Error en enviarBienvenidaTudojang:", error);
-    throw new Error(`Error al enviar email de bienvenida: ${error.message}`);
+    console.error("Error Resend v1:", error);
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 /**
- * Cloud Function: Enviar email de confirmación de pago exitoso
+ * Cloud Function: Webhook Wompi (v1)
+ * URL: https://us-central1-tudojang.cloudfunctions.net/webhookWompi
  */
-exports.enviarConfirmacionPago = onCall(async (request) => {
-  const { email, nombreClub, montoPagado, referenciaPago } = request.data;
-
-  if (!email || !nombreClub || !montoPagado) {
-    throw new Error("Faltan parámetros requeridos");
-  }
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [email],
-      subject: "✅ Pago Confirmado - Tudojang",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 40px 30px; text-align: center; color: white; }
-            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
-            .content { padding: 40px 30px; }
-            .success-icon { font-size: 64px; text-align: center; margin-bottom: 20px; }
-            .amount-box { background: #f0fdf4; border-left: 4px solid #10B981; padding: 20px; margin: 30px 0; border-radius: 8px; }
-            .amount { font-size: 32px; font-weight: 900; color: #059669; }
-            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🥋 PAGO CONFIRMADO</h1>
-            </div>
-            <div class="content">
-              <div class="success-icon">✅</div>
-              <h2 style="text-align: center; color: #0047A0;">¡Pago Procesado Exitosamente!</h2>
-              <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                Hola <strong>${nombreClub}</strong>,<br><br>
-                Hemos recibido y confirmado tu pago. Tu suscripción a Tudojang está ahora completamente activa.
-              </p>
-              <div class="amount-box">
-                <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase; font-weight: 700;">Monto Pagado</p>
-                <div class="amount">$${(montoPagado / 100).toLocaleString('es-CO')}</div>
-                <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Referencia: ${referenciaPago || 'N/A'}</p>
-              </div>
-              <p style="color: #666; font-size: 14px;">
-                Puedes iniciar sesión en tu academia digital en cualquier momento desde 
-                <a href="https://tudojang.web.app/#/login" style="color: #0047A0; font-weight: 700;">tudojang.web.app</a>
-              </p>
-            </div>
-            <div class="footer">
-              <p><strong>Tudojang SaaS Core 2026</strong></p>
-              <p>Sistema de Gestión para Academias de Taekwondo</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    });
-
-    if (error) {
-      logger.error("Error enviando confirmación de pago:", error);
-      throw new Error(`Error al enviar email: ${error.message}`);
-    }
-
-    logger.info("Email de confirmación de pago enviado", { email, emailId: data.id });
-    return { success: true, emailId: data.id };
-  } catch (error) {
-    logger.error("Error en enviarConfirmacionPago:", error);
-    throw new Error(`Error al enviar confirmación de pago: ${error.message}`);
-  }
-});
-
-/**
- * Cloud Function: Enviar email de restauración de contraseña
- */
-exports.enviarRecuperacionPassword = onCall(async (request) => {
-  const { email, nombreClub, resetLink } = request.data;
-
-  if (!email || !resetLink) {
-    throw new Error("Faltan parámetros requeridos");
-  }
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [email],
-      subject: "🔐 Recuperación de Contraseña - Tudojang",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #CD2E3A 0%, #A02329 100%); padding: 40px 30px; text-align: center; color: white; }
-            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
-            .content { padding: 40px 30px; }
-            .warning-box { background: #fff3cd; border: 2px solid #ffc107; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .cta-button { display: inline-block; background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900; text-transform: uppercase; margin: 20px 0; }
-            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔐 RECUPERACIÓN DE CONTRASEÑA</h1>
-            </div>
-            <div class="content">
-              <p style="color: #666; font-size: 16px; line-height: 1.6;">
-                Hola${nombreClub ? ` <strong>${nombreClub}</strong>` : ""},<br><br>
-                Recibimos una solicitud para restablecer la contraseña de tu cuenta en Tudojang.
-              </p>
-              <div class="warning-box">
-                <p style="margin: 0; font-size: 14px; color: #856404; font-weight: 700;">⚠️ Importante</p>
-                <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
-                  Este enlace es válido por <strong>1 hora</strong>. Si no solicitaste este cambio, ignora este mensaje.
-                </p>
-              </div>
-              <center>
-                <a href="${resetLink}" class="cta-button">Restablecer Contraseña</a>
-              </center>
-              <p style="color: #999; font-size: 12px; margin-top: 30px;">
-                Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
-                <span style="color: #0047A0; word-break: break-all;">${resetLink}</span>
-              </p>
-            </div>
-            <div class="footer">
-              <p><strong>Tudojang SaaS Core 2026</strong></p>
-              <p>Si no solicitaste este cambio, contacta a soporte@tudojang.com</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    });
-
-    if (error) {
-      logger.error("Error enviando recuperación de password:", error);
-      throw new Error(`Error al enviar email: ${error.message}`);
-    }
-
-    logger.info("Email de recuperación enviado", { email, emailId: data.id });
-    return { success: true, emailId: data.id };
-  } catch (error) {
-    logger.error("Error en enviarRecuperacionPassword:", error);
-    throw new Error(`Error al enviar recuperación: ${error.message}`);
-  }
-});
-
-/**
- * Cloud Function: Notificar cambio de contraseña exitoso
- */
-exports.notificarCambioPassword = onCall(async (request) => {
-  const { email, nombreClub } = request.data;
-
-  if (!email) {
-    throw new Error("Email es requerido");
-  }
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [email],
-      subject: "✅ Contraseña Actualizada - Tudojang",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-            .header { background: linear-gradient(135deg, #0047A0 0%, #003580 100%); padding: 40px 30px; text-align: center; color: white; }
-            .header h1 { margin: 0; font-size: 28px; font-weight: 900; }
-            .content { padding: 40px 30px; }
-            .success-icon { font-size: 64px; text-align: center; margin-bottom: 20px; }
-            .info-box { background: #e0f2fe; border-left: 4px solid #0047A0; padding: 20px; margin: 20px 0; border-radius: 8px; }
-            .footer { background: #f8f9fa; padding: 30px; text-align: center; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔒 CONTRASEÑA ACTUALIZADA</h1>
-            </div>
-            <div class="content">
-              <div class="success-icon">✅</div>
-              <p style="color: #666; font-size: 16px; line-height: 1.6; text-align: center;">
-                Hola${nombreClub ? ` <strong>${nombreClub}</strong>` : ""},<br><br>
-                Tu contraseña ha sido actualizada exitosamente.
-              </p>
-              <div class="info-box">
-                <p style="margin: 0; font-size: 14px; color: #0369a1; font-weight: 700;">🛡️ Seguridad</p>
-                <p style="margin: 10px 0 0 0; font-size: 13px; color: #0369a1;">
-                  Si no realizaste este cambio, contacta inmediatamente a nuestro equipo de soporte.
-                </p>
-              </div>
-              <p style="color: #666; font-size: 14px; text-align: center;">
-                Puedes iniciar sesión con tu nueva contraseña en:<br>
-                <a href="https://tudojang.web.app/#/login" style="color: #0047A0; font-weight: 700;">tudojang.web.app</a>
-              </p>
-            </div>
-            <div class="footer">
-              <p><strong>Tudojang SaaS Core 2026</strong></p>
-              <p>Soporte: soporte@tudojang.com</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-    });
-
-    if (error) {
-      logger.error("Error enviando notificación de cambio:", error);
-      throw new Error(`Error al enviar email: ${error.message}`);
-    }
-
-    logger.info("Notificación de cambio de password enviada", { email, emailId: data.id });
-    return { success: true, emailId: data.id };
-  } catch (error) {
-    logger.error("Error en notificarCambioPassword:", error);
-    throw new Error(`Error al enviar notificación: ${error.message}`);
-  }
-});
-
-/**
- * Cloud Function: Webhook para recibir notificaciones de Wompi
- */
-exports.webhookWompi = onRequest(async (req, res) => {
+exports.webhookWompi = functions.https.onRequest(async (req, res) => {
   const evento = req.body;
+  console.log("Evento Wompi recibido v1:", JSON.stringify(evento));
 
-  // TODO: Validar firma de Wompi usando 'x-wompi-signature' y events events secret
+  if (evento.event === 'transaction.updated' && evento.data.transaction.status === 'APPROVED') {
+    const transaction = evento.data.transaction;
+    const referencia = transaction.reference; // Ej: SUSC_SLUG_TNTID
 
-  if (evento.event === 'transaction.updated') {
-    const { data } = evento;
-    const transaction = data.transaction;
+    if (referencia && referencia.startsWith('SUSC_')) {
+      const parts = referencia.split('_');
+      const tenantId = parts[2];
 
-    // Solo procesar si el pago es APROBADO
-    if (transaction.status === 'APPROVED') {
-      const referencia = transaction.reference; // Ej: "SUSC_gajog_id123"
-      if (referencia) {
-        const parts = referencia.split('_');
-        if (parts.length >= 3) {
-          const tipo = parts[0];
-          const slug = parts[1];
-          const id = parts[2];
+      try {
+        const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
+        const tenantSnap = await tenantRef.get();
 
-          if (tipo === 'SUSC') {
-            try {
-              // 1. Obtener datos del tenant
-              const tenantRef = admin.firestore().collection('tenants').doc(id);
-              const tenantSnap = await tenantRef.get();
+        if (tenantSnap.exists) {
+          const tenantData = tenantSnap.data();
 
-              if (!tenantSnap.exists) {
-                logger.error(`Tenant no encontrado: ${id}`);
-                return;
-              }
-              const tenantData = tenantSnap.data();
+          // 1. Activar Tenant
+          await tenantRef.update({
+            estadoSuscripcion: 'activo',
+            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
+          });
 
-              // 2. Activar suscripción
-              await tenantRef.update({
-                estadoSuscripcion: 'activo',
-                fechaVencimiento: admin.firestore.Timestamp.fromDate(
-                  new Date(Date.now() + 31 * 24 * 60 * 60 * 1000)
-                )
+          // 2. Crear/Actualizar Usuario Auth
+          let user;
+          try {
+            user = await admin.auth().createUser({
+              uid: tenantId,
+              email: tenantData.emailClub,
+              password: tenantData.passwordTemporal,
+              displayName: tenantData.nombreClub
+            });
+          } catch (e) {
+            if (e.code === 'auth/email-already-exists') {
+              user = await admin.auth().getUserByEmail(tenantData.emailClub);
+              await admin.auth().updateUser(user.uid, {
+                password: tenantData.passwordTemporal
               });
-              logger.info(`Suscripción activada para: ${slug}`);
-
-              // 3. Obtener o crear usuario Auth
-              let userRecord;
-              try {
-                // Primero intentamos crear el usuario con el ID que elegimos (tnt-...)
-                userRecord = await admin.auth().createUser({
-                  uid: id,
-                  email: tenantData.emailClub,
-                  password: tenantData.passwordTemporal,
-                  displayName: tenantData.nombreClub,
-                });
-                logger.info(`Usuario Auth creado (nuevo): ${id}`);
-              } catch (authError) {
-                if (authError.code === 'auth/email-already-exists' || authError.code === 'auth/uid-already-exists') {
-                  // Si el email ya existe, lo buscamos para obtener su UID real y actualizamos su password
-                  userRecord = await admin.auth().getUserByEmail(tenantData.emailClub);
-                  await admin.auth().updateUser(userRecord.uid, {
-                    password: tenantData.passwordTemporal,
-                    displayName: tenantData.nombreClub
-                  });
-                  logger.info(`Usuario Auth actualizado (existente): ${userRecord.uid}`);
-                } else {
-                  throw authError;
-                }
-              }
-
-              const finalUid = userRecord.uid;
-
-              // 4. Crear perfil de usuario en Firestore (Asegurando coincidencia con finalUid)
-              await admin.firestore().collection('usuarios').doc(finalUid).set({
-                id: finalUid,
-                email: tenantData.emailClub,
-                nombreUsuario: tenantData.nombreClub,
-                numeroIdentificacion: '0',
-                whatsapp: tenantData.telefono || '',
-                rol: 'Admin',
-                tenantId: id, // El tenantId siempre es el del registro actual
-                estadoContrato: 'Sin configurar'
-              });
-              logger.info(`Perfil Firestore creado para UID: ${finalUid}`);
-
-              // 5. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
-              try {
-                const emailDestino = tenantData.emailClub || transaction.customer_email;
-                if (!emailDestino) {
-                  logger.warn("No se encontró email para enviar bienvenida");
-                  return;
-                }
-
-                logger.info(`Enviando bienvenida a: ${emailDestino}`);
-                const { data, error } = await resend.emails.send({
-                  from: "Tudojang Academia <info@tudojang.com>",
-                  to: [emailDestino],
-                  subject: `¡Bienvenido a Tudojang, ${tenantData.nombreClub}!`,
-                  html: `
-                      <!DOCTYPE html>
-                      <html>
-                      <body style="font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa;">
-                        <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                          <div style="background: linear-gradient(135deg, #0047A0 0%, #003580 100%); padding: 40px 30px; text-align: center; color: white;">
-                            <h1 style="margin: 0; font-size: 28px; text-transform: uppercase;">🥋 TUDOJANG</h1>
-                          </div>
-                          <div style="padding: 40px 30px;">
-                            <p style="font-size: 18px; color: #333;"><strong>¡Bienvenido, Sabonim!</strong><br>Su academia <strong>${tenantData.nombreClub}</strong> está activa.</p>
-                            <div style="background: #f8f9fa; border-left: 4px solid #0047A0; padding: 20px; margin: 30px 0;">
-                              <div style="margin: 15px 0;">
-                                <div style="font-size: 12px; font-weight: 700; color: #666;">CORREO</div>
-                                <div style="font-size: 16px; color: #0047A0;">${emailDestino}</div>
-                              </div>
-                              <div style="margin: 15px 0;">
-                                <div style="font-size: 12px; font-weight: 700; color: #666;">CONTRASEÑA TEMPORAL</div>
-                                <div style="font-size: 16px; color: #0047A0; font-family: monospace;">${tenantData.passwordTemporal}</div>
-                              </div>
-                            </div>
-                            <center><a href="https://tudojang.com/#/login" style="background: #CD2E3A; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 900;">INICIAR SESIÓN</a></center>
-                          </div>
-                        </div>
-                      </body>
-                      </html>
-                    `,
-                });
-
-                if (error) {
-                  logger.error("Error de Resend en Webhook:", error);
-                } else {
-                  logger.info("Email de bienvenida enviado exitosamente:", data);
-                }
-              } catch (emailError) {
-                logger.error("Excepción enviando email en Webhook:", emailError);
-              }
-
-            } catch (error) {
-              logger.error(`Error procesando suscripción para ${slug}:`, error);
-            }
+            } else { throw e; }
           }
+
+          // 3. Crear Perfil Firestore
+          await admin.firestore().collection('usuarios').doc(user.uid).set({
+            id: user.uid,
+            email: tenantData.emailClub,
+            nombreUsuario: tenantData.nombreClub,
+            rol: 'Admin',
+            tenantId: tenantId,
+            estadoContrato: 'Activo'
+          });
+
+          console.log(`Registro completado exitosamente para ${tenantData.emailClub}`);
+
+          // 4. Email opcional (Backend)
+          await resend.emails.send({
+            from: "Tudojang Academia <info@tudojang.com>",
+            to: [tenantData.emailClub],
+            subject: "🥋 Tu Academia está activada",
+            text: `Hola Sabonim, tu pago ha sido procesado. Ya puedes entrar con tu clave temporal: ${tenantData.passwordTemporal}`
+          });
         }
+      } catch (err) {
+        console.error("Error procesando webhook v1:", err);
       }
     }
   }
 
-  // Responder a Wompi que recibiste el mensaje correctamente
   res.status(200).send('OK');
 });
