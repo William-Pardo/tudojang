@@ -59,11 +59,11 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
     const nuevoTenantId = datos.tenantId || `tnt-${Date.now()}`;
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
+        estadoSuscripcion: 'demo', // Valor por defecto
+        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de gracia
         ...datos,
         tenantId: nuevoTenantId,
         slug: datos.slug?.toLowerCase().trim() || '',
-        estadoSuscripcion: 'demo', // Inicia en demo hasta confirmar pago
-        fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de gracia
     };
 
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);

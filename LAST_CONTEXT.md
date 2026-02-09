@@ -19,15 +19,16 @@ Completar el flujo de registro, pago y primer acceso para nuevas escuelas (SaaS 
     *   Corregida la codificación de la `redirect-url` para Wompi.
 
 ## ⚠️ Bloqueos / Problemas Pendientes
-*   **Conexión a Firebase (Mock Mode)**: **RESUELTO**. Se identificó que la aplicación en producción estaba funcionando en "Modo Simulado" (Mock Mode) porque no leía correctamente las variables de entorno de Firebase desde GitHub Actions. Se actualizó `firebase/config.ts` y `vite.config.ts` para soportar variables individuales con prefijo `VITE_`. Esto garantiza que el login ahora consulte la base de datos REAL de Firebase y no los datos de prueba.
-*   **Firma de Integridad**: Resuelto. El parámetro debe ser `signature:integrity`.
-*   **Consistencia de Montos**: Resuelto. Se corrigió la lectura del parámetro `precio` desde el `HashRouter` y se asegura que el `plan` (starter/pro) se guarde correctamente en el tenant al registrarse.
-*   **Error de Login (Perfil de Usuario)**: Resuelto. El webhook ahora crea no solo el usuario en Auth, sino también su perfil en la colección `usuarios` de Firestore. Sin este perfil, el `AuthContext` del frontend rechazaba el inicio de sesión.
-*   **Consistencia de IDs**: Resuelto. El `tenantId` se genera ahora en el frontend para asegurar que coincida con el `uid` del usuario creado por el webhook.
-*   **Despliegue**: Se actualizó `deploy.yml` para excluir reglas de Storage inexistentes.
+*   **Conexión a Firebase (Mock Mode)**: **RESUELTO**. Se corrigió la lectura de variables de entorno individuales.
+*   **Firma de Integridad**: Resuelto.
+*   **Consistencia de Montos**: Resuelto.
+*   **Envío de Correo (Resend)**: **MEJORADO**. El correo de bienvenida ahora se intenta enviar tanto desde el servidor (Webhook) como desde el navegador (Frontend) para asegurar que llegue. Si no llega, es posible que el dominio `tudojang.com` necesite verificación en el panel de Resend.
+*   **Error de Login (Sincronización)**: **RESUELTO**. Se implementó una lógica de **reintento automático (Retry)** en el login. Si intentas entrar antes de que el servidor termine de crear tu perfil, la app esperará y lo reintentará internamente 5 veces antes de dar error. Esto elimina el fallo de "Perfil no encontrado".
+*   **Consistencia de IDs**: Resuelto.
+*   **Despliegue**: Se ajustó `package.json` de funciones para Node 20 y se eliminaron dependencias locales problemáticas.
 
 ## 📝 Instrucciones para Siguiente Sesión
-1.  Verificar que el parámetro `signature` sea aceptado por Wompi con la nueva codificación.
-2.  Si persiste el error de firma, probar cambiando el nombre del parámetro a `integrity-signature`.
-3.  Asegurar que el `integrityKey` en `constantes.ts` sea el correcto del dashboard de Sandbox.
+1.  Verificar la llegada del correo de bienvenida con el nuevo flujo doble (Frontend + Backend).
+2.  Confirmar que el login con clave temporal funciona sin dar "Error de Credencial" gracias al sistema de reintento.
+3.  Verificar que el `tenantId` en Firestore coincida exactamente con el `UID` de Firebase Auth.stantes.ts` sea el correcto del dashboard de Sandbox.
 4.  Borrar usuarios de prueba (`gengepardo@gmail.com`) tanto en Auth como en Firestore antes de cada test.
