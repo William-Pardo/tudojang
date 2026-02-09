@@ -27,23 +27,41 @@ interface NotificarCambioPasswordParams {
 }
 
 /**
- * Helper para llamar a las funciones a través del proxy de Hosting (/api/...)
+ * Helper para llamar a las funciones directamente (Evita problemas de Hosting/CORS)
  */
 const callApi = async (functionName: string, data: any) => {
+    // Usamos la URL directa de la función para mayor fiabilidad
+    const baseUrl = `https://us-central1-tudojang.cloudfunctions.net`;
+    const url = `${baseUrl}/${functionName}`;
+
     try {
-        const response = await fetch(`/api/${functionName}`, {
+        console.log(`Llamando a función: ${url}`);
+        const response = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors', // Aseguramos modo CORS
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({ data })
         });
 
-        const result = await response.json();
+        // Intentamos leer como texto primero por si el servidor devuelve algo no-JSON
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error("Respuesta no es JSON:", text);
+            throw new Error(`Respuesta inválida del servidor: ${text.substring(0, 100)}`);
+        }
+
         if (!response.ok) {
-            throw new Error(result.error?.message || result.message || 'Error en el servidor');
+            throw new Error(result.error?.message || result.message || `Error ${response.status}: ${text}`);
         }
         return result.data;
     } catch (error: any) {
-        console.error(`Error llamando a ${functionName}:`, error);
+        console.error(`Error crítico en ${functionName}:`, error);
         throw error;
     }
 };
