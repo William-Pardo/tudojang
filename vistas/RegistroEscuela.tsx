@@ -120,7 +120,7 @@ const RegistroEscuela: React.FC = () => {
                 `amount-in-cents=${montoCentavos}&` +
                 `reference=${referencia}&` +
                 `signature=${firmaIntegridad}&` +
-                `redirect-url=${window.location.href}`; // Vuelve a esta misma página
+                `redirect-url=${encodeURIComponent(window.location.href)}`;
 
             window.location.href = urlWompi;
 
