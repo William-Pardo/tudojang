@@ -6,25 +6,29 @@ admin.initializeApp();
 
 const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
 
+const cors = require("cors")({ origin: true });
+
 /**
- * Cloud Function: Enviar email de bienvenida
- * v1 onCall maneja CORS automáticamente
+ * Helper para manejar CORS y errores en onRequest
  */
-/**
- * Cloud Function: Provisionar usuario (Crear en Auth y Firestore ANTES del pago)
- * Esto asegura que el login funcione aunque el webhook falle.
- */
-exports.provisionarUsuarioOnboarding = functions.https.onCall(async (data, context) => {
-  const { tenantId, email, password, nombreClub, slug, plan } = data;
+const manejarRequest = (req, res, handler) => {
+  return cors(req, res, async () => {
+    try {
+      const result = await handler(req.body.data || req.body);
+      res.status(200).send({ data: result });
+    } catch (error) {
+      console.error("Error en función:", error);
+      res.status(500).send({ error: { message: error.message, status: "INTERNAL" } });
+    }
+  });
+};
 
-  if (!email || !password || !tenantId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros');
-  }
+exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { tenantId, email, password, nombreClub } = data;
+    if (!email || !password || !tenantId) throw new Error('Faltan parámetros');
 
-  try {
-    console.log(`Provisionando usuario preliminar: ${email}`);
-
-    // 1. Crear en Auth
+    console.log(`Provisionando usuario: ${email}`);
     let user;
     try {
       user = await admin.auth().createUser({
@@ -40,7 +44,6 @@ exports.provisionarUsuarioOnboarding = functions.https.onCall(async (data, conte
       } else { throw e; }
     }
 
-    // 2. Crear Perfil Firestore (Estado: Pendiente)
     await admin.firestore().collection('usuarios').doc(user.uid).set({
       id: user.uid,
       email: email,
@@ -51,20 +54,14 @@ exports.provisionarUsuarioOnboarding = functions.https.onCall(async (data, conte
     });
 
     return { success: true, uid: user.uid };
-  } catch (error) {
-    console.error("Error provisionando:", error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
+  });
 });
 
-/**
- * Cloud Function: Activar Suscripción (Llamada manualmente desde el frontend al volver de Wompi)
- * Doble seguridad por si el webhook falla.
- */
-exports.activarSuscripcionManual = functions.https.onCall(async (data, context) => {
-  const { tenantId, email } = data;
+exports.activarSuscripcionManual = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { tenantId, email } = data;
+    console.log(`Activación manual para: ${tenantId}`);
 
-  try {
     const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
     await tenantRef.update({
       estadoSuscripcion: 'activo',
@@ -77,15 +74,14 @@ exports.activarSuscripcionManual = functions.https.onCall(async (data, context) 
     });
 
     return { success: true };
-  } catch (error) {
-    console.error("Error activación manual:", error);
-    throw new functions.https.HttpsError('internal', error.message);
-  }
+  });
 });
 
-exports.enviarBienvenidaTudojang = functions.https.onCall(async (data, context) => {
-  const { email, nombreClub, passwordTemporal } = data;
-  try {
+exports.enviarBienvenidaTudojang = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { email, nombreClub, passwordTemporal } = data;
+    console.log(`Enviando bienvenida a: ${email}`);
+
     await resend.emails.send({
       from: "Tudojang Academia <info@tudojang.com>",
       to: [email],
@@ -103,13 +99,25 @@ exports.enviarBienvenidaTudojang = functions.https.onCall(async (data, context) 
       `
     });
     return { success: true };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
+  });
+});
+
+exports.testEmailResend = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [data.toEmail || "gengepardo@gmail.com"],
+      subject: "🚀 Prueba de Sistema",
+      html: "<h1>Funciona</h1>"
+    });
+    return { success: true };
+  });
 });
 
 exports.webhookWompi = functions.https.onRequest(async (req, res) => {
   const { event, data } = req.body;
+  console.log("Webhook recibido:", event);
+
   if (event === 'transaction.updated' && data.transaction.status === 'APPROVED') {
     const ref = data.transaction.reference;
     if (ref && ref.startsWith('SUSC_')) {
@@ -117,7 +125,6 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
       try {
         const tSnap = await admin.firestore().collection('tenants').doc(tId).get();
         if (tSnap.exists) {
-          const tData = tSnap.data();
           await admin.firestore().collection('tenants').doc(tId).update({
             estadoSuscripcion: 'activo',
             fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
@@ -128,18 +135,8 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
           }
           console.log("Activado via Webhook exitosamente");
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("Error en webhook:", err); }
     }
   }
   res.status(200).send('OK');
-});
-
-exports.testEmailResend = functions.https.onCall(async (data) => {
-  await resend.emails.send({
-    from: "Tudojang Academia <info@tudojang.com>",
-    to: [data.toEmail || "gengepardo@gmail.com"],
-    subject: "🚀 Prueba de Sistema",
-    html: "<h1>Funciona</h1>"
-  });
-  return { success: true };
 });

@@ -16,6 +16,14 @@
         "function": "enviarBienvenidaTudojang"
       },
       {
+        "source": "/api/provisionarUsuarioOnboarding",
+        "function": "provisionarUsuarioOnboarding"
+      },
+      {
+        "source": "/api/activarSuscripcionManual",
+        "function": "activarSuscripcionManual"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

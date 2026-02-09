@@ -27,50 +27,49 @@ interface NotificarCambioPasswordParams {
 }
 
 /**
+ * Helper para llamar a las funciones a través del proxy de Hosting (/api/...)
+ */
+const callApi = async (functionName: string, data: any) => {
+    try {
+        const response = await fetch(`/api/${functionName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error?.message || result.message || 'Error en el servidor');
+        }
+        return result.data;
+    } catch (error: any) {
+        console.error(`Error llamando a ${functionName}:`, error);
+        throw error;
+    }
+};
+
+/**
  * Crea el usuario en Auth y Firestore antes del pago para asegurar persistencia
  */
 export const provisionarUsuarioOnboarding = async (params: any): Promise<any> => {
-    try {
-        const functions = getFunctions();
-        const provisionar = httpsCallable(functions, 'provisionarUsuarioOnboarding');
-        const result = await provisionar(params);
-        return result.data;
-    } catch (error) {
-        console.error('Error en provisionamiento:', error);
-        throw error;
-    }
+    return callApi('provisionarUsuarioOnboarding', params);
 };
 
 /**
  * Activa la suscripción manualmente si el webhook falla o tarda
  */
 export const activarSuscripcionManual = async (params: any): Promise<any> => {
-    try {
-        const functions = getFunctions();
-        const activar = httpsCallable(functions, 'activarSuscripcionManual');
-        const result = await activar(params);
-        return result.data;
-    } catch (error) {
-        console.error('Error en activación manual:', error);
-        throw error;
-    }
+    return callApi('activarSuscripcionManual', params);
 };
 
 /**
  * Envía un email de bienvenida con las credenciales temporales
- * usando Cloud Functions y Resend
  */
 export const enviarEmailBienvenida = async (params: EnviarBienvenidaParams): Promise<void> => {
     try {
-        const functions = getFunctions();
-        const enviarBienvenida = httpsCallable(functions, 'enviarBienvenidaTudojang');
-
-        const result = await enviarBienvenida(params);
-        console.log('Email de bienvenida enviado:', result.data);
+        await callApi('enviarBienvenidaTudojang', params);
     } catch (error) {
         console.error('Error al enviar email de bienvenida:', error);
-        // No lanzamos el error para no bloquear el flujo si falla el email
-        // El usuario ya tiene la contraseña en pantalla
     }
 };
 
@@ -79,11 +78,7 @@ export const enviarEmailBienvenida = async (params: EnviarBienvenidaParams): Pro
  */
 export const enviarEmailConfirmacionPago = async (params: EnviarConfirmacionPagoParams): Promise<void> => {
     try {
-        const functions = getFunctions();
-        const enviarConfirmacion = httpsCallable(functions, 'enviarConfirmacionPago');
-
-        const result = await enviarConfirmacion(params);
-        console.log('Email de confirmación de pago enviado:', result.data);
+        await callApi('enviarConfirmacionPago', params);
     } catch (error) {
         console.error('Error al enviar confirmación de pago:', error);
     }
@@ -93,16 +88,7 @@ export const enviarEmailConfirmacionPago = async (params: EnviarConfirmacionPago
  * Envía un email de recuperación de contraseña con enlace de reset
  */
 export const enviarEmailRecuperacionPassword = async (params: EnviarRecuperacionPasswordParams): Promise<void> => {
-    try {
-        const functions = getFunctions();
-        const enviarRecuperacion = httpsCallable(functions, 'enviarRecuperacionPassword');
-
-        const result = await enviarRecuperacion(params);
-        console.log('Email de recuperación enviado:', result.data);
-    } catch (error) {
-        console.error('Error al enviar email de recuperación:', error);
-        throw error; // En este caso sí lanzamos el error porque el usuario necesita saber si falló
-    }
+    return callApi('enviarRecuperacionPassword', params);
 };
 
 /**
@@ -110,13 +96,8 @@ export const enviarEmailRecuperacionPassword = async (params: EnviarRecuperacion
  */
 export const notificarCambioPassword = async (params: NotificarCambioPasswordParams): Promise<void> => {
     try {
-        const functions = getFunctions();
-        const notificar = httpsCallable(functions, 'notificarCambioPassword');
-
-        const result = await notificar(params);
-        console.log('Notificación de cambio de password enviada:', result.data);
+        await callApi('notificarCambioPassword', params);
     } catch (error) {
         console.error('Error al notificar cambio de password:', error);
-        // No bloqueamos el flujo si falla la notificación
     }
 };
