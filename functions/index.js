@@ -507,7 +507,20 @@ exports.webhookWompi = onRequest(async (req, res) => {
                 }
               }
 
-              // 4. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
+              // 4. Crear perfil de usuario en Firestore (Requerido para login)
+              await admin.firestore().collection('usuarios').doc(id).set({
+                id: id,
+                email: tenantData.emailClub,
+                nombreUsuario: tenantData.nombreClub,
+                numeroIdentificacion: '0',
+                whatsapp: tenantData.telefono || '',
+                rol: 'Admin',
+                tenantId: id,
+                estadoContrato: 'Sin configurar'
+              });
+              logger.info(`Perfil Firestore creado para: ${id}`);
+
+              // 5. Enviar Email (Inline para asegurar que el server tiene acceso a credenciales)
               try {
                 await resend.emails.send({
                   from: "Tudojang Academia <info@tudojang.com>",

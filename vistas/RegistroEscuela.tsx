@@ -37,21 +37,21 @@ const RegistroEscuela: React.FC = () => {
     const nombreClub = watch('nombreClub');
     const slugCalculado = nombreClub ? generarSlug(nombreClub) : '';
 
+    // Helper robusto para obtener parámetros sin importar HashRouter
+    const getParam = (name: string) => {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.has(name)) return searchParams.get(name);
+
+        const hashParts = window.location.hash.split('?');
+        if (hashParts.length > 1) {
+            const hashParams = new URLSearchParams(hashParts[1]);
+            return hashParams.get(name);
+        }
+        return null;
+    };
+
     // Detectar retorno de Wompi
     useEffect(() => {
-        // En un HashRouter, los parámetros pueden quedar en search o en el hash
-        const getParam = (name: string) => {
-            const searchParams = new URLSearchParams(window.location.search);
-            if (searchParams.has(name)) return searchParams.get(name);
-
-            const hashParts = window.location.hash.split('?');
-            if (hashParts.length > 1) {
-                const hashParams = new URLSearchParams(hashParts[1]);
-                return hashParams.get(name);
-            }
-            return null;
-        };
-
         const wompiId = getParam('id');
         const pendingReg = localStorage.getItem('registro_pendiente');
 
@@ -87,25 +87,26 @@ const RegistroEscuela: React.FC = () => {
                 slug = `${slug}-${Math.random().toString(36).slice(-4)}`;
             }
 
-            // 1. Generar contraseña temporal segura
+            // 1. Generar contraseña temporal segura e ID único
             const passwordTemporal = Math.random().toString(36).slice(-8).toUpperCase();
+            const nuevoTenantId = `tnt-${Date.now()}`;
 
             // 2. Registrar tenant preliminar (Estado: pendiente_pago)
             await registrarNuevaEscuela({
+                tenantId: nuevoTenantId,
                 nombreClub: data.nombreClub,
                 slug: slug,
                 emailClub: data.email,
                 telefono: data.telefono,
-                passwordTemporal: passwordTemporal, // Se guarda para mostrarla tras el pago
+                passwordTemporal: passwordTemporal,
+                plan: getParam('plan') || 'starter',
                 estadoSuscripcion: 'pendiente_pago' as any
             } as any);
 
             // 3. Preparar datos para Wompi
-            // Obtener precio del plan desde URL o default
-            const params = new URLSearchParams(window.location.search);
-            const precioPlan = params.get('precio') || '50000'; // Fallback a 50mil si no hay plan
-            const montoCentavos = parseInt(precioPlan) * 100;
-            const referencia = `SUSC_${slug.toUpperCase()}_${Date.now()}`; // Formato esperado por Webhook
+            const precioParam = getParam('precio') || '50000';
+            const montoCentavos = parseInt(precioParam) * 100;
+            const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
             const moneda = 'COP';
 
             // Generar Firma de Integridad

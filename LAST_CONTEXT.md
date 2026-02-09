@@ -19,10 +19,11 @@ Completar el flujo de registro, pago y primer acceso para nuevas escuelas (SaaS 
     *   Corregida la codificación de la `redirect-url` para Wompi.
 
 ## ⚠️ Bloqueos / Problemas Pendientes
-*   **Firma de Integridad**: Wompi reportaba "Firma de integridad requerida no enviada". Se identificó que para el Web Checkout Redirect, el parámetro debe llamarse exactamente **`signature:integrity`** (con los dos puntos) cuando la cuenta tiene la integridad activa. Se aplicó este cambio.
-*   **Retorno de Wompi (HashRouter)**: Se detectó que al usar `HashRouter`, los parámetros que retorna Wompi quedaban dentro del fragmento `#`, lo que impedía que la aplicación los leyera correctamente y causaba que el usuario volviera al formulario inicial en lugar de ver el éxito. Se corrigió la lógica de detección y se limpió la URL de redirección para evitar parámetros duplicados o mal formados (ej: `?param1?param2`).
-*   **Credenciales**: Se requiere confirmar que las llaves en `constantes.ts` (Sandbox) correspondan a las del dashboard "Modo Pruebas" de la cuenta "Aliant".
-*   **Despliegue**: Se actualizó `deploy.yml` para excluir reglas de Storage inexistentes, facilitando el despliegue por GitHub Actions.
+*   **Firma de Integridad**: Resuelto. El parámetro debe ser `signature:integrity`.
+*   **Consistencia de Montos**: Resuelto. Se corrigió la lectura del parámetro `precio` desde el `HashRouter` y se asegura que el `plan` (starter/pro) se guarde correctamente en el tenant al registrarse.
+*   **Error de Login (Perfil de Usuario)**: Resuelto. El webhook ahora crea no solo el usuario en Auth, sino también su perfil en la colección `usuarios` de Firestore. Sin este perfil, el `AuthContext` del frontend rechazaba el inicio de sesión.
+*   **Consistencia de IDs**: Resuelto. El `tenantId` se genera ahora en el frontend para asegurar que coincida con el `uid` del usuario creado por el webhook.
+*   **Despliegue**: Se actualizó `deploy.yml` para excluir reglas de Storage inexistentes.
 
 ## 📝 Instrucciones para Siguiente Sesión
 1.  Verificar que el parámetro `signature` sea aceptado por Wompi con la nueva codificación.
