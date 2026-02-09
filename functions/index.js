@@ -10,152 +10,136 @@ const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
  * Cloud Function: Enviar email de bienvenida
  * v1 onCall maneja CORS automáticamente
  */
-exports.enviarBienvenidaTudojang = functions.https.onCall(async (data, context) => {
-  const { email, nombreClub, passwordTemporal, slug } = data;
+/**
+ * Cloud Function: Provisionar usuario (Crear en Auth y Firestore ANTES del pago)
+ * Esto asegura que el login funcione aunque el webhook falle.
+ */
+exports.provisionarUsuarioOnboarding = functions.https.onCall(async (data, context) => {
+  const { tenantId, email, password, nombreClub, slug, plan } = data;
 
-  if (!email || !nombreClub || !passwordTemporal) {
-    throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros requeridos');
+  if (!email || !password || !tenantId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Faltan parámetros');
   }
 
   try {
-    console.log(`Enviando bienvenida v1 a: ${email}`);
-    const result = await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [email],
-      subject: `¡Bienvenido a Tudojang, ${nombreClub}!`,
-      html: `
-        <div style="font-family: sans-serif; padding: 20px; color: #333;">
-          <h1 style="color: #0047A0;">🥋 ¡Bienvenido a Tudojang!</h1>
-          <p>Tu academia <strong>${nombreClub}</strong> está lista para empezar.</p>
-          <div style="background: #f4f4f4; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Usuario:</strong> ${email}</p>
-            <p><strong>Clave Temporal:</strong> <code>${passwordTemporal}</code></p>
-          </div>
-          <p>Puedes iniciar sesión en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
-        </div>
-      `
+    console.log(`Provisionando usuario preliminar: ${email}`);
+
+    // 1. Crear en Auth
+    let user;
+    try {
+      user = await admin.auth().createUser({
+        uid: tenantId,
+        email: email,
+        password: password,
+        displayName: nombreClub
+      });
+    } catch (e) {
+      if (e.code === 'auth/email-already-exists') {
+        user = await admin.auth().getUserByEmail(email);
+        await admin.auth().updateUser(user.uid, { password: password });
+      } else { throw e; }
+    }
+
+    // 2. Crear Perfil Firestore (Estado: Pendiente)
+    await admin.firestore().collection('usuarios').doc(user.uid).set({
+      id: user.uid,
+      email: email,
+      nombreUsuario: nombreClub,
+      rol: 'Admin',
+      tenantId: tenantId,
+      estadoContrato: 'Pendiente de Pago'
     });
-    return { success: true, id: result.id };
+
+    return { success: true, uid: user.uid };
   } catch (error) {
-    console.error("Error Resend v1:", error);
+    console.error("Error provisionando:", error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
 
 /**
- * Cloud Function: Webhook Wompi (v1)
- * URL: https://us-central1-tudojang.cloudfunctions.net/webhookWompi
+ * Cloud Function: Activar Suscripción (Llamada manualmente desde el frontend al volver de Wompi)
+ * Doble seguridad por si el webhook falla.
  */
-exports.webhookWompi = functions.https.onRequest(async (req, res) => {
-  const evento = req.body;
-  console.log("Evento Wompi recibido v1:", JSON.stringify(evento));
+exports.activarSuscripcionManual = functions.https.onCall(async (data, context) => {
+  const { tenantId, email } = data;
 
-  if (evento.event === 'transaction.updated') {
-    const transaction = evento.data.transaction;
-    console.log(`Transacción ${transaction.id} con estado: ${transaction.status}`);
-
-    if (transaction.status === 'APPROVED') {
-      const referencia = transaction.reference;
-      console.log(`Referencia recibida: ${referencia}`);
-
-      if (referencia && referencia.startsWith('SUSC_')) {
-        const parts = referencia.split('_');
-        const tenantId = parts[2];
-
-        try {
-          const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
-          const tenantSnap = await tenantRef.get();
-
-          if (tenantSnap.exists) {
-            const tenantData = tenantSnap.data();
-            console.log(`Procesando activación para tenant: ${tenantId}`);
-
-            // 1. Activar Tenant
-            await tenantRef.update({
-              estadoSuscripcion: 'activo',
-              fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
-            });
-
-            // 2. Crear/Actualizar Usuario Auth
-            let user;
-            try {
-              user = await admin.auth().createUser({
-                uid: tenantId,
-                email: tenantData.emailClub,
-                password: tenantData.passwordTemporal,
-                displayName: tenantData.nombreClub
-              });
-              console.log("Usuario Auth creado nuevo");
-            } catch (e) {
-              if (e.code === 'auth/email-already-exists') {
-                user = await admin.auth().getUserByEmail(tenantData.emailClub);
-                await admin.auth().updateUser(user.uid, {
-                  password: tenantData.passwordTemporal
-                });
-                console.log("Usuario Auth actualizado existente");
-              } else { throw e; }
-            }
-
-            // 3. Crear Perfil Firestore
-            await admin.firestore().collection('usuarios').doc(user.uid).set({
-              id: user.uid,
-              email: tenantData.emailClub,
-              nombreUsuario: tenantData.nombreClub,
-              rol: 'Admin',
-              tenantId: tenantId,
-              estadoContrato: 'Activo'
-            });
-
-            console.log(`Registro completado exitosamente para ${tenantData.emailClub}`);
-
-            // 4. Email de bienvenida (Backend)
-            try {
-              await resend.emails.send({
-                from: "Tudojang Academia <info@tudojang.com>",
-                to: [tenantData.emailClub],
-                subject: "🥋 Tu Academia está activada",
-                html: `
-                  <div style="font-family: sans-serif; padding: 20px;">
-                    <h1>¡Felicidades Sabonim!</h1>
-                    <p>Tu pago ha sido procesado exitosamente en modo Sandbox.</p>
-                    <p><strong>Academia:</strong> ${tenantData.nombreClub}</p>
-                    <p><strong>Tu clave de acceso:</strong> ${tenantData.passwordTemporal}</p>
-                    <p>Ya puedes entrar en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
-                  </div>
-                `
-              });
-              console.log("Email enviado desde backend");
-            } catch (emailErr) {
-              console.error("Error enviando email desde backend:", emailErr);
-            }
-          } else {
-            console.warn(`Tenant con ID ${tenantId} no existe en Firestore`);
-          }
-        } catch (err) {
-          console.error("Error crítico procesando webhook:", err);
-        }
-      }
-    } else {
-      console.log(`La transacción no fue aprobada (Estado: ${transaction.status})`);
-    }
-  }
-
-  res.status(200).send('Webhook Procesado');
-});
-
-// Función para probar el envío de emails manualmente
-exports.testEmailResend = functions.https.onCall(async (data, context) => {
-  const { toEmail } = data;
   try {
-    const result = await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [toEmail || "gengepardo@gmail.com"],
-      subject: "🚀 Prueba de Sistema - Tudojang",
-      html: "<h1>¡Funciona!</h1><p>Si recibes este correo, la configuración de <b>info@tudojang.com</b> y Resend es correcta.</p>"
+    const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
+    await tenantRef.update({
+      estadoSuscripcion: 'activo',
+      fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
     });
-    return { success: true, id: result.id };
+
+    const userRecord = await admin.auth().getUserByEmail(email);
+    await admin.firestore().collection('usuarios').doc(userRecord.uid).update({
+      estadoContrato: 'Activo'
+    });
+
+    return { success: true };
   } catch (error) {
-    console.error("Error en prueba de email:", error);
+    console.error("Error activación manual:", error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+});
+
+exports.enviarBienvenidaTudojang = functions.https.onCall(async (data, context) => {
+  const { email, nombreClub, passwordTemporal } = data;
+  try {
+    await resend.emails.send({
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [email],
+      subject: `🥋 ¡Bienvenido a Tudojang, ${nombreClub}!`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px;">
+          <h1 style="color: #0047A0;">🥋 ¡Acceso Activado!</h1>
+          <p>Hola Sabonim, tu academia <b>${nombreClub}</b> ya está lista.</p>
+          <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
+            <p><strong>Usuario:</strong> ${email}</p>
+            <p><strong>Clave:</strong> <code>${passwordTemporal}</code></p>
+          </div>
+          <p>Inicia sesión en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
+        </div>
+      `
+    });
+    return { success: true };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+exports.webhookWompi = functions.https.onRequest(async (req, res) => {
+  const { event, data } = req.body;
+  if (event === 'transaction.updated' && data.transaction.status === 'APPROVED') {
+    const ref = data.transaction.reference;
+    if (ref && ref.startsWith('SUSC_')) {
+      const tId = ref.split('_')[2];
+      try {
+        const tSnap = await admin.firestore().collection('tenants').doc(tId).get();
+        if (tSnap.exists) {
+          const tData = tSnap.data();
+          await admin.firestore().collection('tenants').doc(tId).update({
+            estadoSuscripcion: 'activo',
+            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
+          });
+          const uSnap = await admin.firestore().collection('usuarios').where('tenantId', '==', tId).limit(1).get();
+          if (!uSnap.empty) {
+            await uSnap.docs[0].ref.update({ estadoContrato: 'Activo' });
+          }
+          console.log("Activado via Webhook exitosamente");
+        }
+      } catch (err) { console.error(err); }
+    }
+  }
+  res.status(200).send('OK');
+});
+
+exports.testEmailResend = functions.https.onCall(async (data) => {
+  await resend.emails.send({
+    from: "Tudojang Academia <info@tudojang.com>",
+    to: [data.toEmail || "gengepardo@gmail.com"],
+    subject: "🚀 Prueba de Sistema",
+    html: "<h1>Funciona</h1>"
+  });
+  return { success: true };
 });

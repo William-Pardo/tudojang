@@ -27,6 +27,36 @@ interface NotificarCambioPasswordParams {
 }
 
 /**
+ * Crea el usuario en Auth y Firestore antes del pago para asegurar persistencia
+ */
+export const provisionarUsuarioOnboarding = async (params: any): Promise<any> => {
+    try {
+        const functions = getFunctions();
+        const provisionar = httpsCallable(functions, 'provisionarUsuarioOnboarding');
+        const result = await provisionar(params);
+        return result.data;
+    } catch (error) {
+        console.error('Error en provisionamiento:', error);
+        throw error;
+    }
+};
+
+/**
+ * Activa la suscripción manualmente si el webhook falla o tarda
+ */
+export const activarSuscripcionManual = async (params: any): Promise<any> => {
+    try {
+        const functions = getFunctions();
+        const activar = httpsCallable(functions, 'activarSuscripcionManual');
+        const result = await activar(params);
+        return result.data;
+    } catch (error) {
+        console.error('Error en activación manual:', error);
+        throw error;
+    }
+};
+
+/**
  * Envía un email de bienvenida con las credenciales temporales
  * usando Cloud Functions y Resend
  */

@@ -8,7 +8,7 @@ import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
 import { CONFIGURACION_WOMPI } from '../constantes';
-import { enviarEmailBienvenida } from '../servicios/emailService';
+import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -57,15 +57,18 @@ const RegistroEscuela: React.FC = () => {
 
         if (wompiId && pendingReg) {
             setPaso('procesando');
-            setTimeout(async () => {
+            const FinalizarActivacion = async () => {
                 const datos = JSON.parse(pendingReg);
                 setDatosTemporales(datos);
-                setPaso('exito');
-                localStorage.removeItem('registro_pendiente');
 
-                // ENVIAR EMAIL DESDE FRONTEND (Fallback)
-                // Se envía aquí para que el usuario reciba algo inmediato si el webhook tarda
                 try {
+                    // DOBLE SEGURIDAD: Activamos manualmente al volver
+                    await activarSuscripcionManual({
+                        tenantId: datos.tenantId,
+                        email: datos.email
+                    });
+
+                    // Enviamos email de bienvenida
                     await enviarEmailBienvenida({
                         email: datos.email,
                         nombreClub: datos.nombreClub,
@@ -73,11 +76,14 @@ const RegistroEscuela: React.FC = () => {
                         slug: datos.slug
                     });
                 } catch (e) {
-                    console.error("Error enviando email desde frontend:", e);
+                    console.warn("Aviso: Activación manual ya procesada o lenta:", e);
                 }
 
-                console.log('Pago detectado. Esperando confirmación del webhook...');
-            }, 2000);
+                setPaso('exito');
+                localStorage.removeItem('registro_pendiente');
+            };
+
+            setTimeout(FinalizarActivacion, 2000);
         }
     }, [window.location.search, window.location.hash]);
 
@@ -96,16 +102,14 @@ const RegistroEscuela: React.FC = () => {
             let slug = generarSlug(data.nombreClub);
             const existe = await buscarTenantPorSlug(slug);
 
-            // Si el slug ya existe, no bloqueamos, sino que le agregamos un sufijo único
             if (existe) {
                 slug = `${slug}-${Math.random().toString(36).slice(-4)}`;
             }
 
-            // 1. Generar contraseña temporal segura e ID único
             const passwordTemporal = Math.random().toString(36).slice(-8).toUpperCase();
             const nuevoTenantId = `tnt-${Date.now()}`;
 
-            // 2. Registrar tenant preliminar (Estado: pendiente_pago)
+            // PASO 1: Registrar tenant en Firestore
             await registrarNuevaEscuela({
                 tenantId: nuevoTenantId,
                 nombreClub: data.nombreClub,
@@ -117,27 +121,33 @@ const RegistroEscuela: React.FC = () => {
                 estadoSuscripcion: 'pendiente_pago' as any
             } as any);
 
-            // 3. Preparar datos para Wompi
+            // PASO 2: Provisionar Usuario en Auth (CRÍTICO - Asegura que la clave funcione)
+            await provisionarUsuarioOnboarding({
+                tenantId: nuevoTenantId,
+                email: data.email,
+                password: passwordTemporal,
+                nombreClub: data.nombreClub,
+                slug: slug
+            });
+
+            // PASO 3: Preparar datos para Wompi
             const precioParam = getParam('precio') || '50000';
             const montoCentavos = parseInt(precioParam) * 100;
             const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
             const moneda = 'COP';
 
-            // Generar Firma de Integridad
-            // Fórmula: SHA256(Referencia + MontoEnCentavos + Moneda + SecretoIntegridad)
             const cadenaConcatenada = `${referencia}${montoCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
             const firmaIntegridad = await generarFirmaIntegridad(cadenaConcatenada);
 
-            // Guardar en local storage para recuperar tras volver de Wompi
             localStorage.setItem('registro_pendiente', JSON.stringify({
+                tenantId: nuevoTenantId,
                 slug,
                 email: data.email,
                 password: passwordTemporal,
                 nombreClub: data.nombreClub
             }));
 
-            // 4. Redirigir a Wompi
-            // Limpiamos la URL de retorno para remover parámetros previos y evitar el doble "?"
+            // PASO 4: Redirigir a Wompi
             const [baseHash] = window.location.hash.split('?');
             const urlRetorno = window.location.origin + window.location.pathname + baseHash;
 
@@ -153,7 +163,7 @@ const RegistroEscuela: React.FC = () => {
 
         } catch (error) {
             console.error(error);
-            mostrarNotificacion("Error al iniciar el proceso de pago.", "error");
+            mostrarNotificacion("Error al preparar el registro. Intenta de nuevo.", "error");
             setCargando(false);
         }
     };
