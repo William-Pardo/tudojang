@@ -14,10 +14,10 @@ const LogoDinamico: React.FC<Props> = ({ className = "w-12 h-12" }) => {
     // Si el club tiene un logo configurado en el branding, lo usamos.
     if (tenant?.logoUrl) {
         return (
-            <img 
-                src={tenant.logoUrl} 
-                alt={tenant.nombreClub} 
-                className={`${className} object-contain`} 
+            <img
+                src={tenant.logoUrl}
+                alt={tenant?.nombreClub || "Logo"}
+                className={`${className} object-contain`}
             />
         );
     }

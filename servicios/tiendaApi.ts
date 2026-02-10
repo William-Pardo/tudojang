@@ -150,32 +150,42 @@ let implementosMock: Implemento[] = [
 export const obtenerImplementos = async (): Promise<Implemento[]> => {
     if (!isFirebaseConfigured) return [...implementosMock];
 
-    const snapshot = await getDocs(implementosCollection);
-    const cloudItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Implemento));
+    try {
+        const snapshot = await getDocs(implementosCollection);
+        const cloudItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Implemento));
 
-    // Verificar si los productos base existen (por ejemplo, el primero)
-    const productosBaseExisten = cloudItems.some(i => i.id === 'imp-dobok-nacional');
+        // Verificar si los productos base existen
+        const productosBaseExisten = cloudItems.some(i => i.id === 'imp-dobok-nacional');
 
-    // Auto-seeding: Si la colección está vacía O le faltan los productos base, inyectamos/actualizamos.
-    if (cloudItems.length === 0 || !productosBaseExisten) {
-        console.log("Detectado inventario incompleto o antiguo. Actualizando catálogo base...");
-        const batch = writeBatch(db);
-        implementosMock.forEach(item => {
-            const docRef = doc(implementosCollection, item.id);
-            // Usamos set con merge: true para actualizar si existe o crear si no
-            batch.set(docRef, item, { merge: true });
-        });
-        await batch.commit();
-        console.log("Catálogo base sincronizado exitosamente.");
+        // Auto-seeding: Si la colección está vacía O le faltan los productos base, inyectamos/actualizamos.
+        if (cloudItems.length === 0 || !productosBaseExisten) {
+            console.log("Detectado inventario incompleto o antiguo. Actualizando catálogo base...");
+            try {
+                const batch = writeBatch(db);
+                implementosMock.forEach(item => {
+                    const docRef = doc(implementosCollection, item.id);
+                    batch.set(docRef, item, { merge: true });
+                });
+                await batch.commit();
+                console.log("Catálogo base sincronizado exitosamente.");
+            } catch (writeError) {
+                console.error("Error al sincronizar catálogo base (posible falta de permisos):", writeError);
+                // Si falla la escritura, igual devolvemos los mocks para que el usuario vea algo
+                return [...implementosMock];
+            }
 
-        // Devolvemos la mezcla de lo que había + lo nuevo (o simplemente recargamos, pero aquí devolvemos el mock actualizado)
-        // Para asegurar consistencia inmediata en UI, devolvemos el mock combinado con lo que había que no sea del mock
-        const idsMock = new Set(implementosMock.map(i => i.id));
-        const itemsExistentesNoMock = cloudItems.filter(i => !idsMock.has(i.id));
-        return [...implementosMock, ...itemsExistentesNoMock];
+            // Devolvemos la mezcla para asegurar consistencia
+            const idsMock = new Set(implementosMock.map(i => i.id));
+            const itemsExistentesNoMock = cloudItems.filter(i => !idsMock.has(i.id));
+            return [...implementosMock, ...itemsExistentesNoMock];
+        }
+
+        return cloudItems;
+    } catch (error) {
+        console.error("Error al obtener implementos de Firebase:", error);
+        // Fallback robusto: si falla la lectura (ej. sin internet o err permisos), devolvemos el mock
+        return [...implementosMock];
     }
-
-    return cloudItems;
 };
 
 export const agregarImplemento = async (nuevo: Omit<Implemento, 'id'>): Promise<Implemento> => {
