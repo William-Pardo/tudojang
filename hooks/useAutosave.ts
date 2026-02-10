@@ -25,19 +25,20 @@ export function useAutosave<T extends object>({
   const [status, setStatus] = useState<AutosaveStatus>('idle');
   const [hasDraft, setHasDraft] = useState(false);
   const timerRef = useRef<number | null>(null);
-  
+
   // Función para guardar los datos en localStorage
   const saveData = useCallback((data: T) => {
     try {
       const dataToSave = JSON.stringify(data);
       localStorage.setItem(formKey, dataToSave);
       setStatus('saved');
+      setHasDraft(true); // Actualizar estado de borrador al guardar
     } catch (e) {
       console.error('Error al guardar borrador en localStorage:', e);
       setStatus('error');
     }
   }, [formKey]);
-  
+
   // Al montar, comprueba si existe un borrador guardado.
   useEffect(() => {
     try {
@@ -53,13 +54,12 @@ export function useAutosave<T extends object>({
   // Efecto que observa los cambios en el formulario y los guarda con debounce.
   useEffect(() => {
     const subscription = watch((value) => {
-      setStatus('saving');
-      
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-      
+
       timerRef.current = window.setTimeout(() => {
+        setStatus('saving');
         saveData(value as T);
       }, debounceMs);
     });
