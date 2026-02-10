@@ -2,7 +2,7 @@
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
 import type { Usuario } from '../tipos';
@@ -47,10 +47,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               ...userData
             } as Usuario);
           } else {
-            // Si el perfil no existe, simplemente dejamos usuario en null.
-            // No forzamos apiCerrarSesion() aquí para permitir que los flujos de login/onboarding
-            // que tienen lógica de reintento puedan funcionar sin ser saboteados.
-            setUsuario(null);
+            // FALLBACK: Buscar por email si el UID falla
+            console.log(`[AuthContext] UID ${firebaseUser.uid} no encontrado, intentando por email: ${firebaseUser.email}`);
+            const q = query(collection(db, 'usuarios'), where('email', '==', firebaseUser.email?.toLowerCase().trim()));
+            const qSnap = await getDocs(q);
+
+            if (!qSnap.empty) {
+              const userData = qSnap.docs[0].data();
+              console.log(`[AuthContext] Perfil recuperado por email query.`);
+              setUsuario({
+                id: qSnap.docs[0].id,
+                email: firebaseUser.email!,
+                ...userData
+              } as Usuario);
+            } else {
+              console.warn(`[AuthContext] No se encontró perfil para el usuario autenticado.`);
+              setUsuario(null);
+            }
           }
         } catch (e) {
           console.error("Error al obtener perfil de usuario:", e);

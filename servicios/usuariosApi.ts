@@ -15,7 +15,9 @@ import {
     getDocs,
     deleteDoc,
     updateDoc,
-    arrayUnion
+    arrayUnion,
+    query,
+    where
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Usuario } from '../tipos';
@@ -97,20 +99,24 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
             return { id: uid, ...userDocSnap.data() } as Usuario;
         }
 
-        // 2. Fallback: Intentar por Email (por si acaso el doc se creó con ID = email)
-        const emailDocSnap = await getDoc(doc(db, 'usuarios', email.toLowerCase()));
-        if (emailDocSnap.exists()) {
-            console.log(`[autenticarUsuario] Perfil encontrado por Email (fallback)`);
-            return { id: uid, ...emailDocSnap.data() } as Usuario;
+        // 2. Intentar consulta por email (Más robusto)
+        console.log(`[autenticarUsuario] Buscando por query de email: ${email}`);
+        const q = query(collection(db, 'usuarios'), where('email', '==', email.toLowerCase().trim()));
+        const qSnap = await getDocs(q);
+
+        if (!qSnap.empty) {
+            console.log(`[autenticarUsuario] Perfil encontrado por Query de Email`);
+            const userData = qSnap.docs[0].data();
+            return { id: qSnap.docs[0].id, ...userData } as Usuario;
         }
 
-        console.log(`[autenticarUsuario] Perfil no encontrado aún. Esperando...`);
+        console.log(`[autenticarUsuario] Perfil no encontrado aún. Reintentando...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
         intentos++;
     }
 
-    console.error(`[autenticarUsuario] Error final: Perfil no encontrado tras 5 intentos para UID ${uid}`);
-    throw new Error("Tu perfil se está creando o no existe. Por favor, contacta a soporte si el problema persiste.");
+    console.error(`[autenticarUsuario] Error final: Imposible encontrar perfil para ${email} (UID: ${uid})`);
+    throw new Error("Tu perfil no existe o no se ha sincronizado correctamente. Por favor, contacta a soporte técnico.");
 };
 
 export const agregarUsuario = async (datos: {
