@@ -1,24 +1,40 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { Resend } = require("resend");
+const cors = require("cors")({ origin: true });
 
 admin.initializeApp();
 
 const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
 
-const cors = require("cors")({ origin: true });
-
 /**
- * Helper para manejar CORS y errores en onRequest
+ * Helper robusto para manejar CORS y errores
  */
 const manejarRequest = (req, res, handler) => {
+  // Manejo manual de preflight para máxima compatibilidad
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
   return cors(req, res, async () => {
     try {
-      const result = await handler(req.body.data || req.body);
+      // Soportamos tanto {data: {}} (formato Firebase) como JSON plano
+      const data = req.body.data || req.body;
+      const result = await handler(data);
       res.status(200).send({ data: result });
     } catch (error) {
       console.error("Error en función:", error);
-      res.status(500).send({ error: { message: error.message, status: "INTERNAL" } });
+      res.status(error.status || 500).send({
+        error: {
+          message: error.message || "Error interno del servidor",
+          status: error.code || "INTERNAL"
+        }
+      });
     }
   });
 };
@@ -50,7 +66,8 @@ exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
       nombreUsuario: nombreClub,
       rol: 'Admin',
       tenantId: tenantId,
-      estadoContrato: 'Pendiente de Pago'
+      estadoContrato: 'Pendiente de Pago',
+      fechaCreado: admin.firestore.FieldValue.serverTimestamp()
     });
 
     return { success: true, uid: user.uid };
@@ -116,8 +133,6 @@ exports.testEmailResend = functions.https.onRequest((req, res) => {
 
 exports.webhookWompi = functions.https.onRequest(async (req, res) => {
   const { event, data } = req.body;
-  console.log("Webhook recibido:", event);
-
   if (event === 'transaction.updated' && data.transaction.status === 'APPROVED') {
     const ref = data.transaction.reference;
     if (ref && ref.startsWith('SUSC_')) {
@@ -133,7 +148,6 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
           if (!uSnap.empty) {
             await uSnap.docs[0].ref.update({ estadoContrato: 'Activo' });
           }
-          console.log("Activado via Webhook exitosamente");
         }
       } catch (err) { console.error("Error en webhook:", err); }
     }
