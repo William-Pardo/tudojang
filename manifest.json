@@ -4,13 +4,18 @@
   "description": "Módulo integral para la gestión de la escuela de TaekwondoGa Jog.",
   "icons": [
     {
-      "src": "/icon-192x192.png",
-      "type": "image/png",
+      "src": "/Logo_TuDojang.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/Logo_TuDojang.svg",
+      "type": "image/svg+xml",
       "sizes": "192x192"
     },
     {
-      "src": "/icon-512x512.png",
-      "type": "image/png",
+      "src": "/Logo_TuDojang.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512"
     }
   ],

@@ -1,101 +1,28 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0047A0" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>Taekwondo Ga Jog - Gestión</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              'tkd-blue': 'var(--color-secundario, #0047A0)', 
-              'tkd-red': 'var(--color-acento, #CD2E3A)',
-              'tkd-dark': 'var(--color-primario, #111111)',
-              'tkd-gray': '#F8F9FA',
-            },
-            borderRadius: {
-              '3xl': '1.5rem',
-              '4xl': '2rem',
-              '5xl': '2.5rem',
-              '6xl': '3rem',
-            },
-            boxShadow: {
-              'premium': '0 20px 50px rgba(0, 0, 0, 0.1)',
-              'soft': '0 10px 30px rgba(0, 0, 0, 0.05)',
-              'hardware': 'inset 0 2px 4px rgba(255, 255, 255, 0.1), 0 10px 20px rgba(0, 0, 0, 0.2)',
-            },
-            animation: {
-              'bounce-slow': 'bounce 3s infinite',
-              'fade-in': 'fadeIn 0.5s ease-out forwards',
-              'slide-in-right': 'slideInRight 0.4s ease-out forwards',
-            },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              slideInRight: {
-                '0%': { transform: 'translateX(30px)', opacity: '0' },
-                '100%': { transform: 'translateX(0)', opacity: '1' },
-              }
-            }
-          }
-        }
-      }
-    </script>
-    <script>
-      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    </script>
-        <script type="importmap">
-{
-  "imports": {
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
-    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
-    "firebase/storage": "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js",
-    "firebase/messaging": "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js",
-    "@google/genai": "https://esm.sh/@google/genai@^1.10.0",
-    "react/": "https://esm.sh/react@^19.1.0/",
-    "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
-    "vite": "https://esm.sh/vite@^7.0.5",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.7.0",
-    "framer-motion": "https://esm.sh/framer-motion@^12.23.6",
-    "@hookform/resolvers/yup": "https://esm.sh/@hookform/resolvers@3.9.0/yup/dist/yup.mjs",
-    "react-hook-form": "https://esm.sh/react-hook-form@7.52.1",
-    "yup": "https://esm.sh/yup@1.4.0",
-    "recharts": "https://esm.sh/recharts@^2.12.7",
-    "qrcode.react": "https://esm.sh/qrcode.react@^4.2.0",
-    "jspdf": "https://esm.sh/jspdf@^2.5.1",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
-    "xlsx": "https://esm.sh/xlsx@0.18.5",
-    "path": "https://esm.sh/path@^0.12.7",
-    "firebase/": "https://esm.sh/firebase@^12.9.0/",
-    "@jest/globals": "https://esm.sh/@jest/globals@^30.2.0",
-    "@testing-library/user-event": "https://esm.sh/@testing-library/user-event@^14.6.1",
-    "@testing-library/react": "https://esm.sh/@testing-library/react@^16.3.2",
-    "@testing-library/jest-dom": "https://esm.sh/@testing-library/jest-dom@^6.9.1",
-    "cypress": "https://esm.sh/cypress@^15.10.0",
-    "firebase-functions": "https://esm.sh/firebase-functions@^7.0.5",
-    "firebase-admin": "https://esm.sh/firebase-admin@^13.6.1",
-    "@hookform/resolvers/": "https://esm.sh/@hookform/resolvers@^5.2.2/"
-  }
-}
-</script>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0047A0" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Taekwondo Ga Jog - Gestión</title>
+
+  <script>
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+
   <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-tkd-gray dark:bg-tkd-dark overflow-x-hidden">
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-tkd-gray dark:bg-tkd-dark overflow-x-hidden">
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

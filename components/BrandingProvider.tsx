@@ -24,19 +24,83 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         const inicializarSaaS = async () => {
             const host = window.location.hostname;
             let slug = host.split('.')[0];
-            
-            // Detección de dominio raíz (Landing Page tudojang.com)
-            const isRoot = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
-            
-            if (isRoot && (slug === 'tudojang' || slug === 'www' || slug === 'localhost' || slug === '127')) {
+            if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
+
+            // Detección de dominio raíz o dominios de hosting por defecto
+            const isRoot = host.includes('tudojang.com') || host.includes('web.app') || host.includes('firebaseapp.com') || host === 'localhost' || host === '127.0.0.1';
+
+            // Si el slug detectado es 'tudojang' (por el dominio), lo tratamos como gajog para la landing
+            if (slug === 'tudojang') slug = 'gajog';
+
+            if (isRoot && (slug === 'gajog' || slug === 'www')) {
                 // Si es la landing, usamos la configuración de gajog como fallback visual pero marcamos OK
                 try {
                     const config = await buscarTenantPorSlug('gajog');
-                    setTenant(config);
+                    setTenant(config || {
+                        tenantId: 'escuela-gajog-001',
+                        slug: 'gajog',
+                        nombreClub: 'Taekwondo Ga Jog',
+                        nit: '900.123.456-7',
+                        representanteLegal: 'CARLOS ANDRÉS PÉREZ',
+                        ccRepresentante: '1.020.333.444',
+                        lugarFirma: 'Bogotá D.C.',
+                        duracionContratoMeses: 12,
+                        valorMensualidad: 180000,
+                        valorInscripcion: 50000,
+                        moraPorcentaje: 5,
+                        metodoPago: 'Transferencia Directa',
+                        pagoNequi: '3001234567',
+                        pagoDaviplata: '',
+                        pagoBreB: '',
+                        pagoBanco: 'Bancolombia Ahorros #123-456789-01',
+                        diasSuspension: 30,
+                        direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
+                        colorPrimario: '#FFFFFF',
+                        colorSecundario: '#0047A0',
+                        colorAcento: '#CD2E3A',
+                        emailClub: 'academia@gajog.com',
+                        estadoSuscripcion: 'activo',
+                        fechaVencimiento: '2025-12-31',
+                        plan: 'starter',
+                        limiteEstudiantes: 50,
+                        limiteUsuarios: 2,
+                        limiteSedes: 1,
+                    });
                     setEstado('ok');
                     return;
-                } catch(e) {
-                    setEstado('ok'); // Fallback silencioso para la landing
+                } catch (e) {
+                    // Fallback directo a constantes para evitar estado 'ok' con tenant null
+                    setTenant({
+                        tenantId: 'escuela-gajog-001',
+                        slug: 'gajog',
+                        nombreClub: 'Taekwondo Ga Jog',
+                        nit: '900.123.456-7',
+                        representanteLegal: 'CARLOS ANDRÉS PÉREZ',
+                        ccRepresentante: '1.020.333.444',
+                        lugarFirma: 'Bogotá D.C.',
+                        duracionContratoMeses: 12,
+                        valorMensualidad: 180000,
+                        valorInscripcion: 50000,
+                        moraPorcentaje: 5,
+                        metodoPago: 'Transferencia Directa',
+                        pagoNequi: '3001234567',
+                        pagoDaviplata: '',
+                        pagoBreB: '',
+                        pagoBanco: 'Bancolombia Ahorros #123-456789-01',
+                        diasSuspension: 30,
+                        direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
+                        colorPrimario: '#FFFFFF',
+                        colorSecundario: '#0047A0',
+                        colorAcento: '#CD2E3A',
+                        emailClub: 'academia@gajog.com',
+                        estadoSuscripcion: 'activo',
+                        fechaVencimiento: '2025-12-31',
+                        plan: 'starter',
+                        limiteEstudiantes: 50,
+                        limiteUsuarios: 2,
+                        limiteSedes: 1,
+                    });
+                    setEstado('ok');
                     return;
                 }
             }
@@ -51,10 +115,12 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                 }
 
                 // Inyectar CSS Variables
-                document.documentElement.style.setProperty('--color-primario', config.colorPrimario);
-                document.documentElement.style.setProperty('--color-secundario', config.colorSecundario);
-                document.documentElement.style.setProperty('--color-acento', config.colorAcento);
-                
+                if (config) {
+                    document.documentElement.style.setProperty('--color-primario', config.colorPrimario || '#111111');
+                    document.documentElement.style.setProperty('--color-secundario', config.colorSecundario || '#0047A0');
+                    document.documentElement.style.setProperty('--color-acento', config.colorAcento || '#CD2E3A');
+                }
+
                 const hoy = new Date();
                 const vencimiento = new Date(config.fechaVencimiento);
 
@@ -96,8 +162,8 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                             <IconoAlertaTriangulo className="w-4 h-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">Aviso del Sistema: Suscripción Vencida o Cuenta Suspendida</span>
                         </div>
-                        <button 
-                            onClick={() => setBypassDev(true)} 
+                        <button
+                            onClick={() => setBypassDev(true)}
                             className="bg-white/20 hover:bg-white/40 px-3 py-1 rounded text-[9px] font-black uppercase transition-all"
                         >
                             Omitir para Desarrollo (Debug)

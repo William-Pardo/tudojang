@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tudojang - Bienvenida</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS CDN removido para producción. Se recomienda usar estilos inline o CSS compilado para emails -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
-        
+
         body {
             font-family: 'Roboto', sans-serif;
             background-color: #f4f7f9;
@@ -71,15 +72,17 @@
         }
     </style>
 </head>
+
 <body>
 
     <div class="email-container">
         <div class="header-accent"></div>
-        
+
         <!-- LOGO OFICIAL -->
         <div class="p-10 text-center">
             <div class="mb-8">
-                <img src="https://gist.github.com/William-Pardo/87c1222a61e7e257cb576be90625d23a" alt="Tudojang" style="max-width: 180px; margin: 0 auto;">
+                <img src="https://gist.github.com/William-Pardo/87c1222a61e7e257cb576be90625d23a" alt="Tudojang"
+                    style="max-width: 180px; margin: 0 auto;">
             </div>
 
             <div class="flex justify-center items-center space-x-2 mb-6">
@@ -92,9 +95,11 @@
             <p class="text-gray-600 text-lg leading-relaxed text-left">
                 Saludos <span class="font-bold text-[#003366] italic">Sabonim {{nombre_usuario}}</span>,
             </p>
-            
+
             <p class="text-gray-600 text-lg leading-relaxed text-left mt-4">
-                Es un honor informarte que la academia <span class="text-[#cc3333] font-black uppercase">{{nombre_academia}}</span> ha sido dada de alta exitosamente en **Tudojang.com**.
+                Es un honor informarte que la academia <span
+                    class="text-[#cc3333] font-black uppercase">{{nombre_academia}}</span> ha sido dada de alta
+                exitosamente en **Tudojang.com**.
             </p>
 
             <div class="brush-stroke text-left">
@@ -103,7 +108,8 @@
 
             <!-- CUADRO DE CREDENCIALES CON ETIQUETAS -->
             <div class="credentials-box mt-8 text-left">
-                <p class="text-[10px] uppercase tracking-widest text-[#003366] font-bold mb-4">Credenciales de Acceso:</p>
+                <p class="text-[10px] uppercase tracking-widest text-[#003366] font-bold mb-4">Credenciales de Acceso:
+                </p>
                 <div class="flex justify-between mb-2">
                     <span class="text-gray-500">Usuario:</span>
                     <span class="font-bold text-[#003366]">{{email_usuario}}</span>
@@ -119,7 +125,7 @@
             <div class="mt-10">
                 <a href="https://tudojang.com" class="btn-primary">Iniciar sesión en mi Dojo</a>
             </div>
-            
+
             <p class="text-[11px] text-gray-400 mt-8 italic">
                 * Por seguridad, se le solicitará cambiar su contraseña al ingresar por primera vez.
             </p>
@@ -128,10 +134,11 @@
         <!-- FOOTER -->
         <div class="footer">
             <div class="mb-4">
-                <span class="title-font font-black italic text-lg text-white">Tudo<span class="text-[#cc3333]">jang</span></span>
+                <span class="title-font font-black italic text-lg text-white">Tudo<span
+                        class="text-[#cc3333]">jang</span></span>
             </div>
             <p class="uppercase tracking-widest text-[10px] mb-6">Software Técnico para Academias en Colombia</p>
-            
+
             <div class="flex justify-center space-x-4 mb-6">
                 <a href="#" class="text-gray-400 hover:text-white transition-colors">Diferenciales</a>
                 <span class="text-gray-700">|</span>
@@ -148,4 +155,5 @@
     </div>
 
 </body>
+
 </html>

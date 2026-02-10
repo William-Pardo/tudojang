@@ -1,13 +1,14 @@
 
 // context/DataContext.tsx
 import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
-import type { 
-    Usuario, Estudiante, Evento, Implemento, SolicitudCompra, 
+import type {
+    Usuario, Estudiante, Evento, Implemento, SolicitudCompra,
     MovimientoFinanciero, Sede, ConfiguracionNotificaciones, ConfiguracionClub,
     Programa
 } from '../tipos';
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
+import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
 // --- CONFIGURACIÓN ---
 interface ConfiguracionContextType {
@@ -100,10 +101,17 @@ interface SedesContextType {
 const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { tenant } = useTenant(); 
-    
+    const { tenant } = useTenant();
+
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
-    const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({} as any);
+    const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({
+        tenantId: tenant?.tenantId || '',
+        diaCobroMensual: 1,
+        diasAnticipoRecordatorio: 5,
+        diasGraciaSuspension: 10,
+        frecuenciaSyncHoras: 24,
+        frecuenciaQueryApiDias: 8
+    });
     const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
     const [eventos, setEventos] = useState<Evento[]>([]);
     const [implementos, setImplementos] = useState<Implemento[]>([]);
@@ -116,32 +124,61 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [error, setError] = useState<string | null>(null);
 
     const cargarTodo = useCallback(async () => {
-        if (!tenant) return;
+        if (!tenant) {
+            console.warn("[DataContext] No hay tenant configurado, abortando carga.");
+            return;
+        }
+
+        console.log("[DataContext] Iniciando sincronización para:", tenant.nombreClub, `(ID: ${tenant.tenantId})`);
         setCargando(true);
+        setError(null);
+
+        // Mecanismo de seguridad: Si la sincronización tarda más de 8 segundos, cancelamos para no colgar la UI
+        const syncTimeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout de sincronización")), 8000)
+        );
+
         try {
-            const [u, cn, s, e, ev, imp, sc, m, pr] = await Promise.all([
-                api.obtenerUsuarios(),
-                api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                api.obtenerSedes(),
-                api.obtenerEstudiantes(),
-                api.obtenerEventos(),
-                api.obtenerImplementos(),
-                api.obtenerSolicitudesCompra(),
-                api.obtenerMovimientos(),
-                api.obtenerProgramas()
+            const results = await Promise.race([
+                Promise.allSettled([
+                    api.obtenerUsuarios(),
+                    api.obtenerConfiguracionNotificaciones(tenant.tenantId),
+                    api.obtenerSedes(),
+                    api.obtenerEstudiantes(),
+                    api.obtenerEventos(),
+                    api.obtenerImplementos(),
+                    api.obtenerSolicitudesCompra(),
+                    api.obtenerMovimientos(),
+                    api.obtenerProgramas()
+                ]),
+                syncTimeout
             ]);
-            setUsuarios(u);
-            setConfigNotificaciones(cn);
-            setSedes(s);
-            setEstudiantes(e);
-            setEventos(ev);
-            setImplementos(imp);
-            setSolicitudesCompra(sc);
-            setMovimientos(m);
-            setProgramas(pr);
+
+            if (Array.isArray(results)) {
+                const values = results.map((res: any, i) => {
+                    if (res.status === 'fulfilled') return res.value;
+                    console.error(`[DataContext] Error en API index ${i}:`, res.reason);
+                    return null;
+                });
+
+                const [u, cn, s, e, ev, imp, sc, m, pr] = values;
+
+                if (u) setUsuarios(u as Usuario[]);
+                if (cn) setConfigNotificaciones(cn as ConfiguracionNotificaciones);
+                if (s) setSedes(s as Sede[]);
+                if (e) setEstudiantes(e as Estudiante[]);
+                if (ev) setEventos(ev as Evento[]);
+                if (imp) setImplementos(imp as Implemento[]);
+                if (sc) setSolicitudesCompra(sc as SolicitudCompra[]);
+                if (m) setMovimientos(m as MovimientoFinanciero[]);
+                if (pr) setProgramas(pr as Programa[]);
+            }
+
         } catch (err) {
-            setError("Error al sincronizar datos de la academia.");
+            console.error("[DataContext] Error o Timeout en sincronización:", err);
+            setError("La sincronización tardó demasiado. Es posible que existan bloqueos de red o de base de datos.");
         } finally {
+            console.log("[DataContext] Sincronización finalizada satisfactoriamente o por timeout.");
             setCargando(false);
         }
     }, [tenant]);
@@ -152,42 +189,42 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return (
         <ConfiguracionContext.Provider value={{
-            usuarios, configNotificaciones, configClub: tenant!, cargando, error, 
+            usuarios, configNotificaciones, configClub: tenant || CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub, cargando, error,
             guardarConfiguraciones: async (cn, cc) => {
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
             },
-            agregarUsuario: async (d) => { d.tenantId = tenant!.tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); return u; },
+            agregarUsuario: async (d) => { d.tenantId = (tenant || CONFIGURACION_CLUB_POR_DEFECTO).tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); return u; },
             actualizarUsuario: api.actualizarUsuario,
             eliminarUsuario: api.eliminarUsuario,
             cargarConfiguracion: cargarTodo
         }}>
             <ProgramasContext.Provider value={{
-                programas, cargando, error, 
+                programas, cargando, error,
                 cargarProgramas: cargarTodo,
-                agregarPrograma: async (p) => { const res = await api.agregarPrograma({...p, tenantId: tenant!.tenantId}); setProgramas(prev => [...prev, res]); return res; },
+                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: tenant!.tenantId }); setProgramas(prev => [...prev, res]); return res; },
                 actualizarPrograma: async (p) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
-                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({...s, tenantId: tenant!.tenantId}); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
-                    <EstudiantesContext.Provider value={{ 
-                        estudiantes, cargando, error, cargarEstudiantes: cargarTodo, 
-                        agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false }); setEstudiantes(prev => [...prev, res]); return res; }, 
-                        actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; }, 
-                        eliminarEstudiante: api.eliminarEstudiante 
+                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({ ...s, tenantId: tenant!.tenantId }); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
+                    <EstudiantesContext.Provider value={{
+                        estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
+                        agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false }); setEstudiantes(prev => [...prev, res]); return res; },
+                        actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; },
+                        eliminarEstudiante: api.eliminarEstudiante
                     }}>
-                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({...e, tenantId: tenant!.tenantId}); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
-                            <TiendaContext.Provider value={{ 
-                                implementos, solicitudesCompra, cargando, error, 
-                                cargarDatosTienda: cargarTodo, 
-                                registrarCompra: api.registrarCompra, 
+                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
+                            <TiendaContext.Provider value={{
+                                implementos, solicitudesCompra, cargando, error,
+                                cargarDatosTienda: cargarTodo,
+                                registrarCompra: api.registrarCompra,
                                 gestionarSolicitudCompra: api.gestionarSolicitudCompra,
                                 agregarImplemento: async (i) => { const res = await api.agregarImplemento(i); setImplementos(p => [...p, res]); return res; },
                                 actualizarImplemento: async (i) => { const res = await api.actualizarImplemento(i); setImplementos(p => p.map(item => item.id === i.id ? res : item)); return res; },
                                 eliminarImplemento: async (id) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
                             }}>
-                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: cargarTodo, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({...m, tenantId: tenant!.tenantId}); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
+                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: cargarTodo, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId }); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
                                     {children}
                                 </FinanzasContext.Provider>
                             </TiendaContext.Provider>

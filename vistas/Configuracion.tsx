@@ -245,7 +245,32 @@ const VistaConfiguracion: React.FC = () => {
         }
     };
 
-    if (cargando || !localConfigClub) return <div className="h-screen flex items-center justify-center bg-tkd-dark/5"><Loader texto="Configurando Dojang..." /></div>;
+    // Modificado: Mejoramos la resiliencia de carga y el feedback visual
+    if (!localConfigClub) {
+        return (
+            <div className="h-screen flex flex-col items-center justify-center bg-tkd-dark/5 gap-6 animate-pulse p-10 text-center">
+                <Loader texto="Configurando Dojang..." />
+                {(!cargando || error) && (
+                    <div className="space-y-4 max-w-sm animate-fade-in">
+                        {error && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl mb-4">
+                                <p className="text-red-600 dark:text-red-400 text-xs font-black uppercase tracking-tight">{error}</p>
+                            </div>
+                        )}
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
+                            Si la carga se detiene, es posible que haya un problema con la conexión a la base de datos o el tenant no se haya sincronizado correctamente.
+                        </p>
+                        <button
+                            onClick={() => cargarConfiguracion()}
+                            className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                        >
+                            Forzar Reintento
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner";
 

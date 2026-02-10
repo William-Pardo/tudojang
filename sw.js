@@ -2,7 +2,7 @@
 // Este archivo es el Service Worker para la Progressive Web App (PWA).
 // Se encarga de gestionar el caché para permitir el funcionamiento offline.
 
-const CACHE_NAME = 'taekwondogajog-gestion-cache-v1';
+const CACHE_NAME = 'taekwondogajog-gestion-cache-v2';
 
 // Lista de los recursos fundamentales de la aplicación (el "app shell").
 const APP_SHELL_URLS = [
@@ -59,7 +59,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') {
     return;
   }
-  
+
   // Estrategia: "Cache First, falling back to Network" (Primero caché, si no, red).
   // Es ideal para los recursos estáticos del App Shell (CSS, JS, imágenes).
   event.respondWith(

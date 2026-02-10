@@ -190,7 +190,15 @@ export const obtenerImplementos = async (): Promise<Implemento[]> => {
         }
 
         console.log(`[tiendaApi] Retornando ${cloudItems.length} productos de Firestore`);
-        return cloudItems;
+
+        // Asegurar que los artículos del prompt se incluyan si no están en Firestore (Basado en requerimiento de usuario)
+        const combined = [...cloudItems];
+        implementosMock.forEach(mockItem => {
+            if (!combined.some(i => i.id === mockItem.id)) {
+                combined.push(mockItem);
+            }
+        });
+        return combined;
     } catch (error) {
         console.error("[tiendaApi] Error al obtener implementos de Firebase:", error);
         console.log("[tiendaApi] Usando fallback completo de mocks");

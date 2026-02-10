@@ -21,13 +21,32 @@ export const useGestionConfiguracion = () => {
     const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState(false);
     const [usuarioAEliminar, setUsuarioAEliminar] = useState<Usuario | null>(null);
 
-    const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(configNotificaciones);
-    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub);
+    // Forzar inicialización con valores por defecto si el contexto aún no los tiene (evita estancamiento en Loader)
+    const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(configNotificaciones || {});
+    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub || null);
+
+    console.log("[useGestionConfiguracion] Render:", {
+        hasLocal: !!localConfigClub,
+        hasContext: !!configClub,
+        cargando,
+        tenantId: usuarioActual?.tenantId
+    });
 
     useEffect(() => {
-        if (configNotificaciones) setLocalConfigNotificaciones(configNotificaciones);
-        if (configClub) setLocalConfigClub(configClub);
-    }, [configNotificaciones, configClub]);
+        if (configNotificaciones && Object.keys(configNotificaciones).length > 0) {
+            setLocalConfigNotificaciones(configNotificaciones);
+        }
+
+        // Sincronización proactiva: si el contexto nos da el club, lo tomamos.
+        // Si no lo tenemos pero tenemos el usuario con su tenantId, intentamos forzar carga.
+        if (configClub) {
+            console.log("[useGestionConfiguracion] Sincronizando configClub desde contexto");
+            setLocalConfigClub(configClub);
+        } else if (usuarioActual?.tenantId && !cargando) {
+            console.log("[useGestionConfiguracion] Intentando cargar configuración forzada para:", usuarioActual.tenantId);
+            cargarConfiguracion();
+        }
+    }, [configNotificaciones, configClub, usuarioActual?.tenantId, cargando, cargarConfiguracion]);
 
 
     const usuariosFiltrados = useMemo(() => {
