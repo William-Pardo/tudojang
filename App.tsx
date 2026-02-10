@@ -27,6 +27,8 @@ import Vista404 from './vistas/404';
 import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
+import LicenciaSuspendida from './vistas/LicenciaSuspendida';
+import { useEstadoLicencia } from './hooks/useEstadoLicencia';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
@@ -110,6 +112,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
 const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
     const { puntos, heatmapActivo } = useAnalytics();
+    const { suspendido, cargando: cargandoLicencia } = useEstadoLicencia();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +128,13 @@ const AppLayout: React.FC = () => {
     }, [theme]);
 
     if (!usuario) return null;
+
+    // Si la licencia está suspendida, bloqueamos toda la interfaz con la vista de suspension
+    // EXCEPTUANDO que sea el SuperAdmin (Aliant) quien esté navegando.
+    const esSuperAdmin = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
+    if (suspendido && !esSuperAdmin && !cargandoLicencia) {
+        return <LicenciaSuspendida />;
+    }
 
     return (
         <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950">
