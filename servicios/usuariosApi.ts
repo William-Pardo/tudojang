@@ -81,22 +81,36 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
     }
 
     const auth = getAuth();
+    console.log(`[autenticarUsuario] Intentando signIn para: ${email}`);
     const userCredential = await signInWithEmailAndPassword(auth, email, contrasena);
+    const uid = userCredential.user.uid;
 
-    // Lógica de reintento para esperar al webhook si es necesario
+    // Lógica de reintento para esperar al usuario doc en Firestore
     let intentos = 0;
     while (intentos < 5) {
-        const userDocSnap = await getDoc(doc(db, 'usuarios', userCredential.user.uid));
+        console.log(`[autenticarUsuario] Buscando perfil en Firestore (uid: ${uid}, intento ${intentos + 1}/5)`);
+
+        // 1. Intentar por UID (estándar)
+        const userDocSnap = await getDoc(doc(db, 'usuarios', uid));
         if (userDocSnap.exists()) {
-            return { id: userCredential.user.uid, ...userDocSnap.data() } as Usuario;
+            console.log(`[autenticarUsuario] Perfil encontrado por UID`);
+            return { id: uid, ...userDocSnap.data() } as Usuario;
         }
 
-        console.log(`Perfil no encontrado (intento ${intentos + 1}/5). Esperando al servidor...`);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Esperar 2 segundos
+        // 2. Fallback: Intentar por Email (por si acaso el doc se creó con ID = email)
+        const emailDocSnap = await getDoc(doc(db, 'usuarios', email.toLowerCase()));
+        if (emailDocSnap.exists()) {
+            console.log(`[autenticarUsuario] Perfil encontrado por Email (fallback)`);
+            return { id: uid, ...emailDocSnap.data() } as Usuario;
+        }
+
+        console.log(`[autenticarUsuario] Perfil no encontrado aún. Esperando...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
         intentos++;
     }
 
-    throw new Error("Tu perfil se está creando. Por favor, intenta de nuevo en 10 segundos.");
+    console.error(`[autenticarUsuario] Error final: Perfil no encontrado tras 5 intentos para UID ${uid}`);
+    throw new Error("Tu perfil se está creando o no existe. Por favor, contacta a soporte si el problema persiste.");
 };
 
 export const agregarUsuario = async (datos: {

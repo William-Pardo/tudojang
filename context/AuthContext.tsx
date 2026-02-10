@@ -28,10 +28,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Si no hay configuración de Firebase, no hacer nada con onAuthStateChanged
     if (!isFirebaseConfigured) {
-        setCargandoSesion(false);
-        return;
+      setCargandoSesion(false);
+      return;
     }
-      
+
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -41,21 +41,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
-            // Added comment above fix: Spread userData to include all required properties (numeroIdentificacion, whatsapp, tenantId) in Usuario state.
             setUsuario({
               id: firebaseUser.uid,
               email: firebaseUser.email!,
               ...userData
             } as Usuario);
           } else {
-            // El perfil de usuario no existe, cerrar sesión
-            await apiCerrarSesion();
+            // Si el perfil no existe, simplemente dejamos usuario en null.
+            // No forzamos apiCerrarSesion() aquí para permitir que los flujos de login/onboarding
+            // que tienen lógica de reintento puedan funcionar sin ser saboteados.
             setUsuario(null);
           }
         } catch (e) {
-            console.error("Error al obtener perfil de usuario:", e);
-            await apiCerrarSesion();
-            setUsuario(null);
+          console.error("Error al obtener perfil de usuario:", e);
+          setUsuario(null);
         }
       } else {
         // Usuario ha cerrado sesión
