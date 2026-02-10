@@ -1,11 +1,11 @@
 
 // servicios/tiendaApi.ts
-import { 
-    collection, 
-    getDocs, 
-    doc, 
-    updateDoc, 
-    addDoc, 
+import {
+    collection,
+    getDocs,
+    doc,
+    updateDoc,
+    addDoc,
     getDoc,
     deleteDoc,
     writeBatch,
@@ -20,116 +20,153 @@ import { obtenerEstudiantePorId, obtenerEstudiantePorNumIdentificacion } from '.
 const implementosCollection = collection(db, 'implementos');
 const solicitudesCompraCollection = collection(db, 'solicitudesCompra');
 
-// Memoria local con los 11 artículos maestros diseñados
+// Memoria local con los artículos maestros del usuario
 let implementosMock: Implemento[] = [
     {
-        id: 'imp-001',
-        nombre: 'Dobok Oficial de Entrenamiento',
-        descripcion: 'Uniforme de alta resistencia 65/35 algodón-poliéster. Corte coreano original.',
-        imagenUrl: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=500&auto=format&fit=crop',
+        id: 'imp-dobok-nacional',
+        nombre: 'Dobok (Uniforme) Nacional',
+        descripcion: 'Uniforme oficial para la práctica de Taekwondo. Ligero y resistente, ideal para entrenamiento y competencia.',
+        imagenUrl: '/imagenes/dobok-nacional.png',
         categoria: CategoriaImplemento.Uniformes,
         variaciones: [
-            { id: 'v1', descripcion: 'Talla 000-1', precio: 120000 },
-            { id: 'v2', descripcion: 'Talla 2-4', precio: 135000 },
-            { id: 'v3', descripcion: 'Talla 5-7', precio: 150000 },
+            { id: 'v-1759344508378-0', descripcion: 'Talla 0 (120 cm)', precio: 120000 },
+            { id: 'v-1759344508378-1', descripcion: 'Talla 1 (130 cm)', precio: 130000 },
+            { id: 'v-1759344508378-2', descripcion: 'Talla 2 (140 cm)', precio: 140000 },
+            { id: 'v-1759344508378-3', descripcion: 'Talla 3 (150 cm)', precio: 150000 },
+            { id: 'v-1759344508378-4', descripcion: 'Talla 4 (160 cm)', precio: 160000 },
         ],
     },
     {
-        id: 'imp-002',
-        nombre: 'Pechera Reversible (WT)',
-        descripcion: 'Protector de torso oficial Azul/Rojo con absorción de impacto de alta densidad.',
-        imagenUrl: 'https://images.unsplash.com/photo-1517438476312-10d79c67750d?q=80&w=500&auto=format&fit=crop',
+        id: 'imp-braceras',
+        nombre: 'Braceras (Protector de Antebrazo)',
+        descripcion: 'Protección esencial para los antebrazos durante los bloqueos y el combate.',
+        imagenUrl: '/imagenes/braceras.png',
+        categoria: CategoriaImplemento.ProteccionExtremidades,
+        variaciones: [
+            { id: 'v-1759344510212-0', descripcion: 'Talla S', precio: 50000 },
+            { id: 'v-1759344510212-1', descripcion: 'Talla M', precio: 55000 },
+            { id: 'v-1759344510212-2', descripcion: 'Talla L', precio: 60000 },
+        ],
+    },
+    {
+        id: 'imp-dobok-importado',
+        nombre: 'Dobok (Uniforme) Importado',
+        descripcion: 'Uniforme de alta gama para competencia, con tecnología de ventilación y tejido ultraligero.',
+        imagenUrl: '/imagenes/dobok-importado.png',
+        categoria: CategoriaImplemento.Uniformes,
+        variaciones: [
+            { id: 'v-1759344510979-0', descripcion: 'Talla 2 (140 cm)', precio: 250000 },
+            { id: 'v-1759344510979-1', descripcion: 'Talla 3 (150 cm)', precio: 270000 },
+            { id: 'v-1759344510979-2', descripcion: 'Talla 4 (160 cm)', precio: 290000 },
+        ],
+    },
+    {
+        id: 'imp-canilleras',
+        nombre: 'Canilleras (Protector Tibial)',
+        descripcion: 'Protección rígida para las tibias, vital para evitar lesiones en combate.',
+        imagenUrl: '/imagenes/canilleras.png',
+        categoria: CategoriaImplemento.ProteccionExtremidades,
+        variaciones: [
+            { id: 'v-1759344510445-0', descripcion: 'Talla S', precio: 55000 },
+            { id: 'v-1759344510445-1', descripcion: 'Talla M', precio: 60000 },
+            { id: 'v-1759344510445-2', descripcion: 'Talla L', precio: 65000 },
+        ],
+    },
+    {
+        id: 'imp-pechera',
+        nombre: 'Pechera (Hogu) Reversible',
+        descripcion: 'Protector de torso reversible (azul/rojo) aprobado para competencia. Absorbe impactos y ofrece gran movilidad.',
+        imagenUrl: '/imagenes/pechera.png',
         categoria: CategoriaImplemento.ProteccionTorso,
         variaciones: [
-            { id: 'v4', descripcion: 'Talla 1 (Infantil)', precio: 145000 },
-            { id: 'v5', descripcion: 'Talla 2-3', precio: 160000 },
+            { id: 'v-1759344509497-0', descripcion: 'Talla 1', precio: 95000 },
+            { id: 'v-1759344509497-1', descripcion: 'Talla 2', precio: 105000 },
+            { id: 'v-1759344509497-2', descripcion: 'Talla 3', precio: 115000 },
+            { id: 'v-1759344509497-3', descripcion: 'Talla 4', precio: 125000 },
         ],
     },
     {
-        id: 'imp-003',
-        nombre: 'Casco de Competición',
-        descripcion: 'Diseño ergonómico con ventilación superior. Protección auditiva reforzada.',
-        imagenUrl: 'https://images.unsplash.com/photo-1599058917233-57c0e6843640?q=80&w=500&auto=format&fit=crop',
+        id: 'imp-empeineras',
+        nombre: 'Empeineras (Protector de Pie)',
+        descripcion: 'Protector de empeine con sensores electrónicos o sin ellos, para entrenamiento y competencia.',
+        imagenUrl: '/imagenes/empeineras.png',
+        categoria: CategoriaImplemento.ProteccionExtremidades,
+        variaciones: [
+            { id: 'v-1759344510075-0', descripcion: 'Talla S', precio: 60000 },
+            { id: 'v-1759344510075-1', descripcion: 'Talla M', precio: 65000 },
+            { id: 'v-1759344510075-2', descripcion: 'Talla L', precio: 70000 },
+        ],
+    },
+    {
+        id: 'imp-copa-masculina',
+        nombre: 'Copa Masculina (Protector inguinal)',
+        descripcion: 'Protector inguinal para hombres, de uso obligatorio en combate.',
+        imagenUrl: '/imagenes/copa-masculina.png',
+        categoria: CategoriaImplemento.Accesorios,
+        variaciones: [
+            { id: 'v-1759344510633-0', descripcion: 'Talla M', precio: 40000 },
+            { id: 'v-1759344510633-1', descripcion: 'Talla L', precio: 45000 },
+        ],
+    },
+    {
+        id: 'imp-casco',
+        nombre: 'Casco de Combate',
+        descripcion: 'Casco de protección para la cabeza, esencial para el combate seguro. Disponible con y sin careta protectora facial.',
+        imagenUrl: '/imagenes/casco.png',
         categoria: CategoriaImplemento.ProteccionCabeza,
         variaciones: [
-            { id: 'v6', descripcion: 'Talla S/M', precio: 95000 },
-            { id: 'v7', descripcion: 'Talla L/XL', precio: 95000 },
+            { id: 'v-1759344509688-0', descripcion: 'Talla S - Sin careta', precio: 80000 },
+            { id: 'v-1759344509689-1', descripcion: 'Talla M - Sin careta', precio: 85000 },
+            { id: 'v-1759344509689-2', descripcion: 'Talla L - Sin careta', precio: 90000 },
+            { id: 'v-1759344509689-3', descripcion: 'Talla M - Con careta', precio: 130000 },
+            { id: 'v-1759344509689-4', descripcion: 'Talla L - Con careta', precio: 140000 },
         ],
     },
     {
-        id: 'imp-004',
-        nombre: 'Protectores de Antebrazo',
-        descripcion: 'Par de protectores con ajuste de velcro elástico. Recubrimiento en vinilo.',
-        imagenUrl: '',
+        id: 'imp-guantines',
+        nombre: 'Guantines de Combate',
+        descripcion: 'Guantes de protección para manos y nudillos, obligatorios para la competencia.',
+        imagenUrl: '/imagenes/guantines.png',
         categoria: CategoriaImplemento.ProteccionExtremidades,
-        variaciones: [{ id: 'v8', descripcion: 'Par Único', precio: 45000 }],
+        variaciones: [
+            { id: 'v-1759344509883-0', descripcion: 'Talla S', precio: 45000 },
+            { id: 'v-1759344509883-1', descripcion: 'Talla M', precio: 50000 },
+            { id: 'v-1759344509883-2', descripcion: 'Talla L', precio: 55000 },
+        ],
     },
     {
-        id: 'imp-005',
-        nombre: 'Protectores de Espinilla',
-        descripcion: 'Protección tibial anatómica. Evita lesiones en combate y práctica de pateo.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.ProteccionExtremidades,
-        variaciones: [{ id: 'v9', descripcion: 'Par Único', precio: 48000 }],
-    },
-    {
-        id: 'imp-006',
-        nombre: 'Zapatillas Técnicas',
-        descripcion: 'Calzado especial para tatami. Suela ultra-flexible con punto de giro.',
-        imagenUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=500&auto=format&fit=crop',
+        id: 'imp-copa-femenina',
+        nombre: 'Copa Femenina (Protector inguinal)',
+        descripcion: 'Protector inguinal para mujeres, de uso obligatorio en combate.',
+        imagenUrl: '/imagenes/copa-femenina.png',
         categoria: CategoriaImplemento.Accesorios,
         variaciones: [
-            { id: 'v10', descripcion: 'Talla 34-37', precio: 185000 },
-            { id: 'v11', descripcion: 'Talla 38-42', precio: 195000 },
+            { id: 'v-1759344510807-0', descripcion: 'Talla S', precio: 40000 },
+            { id: 'v-1759344510807-1', descripcion: 'Talla M', precio: 45000 },
         ],
-    },
-    {
-        id: 'imp-007',
-        nombre: 'Guantines de Combate',
-        descripcion: 'Protección de manos oficial. Diseño de dedos libres para agarre técnico.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.ProteccionExtremidades,
-        variaciones: [{ id: 'v12', descripcion: 'Par M/L', precio: 55000 }],
-    },
-    {
-        id: 'imp-008',
-        nombre: 'Protector Inguinal',
-        descripcion: 'Copa de protección obligatoria para combate. Ajuste cómodo bajo el dobok.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.ProteccionTorso,
-        variaciones: [{ id: 'v13', descripcion: 'Talla Única', precio: 38000 }],
-    },
-    {
-        id: 'imp-009',
-        nombre: 'Mochila Deportiva Club',
-        descripcion: 'Maletín de gran capacidad para cargar todo el equipo de combate.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.Accesorios,
-        variaciones: [{ id: 'v14', descripcion: 'Modelo Pro', precio: 85000 }],
-    },
-    {
-        id: 'imp-010',
-        nombre: 'Paleta de Pateo Simple',
-        descripcion: 'Implemento para práctica de velocidad y precisión en patadas.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.Accesorios,
-        variaciones: [{ id: 'v15', descripcion: 'Unidad', precio: 40000 }],
-    },
-    {
-        id: 'imp-011',
-        nombre: 'Foco de Pateo Doble',
-        descripcion: 'Paleta doble para sonido de impacto y práctica de combinaciones.',
-        imagenUrl: '',
-        categoria: CategoriaImplemento.Accesorios,
-        variaciones: [{ id: 'v16', descripcion: 'Unidad Premium', precio: 65000 }],
     }
 ];
 
 export const obtenerImplementos = async (): Promise<Implemento[]> => {
     if (!isFirebaseConfigured) return [...implementosMock];
+
     const snapshot = await getDocs(implementosCollection);
     const cloudItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Implemento));
-    return cloudItems.length > 0 ? cloudItems : [...implementosMock];
+
+    // Auto-seeding: Si la colección está vacía en producción, inyectamos los defaults.
+    if (cloudItems.length === 0) {
+        console.log("Iniciando inyección de inventario base...");
+        const batch = writeBatch(db);
+        implementosMock.forEach(item => {
+            const docRef = doc(implementosCollection, item.id);
+            batch.set(docRef, item);
+        });
+        await batch.commit();
+        console.log("Inventario base activado exitosamente.");
+        return [...implementosMock];
+    }
+
+    return cloudItems;
 };
 
 export const agregarImplemento = async (nuevo: Omit<Implemento, 'id'>): Promise<Implemento> => {
