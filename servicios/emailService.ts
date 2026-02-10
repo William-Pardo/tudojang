@@ -30,18 +30,15 @@ interface NotificarCambioPasswordParams {
  * Helper para llamar a las funciones directamente (Evita problemas de Hosting/CORS)
  */
 const callApi = async (functionName: string, data: any) => {
-    // Detectar si estamos en local o producción
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    // Siempre intentamos usar el proxy /api para consistencia y evitar CORS
-    const url = isLocal
-        ? `https://us-central1-tudojang.cloudfunctions.net/${functionName}`
-        : `/api/${functionName}`;
+    // Usamos la URL directa de la función para mayor fiabilidad
+    const baseUrl = `https://us-central1-tudojang.cloudfunctions.net`;
+    const url = `${baseUrl}/${functionName}`;
 
     try {
-        console.log(`Llamando a API: ${url}`);
+        console.log(`Llamando a función: ${url}`);
         const response = await fetch(url, {
             method: 'POST',
+            mode: 'cors', // Aseguramos modo CORS
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
@@ -49,33 +46,22 @@ const callApi = async (functionName: string, data: any) => {
             body: JSON.stringify({ data })
         });
 
-        // Manejo de respuesta no-JSON (ej: errores 404/403 de GFE)
+        // Intentamos leer como texto primero por si el servidor devuelve algo no-JSON
         const text = await response.text();
         let result;
         try {
             result = JSON.parse(text);
         } catch (e) {
-            console.error("Respuesta inválida:", text);
-            if (response.status === 403) {
-                throw new Error("Permiso denegado por el servidor (403). Contacta a soporte.");
-            }
-            if (response.status === 404) {
-                throw new Error("Servicio no encontrado (404). Posible error de despliegue.");
-            }
-            throw new Error(`Error de comunicación: ${response.status}`);
+            console.error("Respuesta no es JSON:", text);
+            throw new Error(`Respuesta inválida del servidor: ${text.substring(0, 100)}`);
         }
 
         if (!response.ok) {
-            const errorMsg = result.error?.message || result.message || `Error ${response.status}`;
-            throw new Error(errorMsg);
+            throw new Error(result.error?.message || result.message || `Error ${response.status}: ${text}`);
         }
-
         return result.data;
     } catch (error: any) {
         console.error(`Error crítico en ${functionName}:`, error);
-        if (error.message === 'Failed to fetch') {
-            throw new Error("No se pudo conectar con el servidor. Verifica tu conexión.");
-        }
         throw error;
     }
 };

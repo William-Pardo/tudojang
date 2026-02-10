@@ -24,17 +24,11 @@ const generarSlug = (nombre: string) => {
         .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y final
 };
 
-import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
-
 const RegistroEscuela: React.FC = () => {
-    const [paso, setPaso] = useState<'formulario' | 'procesando' | 'preparando' | 'exito'>('formulario');
+    const [paso, setPaso] = useState<'formulario' | 'procesando' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
     const [datosTemporales, setDatosTemporales] = useState<any>(null); // Datos tras volver de Wompi
     const [passwordCopiada, setPasswordCopiada] = useState(false); // Control para habilitar login
-    const [progresoCarga, setProgresoCarga] = useState(0);
-    const [mensajeCarga, setMensajeCarga] = useState('Meditando y preparando el Dojang...');
-
     const { mostrarNotificacion } = useNotificacion();
     const { register, handleSubmit, formState: { errors }, watch } = useForm({
         resolver: yupResolver(schema)
@@ -55,29 +49,6 @@ const RegistroEscuela: React.FC = () => {
         }
         return null;
     };
-
-    // Lógica de mensajes de carga
-    useEffect(() => {
-        if (paso === 'preparando') {
-            const interval = setInterval(() => {
-                setProgresoCarga(prev => {
-                    if (prev >= 100) {
-                        clearInterval(interval);
-                        setPaso('exito');
-                        return 100;
-                    }
-                    return prev + 1;
-                });
-            }, 100); // 100ms * 100 = 10 segundos
-
-            const totalTime = 10000;
-            setTimeout(() => setMensajeCarga('Ajustando cinturones y registros maestros...'), totalTime * 0.3);
-            setTimeout(() => setMensajeCarga('Sincronizando con los servidores olímpicos...'), totalTime * 0.6);
-            setTimeout(() => setMensajeCarga('¡Listo para el combate! (Kyeong-rye)'), totalTime * 0.9);
-
-            return () => clearInterval(interval);
-        }
-    }, [paso]);
 
     // Detectar retorno de Wompi
     useEffect(() => {
@@ -108,8 +79,7 @@ const RegistroEscuela: React.FC = () => {
                     console.warn("Aviso: Activación manual ya procesada o lenta:", e);
                 }
 
-                // En lugar de ir directo a exito, vamos a la fase de preparación
-                setPaso('preparando');
+                setPaso('exito');
                 localStorage.removeItem('registro_pendiente');
             };
 
@@ -223,89 +193,6 @@ const RegistroEscuela: React.FC = () => {
         );
     }
 
-    if (paso === 'preparando') {
-        return (
-            <div className="min-h-screen bg-white flex items-center justify-center font-sans p-6 overflow-hidden">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-md w-full text-center space-y-12 relative"
-                >
-                    {/* Aura de fondo sutil */}
-                    <div className="absolute inset-0 bg-tkd-blue/5 rounded-full blur-[100px] -z-10 animate-pulse"></div>
-
-                    <div className="relative inline-block">
-                        <motion.div
-                            animate={{
-                                scale: [1, 1.1, 1],
-                                rotate: [0, 5, -5, 0]
-                            }}
-                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                        >
-                            <IconoLogoOficial className="w-32 h-32 text-tkd-blue mx-auto" />
-                        </motion.div>
-                        {/* Círculo de progreso alrededor del logo */}
-                        <svg className="absolute -inset-4 w-40 h-40 transform -rotate-90">
-                            <circle
-                                cx="80"
-                                cy="80"
-                                r="70"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                fill="transparent"
-                                className="text-gray-100"
-                            />
-                            <motion.circle
-                                cx="80"
-                                cy="80"
-                                r="70"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                fill="transparent"
-                                strokeDasharray="440"
-                                strokeDashoffset={440 - (440 * progresoCarga) / 100}
-                                className="text-tkd-blue"
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                    </div>
-
-                    <div className="space-y-6">
-                        <AnimatePresence mode="wait">
-                            <motion.h2
-                                key={mensajeCarga}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="text-2xl font-black uppercase text-tkd-dark tracking-tighter min-h-[3rem]"
-                            >
-                                {mensajeCarga}
-                            </motion.h2>
-                        </AnimatePresence>
-
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <motion.div
-                                className="bg-tkd-blue h-full"
-                                initial={{ width: "0%" }}
-                                animate={{ width: `${progresoCarga}%` }}
-                                transition={{ ease: "linear" }}
-                            />
-                        </div>
-
-                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-400">
-                            <span>Alistando Tatami</span>
-                            <span>{progresoCarga}%</span>
-                        </div>
-                    </div>
-
-                    <p className="text-xs text-gray-500 font-medium leading-relaxed italic">
-                        "El camino de los mil pasos comienza con una mente en calma."
-                    </p>
-                </motion.div>
-            </div>
-        );
-    }
-
     if (paso === 'exito' && datosTemporales) {
         const copiarPassword = () => {
             navigator.clipboard.writeText(datosTemporales.password);
@@ -317,11 +204,7 @@ const RegistroEscuela: React.FC = () => {
             <div className="min-h-screen bg-white font-sans selection:bg-tkd-blue selection:text-white">
                 {navbar}
                 <div className="min-h-screen flex items-center justify-center p-6 pt-32">
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-2xl border border-gray-100 text-center space-y-8"
-                    >
+                    <div className="max-w-md w-full bg-white rounded-[3rem] p-12 shadow-2xl border border-gray-100 text-center space-y-8 animate-fade-in">
                         <IconoExitoAnimado className="mx-auto text-green-500 w-24 h-24" />
                         <div className="space-y-4">
                             <h2 className="text-3xl font-black uppercase text-tkd-dark tracking-tighter">¡Dojang Activado!</h2>
@@ -346,6 +229,7 @@ const RegistroEscuela: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Botón de Copiar - CRÍTICO para habilitar login */}
                             <button
                                 onClick={copiarPassword}
                                 disabled={passwordCopiada}
@@ -356,19 +240,38 @@ const RegistroEscuela: React.FC = () => {
                             >
                                 {passwordCopiada ? '✓ Contraseña Copiada' : '📋 Copiar Contraseña'}
                             </button>
+
+                            <p className="text-[9px] text-gray-400 text-center leading-tight pt-2">
+                                {passwordCopiada
+                                    ? 'Ahora puedes iniciar sesión con tu nueva cuenta'
+                                    : 'Debes copiar la contraseña para continuar'}
+                            </p>
                         </div>
 
-                        <Link
-                            to={passwordCopiada ? "/login" : "#"}
-                            onClick={(e: React.MouseEvent) => !passwordCopiada && e.preventDefault()}
-                            className={`block w-full py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl text-center text-xs transition-all ${passwordCopiada
+                        {/* Botón de Login - Solo habilitado después de copiar */}
+                        <a
+                            href={passwordCopiada ? "/#/login" : "#"}
+                            onClick={(e) => !passwordCopiada && e.preventDefault()}
+                            className={`block w-full py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl text-xs transition-all ${passwordCopiada
                                 ? 'bg-tkd-dark text-white hover:bg-tkd-blue hover:scale-[1.02] active:scale-95 cursor-pointer'
                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
                                 }`}
                         >
                             {passwordCopiada ? 'Iniciar Sesión Ahora' : '🔒 Copia la Contraseña Primero'}
-                        </Link>
-                    </motion.div>
+                        </a>
+
+                        {passwordCopiada && (
+                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 text-left space-y-2">
+                                <p className="text-[10px] font-black uppercase text-yellow-700">⚠️ Importante</p>
+                                <p className="text-[9px] text-yellow-600 leading-relaxed">
+                                    Estamos terminando de configurar tu academia. <strong>Espera 10 segundos</strong> después de copiar la contraseña antes de intentar iniciar sesión para asegurar que tu perfil esté listo.
+                                </p>
+                                <p className="text-[9px] text-yellow-600 leading-relaxed">
+                                    Usa <strong>{datosTemporales.email}</strong> y la contraseña que copiaste.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         );
