@@ -148,18 +148,25 @@ let implementosMock: Implemento[] = [
 ];
 
 export const obtenerImplementos = async (): Promise<Implemento[]> => {
-    if (!isFirebaseConfigured) return [...implementosMock];
+    console.log("[tiendaApi] obtenerImplementos - iniciando...");
+    if (!isFirebaseConfigured) {
+        console.log("[tiendaApi] Firebase no configurado, retornando mock");
+        return [...implementosMock];
+    }
 
     try {
+        console.log("[tiendaApi] Obteniendo documentos desde Firestore...");
         const snapshot = await getDocs(implementosCollection);
         const cloudItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Implemento));
+        console.log(`[tiendaApi] Firestore retornó ${cloudItems.length} productos`);
 
         // Verificar si los productos base existen
         const productosBaseExisten = cloudItems.some(i => i.id === 'imp-dobok-nacional');
+        console.log(`[tiendaApi] ¿Productos base existen? ${productosBaseExisten}`);
 
         // Auto-seeding: Si la colección está vacía O le faltan los productos base, inyectamos/actualizamos.
         if (cloudItems.length === 0 || !productosBaseExisten) {
-            console.log("Detectado inventario incompleto o antiguo. Actualizando catálogo base...");
+            console.log("[tiendaApi] Detectado inventario incompleto. Intentando sincronizar...");
             try {
                 const batch = writeBatch(db);
                 implementosMock.forEach(item => {
@@ -167,22 +174,26 @@ export const obtenerImplementos = async (): Promise<Implemento[]> => {
                     batch.set(docRef, item, { merge: true });
                 });
                 await batch.commit();
-                console.log("Catálogo base sincronizado exitosamente.");
+                console.log("[tiendaApi] Catálogo base sincronizado exitosamente.");
             } catch (writeError) {
-                console.error("Error al sincronizar catálogo base (posible falta de permisos):", writeError);
+                console.error("[tiendaApi] Error al sincronizar catálogo base:", writeError);
                 // Si falla la escritura, igual devolvemos los mocks para que el usuario vea algo
+                console.log("[tiendaApi] Usando fallback de mocks debido al error de escritura");
                 return [...implementosMock];
             }
 
             // Devolvemos la mezcla para asegurar consistencia
             const idsMock = new Set(implementosMock.map(i => i.id));
             const itemsExistentesNoMock = cloudItems.filter(i => !idsMock.has(i.id));
+            console.log(`[tiendaApi] Retornando ${implementosMock.length} mocks + ${itemsExistentesNoMock.length} existentes`);
             return [...implementosMock, ...itemsExistentesNoMock];
         }
 
+        console.log(`[tiendaApi] Retornando ${cloudItems.length} productos de Firestore`);
         return cloudItems;
     } catch (error) {
-        console.error("Error al obtener implementos de Firebase:", error);
+        console.error("[tiendaApi] Error al obtener implementos de Firebase:", error);
+        console.log("[tiendaApi] Usando fallback completo de mocks");
         // Fallback robusto: si falla la lectura (ej. sin internet o err permisos), devolvemos el mock
         return [...implementosMock];
     }

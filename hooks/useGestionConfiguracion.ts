@@ -7,8 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 
 export const useGestionConfiguracion = () => {
-    const { 
-        usuarios, configNotificaciones, configClub, cargando, error, 
+    const {
+        usuarios, configNotificaciones, configClub, cargando, error,
         guardarConfiguraciones, agregarUsuario, actualizarUsuario, eliminarUsuario, cargarConfiguracion
     } = useConfiguracion();
     const { usuario: usuarioActual } = useAuth();
@@ -20,24 +20,25 @@ export const useGestionConfiguracion = () => {
     const [usuarioEnEdicion, setUsuarioEnEdicion] = useState<Usuario | null>(null);
     const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState(false);
     const [usuarioAEliminar, setUsuarioAEliminar] = useState<Usuario | null>(null);
-    
+
     const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(configNotificaciones);
-    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub>(configClub);
+    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub);
 
     useEffect(() => {
-        setLocalConfigNotificaciones(configNotificaciones);
-        setLocalConfigClub(configClub);
+        if (configNotificaciones) setLocalConfigNotificaciones(configNotificaciones);
+        if (configClub) setLocalConfigClub(configClub);
     }, [configNotificaciones, configClub]);
+
 
     const usuariosFiltrados = useMemo(() => {
         if (!filtroUsuario) return usuarios;
         const filtroLowerCase = filtroUsuario.toLowerCase();
-        return usuarios.filter(u => 
+        return usuarios.filter(u =>
             u.nombreUsuario.toLowerCase().includes(filtroLowerCase) ||
             u.email.toLowerCase().includes(filtroLowerCase)
         );
     }, [usuarios, filtroUsuario]);
-    
+
     const abrirFormularioUsuario = (usuario: Usuario | null = null) => {
         // VALIDACIÓN SAAS: Límite de usuarios (instructores/asistentes)
         if (!usuario && usuarios.length >= configClub.limiteUsuarios) {
@@ -69,7 +70,7 @@ export const useGestionConfiguracion = () => {
             setCargandoAccion(false);
         }
     };
-    
+
     const abrirConfirmacionEliminar = (usuario: Usuario) => {
         setUsuarioAEliminar(usuario);
         setModalConfirmacionAbierto(true);
@@ -93,14 +94,18 @@ export const useGestionConfiguracion = () => {
             setCargandoAccion(false);
         }
     };
-    
+
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement>, setConfig: React.Dispatch<React.SetStateAction<any>>) => {
         const { name, value, type } = e.target;
-        setConfig(prev => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
+        setConfig((prev: any) => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
 
     const guardarConfiguracionesHandler = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!localConfigClub) {
+            mostrarNotificacion("Error: Configuración del club no disponible.", "error");
+            return;
+        }
         setCargandoAccion(true);
         try {
             await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
