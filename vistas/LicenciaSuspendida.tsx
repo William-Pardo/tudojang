@@ -10,9 +10,35 @@ const LicenciaSuspendida: React.FC = () => {
 
     const planActual = (PLANES_SAAS as any)[plan || 'starter'] || PLANES_SAAS.starter;
 
-    const handlePagarConWompi = () => {
-        // En un futuro aquí abriremos el Widget de Wompi real
-        alert("Redirigiendo a pasarela de pagos Wompi (Modo Sandbox)...");
+    const handlePagarConWompi = async () => {
+        try {
+            const precio = planActual.precio;
+            const precioEnCentavos = precio * 100;
+            const moneda = 'COP';
+            const referencia = `RENOVACION_${configClub?.tenantId || 'TEST'}_${Date.now()}`;
+
+            // Generar firma de integridad
+            const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
+
+            const encondedText = new TextEncoder().encode(cadenaFirma);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            const urlRetorno = `${window.location.origin}/#/`;
+            const urlWompi = `https://checkout.wompi.co/p/?` +
+                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
+                `currency=${moneda}&` +
+                `amount-in-cents=${precioEnCentavos}&` +
+                `reference=${referencia}&` +
+                `signature:integrity=${signature}&` +
+                `redirect-url=${encodeURIComponent(urlRetorno)}`;
+
+            window.location.assign(urlWompi);
+        } catch (error) {
+            console.error("Error al iniciar pago:", error);
+            alert("No se pudo iniciar el proceso de pago. Por favor intenta de nuevo o contacta a soporte.");
+        }
     };
 
     return (
@@ -107,7 +133,7 @@ const LicenciaSuspendida: React.FC = () => {
 
                     <div className="pt-8 border-t dark:border-white/5">
                         <div className="flex items-center gap-4 grayscale opacity-30">
-                            <img src="https://static.wompi.co/img/logos/wompi-logo.png" alt="Wompi" className="h-4" />
+                            <img src="/img/wompi-logo.png" alt="Wompi" className="h-4" onError={(e) => { e.currentTarget.src = "https://wompi.com/assets/img/logos/wompi-logo-full.png"; }} />
                             <p className="text-[9px] font-bold text-gray-400 uppercase">Pagos seguros procesados por Wompi Colombia</p>
                         </div>
                     </div>
