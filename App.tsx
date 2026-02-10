@@ -45,7 +45,7 @@ import HeatmapOverlay from './components/HeatmapOverlay';
 import {
     IconoCampana, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
-    IconoBuscar, IconoUsuario, IconoAprobar
+    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
 } from './components/Iconos';
 
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
@@ -129,19 +129,31 @@ const AppLayout: React.FC = () => {
 
     if (!usuario) return null;
 
-    // Si la licencia está suspendida, bloqueamos toda la interfaz con la vista de suspension
-    // EXCEPTUANDO que sea el SuperAdmin (Aliant) quien esté navegando.
     const esSuperAdmin = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
-    if (suspendido && !esSuperAdmin && !cargandoLicencia) {
-        return <LicenciaSuspendida />;
-    }
 
     return (
-        <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950">
+        <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950 overflow-hidden">
             <HeatmapOverlay puntos={puntos} activo={heatmapActivo} />
             {menuAbierto && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setMenuAbierto(false)}></div>}
             <BarraLateral usuario={usuario} onLogout={logout} estaAbierta={menuAbierto} onCerrar={() => setMenuAbierto(false)} />
-            <main className="flex-1 flex flex-col overflow-hidden">
+
+            <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 md:rounded-l-[3rem] shadow-2xl relative overflow-hidden">
+                {/* Banner de Estado de Licencia (Solo se muestra si está vencida o suspendida) */}
+                {suspendido && !esSuperAdmin && !cargandoLicencia && (
+                    <div className="bg-tkd-red text-white py-2.5 px-6 flex justify-between items-center z-[100] animate-pulse">
+                        <div className="flex items-center gap-2">
+                            <IconoInformacion className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Suscripción Vencida - Acceso Restringido (Modo Demo Activo)</span>
+                        </div>
+                        <ReactRouterDOM.Link
+                            to="/renovar-licencia"
+                            className="bg-white text-tkd-red px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-gray-100 transition-all shadow-lg"
+                        >
+                            Pagar & Activar Ahora
+                        </ReactRouterDOM.Link>
+                    </div>
+                )}
+
                 <header className="flex items-center justify-between h-20 px-8 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/5 z-20">
                     <button onClick={() => setMenuAbierto(!menuAbierto)} className="p-3 rounded-2xl text-gray-400 hover:text-tkd-dark transition-all hover:bg-gray-50 dark:hover:bg-white/5">
                         <IconoMenu className="w-6 h-6" />
@@ -162,6 +174,7 @@ const AppLayout: React.FC = () => {
                         </div>
                     </div>
                 </header>
+
                 <div className="flex-1 overflow-y-auto" ref={scrollableContainerRef}>
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="h-full">
                         <ReactRouterDOM.Outlet />
@@ -244,6 +257,7 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
                     <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />
+                    <ReactRouterDOM.Route path="/renovar-licencia" element={<LicenciaSuspendida />} />
                 </ReactRouterDOM.Route>
                 <ReactRouterDOM.Route path="*" element={<Vista404 />} />
             </ReactRouterDOM.Routes>
