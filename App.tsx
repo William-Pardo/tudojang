@@ -6,15 +6,15 @@ import { motion } from 'framer-motion';
 
 import './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext'; 
+import { DataProvider } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
-import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext'; 
+import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
 import BrandingProvider, { useTenant } from './components/BrandingProvider';
 import { RolUsuario, type Usuario } from './tipos';
 
 import PublicLanding from './vistas/PublicLanding';
 import Login from './vistas/Login';
-import RegistroEscuela from './vistas/RegistroEscuela'; 
+import RegistroEscuela from './vistas/RegistroEscuela';
 import PasarelaInscripcion from './vistas/PasarelaInscripcion'; // Importación nueva
 import VistaConfiguracion from './vistas/Configuracion';
 import VistaAdministracion from './vistas/Administracion';
@@ -38,8 +38,8 @@ import NotificacionToast from './components/NotificacionToast';
 import BotonVolverArriba from './components/BotonVolverArriba';
 import ModalBusquedaGlobal from './components/ModalBusquedaGlobal';
 import LogoDinamico from './components/LogoDinamico';
-import AsistenteVirtual from './components/AsistenteVirtual'; 
-import HeatmapOverlay from './components/HeatmapOverlay'; 
+import AsistenteVirtual from './components/AsistenteVirtual';
+import HeatmapOverlay from './components/HeatmapOverlay';
 import {
     IconoCampana, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
@@ -109,7 +109,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
 
 const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
-    const { puntos, heatmapActivo } = useAnalytics(); 
+    const { puntos, heatmapActivo } = useAnalytics();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
@@ -123,9 +123,9 @@ const AppLayout: React.FC = () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
     }, [theme]);
-    
-    if(!usuario) return null;
-    
+
+    if (!usuario) return null;
+
     return (
         <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950">
             <HeatmapOverlay puntos={puntos} activo={heatmapActivo} />
@@ -139,11 +139,11 @@ const AppLayout: React.FC = () => {
                     <div className="flex items-center space-x-4">
                         {usuario.rol !== RolUsuario.Tutor && (
                             <button onClick={() => setBusquedaAbierta(true)} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
-                               <IconoBuscar className="w-5 h-5"/>
+                                <IconoBuscar className="w-5 h-5" />
                             </button>
                         )}
                         <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
-                            {theme === 'light' ? <IconoLuna className="w-5 h-5"/> : <IconoSol className="w-5 h-5" />}
+                            {theme === 'light' ? <IconoLuna className="w-5 h-5" /> : <IconoSol className="w-5 h-5" />}
                         </button>
                         <div className="h-8 w-px bg-gray-100 dark:bg-white/10 mx-2"></div>
                         <div className="text-right hidden sm:block">
@@ -169,18 +169,19 @@ const AppLayout: React.FC = () => {
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
-    
+
     if (cargandoSesion) return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;
 
     const host = window.location.hostname;
     const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
 
-    if (isRootDomain && (!tenant || tenant.slug === 'gajog')) {
+    // Mostrar rutas públicas SOLO si: dominio raíz + sin tenant + sin usuario autenticado
+    if (isRootDomain && (!tenant || tenant.slug === 'gajog') && !usuario) {
         return (
             <ReactRouterDOM.Routes>
                 <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
                 <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
-                <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to="/" /> : <Login />} />
+                <ReactRouterDOM.Route path="/login" element={<Login />} />
                 <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
             </ReactRouterDOM.Routes>
         );

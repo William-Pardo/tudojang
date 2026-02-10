@@ -34,7 +34,7 @@ const VistaAdministracion: React.FC = () => {
 
         setProcesandoMora(true);
         try {
-            const porcentaje = configClub.moraPorcentaje || 5; // Fallback 5%
+            const porcentaje = configClub?.moraPorcentaje || 5; // Fallback 5%
             for (const est of vencidos) {
                 const recargo = Math.round(est.saldoDeudor * (porcentaje / 100));
                 await actualizarEstudiante({
@@ -58,15 +58,15 @@ const VistaAdministracion: React.FC = () => {
                     <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Administración</h1>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Monitoreo de Salud Institucional</p>
                 </div>
-                
+
                 {/* ACCIÓN DE MORA ESTRATÉGICA */}
-                <button 
+                <button
                     onClick={aplicarRecargosMora}
                     disabled={procesandoMora}
                     className="bg-white dark:bg-gray-800 border-2 border-tkd-red/20 hover:border-tkd-red px-8 py-4 rounded-2xl font-black uppercase text-[10px] text-tkd-red tracking-widest shadow-soft transition-all active:scale-95 disabled:opacity-50 flex items-center gap-3"
                 >
                     {procesandoMora ? <div className="w-4 h-4 border-2 border-tkd-red border-t-transparent rounded-full animate-spin"></div> : <IconoLogoOficial className="w-4 h-4" />}
-                    Ejecutar Sobrecargos Mora ({configClub.moraPorcentaje}%)
+                    Ejecutar Sobrecargos Mora ({configClub?.moraPorcentaje || 5}%)
                 </button>
             </header>
 
@@ -77,11 +77,10 @@ const VistaAdministracion: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as AdminTab)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-                                activeTab === tab.id 
-                                ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' 
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id
+                                ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10'
                                 : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'
-                            }`}
+                                }`}
                         >
                             <tab.icono className={`w-4 h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span>{tab.label}</span>
