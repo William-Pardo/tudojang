@@ -153,17 +153,26 @@ export const obtenerImplementos = async (): Promise<Implemento[]> => {
     const snapshot = await getDocs(implementosCollection);
     const cloudItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Implemento));
 
-    // Auto-seeding: Si la colección está vacía en producción, inyectamos los defaults.
-    if (cloudItems.length === 0) {
-        console.log("Iniciando inyección de inventario base...");
+    // Verificar si los productos base existen (por ejemplo, el primero)
+    const productosBaseExisten = cloudItems.some(i => i.id === 'imp-dobok-nacional');
+
+    // Auto-seeding: Si la colección está vacía O le faltan los productos base, inyectamos/actualizamos.
+    if (cloudItems.length === 0 || !productosBaseExisten) {
+        console.log("Detectado inventario incompleto o antiguo. Actualizando catálogo base...");
         const batch = writeBatch(db);
         implementosMock.forEach(item => {
             const docRef = doc(implementosCollection, item.id);
-            batch.set(docRef, item);
+            // Usamos set con merge: true para actualizar si existe o crear si no
+            batch.set(docRef, item, { merge: true });
         });
         await batch.commit();
-        console.log("Inventario base activado exitosamente.");
-        return [...implementosMock];
+        console.log("Catálogo base sincronizado exitosamente.");
+
+        // Devolvemos la mezcla de lo que había + lo nuevo (o simplemente recargamos, pero aquí devolvemos el mock actualizado)
+        // Para asegurar consistencia inmediata en UI, devolvemos el mock combinado con lo que había que no sea del mock
+        const idsMock = new Set(implementosMock.map(i => i.id));
+        const itemsExistentesNoMock = cloudItems.filter(i => !idsMock.has(i.id));
+        return [...implementosMock, ...itemsExistentesNoMock];
     }
 
     return cloudItems;
