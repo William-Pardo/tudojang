@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
-import { 
-    IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar, 
-    IconoAgregar, IconoImagen, IconoCampana, IconoUsuario, IconoGuardar, 
-    IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar, 
-    IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado, 
-    IconoHistorial, IconoEmail 
+import {
+    IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar,
+    IconoAgregar, IconoImagen, IconoCampana, IconoUsuario, IconoGuardar,
+    IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar,
+    IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado,
+    IconoHistorial, IconoEmail
 } from '../components/Iconos';
 import { useGestionConfiguracion } from '../hooks/useGestionConfiguracion';
 import { useNotificacion } from '../context/NotificacionContext';
@@ -25,16 +25,16 @@ import Loader from '../components/Loader';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
-const ModalFormPrograma: React.FC<{ 
-    programa: Partial<Programa> | null, 
-    onCerrar: () => void, 
-    onGuardar: (datos: any) => void 
+const ModalFormPrograma: React.FC<{
+    programa: Partial<Programa> | null,
+    onCerrar: () => void,
+    onGuardar: (datos: any) => void
 }> = ({ programa, onCerrar, onGuardar }) => {
     const [nombre, setNombre] = useState(programa?.nombre || '');
     const [tipo, setTipo] = useState(programa?.tipoCobro || TipoCobroPrograma.Recurrente);
     const [valor, setValor] = useState(programa?.valor || 0);
     const [horario, setHorario] = useState(programa?.horario || '');
-    
+
     const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all placeholder:text-gray-300";
     const selectStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner appearance-none cursor-pointer";
 
@@ -51,7 +51,7 @@ const ModalFormPrograma: React.FC<{
                         <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Nombre Descriptivo</label>
                         <input type="text" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Poomsae Avanzado" className={inputStyle} />
                     </div>
-                    
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="relative">
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Modalidad</label>
@@ -73,7 +73,7 @@ const ModalFormPrograma: React.FC<{
                 </div>
 
                 <div className="space-y-3 pt-4">
-                    <button 
+                    <button
                         onClick={() => onGuardar({ ...programa, nombre, tipoCobro: tipo, valor, horario })}
                         className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95"
                     >
@@ -86,12 +86,12 @@ const ModalFormPrograma: React.FC<{
     );
 };
 
-const ModalPagoCheckout: React.FC<{ 
-    item: any, 
+const ModalPagoCheckout: React.FC<{
+    item: any,
     tipo: 'addon' | 'plan',
-    tenantId: string, 
-    onCerrar: () => void, 
-    onExito: (datos: any) => void 
+    tenantId: string,
+    onCerrar: () => void,
+    onExito: (datos: any) => void
 }> = ({ item, tipo, tenantId, onCerrar, onExito }) => {
     const [paso, setPaso] = useState<'checkout' | 'procesando' | 'exito'>('checkout');
     const { mostrarNotificacion } = useNotificacion();
@@ -100,7 +100,7 @@ const ModalPagoCheckout: React.FC<{
         setPaso('procesando');
         try {
             await new Promise(r => setTimeout(r, 2500));
-            
+
             if (tipo === 'addon') {
                 const mapeoCampos: Record<string, any> = {
                     'estudiantes': 'limiteEstudiantes',
@@ -114,7 +114,7 @@ const ModalPagoCheckout: React.FC<{
                 await actualizarPlanClub(tenantId, item);
                 onExito({ tipo: 'plan', plan: item });
             }
-            
+
             setPaso('exito');
         } catch (error) {
             mostrarNotificacion("La transacción fue rechazada por el banco.", "error");
@@ -174,18 +174,18 @@ const ModalPagoCheckout: React.FC<{
 // --- VISTA PRINCIPAL ---
 
 const VistaConfiguracion: React.FC = () => {
-    const { 
+    const {
         usuarios, cargando, cargarConfiguracion,
         localConfigClub, localConfigNotificaciones, cargandoAccion,
         modalUsuarioAbierto, usuarioEnEdicion, abrirFormularioUsuario, cerrarFormularioUsuario, guardarUsuarioHandler,
         modalConfirmacionAbierto, usuarioAEliminar, abrirConfirmacionEliminar, cerrarConfirmacion, confirmarEliminacion,
         handleConfigChange, guardarConfiguracionesHandler, setLocalConfigClub, setLocalConfigNotificaciones
     } = useGestionConfiguracion();
-    
+
     const { programas, agregarPrograma, actualizarPrograma, eliminarPrograma } = useProgramas();
     const { sedes, agregarSede, actualizarSede, eliminarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
-    
+
     const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
@@ -245,7 +245,7 @@ const VistaConfiguracion: React.FC = () => {
         }
     };
 
-    if (cargando) return <div className="h-screen flex items-center justify-center bg-tkd-dark/5"><Loader texto="Configurando Dojang..." /></div>;
+    if (cargando || !localConfigClub) return <div className="h-screen flex items-center justify-center bg-tkd-dark/5"><Loader texto="Configurando Dojang..." /></div>;
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner";
 
@@ -272,7 +272,7 @@ const VistaConfiguracion: React.FC = () => {
                         { id: 'alertas', label: 'Alertas', icon: IconoCampana },
                         { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
                     ].map(tab => (
-                        <button 
+                        <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
@@ -340,11 +340,11 @@ const VistaConfiguracion: React.FC = () => {
                             </button>
                         </div>
                         <div className="tkd-card p-0">
-                            <TablaUsuarios 
-                                usuarios={usuarios} 
-                                onEditar={abrirFormularioUsuario} 
-                                onEliminar={abrirConfirmacionEliminar} 
-                                onGestionarContrato={() => mostrarNotificacion("Módulo legal en actualización.", "info")} 
+                            <TablaUsuarios
+                                usuarios={usuarios}
+                                onEditar={abrirFormularioUsuario}
+                                onEliminar={abrirConfirmacionEliminar}
+                                onGestionarContrato={() => mostrarNotificacion("Módulo legal en actualización.", "info")}
                             />
                         </div>
                     </div>
@@ -364,8 +364,8 @@ const VistaConfiguracion: React.FC = () => {
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4"/></button>
-                                            <button onClick={() => eliminarSede(s.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4"/></button>
+                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
+                                            <button onClick={() => eliminarSede(s.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div>
@@ -396,8 +396,8 @@ const VistaConfiguracion: React.FC = () => {
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-red/10 rounded-2xl"><IconoLogoOficial className="w-6 h-6 text-tkd-red" /></div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setProgramaEdit(p); setModalProgramaAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4"/></button>
-                                            <button onClick={() => eliminarPrograma(p.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4"/></button>
+                                            <button onClick={() => { setProgramaEdit(p); setModalProgramaAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
+                                            <button onClick={() => eliminarPrograma(p.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div>
@@ -425,7 +425,7 @@ const VistaConfiguracion: React.FC = () => {
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Business Intelligence Rules</p>
                                 </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 tracking-widest">Día de Cobro Mensual (1-28)</label>

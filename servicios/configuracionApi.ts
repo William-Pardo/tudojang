@@ -27,7 +27,9 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
 
 export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionClub | null> => {
     if (!isFirebaseConfigured) {
-        // Added comment above fix: explicitly cast the mock object to ConfiguracionClub.
+        // En modo mock, solo existe 'gajog' y 'dragones' por defecto
+        if (slug !== 'gajog' && slug !== 'dragones') return null;
+
         return {
             ...CONFIGURACION_CLUB_POR_DEFECTO,
             slug: slug,

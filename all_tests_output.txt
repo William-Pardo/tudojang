@@ -1,0 +1,1009 @@
+﻿node.exe : npm warn invalid config cache=false set in command line options
+En C:\Program Files\nodejs\npm.ps1: 29 Carácter: 3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn invali...nd line options:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm warn invalid config Must be valid filesystem path
+
+> tudojang-gestion@0.0.0 test
+> jest
+
+FAIL vistas/Dashboard.test.tsx
+  ÔùÅ Test suite failed to run
+
+    ReferenceError: TextEncoder is not defined
+
+    [0m [90m 3 |[39m [36mimport[39m { render[33m,[39m screen } [36mfrom[39m [32m'@testing-library/react'[39m[33m;[39m
+     [90m 4 |[39m [90m// FIX: Changed to namespace import to fix module resolution issues.[39m
+    [31m[1m>[22m[39m[90m 5 |[39m [36mimport[39m [33m*[39m [36mas[39m [33mReactRouterDOM[39m [36mfrom[39m 
+[32m'react-router-dom'[39m[33m;[39m
+     [90m   |[39m [31m[1m^[22m[39m
+     [90m 6 |[39m [90m// FIX: Added 'expect' to the import from '@jest/globals' to resolve type inference issues with jest-dom matchers.[39m
+     [90m 7 |[39m [36mimport[39m { describe[33m,[39m it[33m,[39m jest[33m,[39m expect } [36mfrom[39m [32m'@jest/globals'[39m[33m;[39m
+     [90m 8 |[39m [36mimport[39m [33mVistaDashboard[39m [36mfrom[39m [32m'./Dashboard'[39m[33m;[39m[0m
+
+      at Object.<anonymous> (node_modules/react-router/dist/development/index.js:342:31)
+      at Object.<anonymous> (node_modules/react-router/dist/development/dom-export.js:40:20)
+      at Object.<anonymous> (node_modules/react-router-dom/dist/index.js:38:18)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:5:1)
+
+FAIL components/ModalConfirmacion.test.tsx
+  ÔùÅ ModalConfirmacion ÔÇ║ llama a onCerrar cuando se hace clic en el bot├│n de cancelar
+
+    expect(jest.fn()).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 0
+
+    [0m [90m 77 |[39m     [36mconst[39m botonCancelar [33m=[39m screen[33m.[39mgetByText([32m'Cancelar'[39m)[33m;[39m
+     [90m 78 |[39m     fireEvent[33m.[39mclick(botonCancelar)[33m;[39m
+    [31m[1m>[22m[39m[90m 79 |[39m     expect(onCerrarMock)[33m.[39mtoHaveBeenCalledTimes([35m1[39m)[33m;[39m
+     [90m    |[39m                          [31m[1m^[22m[39m
+     [90m 80 |[39m   })[33m;[39m
+     [90m 81 |[39m
+     [90m 82 |[39m   it([32m'deshabilita los botones cuando "cargando" es verdadero'[39m[33m,[39m () [33m=>[39m {[0m
+
+      at Object.<anonymous> (components/ModalConfirmacion.test.tsx:79:26)
+
+PASS vistas/Login.test.tsx
+PASS components/FormularioEstudiante.test.tsx (7.477 s)
+  ÔùÅ Console
+
+    console.warn
+      ADVERTENCIA: La configuraci├│n de Firebase no est├í definida. Se utilizar├í una configuraci├│n de respaldo (MODO SIMULADO).
+
+    [0m [90m 39 |[39m [90m// Configuraci├│n de respaldo (Mock Mode)[39m
+     [90m 40 |[39m [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m   console[33m.[39mwarn([32m"ADVERTENCIA: La configuraci├│n de Firebase no est├í definida. Se utilizar├í una 
+configuraci├│n de respaldo (MODO SIMULADO)."[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 42 |[39m   firebaseConfig [33m=[39m {
+     [90m 43 |[39m     apiKey[33m:[39m [32m"xxxxxxxxxxxxxxxxxxxxxxxxxx"[39m[33m,[39m
+     [90m 44 |[39m     authDomain[33m:[39m [32m"xxxxxxxx.firebaseapp.com"[39m[33m,[39m[0m
+
+      at Object.<anonymous> (firebase/config.ts:41:11)
+      at Object.<anonymous> (servicios/usuariosApi.ts:20:1)
+      at Object.<anonymous> (servicios/api.ts:3:1)
+      at Object.<anonymous> (context/DataContext.tsx:9:1)
+      at Object.<anonymous> (components/FormularioEstudiante.tsx:13:1)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:8:1)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de estudiantes mock.
+
+    [0m [90m 35 |[39m [36mexport[39m [36mconst[39m obtenerEstudiantes [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEstudiante[39m[][33m>[39m [33m=>[39m {
+     [90m 36 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 37 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de estudiantes mock."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 38 |[39m         [36mreturn[39m [
+     [90m 39 |[39m             {
+     [90m 40 |[39m                 id[33m:[39m [32m'1'[39m[33m,[39m tenantId[33m:[39m [32m'escuela-gajog-001'[39m[33m,[39m nombres[33m:[39m 
+[32m'Juan'[39m[33m,[39m apellidos[33m:[39m [32m'P├®rez'[39m[33m,[39m numeroIdentificacion[33m:[39m [32m'10101'[39m[33m,[39m 
+fechaNacimiento[33m:[39m [32m'2015-05-10'[39m[33m,[39m [0m
+
+      at Object.obtenerEstudiantes (servicios/estudiantesApi.ts:37:17)
+      at context/DataContext.tsx:126:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:65:5)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de eventos vac├¡a.
+
+    [0m [90m 39 |[39m [36mexport[39m [36mconst[39m obtenerEventos [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEvento[39m[][33m>[39m [33m=>[39m {
+     [90m 40 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de eventos vac├¡a."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 42 |[39m         [36mreturn[39m [][33m;[39m
+     [90m 43 |[39m     }
+     [90m 44 |[39m     [36mconst[39m q [33m=[39m query(eventosCollection[33m,[39m orderBy([32m'fechaEvento'[39m[33m,[39m 
+[32m'desc'[39m))[33m;[39m[0m
+
+      at Object.obtenerEventos (servicios/eventosApi.ts:41:17)
+      at context/DataContext.tsx:127:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:65:5)
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 131 |[39m                 api[33m.[39mobtenerProgramas()
+     [90m 132 |[39m             ])[33m;[39m
+    [31m[1m>[22m[39m[90m 133 |[39m             setUsuarios(u)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:133:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 132 |[39m             ])[33m;[39m
+     [90m 133 |[39m             setUsuarios(u)[33m;[39m
+    [31m[1m>[22m[39m[90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:134:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 133 |[39m             setUsuarios(u)[33m;[39m
+     [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+    [31m[1m>[22m[39m[90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:135:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+    [31m[1m>[22m[39m[90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:136:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+    [31m[1m>[22m[39m[90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:137:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+    [31m[1m>[22m[39m[90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:138:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+    [31m[1m>[22m[39m[90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:139:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+    [31m[1m>[22m[39m[90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {
+     [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:140:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+    [31m[1m>[22m[39m[90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {
+     [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m
+     [90m 144 |[39m         } [36mfinally[39m {[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:141:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m
+     [90m 144 |[39m         } [36mfinally[39m {
+    [31m[1m>[22m[39m[90m 145 |[39m             setCargando([36mfalse[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 146 |[39m         }
+     [90m 147 |[39m     }[33m,[39m [tenant])[33m;[39m
+     [90m 148 |[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:145:13
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de estudiantes mock.
+
+    [0m [90m 35 |[39m [36mexport[39m [36mconst[39m obtenerEstudiantes [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEstudiante[39m[][33m>[39m [33m=>[39m {
+     [90m 36 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 37 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de estudiantes mock."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 38 |[39m         [36mreturn[39m [
+     [90m 39 |[39m             {
+     [90m 40 |[39m                 id[33m:[39m [32m'1'[39m[33m,[39m tenantId[33m:[39m [32m'escuela-gajog-001'[39m[33m,[39m nombres[33m:[39m 
+[32m'Juan'[39m[33m,[39m apellidos[33m:[39m [32m'P├®rez'[39m[33m,[39m numeroIdentificacion[33m:[39m [32m'10101'[39m[33m,[39m 
+fechaNacimiento[33m:[39m [32m'2015-05-10'[39m[33m,[39m [0m
+
+      at Object.obtenerEstudiantes (servicios/estudiantesApi.ts:37:17)
+      at context/DataContext.tsx:126:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:94:5)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de eventos vac├¡a.
+
+    [0m [90m 39 |[39m [36mexport[39m [36mconst[39m obtenerEventos [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEvento[39m[][33m>[39m [33m=>[39m {
+     [90m 40 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de eventos vac├¡a."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 42 |[39m         [36mreturn[39m [][33m;[39m
+     [90m 43 |[39m     }
+     [90m 44 |[39m     [36mconst[39m q [33m=[39m query(eventosCollection[33m,[39m orderBy([32m'fechaEvento'[39m[33m,[39m 
+[32m'desc'[39m))[33m;[39m[0m
+
+      at Object.obtenerEventos (servicios/eventosApi.ts:41:17)
+      at context/DataContext.tsx:127:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:94:5)
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 131 |[39m                 api[33m.[39mobtenerProgramas()
+     [90m 132 |[39m             ])[33m;[39m
+    [31m[1m>[22m[39m[90m 133 |[39m             setUsuarios(u)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:133:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 132 |[39m             ])[33m;[39m
+     [90m 133 |[39m             setUsuarios(u)[33m;[39m
+    [31m[1m>[22m[39m[90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:134:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 133 |[39m             setUsuarios(u)[33m;[39m
+     [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+    [31m[1m>[22m[39m[90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:135:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 134 |[39m             setConfigNotificaciones(cn)[33m;[39m
+     [90m 135 |[39m             setSedes(s)[33m;[39m
+    [31m[1m>[22m[39m[90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:136:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 135 |[39m             setSedes(s)[33m;[39m
+     [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+    [31m[1m>[22m[39m[90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:137:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 136 |[39m             setEstudiantes(e)[33m;[39m
+     [90m 137 |[39m             setEventos(ev)[33m;[39m
+    [31m[1m>[22m[39m[90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:138:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 137 |[39m             setEventos(ev)[33m;[39m
+     [90m 138 |[39m             setImplementos(imp)[33m;[39m
+    [31m[1m>[22m[39m[90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:139:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 138 |[39m             setImplementos(imp)[33m;[39m
+     [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+    [31m[1m>[22m[39m[90m 140 |[39m             setMovimientos(m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {
+     [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:140:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 139 |[39m             setSolicitudesCompra(sc)[33m;[39m
+     [90m 140 |[39m             setMovimientos(m)[33m;[39m
+    [31m[1m>[22m[39m[90m 141 |[39m             setProgramas(pr)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 142 |[39m         } [36mcatch[39m (err) {
+     [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m
+     [90m 144 |[39m         } [36mfinally[39m {[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:141:13
+
+    console.error
+      An update to DataProvider inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+    [0m [90m 143 |[39m             setError([32m"Error al sincronizar datos de la academia."[39m)[33m;[39m
+     [90m 144 |[39m         } [36mfinally[39m {
+    [31m[1m>[22m[39m[90m 145 |[39m             setCargando([36mfalse[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 146 |[39m         }
+     [90m 147 |[39m     }[33m,[39m [tenant])[33m;[39m
+     [90m 148 |[39m[0m
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at context/DataContext.tsx:145:13
+
+    console.error
+      An update to FormularioEstudiante inside a test was not wrapped in act(...).
+      
+      When testing, code that causes React state updates should be wrapped into act(...):
+      
+      act(() => {
+        /* fire events that update state */
+      });
+      /* assert on the output */
+      
+      This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      at node_modules/react-dom/cjs/react-dom-client.development.js:18758:19
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-dom/cjs/react-dom-client.development.js:18757:9)
+      at scheduleUpdateOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:16409:11)
+      at dispatchSetStateInternal (node_modules/react-dom/cjs/react-dom-client.development.js:9170:13)
+      at dispatchSetState (node_modules/react-dom/cjs/react-dom-client.development.js:9127:7)
+      at Object.control [as callback] (node_modules/react-hook-form/src/useForm.ts:113:7)
+      at Object.name (node_modules/react-hook-form/src/logic/createFormControl.ts:1088:58)
+      at Object.next (node_modules/react-hook-form/src/utils/extractFormValues.ts:3:15)
+      at Object.validatingFields [as _setValid] (node_modules/react-hook-form/src/logic/createFormControl.ts:218:34)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de estudiantes mock.
+
+    [0m [90m 35 |[39m [36mexport[39m [36mconst[39m obtenerEstudiantes [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEstudiante[39m[][33m>[39m [33m=>[39m {
+     [90m 36 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 37 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de estudiantes mock."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 38 |[39m         [36mreturn[39m [
+     [90m 39 |[39m             {
+     [90m 40 |[39m                 id[33m:[39m [32m'1'[39m[33m,[39m tenantId[33m:[39m [32m'escuela-gajog-001'[39m[33m,[39m nombres[33m:[39m 
+[32m'Juan'[39m[33m,[39m apellidos[33m:[39m [32m'P├®rez'[39m[33m,[39m numeroIdentificacion[33m:[39m [32m'10101'[39m[33m,[39m 
+fechaNacimiento[33m:[39m [32m'2015-05-10'[39m[33m,[39m [0m
+
+      at Object.obtenerEstudiantes (servicios/estudiantesApi.ts:37:17)
+      at context/DataContext.tsx:126:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:103:5)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de eventos vac├¡a.
+
+    [0m [90m 39 |[39m [36mexport[39m [36mconst[39m obtenerEventos [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEvento[39m[][33m>[39m [33m=>[39m {
+     [90m 40 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de eventos vac├¡a."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 42 |[39m         [36mreturn[39m [][33m;[39m
+     [90m 43 |[39m     }
+     [90m 44 |[39m     [36mconst[39m q [33m=[39m query(eventosCollection[33m,[39m orderBy([32m'fechaEvento'[39m[33m,[39m 
+[32m'desc'[39m))[33m;[39m[0m
+
+      at Object.obtenerEventos (servicios/eventosApi.ts:41:17)
+      at context/DataContext.tsx:127:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:103:5)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de estudiantes mock.
+
+    [0m [90m 35 |[39m [36mexport[39m [36mconst[39m obtenerEstudiantes [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEstudiante[39m[][33m>[39m [33m=>[39m {
+     [90m 36 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 37 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de estudiantes mock."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 38 |[39m         [36mreturn[39m [
+     [90m 39 |[39m             {
+     [90m 40 |[39m                 id[33m:[39m [32m'1'[39m[33m,[39m tenantId[33m:[39m [32m'escuela-gajog-001'[39m[33m,[39m nombres[33m:[39m 
+[32m'Juan'[39m[33m,[39m apellidos[33m:[39m [32m'P├®rez'[39m[33m,[39m numeroIdentificacion[33m:[39m [32m'10101'[39m[33m,[39m 
+fechaNacimiento[33m:[39m [32m'2015-05-10'[39m[33m,[39m [0m
+
+      at Object.obtenerEstudiantes (servicios/estudiantesApi.ts:37:17)
+      at context/DataContext.tsx:126:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:122:5)
+
+    console.warn
+      MODO SIMULADO: Devolviendo lista de eventos vac├¡a.
+
+    [0m [90m 39 |[39m [36mexport[39m [36mconst[39m obtenerEventos [33m=[39m [36masync[39m ()[33m:[39m 
+[33mPromise[39m[33m<[39m[33mEvento[39m[][33m>[39m [33m=>[39m {
+     [90m 40 |[39m     [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m         console[33m.[39mwarn([32m"MODO SIMULADO: Devolviendo lista de eventos vac├¡a."[39m)[33m;[39m
+     [90m    |[39m                 [31m[1m^[22m[39m
+     [90m 42 |[39m         [36mreturn[39m [][33m;[39m
+     [90m 43 |[39m     }
+     [90m 44 |[39m     [36mconst[39m q [33m=[39m query(eventosCollection[33m,[39m orderBy([32m'fechaEvento'[39m[33m,[39m 
+[32m'desc'[39m))[33m;[39m[0m
+
+      at Object.obtenerEventos (servicios/eventosApi.ts:41:17)
+      at context/DataContext.tsx:127:21
+      at context/DataContext.tsx:150:9
+      at Object.react_stack_bottom_frame (node_modules/react-dom/cjs/react-dom-client.development.js:25989:20)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at commitHookEffectListMount (node_modules/react-dom/cjs/react-dom-client.development.js:13249:29)
+      at commitHookPassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:13336:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15484:13)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15718:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15476:11)
+      at recursivelyTraversePassiveMountEffects (node_modules/react-dom/cjs/react-dom-client.development.js:15439:11)
+      at commitPassiveMountOnFiber (node_modules/react-dom/cjs/react-dom-client.development.js:15519:11)
+      at flushPassiveEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18432:9)
+      at flushPendingEffects (node_modules/react-dom/cjs/react-dom-client.development.js:18358:14)
+      at performSyncWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:18969:11)
+      at flushSyncWorkAcrossRoots_impl (node_modules/react-dom/cjs/react-dom-client.development.js:18814:21)
+      at flushSpawnedWork (node_modules/react-dom/cjs/react-dom-client.development.js:18334:9)
+      at commitRoot (node_modules/react-dom/cjs/react-dom-client.development.js:17955:9)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16667:15)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at renderComponent (components/FormularioEstudiante.test.tsx:42:18)
+      at Object.<anonymous> (components/FormularioEstudiante.test.tsx:122:5)
+
+
+Test Suites: 2 failed, 2 passed, 4 total
+Tests:       1 failed, 13 passed, 14 total
+Snapshots:   0 total
+Time:        11.771 s
+Ran all test suites.

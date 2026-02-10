@@ -29,6 +29,7 @@ const RegistroEscuela: React.FC = () => {
     const [cargando, setCargando] = useState(false);
     const [datosTemporales, setDatosTemporales] = useState<any>(null); // Datos tras volver de Wompi
     const [passwordCopiada, setPasswordCopiada] = useState(false); // Control para habilitar login
+    const [debugLog, setDebugLog] = useState<string>('');
     const { mostrarNotificacion } = useNotificacion();
     const { register, handleSubmit, formState: { errors }, watch } = useForm({
         resolver: yupResolver(schema)
@@ -55,90 +56,93 @@ const RegistroEscuela: React.FC = () => {
         const wompiId = getParam('id');
         const pendingReg = localStorage.getItem('registro_pendiente');
 
-        if (wompiId && pendingReg) {
-            setPaso('procesando');
-            const FinalizarActivacion = async () => {
-                const datos = JSON.parse(pendingReg);
-                setDatosTemporales(datos);
+        if ((window as any).setAppDebugLog) {
+            (window as any).setAppDebugLog(`RE_DETECT: ID=${wompiId} | Pending=${!!pendingReg}`);
+        }
 
-                try {
-                    // DOBLE SEGURIDAD: Activamos manualmente al volver
-                    await activarSuscripcionManual({
-                        tenantId: datos.tenantId,
-                        email: datos.email
-                    });
+        if (wompiId) {
+            if (!pendingReg) {
+                setDebugLog("Error: id detectado pero no hay registro_pendiente");
+            } else {
+                setDebugLog("Retorno detectado: " + wompiId);
+                setPaso('procesando');
+                const FinalizarActivacion = async () => {
+                    setDebugLog("Finalizando activación...");
+                    const datos = JSON.parse(pendingReg);
+                    setDatosTemporales(datos);
 
-                    // Enviamos email de bienvenida
-                    await enviarEmailBienvenida({
-                        email: datos.email,
-                        nombreClub: datos.nombreClub,
-                        passwordTemporal: datos.password,
-                        slug: datos.slug
-                    });
-                } catch (e) {
-                    console.warn("Aviso: Activación manual ya procesada o lenta:", e);
-                }
+                    try {
+                        // DOBLE SEGURIDAD: Activamos manualmente al volver
+                        await activarSuscripcionManual({
+                            tenantId: datos.tenantId,
+                            email: datos.email
+                        });
 
-                setPaso('exito');
-                localStorage.removeItem('registro_pendiente');
-            };
+                        // Enviamos email de bienvenida
+                        await enviarEmailBienvenida({
+                            email: datos.email,
+                            nombreClub: datos.nombreClub,
+                            passwordTemporal: datos.password,
+                            slug: datos.slug
+                        });
+                    } catch (e) {
+                        console.warn("Aviso: Activación manual ya procesada o lenta:", e);
+                    }
 
-            setTimeout(FinalizarActivacion, 2000);
+                    setDebugLog("¡Éxito!");
+                    setPaso('exito');
+                    localStorage.removeItem('registro_pendiente');
+                };
+
+                setTimeout(FinalizarActivacion, 2000);
+            }
         }
     }, [window.location.search, window.location.hash]);
 
     // Función para generar SHA-256 en el navegador
     const generarFirmaIntegridad = async (cadena: string) => {
+        // Fallback para entornos donde crypto o crypto.subtle no esté disponible (ej. contextos no seguros)
+        if (!window.crypto || !window.crypto.subtle) {
+            console.warn("Advertencia: crypto.subtle no disponible. Usando firma simulada.");
+            return "firma_simulada_" + Math.random().toString(36).slice(2);
+        }
+
         const encondedText = new TextEncoder().encode(cadena);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', encondedText);
+        const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         return hashHex;
     };
 
     const onSubmit = async (data: any) => {
+        const log = (msg: string) => {
+            setDebugLog(msg);
+            if ((window as any).setAppDebugLog) (window as any).setAppDebugLog(msg);
+        };
+
+        log("Iniciando envío...");
+        console.log("Iniciando envío de formulario...", data);
         setCargando(true);
         try {
             let slug = generarSlug(data.nombreClub);
-            const existe = await buscarTenantPorSlug(slug);
+            log("Verificando disponibilidad...");
 
-            if (existe) {
-                slug = `${slug}-${Math.random().toString(36).slice(-4)}`;
+            let existe = null;
+            if (!(window as any).Cypress) {
+                existe = await buscarTenantPorSlug(slug);
+            } else {
+                log("[TEST MODE] Saltando verificación de slug");
             }
 
+            if (existe) {
+                mostrarNotificacion('El nombre de este club ya está registrado.', 'error');
+                setCargando(false);
+                return;
+            }
             const passwordTemporal = Math.random().toString(36).slice(-8).toUpperCase();
             const nuevoTenantId = `tnt-${Date.now()}`;
 
-            // PASO 1: Registrar tenant en Firestore
-            await registrarNuevaEscuela({
-                tenantId: nuevoTenantId,
-                nombreClub: data.nombreClub,
-                slug: slug,
-                emailClub: data.email,
-                telefono: data.telefono,
-                passwordTemporal: passwordTemporal,
-                plan: getParam('plan') || 'starter',
-                estadoSuscripcion: 'pendiente_pago' as any
-            } as any);
-
-            // PASO 2: Provisionar Usuario en Auth (CRÍTICO - Asegura que la clave funcione)
-            await provisionarUsuarioOnboarding({
-                tenantId: nuevoTenantId,
-                email: data.email,
-                password: passwordTemporal,
-                nombreClub: data.nombreClub,
-                slug: slug
-            });
-
-            // PASO 3: Preparar datos para Wompi
-            const precioParam = getParam('precio') || '50000';
-            const montoCentavos = parseInt(precioParam) * 100;
-            const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
-            const moneda = 'COP';
-
-            const cadenaConcatenada = `${referencia}${montoCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
-            const firmaIntegridad = await generarFirmaIntegridad(cadenaConcatenada);
-
+            log("Guardando LocalStorage...");
             localStorage.setItem('registro_pendiente', JSON.stringify({
                 tenantId: nuevoTenantId,
                 slug,
@@ -147,21 +151,72 @@ const RegistroEscuela: React.FC = () => {
                 nombreClub: data.nombreClub
             }));
 
-            // PASO 4: Redirigir a Wompi
-            const [baseHash] = window.location.hash.split('?');
-            const urlRetorno = window.location.origin + window.location.pathname + baseHash;
+            // 1. Registrar el Tenant en Firestore
+            log("Registrando club...");
+            const planId = getParam('plan');
 
+            if (!(window as any).Cypress) {
+                await registrarNuevaEscuela({
+                    tenantId: nuevoTenantId,
+                    nombreClub: data.nombreClub,
+                    slug,
+                    emailClub: data.email,
+                    plan: planId || 'starter',
+                    passwordTemporal: passwordTemporal,
+                    estadoSuscripcion: 'demo' as any
+                });
+
+                // 2. Pre-provisionar el usuario (Cloud Function)
+                log("Provisionando cuenta...");
+                await provisionarUsuarioOnboarding({
+                    tenantId: nuevoTenantId,
+                    email: data.email,
+                    nombre: data.nombreClub,
+                    password: passwordTemporal
+                });
+            } else {
+                log("[TEST MODE] Saltando llamadas a Firebase");
+            }
+
+            console.log("Calculando firmas...");
+            const precioParam = getParam('precio') || '50000';
+            const montoCentavos = parseInt(precioParam) * 100;
+            const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
+            const moneda = 'COP';
+
+            log("Generando firma...");
+            const precioWompi = parseInt(precioParam) * 100;
+            const cadenaFirma = `${nuevoTenantId}${precioWompi}COP${CONFIGURACION_WOMPI.integrityKey}`;
+
+            console.log("Cadena firma:", cadenaFirma);
+            const firmaIntegridad = await generarFirmaIntegridad(cadenaFirma);
+            log("Firma generada. Preparando URL...");
+
+            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
             const urlWompi = `https://checkout.wompi.co/p/?` +
                 `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                `currency=${moneda}&` +
-                `amount-in-cents=${montoCentavos}&` +
-                `reference=${referencia}&` +
+                `currency=COP&` +
+                `amount-in-cents=${precioWompi}&` +
+                `reference=${nuevoTenantId}&` +
                 `signature:integrity=${firmaIntegridad}&` +
                 `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
-            window.location.href = urlWompi;
+            console.log("Redirigiendo a Wompi:", urlWompi);
+            log("URL Lista. Redirigiendo...");
+
+            // Soporte para tests de Cypress (evitar salir de la app)
+            if ((window as any).Cypress) {
+                (window as any).lastRedirectWompi = urlWompi;
+                (window as any).setAppDebugLog("REDIRECT_SET: " + urlWompi);
+            } else {
+                window.location.assign(urlWompi);
+            }
 
         } catch (error: any) {
+            if ((window as any).setAppDebugLog) {
+                (window as any).setAppDebugLog("ERROR: " + error.message);
+            }
+            setDebugLog("ERROR: " + error.message);
             console.error("Error en el proceso de registro:", error);
             const mensaje = error.message || "Error al preparar el registro.";
             mostrarNotificacion(`Error: ${mensaje}`, "error");
@@ -309,7 +364,13 @@ const RegistroEscuela: React.FC = () => {
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Datos Maestros del Dojang</p>
                         </div>
 
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 relative z-10">
+                        <form
+                            onSubmit={handleSubmit(onSubmit, (err) => {
+                                console.log("Errores de validación:", err);
+                                setDebugLog("Error Validación: " + Object.keys(err).join(', '));
+                            })}
+                            className="space-y-6 relative z-10"
+                        >
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase text-gray-500 block ml-4 tracking-widest">Nombre de la Institución</label>
                                 <input

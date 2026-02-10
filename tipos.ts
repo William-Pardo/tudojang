@@ -127,6 +127,7 @@ export interface ConfiguracionClub {
     limiteUsuarios: number;
     limiteSedes: number;
     logoUrl?: string;
+    passwordTemporal?: string;
 }
 
 export interface Estudiante {
@@ -281,35 +282,35 @@ export interface Asistencia {
 }
 
 export interface MisionKicho {
-  id: string;
-  tenantId: string;
-  nombreMision: string;
-  fechaExpiracion: string;
-  activa: boolean;
-  registrosRecibidos: number;
-  estadoLote: 'captura' | 'legalizado' | 'procesado';
-  firmaLegalizacion?: string;
-  fechaLegalizacion?: string;
+    id: string;
+    tenantId: string;
+    nombreMision: string;
+    fechaExpiracion: string;
+    activa: boolean;
+    registrosRecibidos: number;
+    estadoLote: 'captura' | 'legalizado' | 'procesado';
+    firmaLegalizacion?: string;
+    fechaLegalizacion?: string;
 }
 
 export interface RegistroTemporal {
-  id: string;
-  tenantId: string;
-  misionId: string;
-  fechaRegistro: string;
-  estado: 'pendiente' | 'verificado' | 'rechazado';
-  datos: {
-    nombres: string;
-    apellidos: string;
-    email: string;
-    telefono: string;
-    fechaNacimiento: string;
-    tutorNombre?: string;
-    tutorTelefono?: string;
-    tutorEmail?: string;
-    parentesco?: string;
-    sedeSugeridaId?: string;
-  };
+    id: string;
+    tenantId: string;
+    misionId: string;
+    fechaRegistro: string;
+    estado: 'pendiente' | 'verificado' | 'rechazado';
+    datos: {
+        nombres: string;
+        apellidos: string;
+        email: string;
+        telefono: string;
+        fechaNacimiento: string;
+        tutorNombre?: string;
+        tutorTelefono?: string;
+        tutorEmail?: string;
+        parentesco?: string;
+        sedeSugeridaId?: string;
+    };
 }
 
 export interface Usuario {

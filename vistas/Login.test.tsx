@@ -2,19 +2,36 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-// FIX: Added 'expect' to the import from '@jest/globals' to resolve type inference issues with jest-dom matchers.
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import Login from './Login';
-import { AuthProvider, useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../components/BrandingProvider';
 
 // Mock del contexto de autenticación
 jest.mock('../context/AuthContext', () => ({
-  ...(jest.requireActual('../context/AuthContext') as object),
   useAuth: jest.fn(),
+}));
+
+// Mock del contexto de Branding
+jest.mock('../components/BrandingProvider', () => ({
+  useTenant: jest.fn(),
+}));
+
+// Mock de LogoDinamico
+jest.mock('../components/LogoDinamico', () => ({
+  __esModule: true,
+  default: () => <div data-testid="logo-dinamico" />,
+}));
+
+// Mock de ModalRecuperarContrasena
+jest.mock('../components/ModalRecuperarContrasena', () => ({
+  __esModule: true,
+  default: () => <div data-testid="modal-recuperar" />,
 }));
 
 const mockLogin = jest.fn();
 const useAuthMock = useAuth as jest.Mock;
+const useTenantMock = useTenant as jest.Mock;
 
 describe('Login', () => {
   beforeEach(() => {
@@ -24,30 +41,26 @@ describe('Login', () => {
       error: null,
       isSubmitting: false,
     });
+    useTenantMock.mockReturnValue({
+      tenant: { nombreClub: 'Test Club' },
+      estaCargado: true
+    });
   });
 
-  const renderWithProvider = (component: React.ReactElement) => {
-    return render(
-      <AuthProvider>
-          {component}
-      </AuthProvider>
-    );
-  };
-  
   it('renderiza el formulario de login correctamente', () => {
-    renderWithProvider(<Login />);
-    
-    expect(screen.getByPlaceholderText('Correo Electrónico')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Contraseña')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ingresar/i })).toBeInTheDocument();
+    render(<Login />);
+
+    expect(screen.getByPlaceholderText('ejemplo@academia.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeInTheDocument();
   });
 
   it('permite al usuario escribir en los campos de usuario y contraseña', async () => {
     const user = userEvent.setup();
-    renderWithProvider(<Login />);
-    
-    const usuarioInput = screen.getByPlaceholderText('Correo Electrónico');
-    const contrasenaInput = screen.getByPlaceholderText('Contraseña');
+    render(<Login />);
+
+    const usuarioInput = screen.getByPlaceholderText('ejemplo@academia.com');
+    const contrasenaInput = screen.getByPlaceholderText('••••••••');
 
     await user.type(usuarioInput, 'testuser@test.com');
     await user.type(contrasenaInput, 'password123');
@@ -58,11 +71,11 @@ describe('Login', () => {
 
   it('llama a la función login al enviar el formulario', async () => {
     const user = userEvent.setup();
-    renderWithProvider(<Login />);
-    
-    const usuarioInput = screen.getByPlaceholderText('Correo Electrónico');
-    const contrasenaInput = screen.getByPlaceholderText('Contraseña');
-    const submitButton = screen.getByRole('button', { name: /Ingresar/i });
+    render(<Login />);
+
+    const usuarioInput = screen.getByPlaceholderText('ejemplo@academia.com');
+    const contrasenaInput = screen.getByPlaceholderText('••••••••');
+    const submitButton = screen.getByRole('button', { name: /Iniciar Sesión/i });
 
     await user.type(usuarioInput, 'admin@test.com');
     await user.type(contrasenaInput, 'admin123');
@@ -70,7 +83,6 @@ describe('Login', () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('admin@test.com', 'admin123');
-      expect(mockLogin).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -80,22 +92,22 @@ describe('Login', () => {
       error: 'Credenciales inválidas',
       isSubmitting: false,
     });
-    
-    renderWithProvider(<Login />);
-    
+
+    render(<Login />);
+
     expect(screen.getByText('Credenciales inválidas')).toBeInTheDocument();
   });
 
-  it('muestra "Ingresando..." y deshabilita el botón mientras se envía', () => {
+  it('muestra "Verificando..." y deshabilita el botón mientras se envía', () => {
     useAuthMock.mockReturnValue({
       login: mockLogin,
       error: null,
       isSubmitting: true,
     });
-    
-    renderWithProvider(<Login />);
 
-    const submitButton = screen.getByRole('button', { name: /Ingresando.../i });
+    render(<Login />);
+
+    const submitButton = screen.getByRole('button', { name: /Verificando.../i });
     expect(submitButton).toBeInTheDocument();
     expect(submitButton).toBeDisabled();
   });

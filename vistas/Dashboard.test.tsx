@@ -11,23 +11,28 @@ import { EstadoPago, GrupoEdad, EstadoSolicitudCompra } from '../tipos';
 
 // Mockear el hook y sus dependencias
 jest.mock('../hooks/useDashboard');
+jest.mock('../context/DataContext', () => ({
+  useSedes: () => ({ sedes: [] }),
+  useConfiguracion: () => ({ configClub: { diasSuspension: 15 } }),
+  useProgramas: () => ({ programas: [] }),
+}));
 jest.mock('../context/NotificacionContext', () => ({
-    useNotificacion: () => ({
-        mostrarNotificacion: jest.fn(),
-    }),
+  useNotificacion: () => ({
+    mostrarNotificacion: jest.fn(),
+  }),
 }));
 jest.mock('../servicios/geminiService');
 
 const useDashboardMock = useDashboard as jest.Mock;
 
 describe('VistaDashboard', () => {
-  
+
   const mockEstudiantes = [
     { id: '1', nombres: 'Estudiante 1', apellidos: 'Test', estadoPago: EstadoPago.AlDia, saldoDeudor: 0, fechaIngreso: '2023-01-01', grupo: GrupoEdad.Cadetes },
     { id: '2', nombres: 'Estudiante 2', apellidos: 'Test', estadoPago: EstadoPago.Pendiente, saldoDeudor: 100, fechaIngreso: '2023-02-01', grupo: GrupoEdad.Precadetes },
   ];
   const mockEventos = [
-      { id: 'evt1', nombre: 'Torneo 1', fechaEvento: '2099-12-01', lugar: 'Coliseo' },
+    { id: 'evt1', nombre: 'Torneo 1', fechaEvento: '2099-12-01', lugar: 'Coliseo' },
   ];
 
   it('muestra el loader mientras los datos están cargando', () => {
@@ -37,10 +42,14 @@ describe('VistaDashboard', () => {
       solicitudesCompra: [],
       filtros: {},
       filtrosActivos: false,
-      datosFiltrados: { estudiantesFiltrados: [], eventosParaMostrar: [] },
+      datosFiltrados: {
+        estudiantesFiltrados: [],
+        eventosParaMostrar: [],
+        finanzas: { ingresos: 0, egresos: 0, balance: 0 }
+      },
     });
     render(<VistaDashboard />);
-    expect(screen.getByText('Cargando dashboard...')).toBeInTheDocument();
+    expect(screen.getByText(/Sincronizando Consola Maestra/i)).toBeInTheDocument();
   });
 
   it('muestra un mensaje de error si la carga falla', () => {
@@ -51,7 +60,11 @@ describe('VistaDashboard', () => {
       solicitudesCompra: [],
       filtros: {},
       filtrosActivos: false,
-      datosFiltrados: { estudiantesFiltrados: [], eventosParaMostrar: [] },
+      datosFiltrados: {
+        estudiantesFiltrados: [],
+        eventosParaMostrar: [],
+        finanzas: { ingresos: 0, egresos: 0, balance: 0 }
+      },
     });
     render(<VistaDashboard />);
     expect(screen.getByText('¡Ups! Algo salió mal')).toBeInTheDocument();
@@ -65,7 +78,11 @@ describe('VistaDashboard', () => {
       solicitudesCompra: [],
       filtros: { fechaInicio: '', fechaFin: '', grupo: 'todos' },
       filtrosActivos: false,
-      datosFiltrados: { estudiantesFiltrados: mockEstudiantes, eventosParaMostrar: mockEventos },
+      datosFiltrados: {
+        estudiantesFiltrados: mockEstudiantes,
+        eventosParaMostrar: mockEventos,
+        finanzas: { ingresos: 250000, egresos: 50000, balance: 200000 }
+      },
       cargandoAccion: {},
       recargarTodo: jest.fn(),
       manejarGestionCompra: jest.fn(),
@@ -83,51 +100,56 @@ describe('VistaDashboard', () => {
     expect(screen.getByRole('heading', { name: /Dashboard/i })).toBeInTheDocument();
 
     // KPIs (ResumenKPIs)
-    expect(screen.getByText('Total de Estudiantes')).toBeInTheDocument();
+    expect(screen.getByText('Alumnos Totales')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument(); // 2 estudiantes
-    expect(screen.getByText('Pagos Pendientes')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument(); // 1 pendiente
+    expect(screen.getByText(/1 AL D/i)).toBeInTheDocument();
 
     // Eventos (ProximosEventos)
-    expect(screen.getByText('Próximos Eventos')).toBeInTheDocument();
+    expect(screen.getByText(/Pr.*ximos Eventos/i)).toBeInTheDocument();
     expect(screen.getByText('Torneo 1')).toBeInTheDocument();
 
     // Pagos (ResumenPagos)
-    expect(screen.getByText('Distribución de Estudiantes')).toBeInTheDocument();
+    expect(screen.getByText(/Distribuci.*n de Cartera/i)).toBeInTheDocument();
 
     // Accesos Directos
     expect(screen.getByText('Accesos Directos')).toBeInTheDocument();
     expect(screen.getByText('Gestionar Estudiantes')).toBeInTheDocument();
   });
-  
+
   it('muestra las solicitudes de compra pendientes si existen', () => {
     const mockSolicitudes = [{
       id: 'sc-1',
-      estudiante: { id: '1', nombres: 'Solicitante', apellidos: 'Test', estadoPago: EstadoPago.AlDia, saldoDeudor: 0, fechaIngreso: '2023-01-01', grupo: GrupoEdad.Cadetes, tutor: {nombres: 'Tutor', apellidos: 'Test'} },
+      estudiante: { id: '1', nombres: 'Solicitante', apellidos: 'Test', estadoPago: EstadoPago.AlDia, saldoDeudor: 0, fechaIngreso: '2023-01-01', grupo: GrupoEdad.Cadetes, tutor: { nombres: 'Tutor', apellidos: 'Test' } },
       implemento: { id: 'imp-1', nombre: 'Pechera' },
       variacion: { id: 'v-1', descripcion: 'Talla M', precio: 150000 },
       fechaSolicitud: '2024-01-01',
       estado: EstadoSolicitudCompra.Pendiente,
     }];
-    
-     useDashboardMock.mockReturnValue({
+
+    useDashboardMock.mockReturnValue({
       cargando: false,
       error: null,
       solicitudesCompra: mockSolicitudes,
       filtros: { fechaInicio: '', fechaFin: '', grupo: 'todos' },
       filtrosActivos: false,
-      datosFiltrados: { estudiantesFiltrados: mockEstudiantes, eventosParaMostrar: mockEventos },
+      datosFiltrados: {
+        estudiantesFiltrados: mockEstudiantes,
+        eventosParaMostrar: mockEventos,
+        finanzas: { ingresos: 0, egresos: 0, balance: 0 }
+      },
       cargandoAccion: {},
       manejarGestionCompra: jest.fn(),
     });
-    
+
     render(
       <ReactRouterDOM.MemoryRouter>
         <VistaDashboard />
       </ReactRouterDOM.MemoryRouter>
     );
-    
+
     expect(screen.getByText(/Solicitudes de Compra Pendientes/)).toBeInTheDocument();
-    expect(screen.getByText(/Solicitante Test quiere comprar Pechera/)).toBeInTheDocument();
+    expect(screen.getByText(/Solicitante Test/)).toBeInTheDocument();
+    expect(screen.getByText(/quiere comprar/)).toBeInTheDocument();
+    expect(screen.getByText(/Pechera/)).toBeInTheDocument();
   });
 });

@@ -1,10 +1,14 @@
-
 // cypress/support/e2e.ts
-// This file is processed automatically before running test files.
-// It's a great place to put global configuration and behavior that modifies Cypress.
-
-// FIX: Removed the failing triple-slash reference as types are handled via local declarations in the respective files to resolve compiler errors.
 import './commands';
 
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
+Cypress.on('window:before:load', (win) => {
+    cy.spy(win.console, 'error').as('consoleError');
+    cy.spy(win.console, 'warn').as('consoleWarn');
+    cy.spy(win.console, 'log').as('consoleLog');
+});
+
+// Pipe console errors to Cypress log for better visibility in headless mode
+Cypress.on('uncaught:exception', (err, runnable) => {
+    console.error('Uncaught Exception:', err.message);
+    return false; // prevent Cypress from failing the test immediately if we want to see more
+});

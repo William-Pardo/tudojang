@@ -62,7 +62,7 @@ describe('ModalConfirmacion', () => {
     expect(onConfirmarMock).toHaveBeenCalledTimes(1);
   });
 
-  it('llama a onCerrar cuando se hace clic en el botón de cancelar', () => {
+  it('llama a onCerrar cuando se hace clic en el botón de cancelar', async () => {
     render(
       <ModalConfirmacion
         abierto={true}
@@ -73,10 +73,10 @@ describe('ModalConfirmacion', () => {
         cargando={false}
       />
     );
-
+    const { waitFor } = require('@testing-library/react');
     const botonCancelar = screen.getByText('Cancelar');
     fireEvent.click(botonCancelar);
-    expect(onCerrarMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onCerrarMock).toHaveBeenCalledTimes(1));
   });
 
   it('deshabilita los botones cuando "cargando" es verdadero', () => {
@@ -90,7 +90,7 @@ describe('ModalConfirmacion', () => {
         cargando={true}
       />
     );
-    
+
     expect(screen.getByText('Procesando...')).toBeInTheDocument();
     expect(screen.getByText('Procesando...').closest('button')).toBeDisabled();
     expect(screen.getByText('Cancelar').closest('button')).toBeDisabled();

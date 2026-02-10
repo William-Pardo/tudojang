@@ -1,0 +1,19 @@
+﻿node.exe : PASS vistas/Login.test.tsx
+En C:\Program Files\nodejs\npx.ps1: 29 Carácter: 3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS vistas/Login.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Login
+    ÔêÜ renderiza el formulario de login correctamente (363 ms)
+    ÔêÜ permite al usuario escribir en los campos de usuario y contrase├▒a (641 ms)
+    ÔêÜ llama a la funci├│n login al enviar el formulario (651 ms)
+    ÔêÜ muestra un mensaje de error si el login falla (30 ms)
+    ÔêÜ muestra "Verificando..." y deshabilita el bot├│n mientras se env├¡a (91 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        6.408 s
+Ran all test suites matching /vistas\\Login.test.tsx/i.

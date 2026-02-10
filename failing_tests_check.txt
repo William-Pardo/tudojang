@@ -1,0 +1,122 @@
+﻿node.exe : PASS components/ModalConfirmacion.test.tsx
+En C:\Program Files\nodejs\npx.ps1: 29 Carácter: 3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS components...macion.test.tsx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+PASS vistas/Dashboard.test.tsx (5.337 s)
+  ÔùÅ Console
+
+    console.warn
+      ADVERTENCIA: La configuraci├│n de Firebase no est├í definida. Se utilizar├í una configuraci├│n de respaldo (MODO SIMULADO).
+
+    [0m [90m 39 |[39m [90m// Configuraci├│n de respaldo (Mock Mode)[39m
+     [90m 40 |[39m [36mif[39m ([33m![39misFirebaseConfigured) {
+    [31m[1m>[22m[39m[90m 41 |[39m   console[33m.[39mwarn([32m"ADVERTENCIA: La configuraci├│n de Firebase no est├í definida. Se utilizar├í una 
+configuraci├│n de respaldo (MODO SIMULADO)."[39m)[33m;[39m
+     [90m    |[39m           [31m[1m^[22m[39m
+     [90m 42 |[39m   firebaseConfig [33m=[39m {
+     [90m 43 |[39m     apiKey[33m:[39m [32m"xxxxxxxxxxxxxxxxxxxxxxxxxx"[39m[33m,[39m
+     [90m 44 |[39m     authDomain[33m:[39m [32m"xxxxxxxx.firebaseapp.com"[39m[33m,[39m[0m
+
+      at Object.<anonymous> (firebase/config.ts:41:11)
+      at Object.<anonymous> (servicios/usuariosApi.ts:20:1)
+      at Object.<anonymous> (servicios/api.ts:3:1)
+      at Object.<anonymous> (components/dashboard/SolicitudesCompraPendientes.tsx:13:1)
+      at Object.<anonymous> (vistas/Dashboard.tsx:6:1)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:8:1)
+
+    console.error
+      You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use 
+`defaultValue`. Otherwise, set `onChange`.
+
+    [0m [90m 142 |[39m     })[33m;[39m
+     [90m 143 |[39m
+    [31m[1m>[22m[39m[90m 144 |[39m     render(
+     [90m     |[39m           [31m[1m^[22m[39m
+     [90m 145 |[39m       [33m<[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m
+     [90m 146 |[39m         [33m<[39m[33mVistaDashboard[39m [33m/[39m[33m>[39m
+     [90m 147 |[39m       [33m<[39m[33m/[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m[0m
+
+      at checkControlledValueProps (node_modules/react-dom/cjs/react-dom-client.development.js:1422:21)
+      at setInitialProperties (node_modules/react-dom/cjs/react-dom-client.development.js:20587:11)
+      at completeWork (node_modules/react-dom/cjs/react-dom-client.development.js:12662:18)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at completeUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17777:19)
+      at performUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17658:11)
+      at workLoopSync (node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16504:11)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:144:11)
+
+    console.error
+      You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use 
+`defaultValue`. Otherwise, set either `onChange` or `readOnly`.
+
+    [0m [90m 142 |[39m     })[33m;[39m
+     [90m 143 |[39m
+    [31m[1m>[22m[39m[90m 144 |[39m     render(
+     [90m     |[39m           [31m[1m^[22m[39m
+     [90m 145 |[39m       [33m<[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m
+     [90m 146 |[39m         [33m<[39m[33mVistaDashboard[39m [33m/[39m[33m>[39m
+     [90m 147 |[39m       [33m<[39m[33m/[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m[0m
+
+      at checkControlledValueProps (node_modules/react-dom/cjs/react-dom-client.development.js:1425:21)
+      at setInitialProperties (node_modules/react-dom/cjs/react-dom-client.development.js:20534:11)
+      at completeWork (node_modules/react-dom/cjs/react-dom-client.development.js:12662:18)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at completeUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17777:19)
+      at performUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17658:11)
+      at workLoopSync (node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16504:11)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:144:11)
+
+    console.error
+      You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use 
+`defaultValue`. Otherwise, set either `onChange` or `readOnly`.
+
+    [0m [90m 142 |[39m     })[33m;[39m
+     [90m 143 |[39m
+    [31m[1m>[22m[39m[90m 144 |[39m     render(
+     [90m     |[39m           [31m[1m^[22m[39m
+     [90m 145 |[39m       [33m<[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m
+     [90m 146 |[39m         [33m<[39m[33mVistaDashboard[39m [33m/[39m[33m>[39m
+     [90m 147 |[39m       [33m<[39m[33m/[39m[33mReactRouterDOM[39m[33m.[39m[33mMemoryRouter[39m[33m>[39m[0m
+
+      at checkControlledValueProps (node_modules/react-dom/cjs/react-dom-client.development.js:1425:21)
+      at setInitialProperties (node_modules/react-dom/cjs/react-dom-client.development.js:20534:11)
+      at completeWork (node_modules/react-dom/cjs/react-dom-client.development.js:12662:18)
+      at runWithFiberInDEV (node_modules/react-dom/cjs/react-dom-client.development.js:874:13)
+      at completeUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17777:19)
+      at performUnitOfWork (node_modules/react-dom/cjs/react-dom-client.development.js:17658:11)
+      at workLoopSync (node_modules/react-dom/cjs/react-dom-client.development.js:17469:41)
+      at renderRootSync (node_modules/react-dom/cjs/react-dom-client.development.js:17450:11)
+      at performWorkOnRoot (node_modules/react-dom/cjs/react-dom-client.development.js:16504:11)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-dom/cjs/react-dom-client.development.js:18957:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:590:34)
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:884:10)
+      at node_modules/@testing-library/react/dist/act-compat.js:46:25
+      at renderRoot (node_modules/@testing-library/react/dist/pure.js:189:26)
+      at render (node_modules/@testing-library/react/dist/pure.js:291:10)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:144:11)
+
+
+Test Suites: 2 passed, 2 total
+Tests:       9 passed, 9 total
+Snapshots:   0 total
+Time:        8.948 s
+Ran all test suites matching /vistas\\Dashboard.test.tsx|components\\ModalConfirmacion.test.tsx/i.

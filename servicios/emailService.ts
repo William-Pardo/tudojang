@@ -30,6 +30,13 @@ interface NotificarCambioPasswordParams {
  * Helper para llamar a las funciones directamente (Evita problemas de Hosting/CORS)
  */
 const callApi = async (functionName: string, data: any) => {
+    // SOPORTE PARA MOCK MODE (Desarrollo sin Firebase configurado)
+    const { isFirebaseConfigured } = await import('../firebase/config');
+    if (!isFirebaseConfigured) {
+        console.warn(`[MOCK MODE] Simulando llamada exitosa a: ${functionName}`);
+        return { success: true, message: 'Operación simulada con éxito' };
+    }
+
     // Usamos la URL directa de la función para mayor fiabilidad
     const baseUrl = `https://us-central1-tudojang.cloudfunctions.net`;
     const url = `${baseUrl}/${functionName}`;

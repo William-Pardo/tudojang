@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-import './firebase/config';
+import { isFirebaseConfigured } from './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
@@ -169,8 +169,28 @@ const AppLayout: React.FC = () => {
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
+    const [appDebug, setAppDebug] = React.useState('App Iniciada');
 
-    if (cargandoSesion) return <div className="flex items-center justify-center h-screen bg-tkd-dark text-white"><div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div></div>;
+    React.useEffect(() => {
+        if ((window as any).Cypress) {
+            (window as any).setAppDebugLog = (msg: string) => {
+                setAppDebug(prev => prev + " | " + msg);
+            };
+        }
+    }, []);
+
+    const debugDiv = (window as any).Cypress ? (
+        <div id="debug-log-onboarding" className="fixed bottom-0 left-0 bg-black/80 text-white text-[10px] p-2 z-[10000] min-w-full">
+            {appDebug} | Host: {window.location.hostname} | FB: {String(isFirebaseConfigured)} | Hash: {window.location.hash} | User: {usuario ? usuario.email : 'No'} | Loading: {cargandoSesion ? 'Yes' : 'No'}
+        </div>
+    ) : null;
+
+    if (cargandoSesion) return (
+        <div className="flex items-center justify-center h-screen bg-tkd-dark text-white">
+            <div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div>
+            {debugDiv}
+        </div>
+    );
 
     const host = window.location.hostname;
     const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
@@ -178,41 +198,47 @@ const AppRoutes: React.FC = () => {
     // Mostrar rutas públicas SOLO si: dominio raíz + sin tenant + sin usuario autenticado
     if (isRootDomain && (!tenant || tenant.slug === 'gajog') && !usuario) {
         return (
-            <ReactRouterDOM.Routes>
-                <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
-                <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
-                <ReactRouterDOM.Route path="/login" element={<Login />} />
-                <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
-            </ReactRouterDOM.Routes>
+            <>
+                <ReactRouterDOM.Routes>
+                    <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
+                    <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
+                    <ReactRouterDOM.Route path="/login" element={<Login />} />
+                    <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
+                </ReactRouterDOM.Routes>
+                {debugDiv}
+            </>
         );
     }
 
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
     return (
-        <ReactRouterDOM.Routes>
-            <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to={usuario.rol === RolUsuario.Tutor ? "/mi-perfil" : "/"} replace /> : <Login />} />
-            <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
-            <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
-            <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
-            <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
-            <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
-            <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
-            <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
-            <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
+        <>
+            <ReactRouterDOM.Routes>
+                <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to={usuario.rol === RolUsuario.Tutor ? "/mi-perfil" : "/"} replace /> : <Login />} />
+                <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
+                <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
+                <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
+                <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
+                <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
+                <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
+                <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
+                <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
 
-            <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
-                <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
-                <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
-                <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
-                <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
-                <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />
-                <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
-                <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
-                <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />
-            </ReactRouterDOM.Route>
-            <ReactRouterDOM.Route path="*" element={<Vista404 />} />
-        </ReactRouterDOM.Routes>
+                <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
+                    <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
+                    <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
+                    <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
+                    <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
+                    <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />
+                    <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
+                    <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
+                    <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />
+                </ReactRouterDOM.Route>
+                <ReactRouterDOM.Route path="*" element={<Vista404 />} />
+            </ReactRouterDOM.Routes>
+            {debugDiv}
+        </>
     );
 };
 

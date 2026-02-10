@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tudojang - Bienvenida</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        .title-font {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 51, 102, 0.1);
+        }
+
+        .header-accent {
+            height: 6px;
+            background: linear-gradient(90deg, #003366 0%, #cc3333 100%);
+        }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 16px 35px;
+            background-color: #cc3333;
+            color: #ffffff !important;
+            text-decoration: none;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-style: italic;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .credentials-box {
+            background-color: #f1f5f9;
+            border-radius: 6px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .footer {
+            background-color: #001a33;
+            color: #94a3b8;
+            padding: 40px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .brush-stroke {
+            border-left: 4px solid #cc3333;
+            padding-left: 20px;
+            margin: 25px 0;
+            font-style: italic;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-container">
+        <div class="header-accent"></div>
+        
+        <!-- LOGO OFICIAL -->
+        <div class="p-10 text-center">
+            <div class="mb-8">
+                <img src="https://gist.github.com/William-Pardo/87c1222a61e7e257cb576be90625d23a" alt="Tudojang" style="max-width: 180px; margin: 0 auto;">
+            </div>
+
+            <div class="flex justify-center items-center space-x-2 mb-6">
+                <span class="text-2xl">🥋</span>
+                <h1 class="text-2xl font-black title-font italic text-[#003366] uppercase tracking-tight">
+                    ¡Acceso Activado!
+                </h1>
+            </div>
+
+            <p class="text-gray-600 text-lg leading-relaxed text-left">
+                Saludos <span class="font-bold text-[#003366] italic">Sabonim {{nombre_usuario}}</span>,
+            </p>
+            
+            <p class="text-gray-600 text-lg leading-relaxed text-left mt-4">
+                Es un honor informarte que la academia <span class="text-[#cc3333] font-black uppercase">{{nombre_academia}}</span> ha sido dada de alta exitosamente en **Tudojang.com**.
+            </p>
+
+            <div class="brush-stroke text-left">
+                "La autoridad técnica se construye con disciplina, el control de la academia con Tudojang."
+            </div>
+
+            <!-- CUADRO DE CREDENCIALES CON ETIQUETAS -->
+            <div class="credentials-box mt-8 text-left">
+                <p class="text-[10px] uppercase tracking-widest text-[#003366] font-bold mb-4">Credenciales de Acceso:</p>
+                <div class="flex justify-between mb-2">
+                    <span class="text-gray-500">Usuario:</span>
+                    <span class="font-bold text-[#003366]">{{email_usuario}}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Clave temporal:</span>
+                    <span class="font-mono font-bold bg-white px-2 py-1 rounded border border-gray-200 text-black">
+                        {{password_temporal}}
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-10">
+                <a href="https://tudojang.com" class="btn-primary">Iniciar sesión en mi Dojo</a>
+            </div>
+            
+            <p class="text-[11px] text-gray-400 mt-8 italic">
+                * Por seguridad, se le solicitará cambiar su contraseña al ingresar por primera vez.
+            </p>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <div class="mb-4">
+                <span class="title-font font-black italic text-lg text-white">Tudo<span class="text-[#cc3333]">jang</span></span>
+            </div>
+            <p class="uppercase tracking-widest text-[10px] mb-6">Software Técnico para Academias en Colombia</p>
+            
+            <div class="flex justify-center space-x-4 mb-6">
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Diferenciales</a>
+                <span class="text-gray-700">|</span>
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Protocolo Kicho</a>
+                <span class="text-gray-700">|</span>
+                <a href="#" class="text-gray-400 hover:text-white transition-colors">Soporte</a>
+            </div>
+
+            <p class="text-gray-500 text-[10px]">
+                © 2026 Tudojang.com. Todos los derechos reservados.<br>
+                Recupere su tiempo y asegure su recaudo.
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -233,17 +233,20 @@ const PublicLanding: React.FC = () => {
                                         {/* Check de validación visual inferior (Solo visible en activo) */}
                                         <Link
                                             to={`/registro-escuela?plan=${plan.id}&precio=${precioFinal}`}
-                                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${esActivo ? 'border-tkd-blue bg-tkd-blue shadow-lg scale-110' : 'border-gray-300 hover:border-tkd-blue'
-                                                }`}
+                                            className="flex flex-col items-center gap-4"
                                         >
-                                            <IconoAprobar className={`w-6 h-6 transition-colors ${esActivo ? 'text-white' : 'text-gray-300'}`} />
-                                        </Link>
+                                            <div
+                                                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${esActivo ? 'border-tkd-blue bg-tkd-blue shadow-lg scale-110' : 'border-gray-300 hover:border-tkd-blue'
+                                                    }`}
+                                            >
+                                                <IconoAprobar className={`w-6 h-6 transition-colors ${esActivo ? 'text-white' : 'text-gray-300'}`} />
+                                            </div>
 
-                                        {/* Nuevo Atributo "Elegir Plan" */}
-                                        <span className={`text-[10px] uppercase tracking-widest transition-all duration-300 ${esActivo ? 'text-red-600 font-bold scale-105' : 'text-gray-400 font-medium'
-                                            }`}>
-                                            Elegir este plan
-                                        </span>
+                                            <span className={`text-[10px] uppercase tracking-widest transition-all duration-300 ${esActivo ? 'text-red-600 font-bold scale-105' : 'text-gray-400 font-medium'
+                                                }`}>
+                                                Elegir este plan
+                                            </span>
+                                        </Link>
                                     </div>
                                 </motion.div>
                             );
