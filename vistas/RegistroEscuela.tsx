@@ -171,7 +171,7 @@ const RegistroEscuela: React.FC = () => {
                 await provisionarUsuarioOnboarding({
                     tenantId: nuevoTenantId,
                     email: data.email,
-                    nombre: data.nombreClub,
+                    nombreClub: data.nombreClub,
                     password: passwordTemporal
                 });
             } else {

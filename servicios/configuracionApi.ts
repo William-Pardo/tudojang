@@ -3,7 +3,7 @@
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
-import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
+import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
 
 const KEY_CONF_NOTIF = 'tkd_mock_conf_notif';
 
@@ -59,6 +59,9 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
     if (!isFirebaseConfigured) return '';
 
     const nuevoTenantId = datos.tenantId || `tnt-${Date.now()}`;
+    const planId = (datos.plan || 'starter') as keyof typeof PLANES_SAAS;
+    const infoPlan = PLANES_SAAS[planId] || PLANES_SAAS.starter;
+
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
         estadoSuscripcion: 'demo', // Valor por defecto
@@ -66,6 +69,10 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
         ...datos,
         tenantId: nuevoTenantId,
         slug: datos.slug?.toLowerCase().trim() || '',
+        // Forzar los límites según el plan elegido para evitar trampas o errores
+        limiteEstudiantes: infoPlan.limiteEstudiantes,
+        limiteUsuarios: infoPlan.limiteUsuarios,
+        limiteSedes: infoPlan.limiteSedes
     };
 
     await setDoc(doc(db, 'tenants', nuevoTenantId), configNueva);
@@ -74,21 +81,41 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
 
 export const obtenerConfiguracionClub = async (tenantId?: string): Promise<ConfiguracionClub> => {
     if (!isFirebaseConfigured) {
-        // Added comment above fix: explicitly cast CONFIGURACION_CLUB_POR_DEFECTO to ConfiguracionClub.
         return CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub;
-    }
-
-    if (tenantId) {
-        const docRef = doc(db, 'tenants', tenantId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) return { id: docSnap.id, ...docSnap.data() } as any;
     }
 
     const host = window.location.hostname;
     let slug = host.split('.')[0];
     if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
+
+    // Determinar qué ID buscar
+    const targetTenantId = tenantId || (slug === 'gajog' ? 'escuela-gajog-001' : null);
+
+    if (targetTenantId) {
+        const docRef = doc(db, 'tenants', targetTenantId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as any;
+        }
+
+        // AUTO-CURACIÓN: Si el tenant por defecto (gajog) no existe, lo recreamos
+        if (targetTenantId === 'escuela-gajog-001') {
+            console.warn("[configuracionApi] Tenant maestro no encontrado. Recreando configuración por defecto...");
+            const defaultDoc: ConfiguracionClub = {
+                ...CONFIGURACION_CLUB_POR_DEFECTO,
+                tenantId: 'escuela-gajog-001',
+                slug: 'gajog',
+                nombreClub: 'Taekwondo Ga Jog',
+                estadoSuscripcion: 'activo',
+                plan: 'pro'
+            };
+            await setDoc(doc(db, 'tenants', 'escuela-gajog-001'), defaultDoc);
+            return defaultDoc;
+        }
+    }
+
     const tenant = await buscarTenantPorSlug(slug);
-    // Added comment above fix: explicitly cast CONFIGURACION_CLUB_POR_DEFECTO to ConfiguracionClub.
     return tenant || CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub;
 };
 
@@ -145,4 +172,17 @@ export const cambiarEstadoSuscripcionTenant = async (tenantId: string, nuevoEsta
     if (!isFirebaseConfigured) return;
     const docRef = doc(db, 'tenants', tenantId);
     await updateDoc(docRef, { estadoSuscripcion: nuevoEstado });
+};
+
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+export const subirLogoTenant = async (tenantId: string, file: File): Promise<string> => {
+    if (!isFirebaseConfigured) {
+        return URL.createObjectURL(file);
+    }
+    const storage = getStorage();
+    const storageRef = ref(storage, `logos/${tenantId}/${Date.now()}_${file.name}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(snapshot.ref);
+    return url;
 };

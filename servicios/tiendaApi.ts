@@ -253,6 +253,7 @@ export const registrarCompra = async (idEstudiante: string, implemento: Implemen
 export const crearSolicitudCompra = async (numIdentificacion: string, implemento: Implemento, variacion: VariacionImplemento): Promise<SolicitudCompra> => {
     const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
     const nuevaSolicitudData = {
+        tenantId: estudiante.tenantId, // Inyectar tenantId
         estudiante: {
             id: estudiante.id, nombres: estudiante.nombres, apellidos: estudiante.apellidos,
             tutor: estudiante.tutor ? { nombres: estudiante.tutor.nombres, apellidos: estudiante.tutor.apellidos, telefono: estudiante.tutor.telefono, correo: estudiante.tutor.correo } : null
@@ -267,9 +268,12 @@ export const crearSolicitudCompra = async (numIdentificacion: string, implemento
     return { id: docRef.id, ...nuevaSolicitudData } as any;
 };
 
-export const obtenerSolicitudesCompra = async (): Promise<SolicitudCompra[]> => {
+export const obtenerSolicitudesCompra = async (tenantId?: string): Promise<SolicitudCompra[]> => {
     if (!isFirebaseConfigured) return [];
-    const q = query(solicitudesCompraCollection, where("estado", "==", EstadoSolicitudCompra.Pendiente));
+    let q = query(solicitudesCompraCollection, where("estado", "==", EstadoSolicitudCompra.Pendiente));
+    if (tenantId) {
+        q = query(solicitudesCompraCollection, where("tenantId", "==", tenantId), where("estado", "==", EstadoSolicitudCompra.Pendiente));
+    }
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SolicitudCompra));
 };

@@ -1,12 +1,12 @@
 
 // servicios/estudiantesApi.ts
-import { 
-    collection, 
-    getDocs, 
-    doc, 
-    getDoc, 
-    addDoc, 
-    updateDoc, 
+import {
+    collection,
+    getDocs,
+    doc,
+    getDoc,
+    addDoc,
+    updateDoc,
     deleteDoc,
     query,
     where,
@@ -22,8 +22,8 @@ const storage = getStorage();
 
 const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'consentimiento' | 'contrato' | 'imagen'): Promise<string> => {
     if (!isFirebaseConfigured) {
-      console.warn("MODO SIMULADO: Saltando subida de firma a Firebase Storage.");
-      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+        console.warn("MODO SIMULADO: Saltando subida de firma a Firebase Storage.");
+        return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
     const storageRef = ref(storage, `firmas/${idEstudiante}/${tipo}_${Date.now()}.png`);
     const finalBase64 = firmaBase64.startsWith('data:') ? firmaBase64 : `data:image/png;base64,${firmaBase64}`;
@@ -32,27 +32,35 @@ const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'con
     return downloadURL;
 };
 
-export const obtenerEstudiantes = async (): Promise<Estudiante[]> => {
+export const obtenerEstudiantes = async (tenantId?: string): Promise<Estudiante[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
-        return [
+        const mock = [
             {
-                id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10', 
-                grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001', 
+                id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10',
+                grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001',
                 correo: 'juan@test.com', fechaIngreso: '2024-01-10', estadoPago: EstadoPago.AlDia, historialPagos: [], saldoDeudor: 0,
                 consentimientoInformado: true, contratoServiciosFirmado: true, consentimientoImagenFirmado: true, consentimientoFotosVideos: true,
                 carnetGenerado: false
             },
             {
-                id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15', 
-                grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002', 
+                id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15',
+                grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002',
                 correo: 'maria@test.com', fechaIngreso: '2024-05-15', estadoPago: EstadoPago.Pendiente, historialPagos: [], saldoDeudor: 180000,
                 consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false, consentimientoFotosVideos: false,
                 carnetGenerado: false
             }
         ];
+        if (!tenantId) return mock;
+        return mock.filter(e => e.tenantId === tenantId);
     }
-    const snapshot = await getDocs(estudiantesCollection);
+
+    let q = query(estudiantesCollection);
+    if (tenantId) {
+        q = query(estudiantesCollection, where("tenantId", "==", tenantId));
+    }
+
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, carnetGenerado: false, ...doc.data() } as Estudiante));
 };
 
@@ -70,7 +78,7 @@ export const marcarCarnetsComoGenerados = async (ids: string[]): Promise<void> =
 };
 
 export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estudiante> => {
-     if (!isFirebaseConfigured) {
+    if (!isFirebaseConfigured) {
         const all = await obtenerEstudiantes();
         const found = all.find(e => e.id === idEstudiante);
         if (found) return found;
@@ -86,7 +94,7 @@ export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estu
 };
 
 export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: string): Promise<Estudiante> => {
-     if (!isFirebaseConfigured) {
+    if (!isFirebaseConfigured) {
         const all = await obtenerEstudiantes();
         const found = all.find(e => e.numeroIdentificacion === numIdentificacion);
         if (found) return found;
@@ -115,7 +123,7 @@ export const agregarEstudiante = async (nuevoEstudiante: Omit<Estudiante, 'id' |
 };
 
 export const actualizarEstudiante = async (estudianteActualizado: Estudiante): Promise<Estudiante> => {
-     if (!isFirebaseConfigured) {
+    if (!isFirebaseConfigured) {
         return estudianteActualizado;
     }
     const { id, ...data } = estudianteActualizado;
@@ -125,7 +133,7 @@ export const actualizarEstudiante = async (estudianteActualizado: Estudiante): P
 };
 
 export const eliminarEstudiante = async (idEstudiante: string): Promise<void> => {
-     if (!isFirebaseConfigured) return;
+    if (!isFirebaseConfigured) return;
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await deleteDoc(docRef);
 };
@@ -138,7 +146,7 @@ export const guardarFirmaConsentimiento = async (idEstudiante: string, firmaDigi
 };
 
 export const guardarFirmaContrato = async (idEstudiante: string, firmaDigital: string): Promise<void> => {
-     if (!isFirebaseConfigured) return;
+    if (!isFirebaseConfigured) return;
     const urlFirma = await uploadFirma(idEstudiante, firmaDigital, 'contrato');
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await updateDoc(docRef, { contratoServiciosFirmado: true, 'tutor.firmaContratoDigital': urlFirma });

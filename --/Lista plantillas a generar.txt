@@ -1,0 +1,6 @@
+Bienvenida a la Academia (Onboarding): Se envía al tutor/alumno cuando se registra por primera vez. Incluye sus credenciales iniciales y un mensaje motivador.
+Firma exitosa de Contrato: Una vez el tutor firma digitalmente, se le envía un correo con el PDF (o link) del contrato firmado para sus registros legales.
+Recordatorio de Pago (Próximo a Vencer): Un correo automático 5 días antes de su fecha de pago para evitar que entren en estado de mora.
+Confirmación de Compra en Tienda: Recibo detalle de los implementos comprados y estado de entrega.
+Notificación de Grado (Examen): Felicitaciones por aprobar un examen y cambio de cinturón (es vital para la retención del alumno).
+Alerta de Suscripción SaaS (Para el Dueño): Correo que te llega a ti cuando una escuela está por vencer su plan mensual de Tudojang.

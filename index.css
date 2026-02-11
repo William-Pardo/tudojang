@@ -1,14 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
-
-:root {
-  --color-primario: #111111;
-  --color-secundario: #0047A0;
-  --color-acento: #CD2E3A;
-}
 
 html {
   scroll-behavior: smooth;
@@ -31,6 +25,7 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -46,8 +41,13 @@ body {
 }
 
 /* Tipografía extrema para títulos marciales */
-.font-black { font-weight: 900; }
-.tracking-tighter { letter-spacing: -0.05em; }
+.font-black {
+  font-weight: 900;
+}
+
+.tracking-tighter {
+  letter-spacing: -0.05em;
+}
 
 /* Micro-interacciones de botones */
 .btn-premium {

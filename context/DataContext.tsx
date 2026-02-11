@@ -8,6 +8,7 @@ import type {
 } from '../tipos';
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
+import { useAuth } from './AuthContext';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
 // --- CONFIGURACIÓN ---
@@ -101,7 +102,8 @@ interface SedesContextType {
 const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { tenant } = useTenant();
+    const { tenant, cargarTenant } = useTenant();
+    const { usuario } = useAuth();
 
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({
@@ -119,17 +121,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>([]);
     const [sedes, setSedes] = useState<Sede[]>([]);
     const [programas, setProgramas] = useState<Programa[]>([]);
+    const [configClub, setConfigClub] = useState<ConfiguracionClub>(CONFIGURACION_CLUB_POR_DEFECTO);
 
     const [cargando, setCargando] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // El ID de tenant prioritario es el del usuario logueado, sino el del branding (subdominio)
+    const effectiveTenantId = usuario?.tenantId || tenant?.tenantId || '';
+
     const cargarTodo = useCallback(async () => {
-        if (!tenant) {
-            console.warn("[DataContext] No hay tenant configurado, abortando carga.");
+        if (!effectiveTenantId) {
+            console.warn("[DataContext] No hay tenantId (usuario ni branding), abortando carga.");
             return;
         }
 
-        console.log("[DataContext] Iniciando sincronización para:", tenant.nombreClub, `(ID: ${tenant.tenantId})`);
+        console.log("[DataContext] Sincronizando datos para:", usuario?.tenantId ? `Usuario (${usuario.nombreUsuario})` : `Branding (${tenant?.nombreClub})`, `ID: ${effectiveTenantId}`);
         setCargando(true);
         setError(null);
 
@@ -141,15 +147,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             const results = await Promise.race([
                 Promise.allSettled([
-                    api.obtenerUsuarios(),
-                    api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                    api.obtenerSedes(),
-                    api.obtenerEstudiantes(),
-                    api.obtenerEventos(),
+                    api.obtenerUsuarios(effectiveTenantId),
+                    api.obtenerConfiguracionNotificaciones(effectiveTenantId),
+                    api.obtenerSedes(effectiveTenantId),
+                    api.obtenerEstudiantes(effectiveTenantId),
+                    api.obtenerEventos(effectiveTenantId),
                     api.obtenerImplementos(),
-                    api.obtenerSolicitudesCompra(),
-                    api.obtenerMovimientos(),
-                    api.obtenerProgramas()
+                    api.obtenerSolicitudesCompra(effectiveTenantId),
+                    api.obtenerMovimientos(effectiveTenantId),
+                    api.obtenerProgramas(effectiveTenantId),
+                    api.obtenerConfiguracionClub(effectiveTenantId)
                 ]),
                 syncTimeout
             ]);
@@ -161,7 +168,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     return null;
                 });
 
-                const [u, cn, s, e, ev, imp, sc, m, pr] = values;
+                const [u, cn, s, e, ev, imp, sc, m, pr, cc] = values;
 
                 if (u) setUsuarios(u as Usuario[]);
                 if (cn) setConfigNotificaciones(cn as ConfiguracionNotificaciones);
@@ -172,16 +179,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (sc) setSolicitudesCompra(sc as SolicitudCompra[]);
                 if (m) setMovimientos(m as MovimientoFinanciero[]);
                 if (pr) setProgramas(pr as Programa[]);
+                if (cc) setConfigClub(cc as ConfiguracionClub);
             }
 
         } catch (err) {
             console.error("[DataContext] Error o Timeout en sincronización:", err);
             setError("La sincronización tardó demasiado. Es posible que existan bloqueos de red o de base de datos.");
         } finally {
-            console.log("[DataContext] Sincronización finalizada satisfactoriamente o por timeout.");
+            console.log("[DataContext] Sincronización finalizada satisfactoriamente.");
             setCargando(false);
         }
-    }, [tenant]);
+    }, [tenant, usuario]);
 
     useEffect(() => {
         cargarTodo();
@@ -189,32 +197,97 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return (
         <ConfiguracionContext.Provider value={{
-            usuarios, configNotificaciones, configClub: tenant || CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub, cargando, error,
+            usuarios, configNotificaciones, configClub, cargando, error,
             guardarConfiguraciones: async (cn, cc) => {
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
+                setConfigClub(cc);
+                await cargarTenant(cc.tenantId); // Sincronizar el provider de marca con el ID real
             },
-            agregarUsuario: async (d) => { d.tenantId = (tenant || CONFIGURACION_CLUB_POR_DEFECTO).tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); return u; },
-            actualizarUsuario: api.actualizarUsuario,
-            eliminarUsuario: api.eliminarUsuario,
+            agregarUsuario: async (d) => {
+                // Validación SaaS: Límite de instructores/equipo técnico
+                if (usuarios.length >= (configClub.limiteUsuarios || 0)) {
+                    throw new Error(`Ha alcanzado el límite de personal (${configClub.limiteUsuarios}) para su plan actual.`);
+                }
+                d.tenantId = effectiveTenantId;
+                const u = await api.agregarUsuario(d);
+                setUsuarios(p => [...p, u]);
+                return u;
+            },
+            actualizarUsuario: async (datos, id) => {
+                const res = await api.actualizarUsuario(datos, id);
+                if (res) setUsuarios(p => p.map(u => u.id === id ? res : u));
+                return res;
+            },
+            eliminarUsuario: async (id) => {
+                await api.eliminarUsuario(id);
+                setUsuarios(p => p.filter(u => u.id !== id));
+            },
             cargarConfiguracion: cargarTodo
         }}>
             <ProgramasContext.Provider value={{
                 programas, cargando, error,
                 cargarProgramas: cargarTodo,
-                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: tenant!.tenantId }); setProgramas(prev => [...prev, res]); return res; },
+                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: effectiveTenantId }); setProgramas(prev => [...prev, res]); return res; },
                 actualizarPrograma: async (p) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
-                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({ ...s, tenantId: tenant!.tenantId }); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
+                <SedesContext.Provider value={{
+                    sedes, cargando, error,
+                    cargarSedes: cargarTodo,
+                    agregarSede: async (s) => {
+                        // Validación SaaS: Límite de sedes
+                        if (sedes.length >= (configClub.limiteSedes || 0)) {
+                            throw new Error(`Límite de Sedes alcanzado (${configClub.limiteSedes}).`);
+                        }
+                        const res = await api.agregarSede({ ...s, tenantId: effectiveTenantId });
+                        setSedes(p => [...p, res]);
+                        return res;
+                    },
+                    actualizarSede: async (s) => {
+                        const res = await api.actualizarSede(s);
+                        setSedes(p => p.map(item => item.id === s.id ? res : item));
+                        return res;
+                    },
+                    eliminarSede: async (id) => {
+                        await api.eliminarSede(id);
+                        setSedes(p => p.filter(item => item.id !== id));
+                    }
+                }}>
                     <EstudiantesContext.Provider value={{
                         estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
-                        agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false }); setEstudiantes(prev => [...prev, res]); return res; },
-                        actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; },
-                        eliminarEstudiante: api.eliminarEstudiante
+                        agregarEstudiante: async (datos) => {
+                            // Validación SaaS: Límite de estudiantes
+                            if (estudiantes.length >= (tenant?.limiteEstudiantes || 0)) {
+                                throw new Error(`Ha alcanzado el límite de estudiantes (${tenant?.limiteEstudiantes}) para su plan actual.`);
+                            }
+                            const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false });
+                            setEstudiantes(prev => [...prev, res]);
+                            return res;
+                        },
+                        actualizarEstudiante: async (e) => {
+                            const res = await api.actualizarEstudiante(e);
+                            setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item));
+                            return res;
+                        },
+                        eliminarEstudiante: async (id) => {
+                            await api.eliminarEstudiante(id);
+                            setEstudiantes(p => p.filter(e => e.id !== id));
+                        }
                     }}>
-                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
+                        <EventosContext.Provider value={{
+                            eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; },
+                            actualizarEvento: async (e) => {
+                                const res = await api.actualizarEvento(e);
+                                setEventos(prev => prev.map(item => item.id === e.id ? res : item));
+                                return res;
+                            },
+                            eliminarEvento: async (id) => {
+                                await api.eliminarEvento(id);
+                                setEventos(p => p.filter(e => e.id !== id));
+                            }
+                        }}>
                             <TiendaContext.Provider value={{
                                 implementos, solicitudesCompra, cargando, error,
                                 cargarDatosTienda: cargarTodo,
@@ -224,7 +297,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 actualizarImplemento: async (i) => { const res = await api.actualizarImplemento(i); setImplementos(p => p.map(item => item.id === i.id ? res : item)); return res; },
                                 eliminarImplemento: async (id) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
                             }}>
-                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: cargarTodo, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId }); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
+                                <FinanzasContext.Provider value={{
+                                    movimientos, cargando, error, cargarMovimientos: cargarTodo,
+                                    agregarMovimiento: async (m) => {
+                                        const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId });
+                                        setMovimientos(p => [res, ...p]);
+                                        return res;
+                                    },
+                                    actualizarMovimiento: async (m) => {
+                                        const res = await api.actualizarMovimiento(m);
+                                        setMovimientos(p => p.map(item => item.id === m.id ? res : item));
+                                        return res;
+                                    },
+                                    eliminarMovimiento: async (id) => {
+                                        await api.eliminarMovimiento(id);
+                                        setMovimientos(p => p.filter(m => m.id !== id));
+                                    }
+                                }}>
                                     {children}
                                 </FinanzasContext.Provider>
                             </TiendaContext.Provider>

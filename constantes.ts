@@ -64,7 +64,7 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     pagoBanco: 'Bancolombia Ahorros #123-456789-01',
     diasSuspension: 30,
     direccionClub: 'Calle 127 # 45-67, Edificio Arcial, Local 102',
-    colorPrimario: '#FFFFFF',
+    colorPrimario: '#111111',
     colorSecundario: '#0047A0',
     colorAcento: '#CD2E3A',
     emailClub: 'academia@gajog.com',
@@ -74,6 +74,11 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     limiteEstudiantes: 50,
     limiteUsuarios: 2,
     limiteSedes: 1,
+    progresoConfiguracion: {
+        institucional: false,
+        branding: false,
+        sedes: false
+    }
 };
 
 export const ADMIN_WHATSAPP = "3001234567";

@@ -1,19 +1,27 @@
 
 // servicios/sedesApi.ts
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Sede } from '../tipos';
 
 const sedesCollection = collection(db, 'sedes');
 
-export const obtenerSedes = async (): Promise<Sede[]> => {
+export const obtenerSedes = async (tenantId?: string): Promise<Sede[]> => {
     if (!isFirebaseConfigured) {
-        return [
+        const mock = [
             { id: '1', tenantId: 'escuela-gajog-001', nombre: 'Sede Central', direccion: 'Calle 10 # 5-20', ciudad: 'Bogotá', telefono: '3001112233', valorMensualidad: 0 },
             { id: '2', tenantId: 'escuela-gajog-001', nombre: 'Sede Premium Norte', direccion: 'Av. Siempre Viva 123', ciudad: 'Bogotá', telefono: '3004445566', valorMensualidad: 220000 }
         ];
+        if (!tenantId) return mock;
+        return mock.filter(s => s.tenantId === tenantId);
     }
-    const snapshot = await getDocs(sedesCollection);
+
+    let q = query(sedesCollection);
+    if (tenantId) {
+        q = query(sedesCollection, where("tenantId", "==", tenantId));
+    }
+
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sede));
 };
 

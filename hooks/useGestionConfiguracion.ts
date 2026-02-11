@@ -6,6 +6,8 @@ import { useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 
+import { subirLogoTenant } from '../servicios/configuracionApi';
+
 export const useGestionConfiguracion = () => {
     const {
         usuarios, configNotificaciones, configClub, cargando, error,
@@ -34,19 +36,18 @@ export const useGestionConfiguracion = () => {
 
     useEffect(() => {
         if (configNotificaciones && Object.keys(configNotificaciones).length > 0) {
-            setLocalConfigNotificaciones(configNotificaciones);
+            setLocalConfigNotificaciones(prev => Object.keys(prev).length === 0 ? configNotificaciones : prev);
         }
 
-        // Sincronización proactiva: si el contexto nos da el club, lo tomamos.
-        // Si no lo tenemos pero tenemos el usuario con su tenantId, intentamos forzar carga.
+        // Sincronización: Actualizamos el estado local cuando el del contexto cambia
         if (configClub) {
-            console.log("[useGestionConfiguracion] Sincronizando configClub desde contexto");
-            setLocalConfigClub(configClub);
-        } else if (usuarioActual?.tenantId && !cargando) {
-            console.log("[useGestionConfiguracion] Intentando cargar configuración forzada para:", usuarioActual.tenantId);
-            cargarConfiguracion();
+            // Si no tenemos nada local, o si el ID cambió, o si los datos son diferentes (discrepancia de límites)
+            if (!localConfigClub || configClub.tenantId !== localConfigClub.tenantId || configClub.limiteSedes !== localConfigClub.limiteSedes) {
+                console.log("[useGestionConfiguracion] Sincronizando configClub local con Contexto");
+                setLocalConfigClub(configClub);
+            }
         }
-    }, [configNotificaciones, configClub, usuarioActual?.tenantId, cargando, cargarConfiguracion]);
+    }, [configNotificaciones, configClub, localConfigClub]); // Añadimos localConfigClub para comparar correctamente
 
 
     const usuariosFiltrados = useMemo(() => {
@@ -114,21 +115,50 @@ export const useGestionConfiguracion = () => {
         }
     };
 
-    const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement>, setConfig: React.Dispatch<React.SetStateAction<any>>) => {
+    // Tipado más flexible para inputs de formulario
+    const handleConfigChange = (
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+        setConfig: React.Dispatch<React.SetStateAction<any>>
+    ) => {
         const { name, value, type } = e.target;
-        setConfig((prev: any) => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
+        // Manejo seguro de tipos numéricos
+        const finalValue = type === 'number' ? (parseInt(value, 10) || 0) : value;
+
+        setConfig((prev: any) => {
+            if (!prev) return prev;
+            return { ...prev, [name]: finalValue };
+        });
     };
 
-    const guardarConfiguracionesHandler = async (e: React.FormEvent) => {
+    const guardarConfiguracionesHandler = async (e: React.FormEvent, sedesCount: number = 0) => {
         e.preventDefault();
         if (!localConfigClub) {
             mostrarNotificacion("Error: Configuración del club no disponible.", "error");
             return;
         }
+
+        // Calcular progreso de configuración
+        const institucionalOk = !!(localConfigClub.nombreClub && localConfigClub.nit);
+        const brandingOk = !!(localConfigClub.logoUrl);
+        const sedesOk = sedesCount > 0;
+
+        const configConProgreso: ConfiguracionClub = {
+            ...localConfigClub,
+            progresoConfiguracion: {
+                institucional: institucionalOk,
+                branding: brandingOk,
+                sedes: sedesOk
+            }
+        };
+
         setCargandoAccion(true);
         try {
-            await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
-            mostrarNotificacion("Configuraciones guardadas exitosamente.", "success");
+            await guardarConfiguraciones(localConfigNotificaciones, configConProgreso);
+            mostrarNotificacion("Configuraciones guardadas exitosamente. Actualizando entorno...", "success");
+            // Forzamos un refresh para que el BrandingProvider y las variables CSS se actualicen en toda la app
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } catch (error) {
             mostrarNotificacion("No se pudieron guardar las configuraciones.", "error");
         } finally {
@@ -161,5 +191,6 @@ export const useGestionConfiguracion = () => {
         guardarConfiguracionesHandler,
         setLocalConfigClub,
         setLocalConfigNotificaciones,
+        subirLogoTenant
     };
 };

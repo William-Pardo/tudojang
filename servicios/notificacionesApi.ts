@@ -54,12 +54,13 @@ export const guardarNotificacionEnHistorial = async (notificacion: Omit<Notifica
  * Obtiene el historial de notificaciones enviadas.
  * @returns Una lista de notificaciones, ordenadas por fecha descendente.
  */
-export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHistorial[]> => {
+export const obtenerHistorialNotificaciones = async (tenantId?: string): Promise<NotificacionHistorial[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo historial de notificaciones de prueba.");
         return [
             {
                 id: '2',
+                tenantId: 'escuela-gajog-001',
                 fecha: new Date().toISOString(),
                 estudianteId: '2',
                 estudianteNombre: 'Sofia Gómez',
@@ -72,6 +73,7 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
             },
             {
                 id: '1',
+                tenantId: 'escuela-gajog-001',
                 fecha: new Date(Date.now() - 86400000).toISOString(),
                 estudianteId: '1',
                 estudianteNombre: 'Juan Pérez',
@@ -84,9 +86,14 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
             }
         ];
     }
-    const q = query(historialCollection, orderBy('fecha', 'desc'));
+
+    let q = query(historialCollection, orderBy('fecha', 'desc'));
+    if (tenantId) {
+        q = query(historialCollection, where('tenantId', '==', tenantId), orderBy('fecha', 'desc'));
+    }
+
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificacionHistorial));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificacionHistorial)).filter(n => !tenantId || n.tenantId === tenantId);
 };
 
 /**
@@ -105,14 +112,17 @@ export const marcarNotificacionComoLeida = async (idNotificacion: string): Promi
 /**
  * Marca todas las notificaciones no leídas como leídas.
  */
-export const marcarTodasComoLeidas = async (): Promise<void> => {
+export const marcarTodasComoLeidas = async (tenantId?: string): Promise<void> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Marcando todas las notificaciones como leídas.");
         return;
     }
-    const q = query(historialCollection, where('leida', '==', false));
+    let q = query(historialCollection, where('leida', '==', false));
+    if (tenantId) {
+        q = query(historialCollection, where('tenantId', '==', tenantId), where('leida', '==', false));
+    }
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
         return;
     }
@@ -121,6 +131,6 @@ export const marcarTodasComoLeidas = async (): Promise<void> => {
     snapshot.docs.forEach(doc => {
         batch.update(doc.ref, { leida: true });
     });
-    
+
     await batch.commit();
 };

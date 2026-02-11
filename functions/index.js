@@ -1,6 +1,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { Resend } = require("resend");
+const plantillas = require("./plantillas");
 
 admin.initializeApp();
 
@@ -25,7 +26,8 @@ const manejarRequest = (req, res, handler) => {
 
 exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
-    const { tenantId, email, password, nombreClub } = data;
+    const { tenantId, email, password, nombreClub, nombre } = data;
+    const nombreUsuario = nombreClub || nombre || 'Administrador';
     if (!email || !password || !tenantId) throw new Error('Faltan parámetros');
 
     console.log(`Provisionando usuario: ${email}`);
@@ -47,7 +49,7 @@ exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
     await admin.firestore().collection('usuarios').doc(user.uid).set({
       id: user.uid,
       email: email,
-      nombreUsuario: nombreClub,
+      nombreUsuario: nombreUsuario,
       rol: 'Admin',
       tenantId: tenantId,
       estadoContrato: 'Pendiente de Pago'
@@ -86,17 +88,72 @@ exports.enviarBienvenidaTudojang = functions.https.onRequest((req, res) => {
       from: "Tudojang Academia <info@tudojang.com>",
       to: [email],
       subject: `🥋 ¡Bienvenido a Tudojang, ${nombreClub}!`,
-      html: `
-        <div style="font-family: sans-serif; padding: 20px;">
-          <h1 style="color: #0047A0;">🥋 ¡Acceso Activado!</h1>
-          <p>Hola Sabonim, tu academia <b>${nombreClub}</b> ya está lista.</p>
-          <div style="background: #f4f4f4; padding: 15px; border-radius: 8px;">
-            <p><strong>Usuario:</strong> ${email}</p>
-            <p><strong>Clave:</strong> <code>${passwordTemporal}</code></p>
-          </div>
-          <p>Inicia sesión en: <a href="https://tudojang.com/#/login">tudojang.com</a></p>
-        </div>
-      `
+      html: plantillas.bienvenida({
+        nombreUsuario: "Sabonim",
+        nombreAcademia: nombreClub,
+        emailUsuario: email,
+        passwordTemporal: passwordTemporal
+      })
+    });
+    return { success: true };
+  });
+});
+
+exports.enviarConfirmacionPago = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { email, nombreClub, montoPagado } = data;
+    console.log(`Enviando confirmación de pago a: ${email}`);
+
+    const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' });
+
+    await resend.emails.send({
+      from: "Tudojang Facturación <pagos@tudojang.com>",
+      to: [email],
+      subject: `🙏 Honor a tu Compromiso - Pago Recibido`,
+      html: plantillas.pagoExitoso({
+        nombreUsuario: "Sabonim",
+        nombreAcademia: nombreClub,
+        montoPagado: formatter.format(montoPagado),
+        fechaPago: new Date().toLocaleDateString('es-CO')
+      })
+    });
+    return { success: true };
+  });
+});
+
+exports.enviarRecuperacionPassword = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { email, resetLink } = data;
+    console.log(`Enviando recuperación a: ${email}`);
+
+    await resend.emails.send({
+      from: "Tudojang Seguridad <soporte@tudojang.com>",
+      to: [email],
+      subject: `🔐 Restablecer Clave de Acceso Tudojang`,
+      html: plantillas.recuperarPassword({
+        nombreUsuario: "Sabonim",
+        enlaceRecuperacion: resetLink
+      })
+    });
+    return { success: true };
+  });
+});
+
+exports.enviarSoporteTecnico = functions.https.onRequest((req, res) => {
+  manejarRequest(req, res, async (data) => {
+    const { email, nombreClub, idTicket, mensajeRespuesta } = data;
+    console.log(`Enviando respuesta de soporte a: ${email}`);
+
+    await resend.emails.send({
+      from: "Tudojang Soporte <soporte@tudojang.com>",
+      to: [email],
+      subject: `🛠️ Soporte Técnico - Ticket #${idTicket}`,
+      html: plantillas.soporteTecnico({
+        nombreUsuario: "Sabonim",
+        nombreAcademia: nombreClub,
+        idTicket: idTicket,
+        mensajeRespuestaSoporte: mensajeRespuesta
+      })
     });
     return { success: true };
   });
@@ -148,22 +205,12 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
                 from: "Tudojang Academia <info@tudojang.com>",
                 to: [tenantData.emailClub],
                 subject: `🥋 ¡Acceso Activado: ${tenantData.nombreClub}!`,
-                html: `
-                    <div style="font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 12px;">
-                      <h1 style="color: #0047A0; text-transform: uppercase;">🥋 ¡Tu Dojang está listo!</h1>
-                      <p>Hola Sabonim, confirmamos el pago de tu suscripción para <b>${tenantData.nombreClub}</b>.</p>
-                      <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; border-left: 4px solid #0047A0; margin: 20px 0;">
-                        <p style="margin: 0 0 10px 0;"><strong>Usuario:</strong> ${tenantData.emailClub}</p>
-                        <p style="margin: 0;"><strong>Clave Temporal:</strong> <code style="font-size: 1.2em; background: #eee; padding: 2px 5px; border-radius: 4px;">${tenantData.passwordTemporal}</code></p>
-                      </div>
-                      <p>Ya puedes configurar tu academia y empezar a registrar estudiantes.</p>
-                      <div style="text-align: center; margin-top: 30px;">
-                        <a href="https://tudojang.com/#/login" style="background: #CD2E3A; color: white; padding: 15px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 14px;">Entrar a Tudojang</a>
-                      </div>
-                      <hr style="margin-top: 40px; border: none; border-top: 1px solid #eee;" />
-                      <p style="font-size: 10px; color: #999; text-align: center;">Tudojang Core v4.4 • Módulo de Activación Automática</p>
-                    </div>
-                  `
+                html: plantillas.bienvenida({
+                  nombreUsuario: "Sabonim",
+                  nombreAcademia: tenantData.nombreClub,
+                  emailUsuario: tenantData.emailClub,
+                  passwordTemporal: tenantData.passwordTemporal
+                })
               });
             } catch (emailErr) {
               console.error("Error enviando email desde webhook:", emailErr);

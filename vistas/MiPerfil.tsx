@@ -1,15 +1,16 @@
 
 // vistas/MiPerfil.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useConfiguracion, useSedes } from '../context/DataContext';
 import { RolUsuario } from '../tipos';
 import { formatearPrecio, formatearFecha } from '../utils/formatters';
 import { generarReciboPagoPdf } from '../utils/receiptGenerator';
-import { 
-    IconoUsuario, IconoWhatsApp, IconoEmail, 
-    IconoAprobar, IconoExportar, IconoDashboard, 
+import {
+    IconoUsuario, IconoWhatsApp, IconoEmail,
+    IconoAprobar, IconoExportar, IconoDashboard,
     IconoContrato, IconoCasa, IconoCampana,
     IconoLogoOficial
 } from '../components/Iconos';
@@ -17,10 +18,11 @@ import EscanerAsistencia from '../components/EscanerAsistencia';
 
 const VistaMiPerfil: React.FC = () => {
     const { usuario } = useAuth();
+    const navigate = useNavigate();
     const { configClub } = useConfiguracion();
     const { sedes } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
-    
+
     const [escanerAbierto, setEscanerAbierto] = useState(false);
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
 
@@ -63,7 +65,7 @@ const VistaMiPerfil: React.FC = () => {
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mt-2">Gestión de datos personales y laborales</p>
                 </div>
                 {esTutorOperativo && (
-                    <button 
+                    <button
                         onClick={() => setEscanerAbierto(true)}
                         className="w-full sm:w-auto bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-blue-800 active:scale-95 transition-all"
                     >
@@ -125,7 +127,10 @@ const VistaMiPerfil: React.FC = () => {
                                         {usuario?.contrato?.firmado ? 'Vigente / Firmado' : 'Pendiente Firma'}
                                     </span>
                                 </div>
-                                <button className="w-full py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-[10px] font-black uppercase text-gray-500 hover:text-tkd-blue transition-colors border border-gray-100 dark:border-gray-700">
+                                <button
+                                    onClick={() => navigate(`/contrato-colaborador/${usuario?.id}`)}
+                                    className="w-full py-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-[10px] font-black uppercase text-gray-500 hover:text-tkd-blue transition-colors border border-gray-100 dark:border-gray-700"
+                                >
                                     Ver Mi Contrato Digital
                                 </button>
                             </div>
@@ -190,7 +195,7 @@ const VistaMiPerfil: React.FC = () => {
                                         <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">{formatearPrecio(t.monto)}</p>
                                         <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Emitido: {formatearFecha(t.fecha)}</p>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => handleDescargarPDF(t)}
                                         disabled={descargandoId === t.id}
                                         className="mt-8 w-full bg-white dark:bg-gray-800 py-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 hover:bg-tkd-blue hover:text-white transition-all group-hover:border-tkd-blue"
@@ -210,9 +215,9 @@ const VistaMiPerfil: React.FC = () => {
             </div>
 
             {escanerAbierto && esTutorOperativo && (
-                <EscanerAsistencia 
-                    sedeId={usuario?.sedeId || '1'} 
-                    onClose={() => setEscanerAbierto(false)} 
+                <EscanerAsistencia
+                    sedeId={usuario?.sedeId || '1'}
+                    onClose={() => setEscanerAbierto(false)}
                 />
             )}
         </div>

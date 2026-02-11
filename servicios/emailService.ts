@@ -26,6 +26,13 @@ interface NotificarCambioPasswordParams {
     nombreClub?: string;
 }
 
+interface EnviarSoporteParams {
+    email: string;
+    nombreClub: string;
+    idTicket: string;
+    mensajeRespuesta: string;
+}
+
 /**
  * Helper para llamar a las funciones directamente (Evita problemas de Hosting/CORS)
  */
@@ -124,5 +131,16 @@ export const notificarCambioPassword = async (params: NotificarCambioPasswordPar
         await callApi('notificarCambioPassword', params);
     } catch (error) {
         console.error('Error al notificar cambio de password:', error);
+    }
+};
+
+/**
+ * Envía un email de respuesta de soporte técnico
+ */
+export const enviarEmailSoporte = async (params: EnviarSoporteParams): Promise<void> => {
+    try {
+        await callApi('enviarSoporteTecnico', params);
+    } catch (error) {
+        console.error('Error al enviar email de soporte:', error);
     }
 };

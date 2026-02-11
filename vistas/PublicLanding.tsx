@@ -13,21 +13,21 @@ const PublicLanding: React.FC = () => {
     const [planSeleccionado, setPlanSeleccionado] = React.useState<string | null>(null);
 
     return (
-        <div className="min-h-screen bg-white text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white overflow-x-hidden">
+        <div className="min-h-screen bg-white text-[#111111] font-sans selection:bg-[#0047A0] selection:text-white overflow-x-hidden">
             {/* NAVBAR ESTRATÉGICO */}
             <nav className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 py-4 px-6 sm:px-12 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <IconoLogoOficial className="w-10 h-10 text-tkd-blue" />
+                    <IconoLogoOficial className="w-10 h-10 text-[#0047A0]" />
                     <span className="font-black text-xl tracking-tighter uppercase italic">Tudojang</span>
                 </div>
                 <div className="hidden md:flex items-center gap-8 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    <a href="#caracteristicas" className="hover:text-tkd-blue transition-colors">Diferenciales</a>
-                    <a href="#tarifas" className="hover:text-tkd-blue transition-colors">Inversión</a>
-                    <a href="#kicho" className="hover:text-tkd-blue transition-colors">Protocolo Kicho</a>
+                    <a href="#caracteristicas" className="hover:text-[#0047A0] transition-colors">Diferenciales</a>
+                    <a href="#tarifas" className="hover:text-[#0047A0] transition-colors">Inversión</a>
+                    <a href="#kicho" className="hover:text-[#0047A0] transition-colors">Protocolo Kicho</a>
                 </div>
                 <Link
                     to="/login"
-                    className="bg-tkd-blue text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95"
+                    className="bg-[#0047A0] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95"
                 >
                     Entrar a mi Academia
                 </Link>
@@ -40,11 +40,11 @@ const PublicLanding: React.FC = () => {
                         initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }}
                         className="space-y-8"
                     >
-                        <div className="inline-block bg-tkd-blue/10 text-tkd-blue px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        <div className="inline-block bg-[#0047A0]/10 text-[#0047A0] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
                             Software Técnico para Academias en Colombia
                         </div>
                         <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.9]">
-                            Recupere su tiempo <br /> y asegure su <span className="text-tkd-blue">Recaudo</span>
+                            Recupere su tiempo <br /> y asegure su <span className="text-[#0047A0]">Recaudo</span>
                         </h1>
                         <p className="text-lg text-gray-500 font-medium uppercase leading-relaxed max-w-md">
                             Gestione cobranzas por WhatsApp con IA, formalice contratos digitales con validez legal y controle su academia con autoridad técnica.
@@ -53,13 +53,13 @@ const PublicLanding: React.FC = () => {
                             <a
                                 href="https://wa.me/573007654321?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang.%20Agendemos%20una%20consultoría"
                                 target="_blank"
-                                className="bg-tkd-red text-white px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.1em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
+                                className="bg-[#CD2E3A] text-white px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.1em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
                             >
                                 Ver Tudojang en Acción (Consultoría Gratuita)
                             </a>
                             <Link
                                 to="/registro-escuela"
-                                className="bg-white border-2 border-gray-100 text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-tkd-blue transition-all text-center"
+                                className="bg-white border-2 border-gray-100 text-[#111111] px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-[#0047A0] transition-all text-center"
                             >
                                 Iniciar prueba sin costo
                             </Link>
@@ -116,7 +116,7 @@ const PublicLanding: React.FC = () => {
                             }
                         ].map((feat, i) => (
                             <div key={i} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all space-y-6">
-                                <div className="w-16 h-16 bg-tkd-blue/5 rounded-2xl flex items-center justify-center text-tkd-blue">
+                                <div className="w-16 h-16 bg-[#0047A0]/5 rounded-2xl flex items-center justify-center text-[#0047A0]">
                                     <feat.icon className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-xl font-black uppercase tracking-tight">{feat.title}</h3>
@@ -141,13 +141,13 @@ const PublicLanding: React.FC = () => {
                             <div className="bg-gray-100 p-1.5 rounded-2xl inline-flex relative">
                                 <button
                                     onClick={() => setCicloFacturacion('mensual')}
-                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'mensual' ? 'bg-white text-tkd-dark shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'mensual' ? 'bg-white text-[#111111] shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                                 >
                                     Mensual
                                 </button>
                                 <button
                                     onClick={() => setCicloFacturacion('anual')}
-                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'anual' ? 'bg-white text-tkd-blue shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'anual' ? 'bg-white text-[#0047A0] shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
                                 >
                                     Anual (Ahorra 2 Meses)
                                 </button>
@@ -183,7 +183,7 @@ const PublicLanding: React.FC = () => {
                                     }}
                                     className={`cursor-pointer rounded-[3rem] p-10 border-4 transition-all relative flex flex-col ${esActivo
                                         // CLASES DE RESALTO CRÍTICO: Borde azul, fondo blanco, sombra extrema y z-index superior
-                                        ? 'border-tkd-blue bg-white shadow-[0_40px_80px_-15px_rgba(31,62,144,0.25)] z-10'
+                                        ? 'border-[#0047A0] bg-white shadow-[0_40px_80px_-15px_rgba(31,62,144,0.25)] z-10'
                                         // ESTADO INACTIVO: Borde gris sutil y opacidad reducida
                                         : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
                                         }`}
@@ -191,14 +191,14 @@ const PublicLanding: React.FC = () => {
                                     {/* Etiqueta de Recomendado */}
                                     {plan.popular && (
                                         <div className="absolute -top-5 left-0 right-0 flex justify-center z-20">
-                                            <span className="bg-tkd-red text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                                            <span className="bg-[#CD2E3A] text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
                                                 Recomendado
                                             </span>
                                         </div>
                                     )}
 
                                     <div className="space-y-6">
-                                        <h4 className="text-2xl font-black uppercase tracking-tight text-tkd-blue/60">{plan.nombre}</h4>
+                                        <h4 className="text-2xl font-black uppercase tracking-tight text-[#0047A0]/60">{plan.nombre}</h4>
 
                                         {/* Animación de cambio de precios (Anual/Mensual) */}
                                         <div className="flex items-baseline gap-1">
@@ -208,7 +208,7 @@ const PublicLanding: React.FC = () => {
                                                     initial={{ opacity: 0, y: 10 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, y: -10 }}
-                                                    className="text-4xl font-black text-tkd-blue flex items-start"
+                                                    className="text-4xl font-black text-[#0047A0] flex items-start"
                                                 >
                                                     <span className="text-xl mr-1">$</span>
                                                     {formatearPrecio(precioFinal).replace('$', '')}
@@ -220,9 +220,9 @@ const PublicLanding: React.FC = () => {
                                         </div>
 
                                         <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
-                                            <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-tkd-blue/40" /> Hasta {plan.limiteEstudiantes} alumnos</li>
-                                            <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteUsuarios} Instructores</li>
-                                            <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteSedes} Sedes</li>
+                                            <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-[#0047A0]/40" /> Hasta {plan.limiteEstudiantes} alumnos</li>
+                                            <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-[#0047A0]/40" /> {plan.limiteUsuarios} Instructores</li>
+                                            <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-[#0047A0]/40" /> {plan.limiteSedes} Sedes</li>
                                             {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
                                                 <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-green-500" /> {c}</li>
                                             ))}

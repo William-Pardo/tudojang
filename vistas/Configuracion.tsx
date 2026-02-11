@@ -2,13 +2,13 @@
 // vistas/Configuracion.tsx
 import React, { useState } from 'react';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede } from '../tipos';
-import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
+import { generarUrlAbsoluta, formatearPrecio, formatearFecha } from '../utils/formatters';
 import {
     IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar,
     IconoAgregar, IconoImagen, IconoCampana, IconoUsuario, IconoGuardar,
     IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar,
     IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado,
-    IconoHistorial, IconoEmail
+    IconoHistorial, IconoEmail, IconoCandado
 } from '../components/Iconos';
 import { useGestionConfiguracion } from '../hooks/useGestionConfiguracion';
 import { useNotificacion } from '../context/NotificacionContext';
@@ -19,6 +19,7 @@ import { COSTOS_ADICIONALES, PLANES_SAAS } from '../constantes';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
+import ModalContratoUsuario from '../components/ModalContratoUsuario';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import Loader from '../components/Loader';
@@ -175,41 +176,45 @@ const ModalPagoCheckout: React.FC<{
 
 const VistaConfiguracion: React.FC = () => {
     const {
-        usuarios, cargando, cargarConfiguracion,
+        usuarios, cargando, error, cargarConfiguracion,
         localConfigClub, localConfigNotificaciones, cargandoAccion,
         modalUsuarioAbierto, usuarioEnEdicion, abrirFormularioUsuario, cerrarFormularioUsuario, guardarUsuarioHandler,
         modalConfirmacionAbierto, usuarioAEliminar, abrirConfirmacionEliminar, cerrarConfirmacion, confirmarEliminacion,
-        handleConfigChange, guardarConfiguracionesHandler, setLocalConfigClub, setLocalConfigNotificaciones
+        handleConfigChange, guardarConfiguracionesHandler, setLocalConfigClub, setLocalConfigNotificaciones, subirLogoTenant
     } = useGestionConfiguracion();
 
     const { programas, agregarPrograma, actualizarPrograma, eliminarPrograma } = useProgramas();
     const { sedes, agregarSede, actualizarSede, eliminarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
+    const [activeTab, setActiveTab] = useState<'institucional' | 'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('institucional');
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Sede | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
+    const [usuarioContrato, setUsuarioContrato] = useState<Usuario | null>(null);
 
     const handleExitoPago = (datos: any) => {
-        if (datos.tipo === 'addon') {
-            setLocalConfigClub(prev => ({
-                ...prev,
-                limiteEstudiantes: prev.limiteEstudiantes + (datos.limiteEstudiantes || 0),
-                limiteUsuarios: prev.limiteUsuarios + (datos.limiteUsuarios || 0),
-                limiteSedes: prev.limiteSedes + (datos.limiteSedes || 0)
-            }));
-        } else {
-            setLocalConfigClub(prev => ({
-                ...prev,
-                plan: datos.plan.id,
-                limiteEstudiantes: datos.plan.limiteEstudiantes,
-                limiteUsuarios: datos.plan.limiteUsuarios,
-                limiteSedes: datos.plan.limiteSedes
-            }));
-        }
+        setLocalConfigClub(prev => {
+            if (!prev) return null;
+            if (datos.tipo === 'addon') {
+                return {
+                    ...prev,
+                    limiteEstudiantes: prev.limiteEstudiantes + (datos.limiteEstudiantes || 0),
+                    limiteUsuarios: prev.limiteUsuarios + (datos.limiteUsuarios || 0),
+                    limiteSedes: prev.limiteSedes + (datos.limiteSedes || 0)
+                };
+            } else {
+                return {
+                    ...prev,
+                    plan: datos.plan.id,
+                    limiteEstudiantes: datos.plan.limiteEstudiantes,
+                    limiteUsuarios: datos.plan.limiteUsuarios,
+                    limiteSedes: datos.plan.limiteSedes
+                };
+            }
+        });
         setItemAPagar(null);
     };
 
@@ -281,29 +286,37 @@ const VistaConfiguracion: React.FC = () => {
                     <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Centro de Control</h1>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Configuración Global y Parámetros del Dojang</p>
                 </div>
-                <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="w-full md:w-auto bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                    <IconoGuardar className="w-5 h-5" /> Guardar Cambios
+                <button
+                    onClick={(e) => guardarConfiguracionesHandler(e, sedes.length)}
+                    disabled={cargandoAccion}
+                    className="w-full md:w-auto bg-tkd-blue hover:brightness-110 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] shadow-premium flex items-center justify-center gap-4 active:scale-95 transition-all group"
+                >
+                    <IconoGuardar className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <span>Guardar Cambios</span>
                 </button>
             </header>
 
-            {/* BARRA DE NAVEGACIÓN */}
+            {/* BARRA DE NAVEGACIÓN CAPAS DE ACCESO */}
             <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
                 <div className="flex flex-row gap-1">
                     {[
-                        { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
-                        { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
-                        { id: 'sedes', label: 'Sedes', icon: IconoCasa },
-                        { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
-                        { id: 'alertas', label: 'Alertas', icon: IconoCampana },
-                        { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
+                        { id: 'institucional', label: '1. Inf. Institucional', icon: IconoInformacion, bloqueado: false },
+                        { id: 'branding', label: '2. Branding & Logo', icon: IconoImagen, bloqueado: !localConfigClub.nombreClub || !localConfigClub.nit },
+                        { id: 'sedes', label: '3. Sedes', icon: IconoCasa, bloqueado: !localConfigClub.logoUrl },
+                        { id: 'equipo', label: '4. Equipo Técnico', icon: IconoUsuario, bloqueado: sedes.length === 0 },
+                        { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial, bloqueado: sedes.length === 0 },
+                        { id: 'alertas', label: 'Alertas', icon: IconoCampana, bloqueado: sedes.length === 0 },
+                        { id: 'licencia', label: 'Licencia', icon: IconoAprobar, bloqueado: false }
                     ].map(tab => (
                         <button
                             key={tab.id}
+                            disabled={tab.bloqueado}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-blue text-white shadow-premium scale-[1.05] z-10' : tab.bloqueado ? 'text-gray-300 cursor-not-allowed grayscale' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-100 dark:hover:bg-white/5'}`}
                         >
-                            <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                            <span>{tab.label}</span>
+                            <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-white' : ''}`} />
+                            <span className="whitespace-nowrap">{tab.label}</span>
+                            {tab.bloqueado && <div className="ml-1 opacity-50"><IconoCandado className="w-3 h-3" /></div>}
                         </button>
                     ))}
                 </div>
@@ -311,7 +324,7 @@ const VistaConfiguracion: React.FC = () => {
 
             {/* CONTENIDO DE PESTAÑAS */}
             <div className="min-h-[500px]">
-                {activeTab === 'branding' && (
+                {activeTab === 'institucional' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
                         <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Información Institucional</h3>
@@ -319,38 +332,151 @@ const VistaConfiguracion: React.FC = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div>
                                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Nombre del Club</label>
-                                        <input type="text" name="nombreClub" value={localConfigClub.nombreClub} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="text" name="nombreClub" value={localConfigClub.nombreClub} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">NIT / Registro</label>
-                                        <input type="text" name="nit" value={localConfigClub.nit} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="text" name="nit" value={localConfigClub.nit} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Representante Legal</label>
-                                    <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                    <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800">
                                         <label className="text-[9px] font-black uppercase text-tkd-blue block mb-2 ml-1 tracking-widest">Inscripción Inicial (COP)</label>
-                                        <input type="number" name="valorInscripcion" value={localConfigClub.valorInscripcion} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="number" name="valorInscripcion" value={localConfigClub.valorInscripcion} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                     <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-100 dark:border-red-800">
                                         <label className="text-[9px] font-black uppercase text-tkd-red block mb-2 ml-1 tracking-widest">Mora Mensual (%)</label>
-                                        <input type="number" name="moraPorcentaje" value={localConfigClub.moraPorcentaje} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="number" name="moraPorcentaje" value={localConfigClub.moraPorcentaje} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                 </div>
                             </div>
                         </section>
 
+                        <section className="bg-tkd-blue/5 p-10 rounded-[3rem] border border-tkd-blue/10 flex flex-col items-center justify-center text-center space-y-6">
+                            <div className="w-20 h-20 bg-tkd-blue text-white rounded-[2rem] flex items-center justify-center shadow-xl">
+                                <IconoInformacion className="w-10 h-10" />
+                            </div>
+                            <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-blue">Primer Paso Obligatorio</h3>
+                            <p className="text-xs font-bold text-gray-500 max-w-xs uppercase leading-relaxed">
+                                Completa los datos institucionales para habilitar la personalización de tu marca y la creación de sedes físicas.
+                            </p>
+                            {!localConfigClub.nombreClub || !localConfigClub.nit ? (
+                                <span className="text-tkd-red font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-tkd-red rounded-full animate-ping" /> Pendiente completar campos
+                                </span>
+                            ) : (
+                                <span className="text-green-500 font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+                                    <IconoAprobar className="w-4 h-4" /> ¡Identidad Definida!
+                                </span>
+                            )}
+                        </section>
+                    </div>
+                )}
+
+                {activeTab === 'branding' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
                         <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Branding & Logo</h3>
-                            <div className="flex flex-col items-center justify-center border-4 border-dashed border-gray-100 dark:border-white/5 rounded-[3rem] p-12 text-center space-y-6">
-                                <div className="w-40 h-40 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl">
+
+                            <div className="flex flex-col items-center justify-center border-4 border-dashed border-gray-100 dark:border-white/5 rounded-[3rem] p-8 text-center space-y-6">
+                                <div className="w-40 h-40 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl relative group">
                                     {localConfigClub.logoUrl ? <img src={localConfigClub.logoUrl} className="w-full h-full object-contain" /> : <IconoLogoOficial className="w-20 h-20 opacity-20" />}
                                 </div>
-                                <button className="px-8 py-3 bg-tkd-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Cambiar Logo Oficial</button>
-                                <p className="text-[9px] text-gray-400 font-bold uppercase">Formato recomendado: PNG Transparente 512x512px</p>
+                                <div className="flex gap-4">
+                                    <label className="cursor-pointer px-6 py-3 bg-tkd-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all flex items-center gap-2">
+                                        <IconoImagen className="w-4 h-4" />
+                                        <span>Seleccionar Logo</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file && localConfigClub) {
+                                                    try {
+                                                        const url = await subirLogoTenant(localConfigClub.tenantId, file);
+                                                        setLocalConfigClub(prev => prev ? ({ ...prev, logoUrl: url }) : null);
+                                                        mostrarNotificacion("Logo cargado. No olvide guardar los cambios.", "success");
+                                                    } catch (err) {
+                                                        mostrarNotificacion("Error al subir la imagen.", "error");
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                    {localConfigClub.logoUrl && (
+                                        <button
+                                            onClick={() => setLocalConfigClub(prev => prev ? ({ ...prev, logoUrl: '' }) : null)}
+                                            className="px-4 py-3 bg-red-50 text-tkd-red rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm active:scale-95 transition-all"
+                                        >
+                                            <IconoEliminar className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8">
+                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Paleta de Colores Institucional</h3>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="flex items-center gap-4 bg-gray-50 dark:bg-black/20 p-3 rounded-2xl">
+                                    <input
+                                        type="color"
+                                        name="colorPrimario"
+                                        value={localConfigClub.colorPrimario || '#FFFFFF'}
+                                        onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)}
+                                        className="w-10 h-10 rounded-xl border-none cursor-pointer bg-transparent"
+                                    />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-gray-900 dark:text-white">Color Primario</p>
+                                        <p className="text-[9px] font-mono text-gray-400">{localConfigClub.colorPrimario}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 bg-gray-50 dark:bg-black/20 p-3 rounded-2xl">
+                                    <input
+                                        type="color"
+                                        name="colorSecundario"
+                                        value={localConfigClub.colorSecundario || '#0047A0'}
+                                        onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)}
+                                        className="w-10 h-10 rounded-xl border-none cursor-pointer bg-transparent"
+                                    />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-gray-900 dark:text-white">Color Secundario</p>
+                                        <p className="text-[9px] font-mono text-gray-400">{localConfigClub.colorSecundario}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4 bg-gray-50 dark:bg-black/20 p-3 rounded-2xl">
+                                    <input
+                                        type="color"
+                                        name="colorAcento"
+                                        value={localConfigClub.colorAcento || '#CD2E3A'}
+                                        onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)}
+                                        className="w-10 h-10 rounded-xl border-none cursor-pointer bg-transparent"
+                                    />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase text-gray-900 dark:text-white">Color de Acento</p>
+                                        <p className="text-[9px] font-mono text-gray-400">{localConfigClub.colorAcento}</p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        setLocalConfigClub(prev => prev ? ({
+                                            ...prev,
+                                            colorPrimario: '#111111',
+                                            colorSecundario: '#0047A0',
+                                            colorAcento: '#CD2E3A'
+                                        }) : null);
+                                        mostrarNotificacion("Colores restaurados a valores originales. No olvide guardar los cambios.", "success");
+                                    }}
+                                    className="mt-4 w-full bg-gray-100 dark:bg-white/5 text-gray-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-200 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-3"
+                                >
+                                    <IconoHistorial className="w-4 h-4" /> Restablecer Colores
+                                </button>
                             </div>
                         </section>
                     </div>
@@ -359,8 +485,24 @@ const VistaConfiguracion: React.FC = () => {
                 {activeTab === 'equipo' && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Nómina Técnica y Personal</h3>
-                            <button onClick={() => abrirFormularioUsuario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Nómina Técnica y Personal</h3>
+                                {localConfigClub && (
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                                        Cupos utilizados: <span className={usuarios.length >= localConfigClub.limiteUsuarios ? 'text-tkd-red' : 'text-tkd-blue'}>{usuarios.length} de {localConfigClub.limiteUsuarios}</span>
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (localConfigClub && usuarios.length >= localConfigClub.limiteUsuarios) {
+                                        mostrarNotificacion(`Ha alcanzado el límite de personal (${localConfigClub.limiteUsuarios}) para su plan actual.`, "warning");
+                                        return;
+                                    }
+                                    abrirFormularioUsuario();
+                                }}
+                                className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+                            >
                                 <IconoAgregar className="w-4 h-4" /> Vincular Miembro
                             </button>
                         </div>
@@ -369,7 +511,7 @@ const VistaConfiguracion: React.FC = () => {
                                 usuarios={usuarios}
                                 onEditar={abrirFormularioUsuario}
                                 onEliminar={abrirConfirmacionEliminar}
-                                onGestionarContrato={() => mostrarNotificacion("Módulo legal en actualización.", "info")}
+                                onGestionarContrato={(u: Usuario) => setUsuarioContrato(u)}
                             />
                         </div>
                     </div>
@@ -378,9 +520,26 @@ const VistaConfiguracion: React.FC = () => {
                 {activeTab === 'sedes' && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Gestión de Sedes / Dojangs</h3>
-                            <button onClick={() => setModalSedeAbierto(true)} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Registrar Sede
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Gestión de Sedes / Dojangs</h3>
+                                {localConfigClub && (
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                                        Sedes activas: <span className={sedes.length >= localConfigClub.limiteSedes ? 'text-tkd-red' : 'text-tkd-blue'}>{sedes.length} de {localConfigClub.limiteSedes}</span>
+                                    </p>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    if (localConfigClub && sedes.length >= localConfigClub.limiteSedes) {
+                                        mostrarNotificacion(`Ha alcanzado el límite de sedes (${localConfigClub.limiteSedes}) para su plan actual.`, "warning");
+                                        return;
+                                    }
+                                    setSedeEdit(null); // Limpiar para nueva sede
+                                    setModalSedeAbierto(true);
+                                }}
+                                className="bg-tkd-blue hover:brightness-110 text-white px-8 py-4 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-premium flex items-center gap-2 active:scale-95 transition-all"
+                            >
+                                <IconoAgregar className="w-5 h-5" /> Registrar Sede
                             </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -411,8 +570,8 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Catálogo de Programas Extra</h3>
-                            <button onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Crear Modalidad
+                            <button onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }} className="bg-tkd-blue hover:brightness-110 text-white px-8 py-4 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-premium flex items-center gap-2 active:scale-95 transition-all">
+                                <IconoAgregar className="w-5 h-5" /> Crear Modalidad
                             </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -477,7 +636,7 @@ const VistaConfiguracion: React.FC = () => {
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black text-tkd-red uppercase tracking-[0.4em] mb-2">Estado de Suscripción</p>
                                 <h3 className="text-4xl font-black uppercase tracking-tighter">Plan <span className="text-tkd-blue">{localConfigClub.plan}</span></h3>
-                                <p className="text-gray-400 text-xs mt-4 font-bold uppercase tracking-widest">Vence el: {localConfigClub.fechaVencimiento}</p>
+                                <p className="text-gray-400 text-xs mt-4 font-bold uppercase tracking-widest">Vence el: {formatearFecha(localConfigClub.fechaVencimiento)}</p>
                             </div>
                             <div className="flex gap-4 relative z-10">
                                 <button className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Renovar Licencia</button>
@@ -507,6 +666,23 @@ const VistaConfiguracion: React.FC = () => {
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
             {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={() => setModalSedeAbierto(false)} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
             {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}
+            {usuarioContrato && (
+                <ModalContratoUsuario
+                    abierto={!!usuarioContrato}
+                    usuario={usuarioContrato}
+                    onCerrar={() => setUsuarioContrato(null)}
+                    onGuardar={async (usuarioActualizado) => {
+                        try {
+                            await actualizarUsuario({ contrato: usuarioActualizado.contrato, estadoContrato: usuarioActualizado.estadoContrato }, usuarioActualizado.id);
+                            mostrarNotificacion("Contrato actualizado correctamente.", "success");
+                            setUsuarioContrato(null);
+                            cargarConfiguracion();
+                        } catch (err) {
+                            mostrarNotificacion("Error al guardar el contrato.", "error");
+                        }
+                    }}
+                />
+            )}
         </div>
     );
 };

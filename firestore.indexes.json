@@ -1,0 +1,93 @@
+{
+    "indexes": [
+        {
+            "collectionGroup": "usuarios",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "email",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "estudiantes",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "nombre",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "tickets_soporte",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "estado",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "eventos",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fechaEvento",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "finanzas",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "tenantId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "fecha",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "asistencia",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "fecha",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "sedeId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "estadoEntrega",
+                    "order": "ASCENDING"
+                }
+            ]
+        }
+    ],
+    "fieldOverrides": []
+}

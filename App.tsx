@@ -10,6 +10,7 @@ import { DataProvider } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
 import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
 import BrandingProvider, { useTenant } from './components/BrandingProvider';
+import { useConfiguracion } from './context/DataContext';
 import { RolUsuario, type Usuario } from './tipos';
 
 import PublicLanding from './vistas/PublicLanding';
@@ -32,6 +33,7 @@ import { useEstadoLicencia } from './hooks/useEstadoLicencia';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
+import VistaFirmaContratoColaborador from './vistas/FirmaContratoColaborador';
 import VistaFirmaImagen from './vistas/FirmaImagen';
 import CensoPublico from './vistas/CensoPublico';
 
@@ -45,20 +47,22 @@ import HeatmapOverlay from './components/HeatmapOverlay';
 import {
     IconoCampana, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
-    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
+    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion, IconoCandado
 } from './components/Iconos';
 
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
     const location = ReactRouterDOM.useLocation();
+    const { configClub } = useConfiguracion();
+    const configLista = configClub?.progresoConfiguracion?.sedes;
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
     const todosLosEnlaces = [
-        { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
-        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
-        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
-        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
-        { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
-        { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
+        { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin], bloqueado: !configLista },
+        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor], bloqueado: !configLista },
+        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor], bloqueado: !configLista },
+        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor], bloqueado: !configLista },
+        { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor], bloqueado: !configLista },
+        { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin], bloqueado: false },
     ];
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => enlace.roles.includes(usuario.rol));
@@ -82,12 +86,33 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                 <LogoDinamico className={estaAbierta ? "h-16 w-auto" : "h-10 w-10"} />
             </div>
             <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
-                {enlacesVisibles.map((enlace) => (
-                    <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
-                        <enlace.icono className="w-5 h-5 flex-shrink-0" />
-                        <span className={`${estaAbierta ? 'block' : 'hidden'}`}>{enlace.texto}</span>
-                    </ReactRouterDOM.Link>
-                ))}
+                {enlacesVisibles.map((enlace) => {
+                    const content = (
+                        <>
+                            {enlace.bloqueado ? (
+                                <IconoCandado className="w-5 h-5 flex-shrink-0 text-white/40" />
+                            ) : (
+                                <enlace.icono className="w-5 h-5 flex-shrink-0" />
+                            )}
+                            <span className={`${estaAbierta ? 'block' : 'hidden'} ${enlace.bloqueado ? 'text-white/20' : ''}`}>{enlace.texto}</span>
+                            {enlace.bloqueado && <div className="absolute right-2"><IconoInformacion className="w-3 h-3 opacity-30" /></div>}
+                        </>
+                    );
+
+                    if (enlace.bloqueado) {
+                        return (
+                            <div key={enlace.ruta} title="Acceso restringido: Completa la configuración inicial" className={`${getButtonStyle(enlace.ruta)} grayscale opacity-20 cursor-not-allowed pointer-events-none relative blur-[1px]`}>
+                                {content}
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
+                            {content}
+                        </ReactRouterDOM.Link>
+                    );
+                })}
             </nav>
             <div className="border-t border-white/10 flex flex-col">
                 {esMaster && (
@@ -216,7 +241,12 @@ const AppRoutes: React.FC = () => {
     );
 
     const host = window.location.hostname;
-    const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
+    const isRootDomain = host === 'tudojang.com' ||
+        host === 'www.tudojang.com' ||
+        host === 'tudojang.web.app' ||
+        host === 'tudojang.firebaseapp.com' ||
+        host === 'localhost' ||
+        host === '127.0.0.1';
 
     // Mostrar rutas públicas SOLO si: dominio raíz + sin tenant + sin usuario autenticado
     if (isRootDomain && (!tenant || tenant.slug === 'gajog') && !usuario) {
@@ -245,6 +275,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
+                <ReactRouterDOM.Route path="/contrato-colaborador/:idUsuario" element={<VistaFirmaContratoColaborador />} />
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
 
@@ -270,16 +301,16 @@ const App: React.FC = () => {
     return (
         <ReactRouterDOM.HashRouter>
             <NotificacionProvider>
-                <BrandingProvider>
-                    <AuthProvider>
+                <AuthProvider>
+                    <BrandingProvider>
                         <AnalyticsProvider>
                             <DataProvider>
                                 <NotificacionToast />
                                 <AppRoutes />
                             </DataProvider>
                         </AnalyticsProvider>
-                    </AuthProvider>
-                </BrandingProvider>
+                    </BrandingProvider>
+                </AuthProvider>
             </NotificacionProvider>
         </ReactRouterDOM.HashRouter>
     );

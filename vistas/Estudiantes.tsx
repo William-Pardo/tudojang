@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
 import { useAuth } from '../context/AuthContext';
+import { useNotificacion } from '../context/NotificacionContext';
 import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
+import { PLANES_SAAS } from '../constantes';
 
 // Componentes
-import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoLogoOficial, IconoCertificado, IconoInformacion, IconoCampana } from '../components/Iconos';
+import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoLogoOficial, IconoCertificado, IconoInformacion, IconoCampana, IconoUsuario } from '../components/Iconos';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import ModalVerFirma from '../components/ModalVerFirma';
@@ -65,9 +67,12 @@ export const VistaEstudiantes: React.FC = () => {
         goToNextPage,
         goToPreviousPage,
         exportarCSV,
+        configClub,
     } = useGestionEstudiantes();
+    const { mostrarNotificacion } = useNotificacion();
 
     const [modalImportMasivaAbierto, setModalImportMasivaAbierto] = useState(false);
+    const [cargandoDemo, setCargandoDemo] = useState(false);
     const [misionActiva, setMisionActiva] = useState<MisionKicho | null>(null);
     const [countdown, setCountdown] = useState('');
 
@@ -97,7 +102,7 @@ export const VistaEstudiantes: React.FC = () => {
     const renderDirectorio = () => {
         if (cargando) return <TablaEstudiantesSkeleton />;
         if (error) return <ErrorState mensaje={error} onReintentar={cargarEstudiantes} />;
-        
+
         const tieneEstudiantes = estudiantes.length > 0;
         const filtrosSinResultados = tieneEstudiantes && estudiantesFiltrados.length === 0;
 
@@ -108,7 +113,7 @@ export const VistaEstudiantes: React.FC = () => {
             return (
                 <div className="animate-fade-in space-y-4">
                     <FiltrosEstudiantes filtroNombre={filtroNombre} setFiltroNombre={setFiltroNombre} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} filtroEstado={filtroEstado} setFiltroEstado={setFiltroEstado} />
-                    
+
                     <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
                         <div>
                             {estudiantesFiltrados.length > 0 ? (
@@ -125,12 +130,12 @@ export const VistaEstudiantes: React.FC = () => {
             );
         }
         return (
-             <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
+            <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
                 <div className="flex flex-col gap-4 max-w-xs mx-auto">
-                    <button onClick={() => abrirFormulario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2">
+                    <button onClick={() => abrirFormulario()} className="bg-tkd-blue text-white px-8 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-premium hover:brightness-110 hover:-translate-y-1 transition-all active:scale-95 flex items-center justify-center gap-3">
                         <IconoAgregar className="w-5 h-5" /><span>Agregar Uno a Uno</span>
                     </button>
-                    <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white dark:bg-white/5 text-gray-400 px-8 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest border border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition-all flex items-center justify-center gap-3">
                         <IconoInformacion className="w-5 h-5" /><span>Carga Masiva (CSV)</span>
                     </button>
                 </div>
@@ -162,7 +167,7 @@ export const VistaEstudiantes: React.FC = () => {
             {/* BANNER GLOBAL DE MISIÓN KICHO ACTIVA */}
             <AnimatePresence>
                 {misionActiva && activeTab !== 'kicho' && (
-                    <motion.div 
+                    <motion.div
                         initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
                         className="bg-tkd-blue/10 border border-tkd-blue/20 p-4 rounded-[1.5rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm"
                     >
@@ -182,13 +187,55 @@ export const VistaEstudiantes: React.FC = () => {
             </AnimatePresence>
 
             <header className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-                <div>
+                <div className="space-y-2">
                     <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Hub de Estudiantes</h1>
-                    <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
+                    {/* INDICADOR DE LÍMITE SAAS */}
+                    {usuario?.rol === RolUsuario.Admin && configClub && (() => {
+                        const planKey = (configClub.plan || 'starter') as keyof typeof PLANES_SAAS;
+                        const limiteReal = PLANES_SAAS[planKey]?.limiteEstudiantes || configClub.limiteEstudiantes || 50;
+                        return (
+                            <div className="flex items-center gap-3 bg-tkd-blue/5 px-3 py-1.5 rounded-full w-fit border border-tkd-blue/10">
+                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full transition-all ${estudiantes.length >= limiteReal ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
+                                        style={{ width: `${Math.min((estudiantes.length / limiteReal) * 100, 100)}%` }}
+                                    ></div>
+                                </div>
+                                <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest leading-none">
+                                    {estudiantes.length} / {limiteReal} Estudiantes
+                                </span>
+                            </div>
+                        );
+                    })()}
                 </div>
-                
+
                 {activeTab === 'directorio' && (
                     <div className="flex items-center gap-2 w-full md:w-auto">
+                        {usuario?.rol === RolUsuario.Admin && (
+                            <button
+                                onClick={async () => {
+                                    if (confirm("¿Generar 10 estudiantes de prueba? Esto afectará tu base de datos actual.")) {
+                                        setCargandoDemo(true);
+                                        try {
+                                            const modulo = await import('../utils/demoDataGenerator');
+                                            await modulo.generarEstudiantesDemo(usuario.tenantId, 10);
+                                            mostrarNotificacion("¡10 Estudiantes generados exitosamente!", "success");
+                                            setTimeout(() => window.location.reload(), 1500); // Recarga forzada para ver cambios
+                                        } catch (error) {
+                                            console.error(error);
+                                            mostrarNotificacion("Error al generar estudiantes.", "error");
+                                        } finally {
+                                            setCargandoDemo(false);
+                                        }
+                                    }
+                                }}
+                                disabled={cargandoDemo}
+                                className={`bg-gray-800 text-white p-3 rounded-xl hover:bg-gray-900 transition-all shadow-lg ${cargandoDemo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                title="[DEV] Generar Data"
+                            >
+                                <IconoUsuario className={`w-5 h-5 ${cargandoDemo ? 'animate-spin' : ''}`} />
+                            </button>
+                        )}
                         <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition-all shadow-lg" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
                         <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"><IconoInformacion className="w-4 h-4" /><span>Importar CSV</span></button>
                         <button onClick={() => abrirFormulario()} className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"><IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span></button>
@@ -199,15 +246,15 @@ export const VistaEstudiantes: React.FC = () => {
             {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
             <div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
-                    {tabs.map(tab => (
-                        <button 
-                            key={tab.id} 
-                            onClick={() => setActiveTab(tab.id as TabId)} 
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                    {tabs.filter(t => t.visible).map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as TabId)}
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-blue text-white shadow-premium scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-100 dark:hover:bg-white/5'}`}
                             title={tab.label}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                            <span className="hidden md:inline">{tab.label}</span>
+                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-white' : ''}`} />
+                            <span className="whitespace-nowrap">{tab.label}</span>
                             {tab.id === 'kicho' && <div className="w-2 h-2 bg-tkd-red rounded-full animate-pulse flex-shrink-0"></div>}
                         </button>
                     ))}

@@ -22,7 +22,7 @@ export const useGestionNotificaciones = () => {
         setCargandoHistorial(true);
         setErrorHistorial(null);
         try {
-            const data = await api.obtenerHistorialNotificaciones();
+            const data = await api.obtenerHistorialNotificaciones(configClub?.tenantId);
             setHistorial(data);
         } catch (err) {
             setErrorHistorial('No se pudo cargar el historial de notificaciones.');
@@ -52,7 +52,7 @@ export const useGestionNotificaciones = () => {
         const original = [...historial];
         setHistorial(prev => prev.map(n => ({ ...n, leida: true })));
         try {
-            await api.marcarTodasComoLeidas();
+            await api.marcarTodasComoLeidas(configClub?.tenantId);
         } catch (error) {
             mostrarNotificacion('Error al marcar todas las notificaciones como leídas.', 'error');
             setHistorial(original);
@@ -78,25 +78,26 @@ export const useGestionNotificaciones = () => {
         for (let i = 0; i < estudiantesARecordar.length; i++) {
             const estudiante = estudiantesARecordar[i];
             setProgreso(`Enviando ${i + 1} de ${estudiantesARecordar.length} a ${estudiante.nombres}...`);
-            
+
             const tutor = estudiante.tutor;
             if (!tutor) continue;
 
             const canal = tutor.telefono ? 'WhatsApp' : 'Email';
             const destinatario = tutor.telefono || tutor.correo;
             if (!destinatario) continue;
-            
+
             const tipo = estudiante.estadoPago === EstadoPago.Pendiente ? TipoNotificacion.RecordatorioPago : TipoNotificacion.AvisoVencimiento;
-            
+
             try {
                 // CAMBIO CLAVE: Ahora se pasa configClub directamente
-                const mensaje = await generarMensajePersonalizado(tipo, estudiante, configClub, { 
-                    monto: estudiante.saldoDeudor 
+                const mensaje = await generarMensajePersonalizado(tipo, estudiante, configClub, {
+                    monto: estudiante.saldoDeudor
                 });
-                
+
                 await api.enviarNotificacion(canal, destinatario, mensaje);
-                
+
                 await api.guardarNotificacionEnHistorial({
+                    tenantId: configClub?.tenantId || '', // Inyectar tenantId
                     fecha: new Date().toISOString(),
                     estudianteId: estudiante.id,
                     estudianteNombre: `${estudiante.nombres} ${estudiante.apellidos}`,
@@ -114,11 +115,11 @@ export const useGestionNotificaciones = () => {
                 mostrarNotificacion(`Error al enviar recordatorio para ${estudiante.nombres}.`, 'error');
             }
         }
-        
+
         mostrarNotificacion(`${enviadosConExito} de ${estudiantesARecordar.length} recordatorios fueron enviados exitosamente.`, 'success');
         setEnviando(false);
         setProgreso(null);
-        cargarHistorial(); 
+        cargarHistorial();
     };
 
     return {

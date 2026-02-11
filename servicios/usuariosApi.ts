@@ -166,9 +166,18 @@ export const cerrarSesion = async (): Promise<void> => {
     if (isFirebaseConfigured) await signOut(getAuth());
 };
 
-export const obtenerUsuarios = async (): Promise<Usuario[]> => {
-    if (!isFirebaseConfigured) return usuariosMock.map(({ contrasena: _, ...u }) => u);
-    const userSnapshot = await getDocs(collection(db, "usuarios"));
+export const obtenerUsuarios = async (tenantId?: string): Promise<Usuario[]> => {
+    if (!isFirebaseConfigured) {
+        if (!tenantId) return usuariosMock.map(({ contrasena: _, ...u }) => u);
+        return usuariosMock.filter(u => u.tenantId === tenantId).map(({ contrasena: _, ...u }) => u);
+    }
+
+    let q = query(collection(db, "usuarios"));
+    if (tenantId) {
+        q = query(collection(db, "usuarios"), where("tenantId", "==", tenantId));
+    }
+
+    const userSnapshot = await getDocs(q);
     return userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Usuario));
 };
 
@@ -191,7 +200,14 @@ export const eliminarUsuario = async (id: string): Promise<void> => {
         usuariosMock = usuariosMock.filter(u => u.id !== id);
         return;
     }
-    await deleteDoc(doc(db, "usuarios", id));
+    try {
+        console.log(`[usuariosApi] Intentando eliminar documento: usuarios/${id}`);
+        await deleteDoc(doc(db, "usuarios", id));
+        console.log(`[usuariosApi] Documento eliminado exitosamente de Firestore.`);
+    } catch (error) {
+        console.error(`[usuariosApi] Error crítico al eliminar usuario ${id}:`, error);
+        throw error; // Re-lanzar para que el UI lo capture
+    }
 };
 
 export const enviarCorreoRecuperacion = async (email: string): Promise<void> => {
@@ -200,4 +216,18 @@ export const enviarCorreoRecuperacion = async (email: string): Promise<void> => 
 
 export const guardarTokenNotificacionUsuario = async (idUsuario: string, token: string): Promise<void> => {
     if (isFirebaseConfigured) await updateDoc(doc(db, 'usuarios', idUsuario), { fcmTokens: arrayUnion(token) });
+};
+
+export const guardarFirmaContratoColaborador = async (idUsuario: string, firmaBase64: string): Promise<void> => {
+    if (!isFirebaseConfigured) {
+        console.warn("MODO SIMULADO: Guardando firma de colaborador.");
+        return;
+    }
+    const userDocRef = doc(db, 'usuarios', idUsuario);
+    await updateDoc(userDocRef, {
+        'contrato.firmado': true,
+        'contrato.firmaDigital': firmaBase64,
+        'contrato.fechaFirma': new Date().toISOString(),
+        estadoContrato: 'Firmado'
+    });
 };

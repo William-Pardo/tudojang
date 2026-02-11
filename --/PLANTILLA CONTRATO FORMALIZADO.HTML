@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tudojang - Agradecimiento de Pago</title>
+    <title>Contrato Firmado Exitosamente - Tudojang</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
         
@@ -33,14 +33,14 @@
             background: linear-gradient(90deg, #003366 0%, #cc3333 100%);
         }
 
-        .btn-secondary {
+        .btn-download {
             display: inline-block;
-            padding: 14px 30px;
-            border: 2px solid #003366;
-            color: #003366 !important;
+            padding: 16px 35px;
+            background-color: #003366;
+            color: #ffffff !important;
             text-decoration: none;
             font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
+            font-weight: 900;
             font-style: italic;
             border-radius: 4px;
             text-transform: uppercase;
@@ -56,13 +56,12 @@
             font-size: 12px;
         }
 
-        .honor-box {
+        .legal-box {
             background-color: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 30px;
+            border-radius: 6px;
+            padding: 20px;
+            border: 1px dashed #cbd5e1;
             margin: 25px 0;
-            text-align: center;
         }
 
         .brush-stroke {
@@ -87,35 +86,46 @@
 
             <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 24px;">
                 <h1 class="title-font" style="font-size: 24px; font-weight: 900; font-style: italic; color: #003366; text-transform: uppercase; margin: 0; letter-spacing: -0.5px;">
-                    🙏 Honor a tu Compromiso
+                    📝 Contrato Formalizado
                 </h1>
             </div>
 
             <p style="color: #4b5563; font-size: 18px; line-height: 1.6; text-align: left; margin: 0;">
-                Estimado <span style="font-weight: bold; color: #003366; font-style: italic;">Sabonim {{nombre_usuario}}</span>,
+                Estimado(a) <span style="font-weight: bold; color: #003366;">{{nombre_tutor_alumno}}</span>,
             </p>
             
             <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 16px;">
-                Recibimos con gratitud tu pago. Más allá de una transacción, este aporte es el soporte que nos permite seguir fortaleciendo la tecnología que respalda tu autoridad técnica y el legado de tu academia <span style="font-weight: bold; color: #cc3333;">{{nombre_academia}}</span>.
+                Confirmamos que el proceso de firma digital ha finalizado satisfactoriamente. Tu compromiso con la academia <span style="font-weight: bold; color: #cc3333; text-transform: uppercase;">{{nombre_academia}}</span> ha quedado legalmente registrado.
             </p>
-
-            <div class="honor-box">
-                <p style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Comprobante de Recaudo</p>
-                <h2 style="color: #003366; font-size: 28px; font-weight: 900; margin: 0;">{{monto_pagado}}</h2>
-                <p style="color: #94a3b8; font-size: 12px; margin-top: 5px;">Fecha: {{fecha_pago}}</p>
-            </div>
 
             <div class="brush-stroke" style="text-align: left;">
-                "El respeto es el cimiento de nuestro arte; la gratitud es el camino hacia la excelencia."
+                "La palabra dada es un vínculo, pero el contrato firmado es la estructura que protege nuestra comunidad marcial."
             </div>
 
-            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left;">
-                Gracias por permitirnos ser parte de tu camino. Tu enfoque en la enseñanza es lo más importante, de la gestión técnica nos encargamos nosotros.
+            <div class="legal-box" style="text-align: left;">
+                <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: bold; margin-bottom: 10px;">Resumen del Documento</p>
+                <div style="font-size: 14px; color: #0f172a; margin-bottom: 5px;">
+                    <strong>Documento:</strong> Contrato de Prestación de Servicios Deportivos
+                </div>
+                <div style="font-size: 14px; color: #0f172a; margin-bottom: 5px;">
+                    <strong>Fecha de Firma:</strong> {{fecha_firma}}
+                </div>
+                <div style="font-size: 14px; color: #0f172a;">
+                    <strong>ID de Transacción:</strong> <span style="font-family: monospace;">{{id_firma_digital}}</span>
+                </div>
+            </div>
+
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 20px;">
+                Adjunto a este correo (o a través del siguiente botón) encontrarás la copia de tu contrato para tus registros personales:
             </p>
 
-            <div style="margin-top: 40px; text-align: center;">
-                <a href="https://tudojang.com" class="btn-secondary">Ir a mi Panel de Control</a>
+            <div style="margin-top: 30px; text-align: center;">
+                <a href="{{enlace_descarga_pdf}}" class="btn-download">Descargar Contrato (PDF)</a>
             </div>
+            
+            <p style="font-size: 11px; color: #9ca3af; margin-top: 40px; text-align: left; line-height: 1.4;">
+                Este documento es una copia fiel del original firmado digitalmente. Te recomendamos guardarlo en un lugar seguro.
+            </p>
         </div>
 
         <!-- FOOTER -->
@@ -123,11 +133,11 @@
             <div style="margin-bottom: 16px;">
                 <span class="title-font" style="font-weight: 900; font-style: italic; font-size: 18px; color: #ffffff;">Tudo<span style="color: #cc3333;">jang</span></span>
             </div>
-            <p style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 24px;">Fortaleciendo la Autoridad Técnica</p>
+            <p style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 24px;">Seguridad Jurídica y Técnica</p>
             
             <p style="color: #64748b; font-size: 10px; margin: 0;">
                 © 2026 Tudojang.com. Todos los derechos reservados.<br>
-                Protocolo Kicho • Disciplina • Gratitud
+                Legalidad • Transparencia • Compromiso
             </p>
         </div>
     </div>

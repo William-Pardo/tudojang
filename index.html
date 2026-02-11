@@ -2,20 +2,58 @@
 <html lang="es">
 
 <head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0047A0" />
-  <link rel="manifest" href="/manifest.json" />
-  <title>Taekwondo Ga Jog - Gestión</title>
+  <style id="tkd-branding-defaults">
+    :root {
+      --color-primario: #111111;
+      --color-secundario: #0047A0;
+      --color-acento: #CD2E3A;
+    }
+  </style>
 
   <script>
+    // BOOTLOADER DE BRANDING: Inyección inmediata para evitar Flash of Unstyled Content
+    (function () {
+      try {
+        const host = window.location.hostname;
+        const isRoot = host === 'tudojang.com' ||
+          host === 'www.tudojang.com' ||
+          host === 'tudojang.web.app' ||
+          host === 'tudojang.firebaseapp.com' ||
+          host === 'localhost' ||
+          host === '127.0.0.1';
+
+        // Si es la página home (root), forzamos siempre los colores corporativos
+        if (isRoot) {
+          const d = document.documentElement.style;
+          d.setProperty('--color-primario', '#111111');
+          d.setProperty('--color-secundario', '#0047A0');
+          d.setProperty('--color-acento', '#CD2E3A');
+          return;
+        }
+
+        const c = localStorage.getItem('tkd_branding_cache');
+        if (c) {
+          const b = JSON.parse(c);
+          const d = document.documentElement.style;
+          d.setProperty('--color-primario', b.p || '#111111');
+          d.setProperty('--color-secundario', b.s || '#0047A0');
+          d.setProperty('--color-acento', b.a || '#CD2E3A');
+        }
+      } catch (e) { }
+    })();
+
     if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
   </script>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0047A0" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Taekwondo TuDoJang - Gestión</title>
 
   <link rel="stylesheet" href="/index.css">
 </head>

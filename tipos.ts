@@ -128,6 +128,11 @@ export interface ConfiguracionClub {
     limiteSedes: number;
     logoUrl?: string;
     passwordTemporal?: string;
+    progresoConfiguracion?: {
+        institucional: boolean;
+        branding: boolean;
+        sedes: boolean;
+    };
 }
 
 export interface Estudiante {
@@ -243,6 +248,7 @@ export interface ConfiguracionNotificaciones {
 
 export interface NotificacionHistorial {
     id: string;
+    tenantId: string; // ID de la academia (Vínculo multi-tenant)
     fecha: string;
     estudianteId: string;
     estudianteNombre: string;
@@ -331,6 +337,8 @@ export interface Usuario {
         fechaInicio: string;
         lugarEjecucion: string;
         firmado: boolean;
+        firmaDigital?: string;
+        fechaFirma?: string;
     };
 }
 
@@ -360,6 +368,7 @@ export interface Evento {
 // Added fix: Exported SolicitudInscripcion interface.
 export interface SolicitudInscripcion {
     id: string;
+    tenantId: string; // ID de la academia (Vínculo multi-tenant)
     eventoId: string;
     estudiante: {
         id: string;
@@ -380,6 +389,7 @@ export interface VariacionImplemento {
 // Added fix: Exported Implemento interface.
 export interface Implemento {
     id: string;
+    tenantId?: string; // Opcional para catálogo base global, obligatorio para personalizados
     nombre: string;
     descripcion: string;
     imagenUrl: string;
@@ -390,6 +400,7 @@ export interface Implemento {
 // Added fix: Exported SolicitudCompra interface.
 export interface SolicitudCompra {
     id: string;
+    tenantId: string; // ID de la academia (Vínculo multi-tenant)
     estudiante: {
         id: string;
         nombres: string;

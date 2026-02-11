@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tudojang - Agradecimiento de Pago</title>
+    <title>Bienvenido a la Academia - Tudojang</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
         
@@ -33,14 +33,14 @@
             background: linear-gradient(90deg, #003366 0%, #cc3333 100%);
         }
 
-        .btn-secondary {
+        .btn-primary {
             display: inline-block;
-            padding: 14px 30px;
-            border: 2px solid #003366;
-            color: #003366 !important;
+            padding: 16px 35px;
+            background-color: #cc3333;
+            color: #ffffff !important;
             text-decoration: none;
             font-family: 'Montserrat', sans-serif;
-            font-weight: 700;
+            font-weight: 900;
             font-style: italic;
             border-radius: 4px;
             text-transform: uppercase;
@@ -56,13 +56,12 @@
             font-size: 12px;
         }
 
-        .honor-box {
-            background-color: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 30px;
+        .credentials-box {
+            background-color: #f1f5f9;
+            border-radius: 6px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
             margin: 25px 0;
-            text-align: center;
         }
 
         .brush-stroke {
@@ -87,35 +86,47 @@
 
             <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 24px;">
                 <h1 class="title-font" style="font-size: 24px; font-weight: 900; font-style: italic; color: #003366; text-transform: uppercase; margin: 0; letter-spacing: -0.5px;">
-                    🙏 Honor a tu Compromiso
+                    🥋 ¡Bienvenido al Camino!
                 </h1>
             </div>
 
             <p style="color: #4b5563; font-size: 18px; line-height: 1.6; text-align: left; margin: 0;">
-                Estimado <span style="font-weight: bold; color: #003366; font-style: italic;">Sabonim {{nombre_usuario}}</span>,
+                Hola <span style="font-weight: bold; color: #003366;">{{nombre_estudiante}}</span>,
             </p>
             
             <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 16px;">
-                Recibimos con gratitud tu pago. Más allá de una transacción, este aporte es el soporte que nos permite seguir fortaleciendo la tecnología que respalda tu autoridad técnica y el legado de tu academia <span style="font-weight: bold; color: #cc3333;">{{nombre_academia}}</span>.
+                Es un honor darte la bienvenida a la academia <span style="font-weight: bold; color: #cc3333; text-transform: uppercase;">{{nombre_academia}}</span>. Hoy comienzas un proceso de formación que fortalece el cuerpo, la mente y el espíritu.
             </p>
-
-            <div class="honor-box">
-                <p style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Comprobante de Recaudo</p>
-                <h2 style="color: #003366; font-size: 28px; font-weight: 900; margin: 0;">{{monto_pagado}}</h2>
-                <p style="color: #94a3b8; font-size: 12px; margin-top: 5px;">Fecha: {{fecha_pago}}</p>
-            </div>
 
             <div class="brush-stroke" style="text-align: left;">
-                "El respeto es el cimiento de nuestro arte; la gratitud es el camino hacia la excelencia."
+                "Un viaje de mil millas comienza con el primer paso. Tu disciplina hoy define tu maestría mañana."
             </div>
 
-            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left;">
-                Gracias por permitirnos ser parte de tu camino. Tu enfoque en la enseñanza es lo más importante, de la gestión técnica nos encargamos nosotros.
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-bottom: 10px;">
+                Desde ahora, podrás realizar el seguimiento de tu progreso técnico, asistencia y pagos a través de nuestro portal digital:
             </p>
 
-            <div style="margin-top: 40px; text-align: center;">
-                <a href="https://tudojang.com" class="btn-secondary">Ir a mi Panel de Control</a>
+            <!-- CUADRO DE CREDENCIALES -->
+            <div class="credentials-box" style="text-align: left;">
+                <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #003366; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">Tus Datos de Acceso</p>
+                <div style="margin-bottom: 10px;">
+                    <span style="color: #64748b; font-size: 14px;">Usuario:</span>
+                    <span style="font-weight: bold; color: #003366; float: right;">{{usuario_login}}</span>
+                </div>
+                <div style="clear: both; margin-bottom: 10px;">
+                    <span style="color: #64748b; font-size: 14px;">Contraseña inicial:</span>
+                    <span style="font-family: monospace; font-weight: bold; background-color: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; color: #000000; float: right;">{{password_inicial}}</span>
+                </div>
+                <div style="clear: both;"></div>
             </div>
+
+            <div style="margin-top: 35px; text-align: center;">
+                <a href="https://tudojang.com/login" class="btn-primary">Entrar a mi Perfil</a>
+            </div>
+            
+            <p style="font-size: 11px; color: #9ca3af; margin-top: 32px; text-align: center; font-style: italic;">
+                * Recomendamos cambiar tu contraseña tras el primer ingreso por seguridad.
+            </p>
         </div>
 
         <!-- FOOTER -->
@@ -123,11 +134,11 @@
             <div style="margin-bottom: 16px;">
                 <span class="title-font" style="font-weight: 900; font-style: italic; font-size: 18px; color: #ffffff;">Tudo<span style="color: #cc3333;">jang</span></span>
             </div>
-            <p style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 24px;">Fortaleciendo la Autoridad Técnica</p>
+            <p style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 24px;">Tecnología al servicio del Do</p>
             
             <p style="color: #64748b; font-size: 10px; margin: 0;">
                 © 2026 Tudojang.com. Todos los derechos reservados.<br>
-                Protocolo Kicho • Disciplina • Gratitud
+                Respeto • Integridad • Autocontrol
             </p>
         </div>
     </div>

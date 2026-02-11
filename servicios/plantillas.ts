@@ -21,10 +21,10 @@ const FECHA_HOY_OBJ = () => {
 export const generarTextoContrato = (estudiante: Estudiante, configClub: ConfiguracionClub, sede?: Sede): string => {
     if (!estudiante.tutor) return "Error: No se puede generar el contrato sin datos del tutor.";
     const f = FECHA_HOY_OBJ();
-    
+
     // Lógica de herencia de precios: Sede > Club
-    const valorMensualidadFinal = (sede?.valorMensualidad && sede.valorMensualidad > 0) 
-        ? sede.valorMensualidad 
+    const valorMensualidadFinal = (sede?.valorMensualidad && sede.valorMensualidad > 0)
+        ? sede.valorMensualidad
         : configClub.valorMensualidad;
 
     return `
@@ -72,8 +72,15 @@ Fecha de suscripción: ${f.dia}/${f.mes}/${f.anio}.
  */
 export const generarTextoContratoColaborador = (usuario: Usuario, configClub: ConfiguracionClub): string => {
     const f = FECHA_HOY_OBJ();
-    const c = usuario.contrato;
-    if (!c) return "Contrato no configurado.";
+    // Si no hay contrato configurado, usamos valores por defecto para evitar errores de renderizado
+    const c = usuario.contrato || {
+        valorPago: 0,
+        tipoVinculacion: 'Mes' as any,
+        tipoVinculacionOtro: '',
+        fechaInicio: new Date().toISOString().split('T')[0],
+        lugarEjecucion: configClub.lugarFirma || 'Bogotá D.C.',
+        firmado: false
+    };
 
     const tipoFinal = c.tipoVinculacion === 'Otro' ? c.tipoVinculacionOtro : c.tipoVinculacion;
     const valorP = formatearPrecio(c.valorPago);

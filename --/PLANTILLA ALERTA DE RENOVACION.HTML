@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerta de Vencimiento SaaS - Tudojang</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
+        
+        body {
+            font-family: 'Roboto', Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .title-font {
+            font-family: 'Montserrat', Helvetica, Arial, sans-serif;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert-accent {
+            height: 6px;
+            background: #f59e0b; /* Color ámbar para alerta */
+        }
+
+        .btn-action {
+            display: inline-block;
+            padding: 14px 30px;
+            background-color: #003366;
+            color: #ffffff !important;
+            text-decoration: none;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-style: italic;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 13px;
+        }
+
+        .data-table {
+            width: 100%;
+            background-color: #f8fafc;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 1px solid #e2e8f0;
+        }
+
+        .footer {
+            background-color: #0f172a;
+            color: #64748b;
+            padding: 30px;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .status-badge {
+            background-color: #fef3c7;
+            color: #92400e;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-container">
+        <div class="alert-accent"></div>
+        
+        <div style="padding: 40px;">
+            <!-- LOGO -->
+            <div style="margin-bottom: 30px; text-align: center;">
+                <img src="https://gist.githubusercontent.com/William-Pardo/87c1222a61e7e257cb576be90625d23a/raw/5b914bc5e82e1b24f373501d325e6284dbe5ba13/Logo%2520TuDoJang.svg" alt="Tudojang" style="max-width: 150px; margin: 0 auto; display: block;">
+            </div>
+
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 class="title-font" style="font-size: 22px; font-weight: 900; font-style: italic; color: #b45309; text-transform: uppercase; margin: 0;">
+                    ⚠️ Alerta de Suscripción
+                </h1>
+                <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Notificación de sistema interno</p>
+            </div>
+
+            <p style="color: #1e293b; font-size: 16px; line-height: 1.6; margin: 0;">
+                Atención <strong>Administrador</strong>,
+            </p>
+            
+            <p style="color: #475569; font-size: 15px; line-height: 1.6; margin-top: 15px;">
+                El sistema ha detectado que una academia está próxima a finalizar su periodo de suscripción mensual. Es necesario revisar el estado de pago o iniciar gestión comercial.
+            </p>
+
+            <!-- DETALLES DE LA ACADEMIA -->
+            <div class="data-table">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Academia:</td>
+                        <td style="padding: 8px 0; color: #0f172a; font-weight: bold; text-align: right; text-transform: uppercase;">{{nombre_academia}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Sabonim / Contacto:</td>
+                        <td style="padding: 8px 0; color: #0f172a; font-weight: bold; text-align: right;">{{nombre_usuario}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Plan Actual:</td>
+                        <td style="padding: 8px 0; color: #0f172a; font-weight: bold; text-align: right;">{{nombre_plan}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Fecha de Vencimiento:</td>
+                        <td style="padding: 8px 0; color: #b45309; font-weight: 900; text-align: right;">{{fecha_vencimiento}}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Días Restantes:</td>
+                        <td style="padding: 8px 0; text-align: right;"><span class="status-badge">{{dias_restantes}} Días</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <p style="color: #475569; font-size: 14px; line-height: 1.6; text-align: left;">
+                <strong>Acción sugerida:</strong> Validar si existe una renovación automática en curso o contactar al encargado para asegurar la continuidad del servicio.
+            </p>
+
+            <div style="margin-top: 35px; text-align: center;">
+                <a href="https://tudojang.com/admin/subscriptions" class="btn-action">Gestionar en Panel Admin</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p style="margin: 0; font-weight: bold; color: #cbd5e1;">Tudojang SaaS - Sistema Automático</p>
+            <p style="margin-top: 5px;">Módulo de Monitoreo de Ingresos Recurrentes</p>
+        </div>
+    </div>
+
+</body>
+</html>
