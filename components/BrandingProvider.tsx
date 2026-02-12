@@ -110,6 +110,12 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         }
     }, [usuario]); // Added usuario to dependency array
 
+    const value = useMemo(() => ({
+        tenant,
+        estaCargado: true,
+        cargarTenant
+    }), [tenant, cargarTenant]);
+
     if (estado === 'cargando') return <div className="h-screen flex items-center justify-center bg-tkd-dark"><Loader texto="Sincronizando..." /></div>;
 
     if (estado === 'error') return (
@@ -122,12 +128,6 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
     // MODO SUSCRIPCIÓN VENCIDA: Ya no bloqueamos la renderización completa aquí.
     // El App.tsx se encargará de mostrar banners o redirigir según el estado.
-
-    const value = useMemo(() => ({
-        tenant,
-        estaCargado: true,
-        cargarTenant
-    }), [tenant, cargarTenant]);
 
     return (
         <TenantContext.Provider value={value}>
