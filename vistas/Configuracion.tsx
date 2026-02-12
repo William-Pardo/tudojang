@@ -24,6 +24,7 @@ import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import Loader from '../components/Loader';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useLimpiarParametrosPago } from '../hooks/useLimpiarParametrosPago';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -221,6 +222,9 @@ const VistaConfiguracion: React.FC = () => {
 
     // Usar ref para evitar ejecuciones múltiples
     const pagoProcesadoRef = useRef(false);
+
+    // Limpiar parámetros de pago de la URL después de procesarlos
+    useLimpiarParametrosPago(6000); // 6 segundos para dar tiempo al rastreo
 
     // Detectar retorno desde Wompi con pago exitoso (Rastreo Inteligente)
     useEffect(() => {

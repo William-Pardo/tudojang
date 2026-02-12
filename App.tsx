@@ -30,6 +30,7 @@ import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
 import LicenciaSuspendida from './vistas/LicenciaSuspendida';
 import { useEstadoLicencia } from './hooks/useEstadoLicencia';
+import { useLimpiarParametrosPago } from './hooks/useLimpiarParametrosPago';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
@@ -147,6 +148,10 @@ const AppLayout: React.FC = () => {
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
     const navigate = ReactRouterDOM.useNavigate();
     const location = ReactRouterDOM.useLocation();
+
+    // Limpiar parámetros de pago de la URL después de procesarlos
+    useLimpiarParametrosPago(5000); // 5 segundos de gracia para procesar
+
 
     // Lógica Optimista Global: Si hay un pago detectado, FORZAMOS el estado a "NO SUSPENDIDO"
     // Esto desbloquea menús y rutas mientras el servidor asimila el pago.
