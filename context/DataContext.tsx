@@ -1,6 +1,6 @@
 
 // context/DataContext.tsx
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
 import type {
     Usuario, Estudiante, Evento, Implemento, SolicitudCompra,
     MovimientoFinanciero, Sede, ConfiguracionNotificaciones, ConfiguracionClub,
@@ -191,7 +191,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [tenant, usuario]);
 
-    // Reinicio de estados cuando cambia el Tenant para evitar "flasheos" de datos de otra academia
     useEffect(() => {
         if (effectiveTenantId) {
             setUsuarios([]);
@@ -205,142 +204,125 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     }, [effectiveTenantId, cargarTodo]);
 
-    const configuracionValue = useMemo(() => ({
-        usuarios, configNotificaciones, configClub, cargando, error,
-        guardarConfiguraciones: async (cn: ConfiguracionNotificaciones, cc: ConfiguracionClub) => {
-            try {
+    return (
+        <ConfiguracionContext.Provider value={{
+            usuarios, configNotificaciones, configClub, cargando, error,
+            guardarConfiguraciones: async (cn, cc) => {
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
                 setConfigClub(cc);
-                await cargarTenant(cc.tenantId);
-            } catch (err) {
-                console.error("[DataContext] Error guardando configuraciones:", err);
-                throw err;
-            }
-        },
-        agregarUsuario: async (d: any) => {
-            if (usuarios.length >= (configClub.limiteUsuarios || 0)) {
-                throw new Error(`Ha alcanzado el límite de personal (${configClub.limiteUsuarios}) para su plan actual.`);
-            }
-            d.tenantId = effectiveTenantId;
-            const u = await api.agregarUsuario(d);
-            setUsuarios(p => [...p, u]);
-            return u;
-        },
-        actualizarUsuario: async (datos: any, id: string) => {
-            const res = await api.actualizarUsuario(datos, id);
-            if (res) setUsuarios(p => p.map(u => u.id === id ? res : u));
-            return res;
-        },
-        eliminarUsuario: async (id: string) => {
-            await api.eliminarUsuario(id);
-            setUsuarios(p => p.filter(u => u.id !== id));
-        },
-        cargarConfiguracion: cargarTodo
-    }), [usuarios, configNotificaciones, configClub, cargando, error, cargarTodo, effectiveTenantId, cargarTenant]);
-
-    const programasValue = useMemo(() => ({
-        programas, cargando, error,
-        cargarProgramas: cargarTodo,
-        agregarPrograma: async (p: any) => { const res = await api.agregarPrograma({ ...p, tenantId: effectiveTenantId }); setProgramas(prev => [...prev, res]); return res; },
-        actualizarPrograma: async (p: any) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
-        eliminarPrograma: async (id: string) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
-    }), [programas, cargando, error, cargarTodo, effectiveTenantId]);
-
-    const sedesValue = useMemo(() => ({
-        sedes, cargando, error,
-        cargarSedes: cargarTodo,
-        agregarSede: async (s: any) => {
-            if (sedes.length >= (configClub.limiteSedes || 0)) {
-                throw new Error(`Límite de Sedes alcanzado (${configClub.limiteSedes}).`);
-            }
-            const res = await api.agregarSede({ ...s, tenantId: effectiveTenantId });
-            setSedes(p => [...p, res]);
-            return res;
-        },
-        actualizarSede: async (s: any) => {
-            const res = await api.actualizarSede(s);
-            setSedes(p => p.map(item => item.id === s.id ? res : item));
-            return res;
-        },
-        eliminarSede: async (id: string) => {
-            await api.eliminarSede(id);
-            setSedes(p => p.filter(item => item.id !== id));
-        }
-    }), [sedes, cargando, error, cargarTodo, configClub.limiteSedes, effectiveTenantId]);
-
-    const estudiantesValue = useMemo(() => ({
-        estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
-        agregarEstudiante: async (datos: any) => {
-            if (estudiantes.length >= (tenant?.limiteEstudiantes || 0)) {
-                throw new Error(`Ha alcanzado el límite de estudiantes (${tenant?.limiteEstudiantes}) para su plan actual.`);
-            }
-            const res = await api.agregarEstudiante({ ...datos, tenantId: effectiveTenantId, carnetGenerado: false });
-            setEstudiantes(prev => [...prev, res]);
-            return res;
-        },
-        actualizarEstudiante: async (e: any) => {
-            const res = await api.actualizarEstudiante(e);
-            setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item));
-            return res;
-        },
-        eliminarEstudiante: async (id: string) => {
-            await api.eliminarEstudiante(id);
-            setEstudiantes(p => p.filter(e => e.id !== id));
-        }
-    }), [estudiantes, cargando, error, cargarTodo, tenant?.limiteEstudiantes, effectiveTenantId]);
-
-    const eventosValue = useMemo(() => ({
-        eventos, cargando, error, cargarEventos: cargarTodo,
-        agregarEvento: async (e: any) => { const res = await api.agregarEvento({ ...e, tenantId: effectiveTenantId }); setEventos(p => [...p, res]); return res; },
-        actualizarEvento: async (e: any) => {
-            const res = await api.actualizarEvento(e);
-            setEventos(prev => prev.map(item => item.id === e.id ? res : item));
-            return res;
-        },
-        eliminarEvento: async (id: string) => {
-            await api.eliminarEvento(id);
-            setEventos(p => p.filter(e => e.id !== id));
-        }
-    }), [eventos, cargando, error, cargarTodo, effectiveTenantId]);
-
-    const tiendaValue = useMemo(() => ({
-        implementos, solicitudesCompra, cargando, error,
-        cargarDatosTienda: cargarTodo,
-        registrarCompra: api.registrarCompra,
-        gestionarSolicitudCompra: api.gestionarSolicitudCompra,
-        agregarImplemento: async (i: any) => { const res = await api.agregarImplemento(i); setImplementos(p => [...p, res]); return res; },
-        actualizarImplemento: async (i: any) => { const res = await api.actualizarImplemento(i); setImplementos(p => p.map(item => item.id === i.id ? res : item)); return res; },
-        eliminarImplemento: async (id: string) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
-    }), [implementos, solicitudesCompra, cargando, error, cargarTodo]);
-
-    const finanzasValue = useMemo(() => ({
-        movimientos, cargando, error, cargarMovimientos: cargarTodo,
-        agregarMovimiento: async (m: any) => {
-            const res = await api.agregarMovimiento({ ...m, tenantId: effectiveTenantId });
-            setMovimientos(p => [res, ...p]);
-            return res;
-        },
-        actualizarMovimiento: async (m: any) => {
-            const res = await api.actualizarMovimiento(m);
-            setMovimientos(p => p.map(item => item.id === m.id ? res : item));
-            return res;
-        },
-        eliminarMovimiento: async (id: string) => {
-            await api.eliminarMovimiento(id);
-            setMovimientos(p => p.filter(m => m.id !== id));
-        }
-    }), [movimientos, cargando, error, cargarTodo, effectiveTenantId]);
-
-    return (
-        <ConfiguracionContext.Provider value={configuracionValue}>
-            <ProgramasContext.Provider value={programasValue}>
-                <SedesContext.Provider value={sedesValue}>
-                    <EstudiantesContext.Provider value={estudiantesValue}>
-                        <EventosContext.Provider value={eventosValue}>
-                            <TiendaContext.Provider value={tiendaValue}>
-                                <FinanzasContext.Provider value={finanzasValue}>
+                await cargarTenant(cc.tenantId); // Sincronizar el provider de marca con el ID real
+            },
+            agregarUsuario: async (d) => {
+                // Validación SaaS: Límite de instructores/equipo técnico
+                if (usuarios.length >= (configClub.limiteUsuarios || 0)) {
+                    throw new Error(`Ha alcanzado el límite de personal (${configClub.limiteUsuarios}) para su plan actual.`);
+                }
+                d.tenantId = effectiveTenantId;
+                const u = await api.agregarUsuario(d);
+                setUsuarios(p => [...p, u]);
+                return u;
+            },
+            actualizarUsuario: async (datos, id) => {
+                const res = await api.actualizarUsuario(datos, id);
+                if (res) setUsuarios(p => p.map(u => u.id === id ? res : u));
+                return res;
+            },
+            eliminarUsuario: async (id) => {
+                await api.eliminarUsuario(id);
+                setUsuarios(p => p.filter(u => u.id !== id));
+            },
+            cargarConfiguracion: cargarTodo
+        }}>
+            <ProgramasContext.Provider value={{
+                programas, cargando, error,
+                cargarProgramas: cargarTodo,
+                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: effectiveTenantId }); setProgramas(prev => [...prev, res]); return res; },
+                actualizarPrograma: async (p) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
+                eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
+            }}>
+                <SedesContext.Provider value={{
+                    sedes, cargando, error,
+                    cargarSedes: cargarTodo,
+                    agregarSede: async (s) => {
+                        // Validación SaaS: Límite de sedes
+                        if (sedes.length >= (configClub.limiteSedes || 0)) {
+                            throw new Error(`Límite de Sedes alcanzado (${configClub.limiteSedes}).`);
+                        }
+                        const res = await api.agregarSede({ ...s, tenantId: effectiveTenantId });
+                        setSedes(p => [...p, res]);
+                        return res;
+                    },
+                    actualizarSede: async (s) => {
+                        const res = await api.actualizarSede(s);
+                        setSedes(p => p.map(item => item.id === s.id ? res : item));
+                        return res;
+                    },
+                    eliminarSede: async (id) => {
+                        await api.eliminarSede(id);
+                        setSedes(p => p.filter(item => item.id !== id));
+                    }
+                }}>
+                    <EstudiantesContext.Provider value={{
+                        estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
+                        agregarEstudiante: async (datos) => {
+                            // Validación SaaS: Límite de estudiantes
+                            if (estudiantes.length >= (tenant?.limiteEstudiantes || 0)) {
+                                throw new Error(`Ha alcanzado el límite de estudiantes (${tenant?.limiteEstudiantes}) para su plan actual.`);
+                            }
+                            const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false });
+                            setEstudiantes(prev => [...prev, res]);
+                            return res;
+                        },
+                        actualizarEstudiante: async (e) => {
+                            const res = await api.actualizarEstudiante(e);
+                            setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item));
+                            return res;
+                        },
+                        eliminarEstudiante: async (id) => {
+                            await api.eliminarEstudiante(id);
+                            setEstudiantes(p => p.filter(e => e.id !== id));
+                        }
+                    }}>
+                        <EventosContext.Provider value={{
+                            eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; },
+                            actualizarEvento: async (e) => {
+                                const res = await api.actualizarEvento(e);
+                                setEventos(prev => prev.map(item => item.id === e.id ? res : item));
+                                return res;
+                            },
+                            eliminarEvento: async (id) => {
+                                await api.eliminarEvento(id);
+                                setEventos(p => p.filter(e => e.id !== id));
+                            }
+                        }}>
+                            <TiendaContext.Provider value={{
+                                implementos, solicitudesCompra, cargando, error,
+                                cargarDatosTienda: cargarTodo,
+                                registrarCompra: api.registrarCompra,
+                                gestionarSolicitudCompra: api.gestionarSolicitudCompra,
+                                agregarImplemento: async (i) => { const res = await api.agregarImplemento(i); setImplementos(p => [...p, res]); return res; },
+                                actualizarImplemento: async (i) => { const res = await api.actualizarImplemento(i); setImplementos(p => p.map(item => item.id === i.id ? res : item)); return res; },
+                                eliminarImplemento: async (id) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
+                            }}>
+                                <FinanzasContext.Provider value={{
+                                    movimientos, cargando, error, cargarMovimientos: cargarTodo,
+                                    agregarMovimiento: async (m) => {
+                                        const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId });
+                                        setMovimientos(p => [res, ...p]);
+                                        return res;
+                                    },
+                                    actualizarMovimiento: async (m) => {
+                                        const res = await api.actualizarMovimiento(m);
+                                        setMovimientos(p => p.map(item => item.id === m.id ? res : item));
+                                        return res;
+                                    },
+                                    eliminarMovimiento: async (id) => {
+                                        await api.eliminarMovimiento(id);
+                                        setMovimientos(p => p.filter(m => m.id !== id));
+                                    }
+                                }}>
                                     {children}
                                 </FinanzasContext.Provider>
                             </TiendaContext.Provider>
