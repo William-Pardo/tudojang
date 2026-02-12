@@ -71,7 +71,10 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
             document.documentElement.style.setProperty('--color-acento', a);
 
             // Guardar en cache para evitar flickering en el siguiente F5
-            localStorage.setItem('tkd_branding_cache', JSON.stringify({ p, s, a }));
+            localStorage.setItem('tkd_branding_cache', JSON.stringify({
+                p, s, a,
+                l: config.logoUrl || ''
+            }));
 
             const hoy = new Date();
             const vencimiento = new Date(config.fechaVencimiento);

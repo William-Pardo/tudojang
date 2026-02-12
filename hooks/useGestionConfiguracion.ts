@@ -39,15 +39,22 @@ export const useGestionConfiguracion = () => {
             setLocalConfigNotificaciones(prev => Object.keys(prev).length === 0 ? configNotificaciones : prev);
         }
 
-        // Sincronización: Actualizamos el estado local cuando el del contexto cambia
+        // Sincronización inteligente: Solo actualizamos si hay cambios estructurales (ID o límites)
+        // para evitar sobrescribir lo que el usuario está editando actualmente (como el Logo)
         if (configClub) {
-            // Si no tenemos nada local, o si el ID cambió, o si los datos son diferentes (discrepancia de límites)
-            if (!localConfigClub || configClub.tenantId !== localConfigClub.tenantId || configClub.limiteSedes !== localConfigClub.limiteSedes) {
-                console.log("[useGestionConfiguracion] Sincronizando configClub local con Contexto");
+            const idCambiado = !localConfigClub || configClub.tenantId !== localConfigClub.tenantId;
+            const limitesCambiados = localConfigClub && (
+                configClub.limiteEstudiantes !== localConfigClub.limiteEstudiantes ||
+                configClub.limiteSedes !== localConfigClub.limiteSedes ||
+                configClub.limiteUsuarios !== localConfigClub.limiteUsuarios
+            );
+
+            if (idCambiado || limitesCambiados) {
+                console.log("[useGestionConfiguracion] Sincronizando configClub local con Contexto (Cambio detectado)");
                 setLocalConfigClub(configClub);
             }
         }
-    }, [configNotificaciones, configClub, localConfigClub]); // Añadimos localConfigClub para comparar correctamente
+    }, [configNotificaciones, configClub]);
 
 
     const usuariosFiltrados = useMemo(() => {

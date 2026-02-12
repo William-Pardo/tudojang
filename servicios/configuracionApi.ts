@@ -121,7 +121,13 @@ export const obtenerConfiguracionClub = async (tenantId?: string): Promise<Confi
 
 export const guardarConfiguracionClub = async (config: ConfiguracionClub): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    await setDoc(doc(db, 'tenants', config.tenantId), config, { merge: true });
+    // Asegurarse de usar el ID correcto para el documento (tenantId es el campo oficial)
+    const docId = config.tenantId || (config as any).id;
+    if (!docId) {
+        console.error("[configuracionApi] Error: No se puede guardar configuración sin tenantId");
+        return;
+    }
+    await setDoc(doc(db, 'tenants', docId), config, { merge: true });
 };
 
 export const actualizarCapacidadClub = async (
