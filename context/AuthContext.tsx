@@ -1,6 +1,6 @@
 
 // context/AuthContext.tsx
-import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
+import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext, useMemo } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
@@ -112,7 +112,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  const value = { usuario, login, logout, enviarEnlaceRecuperacion, error, isSubmitting, cargandoSesion };
+  const value = useMemo(() => ({
+    usuario,
+    login,
+    logout,
+    enviarEnlaceRecuperacion,
+    error,
+    isSubmitting,
+    cargandoSesion
+  }), [usuario, login, logout, enviarEnlaceRecuperacion, error, isSubmitting, cargandoSesion]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

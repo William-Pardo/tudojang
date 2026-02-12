@@ -27,31 +27,37 @@ export const useGestionConfiguracion = () => {
     const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(configNotificaciones || {});
     const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub || null);
 
-    console.log("[useGestionConfiguracion] Render:", {
-        hasLocal: !!localConfigClub,
-        hasContext: !!configClub,
-        cargando,
-        tenantId: usuarioActual?.tenantId
-    });
-
     useEffect(() => {
-        if (configNotificaciones && Object.keys(configNotificaciones).length > 0) {
-            setLocalConfigNotificaciones(prev => Object.keys(prev).length === 0 ? configNotificaciones : prev);
+        // Sincronización de Notificaciones
+        if (configNotificaciones && configNotificaciones.tenantId) {
+            const idNotifCambiado = !localConfigNotificaciones.tenantId || configNotificaciones.tenantId !== localConfigNotificaciones.tenantId;
+            if (idNotifCambiado) {
+                setLocalConfigNotificaciones(configNotificaciones);
+            }
         }
 
-        // Sincronización inteligente: Solo actualizamos si hay cambios estructurales (ID o límites)
-        // para evitar sobrescribir lo que el usuario está editando actualmente (como el Logo)
-        if (configClub) {
-            const idCambiado = !localConfigClub || configClub.tenantId !== localConfigClub.tenantId;
+        // Sincronización inteligente de Configuración de Club
+        if (configClub && configClub.tenantId) {
+            const idClubCambiado = !localConfigClub || configClub.tenantId !== localConfigClub.tenantId;
             const limitesCambiados = localConfigClub && (
                 configClub.limiteEstudiantes !== localConfigClub.limiteEstudiantes ||
                 configClub.limiteSedes !== localConfigClub.limiteSedes ||
                 configClub.limiteUsuarios !== localConfigClub.limiteUsuarios
             );
 
-            if (idCambiado || limitesCambiados) {
-                console.log("[useGestionConfiguracion] Sincronizando configClub local con Contexto (Cambio detectado)");
+            // CRÍTICO: Solo sincronizamos si cambió el tenant o los límites del plan
+            // NO sobrescribimos el logoUrl local si el usuario está en medio de una edición
+            if (idClubCambiado) {
+                // Cambio completo de tenant, sincronizar todo
                 setLocalConfigClub(configClub);
+            } else if (limitesCambiados) {
+                // Solo actualizar los límites del plan, preservar el resto (incluido el logo)
+                setLocalConfigClub(prev => prev ? {
+                    ...prev,
+                    limiteEstudiantes: configClub.limiteEstudiantes,
+                    limiteSedes: configClub.limiteSedes,
+                    limiteUsuarios: configClub.limiteUsuarios
+                } : configClub);
             }
         }
     }, [configNotificaciones, configClub]);

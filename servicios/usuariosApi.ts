@@ -27,8 +27,11 @@ interface UsuarioSimulado extends Usuario {
     contrasena: string;
 }
 
+// Clave para localStorage
+const KEY_USUARIOS_MOCK = 'tkd_mock_usuarios';
+
 // Usuarios iniciales para pruebas locales sin Firebase
-let usuariosMock: UsuarioSimulado[] = [
+const USUARIOS_SEMILLA = [
     {
         id: 'master-aliant',
         email: 'aliantlab@gmail.com',
@@ -71,6 +74,18 @@ let usuariosMock: UsuarioSimulado[] = [
         contrasena: 'asistente123'
     }
 ];
+
+// Carga inicial desde localStorage o semilla
+let usuariosMock: UsuarioSimulado[] = (() => {
+    const saved = localStorage.getItem(KEY_USUARIOS_MOCK);
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem(KEY_USUARIOS_MOCK, JSON.stringify(USUARIOS_SEMILLA));
+    return USUARIOS_SEMILLA as UsuarioSimulado[];
+})();
+
+const persistirMock = () => {
+    localStorage.setItem(KEY_USUARIOS_MOCK, JSON.stringify(usuariosMock));
+};
 
 /**
  * REGLA DE ORO / AUTO-CURACIÓN:
@@ -168,6 +183,7 @@ export const agregarUsuario = async (datos: {
             contrasena: datos.contrasena
         };
         usuariosMock.push(nuevo);
+        persistirMock();
         const { contrasena: _, ...usuarioRetorno } = nuevo;
         return usuarioRetorno;
     }
@@ -210,6 +226,7 @@ export const obtenerUsuarios = async (tenantId?: string): Promise<Usuario[]> => 
 export const actualizarUsuario = async (datos: Partial<UsuarioSimulado>, id: string): Promise<Usuario> => {
     if (!isFirebaseConfigured) {
         usuariosMock = usuariosMock.map(u => u.id === id ? { ...u, ...datos } : u);
+        persistirMock();
         const encontrado = usuariosMock.find(u => u.id === id);
         if (!encontrado) throw new Error("Usuario no encontrado.");
         const { contrasena: _, ...retorno } = encontrado;
@@ -224,6 +241,7 @@ export const actualizarUsuario = async (datos: Partial<UsuarioSimulado>, id: str
 export const eliminarUsuario = async (id: string): Promise<void> => {
     if (!isFirebaseConfigured) {
         usuariosMock = usuariosMock.filter(u => u.id !== id);
+        persistirMock();
         return;
     }
     try {

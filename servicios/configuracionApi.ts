@@ -6,6 +6,7 @@ import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
 
 const KEY_CONF_NOTIF = 'tkd_mock_conf_notif';
+const KEY_CONF_CLUB = 'tkd_mock_conf_club';
 
 export const obtenerConfiguracionNotificaciones = async (tenantId: string): Promise<ConfiguracionNotificaciones> => {
     if (!isFirebaseConfigured) {
@@ -81,6 +82,10 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
 
 export const obtenerConfiguracionClub = async (tenantId?: string): Promise<ConfiguracionClub> => {
     if (!isFirebaseConfigured) {
+        const saved = localStorage.getItem(KEY_CONF_CLUB);
+        if (saved) return JSON.parse(saved);
+        // Si no hay guardado, devolver y guardar el valor por defecto
+        localStorage.setItem(KEY_CONF_CLUB, JSON.stringify(CONFIGURACION_CLUB_POR_DEFECTO));
         return CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub;
     }
 
@@ -120,12 +125,16 @@ export const obtenerConfiguracionClub = async (tenantId?: string): Promise<Confi
 };
 
 export const guardarConfiguracionClub = async (config: ConfiguracionClub): Promise<void> => {
-    if (!isFirebaseConfigured) return;
+    if (!isFirebaseConfigured) {
+        localStorage.setItem(KEY_CONF_CLUB, JSON.stringify(config));
+        return;
+    }
     // Asegurarse de usar el ID correcto para el documento (tenantId es el campo oficial)
     const docId = config.tenantId || (config as any).id;
     if (!docId) {
-        console.error("[configuracionApi] Error: No se puede guardar configuración sin tenantId");
-        return;
+        const errorMsg = "[configuracionApi] Error: No se puede guardar configuración sin tenantId";
+        console.error(errorMsg);
+        throw new Error(errorMsg);
     }
     await setDoc(doc(db, 'tenants', docId), config, { merge: true });
 };

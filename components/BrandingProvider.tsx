@@ -1,6 +1,6 @@
 
 // components/BrandingProvider.tsx
-import React, { useEffect, useState, createContext, useContext } from 'react';
+import React, { useEffect, useState, createContext, useContext, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { obtenerConfiguracionClub } from '../servicios/configuracionApi';
 import type { ConfiguracionClub } from '../tipos';
@@ -22,7 +22,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
     const { usuario } = useAuth(); // Added useAuth hook
 
-    const cargarTenant = async (targetId?: string) => {
+    const cargarTenant = useCallback(async (targetId?: string) => {
         const host = window.location.hostname;
         let slug = host.split('.')[0];
         if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
@@ -93,7 +93,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
             setEstado('error');
             setMensajeError("Error de conexión al cargar identidad.");
         }
-    };
+    }, [usuario]);
 
     useEffect(() => {
         // Al montar, intentamos cargar por dominio
@@ -123,8 +123,14 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     // MODO SUSCRIPCIÓN VENCIDA: Ya no bloqueamos la renderización completa aquí.
     // El App.tsx se encargará de mostrar banners o redirigir según el estado.
 
+    const value = useMemo(() => ({
+        tenant,
+        estaCargado: true,
+        cargarTenant
+    }), [tenant, cargarTenant]);
+
     return (
-        <TenantContext.Provider value={{ tenant, estaCargado: true, cargarTenant }}>
+        <TenantContext.Provider value={value}>
             {children}
         </TenantContext.Provider>
     );

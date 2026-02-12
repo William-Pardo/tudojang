@@ -32,27 +32,40 @@ const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'con
     return downloadURL;
 };
 
+// --- MOCK PERSISTENCE ---
+const KEY_ESTUDIANTES_MOCK = 'tkd_mock_estudiantes';
+const ESTUDIANTES_SEMILLA = [
+    {
+        id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10',
+        grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001',
+        correo: 'juan@test.com', fechaIngreso: '2024-01-10', estadoPago: EstadoPago.AlDia, historialPagos: [], saldoDeudor: 0,
+        consentimientoInformado: true, contratoServiciosFirmado: true, consentimientoImagenFirmado: true, consentimientoFotosVideos: true,
+        carnetGenerado: false
+    },
+    {
+        id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15',
+        grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002',
+        correo: 'maria@test.com', fechaIngreso: '2024-05-15', estadoPago: EstadoPago.Pendiente, historialPagos: [], saldoDeudor: 180000,
+        consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false, consentimientoFotosVideos: false,
+        carnetGenerado: false
+    }
+];
+
+let estudiantesMock: Estudiante[] = (() => {
+    const saved = localStorage.getItem(KEY_ESTUDIANTES_MOCK);
+    if (saved) return JSON.parse(saved);
+    localStorage.setItem(KEY_ESTUDIANTES_MOCK, JSON.stringify(ESTUDIANTES_SEMILLA));
+    return ESTUDIANTES_SEMILLA;
+})();
+
+const persistirMock = () => {
+    localStorage.setItem(KEY_ESTUDIANTES_MOCK, JSON.stringify(estudiantesMock));
+};
+
 export const obtenerEstudiantes = async (tenantId?: string): Promise<Estudiante[]> => {
     if (!isFirebaseConfigured) {
-        console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
-        const mock = [
-            {
-                id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10',
-                grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001',
-                correo: 'juan@test.com', fechaIngreso: '2024-01-10', estadoPago: EstadoPago.AlDia, historialPagos: [], saldoDeudor: 0,
-                consentimientoInformado: true, contratoServiciosFirmado: true, consentimientoImagenFirmado: true, consentimientoFotosVideos: true,
-                carnetGenerado: false
-            },
-            {
-                id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15',
-                grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002',
-                correo: 'maria@test.com', fechaIngreso: '2024-05-15', estadoPago: EstadoPago.Pendiente, historialPagos: [], saldoDeudor: 180000,
-                consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false, consentimientoFotosVideos: false,
-                carnetGenerado: false
-            }
-        ];
-        if (!tenantId) return mock;
-        return mock.filter(e => e.tenantId === tenantId);
+        if (!tenantId) return estudiantesMock;
+        return estudiantesMock.filter(e => e.tenantId === tenantId);
     }
 
     let q = query(estudiantesCollection);
@@ -79,8 +92,7 @@ export const marcarCarnetsComoGenerados = async (ids: string[]): Promise<void> =
 
 export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
-        const all = await obtenerEstudiantes();
-        const found = all.find(e => e.id === idEstudiante);
+        const found = estudiantesMock.find(e => e.id === idEstudiante);
         if (found) return found;
         throw new Error("Estudiante no encontrado.");
     }
@@ -95,8 +107,7 @@ export const obtenerEstudiantePorId = async (idEstudiante: string): Promise<Estu
 
 export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: string): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
-        const all = await obtenerEstudiantes();
-        const found = all.find(e => e.numeroIdentificacion === numIdentificacion);
+        const found = estudiantesMock.find(e => e.numeroIdentificacion === numIdentificacion);
         if (found) return found;
         throw new Error("No se encontró un estudiante con ese número de identificación.");
     }
@@ -111,7 +122,10 @@ export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: s
 
 export const agregarEstudiante = async (nuevoEstudiante: Omit<Estudiante, 'id' | 'historialPagos'>): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
-        return { ...nuevoEstudiante, id: `mock-${Date.now()}`, historialPagos: [] } as Estudiante;
+        const nuevo = { ...nuevoEstudiante, id: `mock-${Date.now()}`, historialPagos: [] } as Estudiante;
+        estudiantesMock.push(nuevo);
+        persistirMock();
+        return nuevo;
     }
     const estudianteParaGuardar = {
         ...nuevoEstudiante,
@@ -124,6 +138,8 @@ export const agregarEstudiante = async (nuevoEstudiante: Omit<Estudiante, 'id' |
 
 export const actualizarEstudiante = async (estudianteActualizado: Estudiante): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
+        estudiantesMock = estudiantesMock.map(e => e.id === estudianteActualizado.id ? estudianteActualizado : e);
+        persistirMock();
         return estudianteActualizado;
     }
     const { id, ...data } = estudianteActualizado;
@@ -133,7 +149,11 @@ export const actualizarEstudiante = async (estudianteActualizado: Estudiante): P
 };
 
 export const eliminarEstudiante = async (idEstudiante: string): Promise<void> => {
-    if (!isFirebaseConfigured) return;
+    if (!isFirebaseConfigured) {
+        estudiantesMock = estudiantesMock.filter(e => e.id !== idEstudiante);
+        persistirMock();
+        return;
+    }
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await deleteDoc(docRef);
 };
