@@ -7,7 +7,7 @@ import { registrarNuevaEscuela, buscarTenantPorSlug } from '../servicios/configu
 import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
-import { CONFIGURACION_WOMPI } from '../constantes';
+import * as C from '../constantes';
 import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
 
 const schema = yup.object({
@@ -186,7 +186,7 @@ const RegistroEscuela: React.FC = () => {
 
             log("Generando firma...");
             const precioWompi = parseInt(precioParam) * 100;
-            const cadenaFirma = `${nuevoTenantId}${precioWompi}COP${CONFIGURACION_WOMPI.integrityKey}`;
+            const cadenaFirma = `${nuevoTenantId}${precioWompi}COP${C.CONFIGURACION_WOMPI.integrityKey}`;
 
             console.log("Cadena firma:", cadenaFirma);
             const firmaIntegridad = await generarFirmaIntegridad(cadenaFirma);
@@ -194,7 +194,7 @@ const RegistroEscuela: React.FC = () => {
 
             const urlRetorno = `${window.location.origin}/#/registro-escuela`;
             const urlWompi = `https://checkout.wompi.co/p/?` +
-                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
+                `public-key=${C.CONFIGURACION_WOMPI.publicKey}&` +
                 `currency=COP&` +
                 `amount-in-cents=${precioWompi}&` +
                 `reference=${nuevoTenantId}&` +

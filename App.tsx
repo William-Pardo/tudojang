@@ -53,7 +53,10 @@ import {
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
     const location = ReactRouterDOM.useLocation();
     const { configClub } = useConfiguracion();
-    const configLista = configClub?.progresoConfiguracion?.sedes;
+    const pagoReciente = localStorage.getItem('tkd_pago_reciente');
+    const esPagoValido = pagoReciente && (Date.now() - parseInt(pagoReciente)) < 25 * 60 * 1000;
+    const enRetornoExito = window.location.href.includes('pago=exito');
+    const configLista = (esPagoValido || enRetornoExito) ? true : !!configClub?.progresoConfiguracion?.sedes;
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
     const todosLosEnlaces = [
@@ -64,6 +67,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor], bloqueado: !configLista },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin], bloqueado: false },
     ];
+
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => enlace.roles.includes(usuario.rol));
     const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
@@ -137,10 +141,46 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
 const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
     const { puntos, heatmapActivo } = useAnalytics();
-    const { suspendido, cargando: cargandoLicencia } = useEstadoLicencia();
+    const { suspendido: suspendidoReal, cargando: cargandoLicencia } = useEstadoLicencia();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
+    const navigate = ReactRouterDOM.useNavigate();
+    const location = ReactRouterDOM.useLocation();
+
+    // Lógica Optimista Global: Si hay un pago detectado, FORZAMOS el estado a "NO SUSPENDIDO"
+    // Esto desbloquea menús y rutas mientras el servidor asimila el pago.
+    const pagoReciente = localStorage.getItem('tkd_pago_reciente');
+    const esPagoValido = pagoReciente && (Date.now() - parseInt(pagoReciente)) < 25 * 60 * 1000;
+    const enRetornoExito = window.location.href.includes('pago=exito');
+    const suspendido = (esPagoValido || enRetornoExito) ? false : suspendidoReal;
+
+    // Redirect logic for suspended users
+    useEffect(() => {
+        // NO redirigir si el usuario acaba de regresar de Wompi con un pago exitoso o tiene marca optimista
+        const queryParams = new URLSearchParams(location.search);
+        const windowParams = new URLSearchParams(window.location.search);
+
+        let pagoExitoso = queryParams.get('pago') || windowParams.get('pago') || (location.hash.includes('pago=exito') ? 'exito' : null);
+
+        console.log('[App] Debug Redirección:', {
+            path: location.pathname,
+            suspendido,
+            suspendidoReal,
+            pagoExitoso,
+            esPagoValido
+        });
+
+        if (!cargandoLicencia && suspendido && usuario && usuario.rol !== RolUsuario.SuperAdmin) {
+            if (location.pathname !== '/renovar-licencia' && pagoExitoso !== 'exito') {
+                console.log('[App] Redirigiendo a /renovar-licencia por licencia vencida');
+                navigate('/renovar-licencia', { replace: true });
+            }
+        }
+    }, [suspendido, suspendidoReal, esPagoValido, cargandoLicencia, usuario, location.pathname, location.search, location.hash, navigate]);
+
+
+
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
         const storedTheme = localStorage.getItem('theme');
         if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
@@ -163,21 +203,40 @@ const AppLayout: React.FC = () => {
             <BarraLateral usuario={usuario} onLogout={logout} estaAbierta={menuAbierto} onCerrar={() => setMenuAbierto(false)} />
 
             <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 md:rounded-l-[3rem] shadow-2xl relative overflow-hidden">
-                {/* Banner de Estado de Licencia (Solo se muestra si está vencida o suspendida) */}
-                {suspendido && !esSuperAdmin && !cargandoLicencia && (
-                    <div className="bg-tkd-red text-white py-2.5 px-6 flex justify-between items-center z-[100] animate-pulse">
-                        <div className="flex items-center gap-2">
-                            <IconoInformacion className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Suscripción Vencida - Acceso Restringido (Modo Demo Activo)</span>
+                {/* Banner de Estado de Licencia (Supresión Optimista y Sincronización) */}
+                {suspendido && !esSuperAdmin && !cargandoLicencia && (() => {
+                    const pagoReciente = localStorage.getItem('tkd_pago_reciente');
+                    const esPagoValido = pagoReciente && (Date.now() - parseInt(pagoReciente)) < 20 * 60 * 1000;
+                    const enRetornoExito = window.location.href.includes('pago=exito');
+
+                    if (esPagoValido || enRetornoExito) {
+                        return (
+                            <div className="bg-tkd-blue text-white py-2.5 px-6 flex justify-between items-center z-[100]">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando Membresía...</span>
+                                </div>
+                                <div className="text-[9px] font-medium opacity-80 uppercase">Verificando Pago con Wompi</div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="bg-tkd-red text-white py-2.5 px-6 flex justify-between items-center z-[100] animate-pulse">
+                            <div className="flex items-center gap-2">
+                                <IconoInformacion className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Suscripción Vencida - Acceso Restringido</span>
+                            </div>
+                            <ReactRouterDOM.Link
+                                to="/renovar-licencia"
+                                className="bg-white text-tkd-red px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-gray-100 transition-all shadow-lg"
+                            >
+                                Pagar & Activar Ahora
+                            </ReactRouterDOM.Link>
                         </div>
-                        <ReactRouterDOM.Link
-                            to="/renovar-licencia"
-                            className="bg-white text-tkd-red px-4 py-1.5 rounded-full text-[9px] font-black uppercase hover:bg-gray-100 transition-all shadow-lg"
-                        >
-                            Pagar & Activar Ahora
-                        </ReactRouterDOM.Link>
-                    </div>
-                )}
+                    );
+                })()}
+
 
                 <header className="flex items-center justify-between h-20 px-8 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/5 z-20">
                     <button onClick={() => setMenuAbierto(!menuAbierto)} className="p-3 rounded-2xl text-gray-400 hover:text-tkd-dark transition-all hover:bg-gray-50 dark:hover:bg-white/5">
@@ -227,11 +286,7 @@ const AppRoutes: React.FC = () => {
         }
     }, []);
 
-    const debugDiv = (window as any).Cypress ? (
-        <div id="debug-log-onboarding" className="fixed bottom-0 left-0 bg-black/80 text-white text-[10px] p-2 z-[10000] min-w-full">
-            {appDebug} | Host: {window.location.hostname} | FB: {String(isFirebaseConfigured)} | Hash: {window.location.hash} | User: {usuario ? usuario.email : 'No'} | Loading: {cargandoSesion ? 'Yes' : 'No'}
-        </div>
-    ) : null;
+    const debugDiv = null;
 
     if (cargandoSesion) return (
         <div className="flex items-center justify-center h-screen bg-tkd-dark text-white">

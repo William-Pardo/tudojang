@@ -3,7 +3,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import type { Usuario } from '../tipos';
-import { IconoEditar, IconoEliminar, IconoContrato, IconoAprobar } from './Iconos';
+import { IconoEditar, IconoEliminar, IconoContrato, IconoAprobar, IconoInformacion } from './Iconos';
+import { validarIntegridadLegalTenant, validarIntegridadContratoUsuario } from '../utils/validaciones';
+import { useConfiguracion } from '../context/DataContext';
 
 interface Props {
   usuario: Usuario;
@@ -14,6 +16,10 @@ interface Props {
 }
 
 export const FilaUsuario: React.FC<Props> = ({ usuario, onEditar, onEliminar, onGestionarContrato, isCard }) => {
+  const { configClub } = useConfiguracion();
+
+  const integridadLegal = validarIntegridadLegalTenant(configClub);
+  const integridadContrato = validarIntegridadContratoUsuario(usuario);
 
   const renderBadgeContrato = () => {
     const estado = usuario.contrato?.firmado ? 'Firmado' : (usuario.contrato ? 'Pendiente' : 'Sin configurar');
@@ -28,6 +34,38 @@ export const FilaUsuario: React.FC<Props> = ({ usuario, onEditar, onEliminar, on
       'Pendiente': 'bg-amber-500 animate-pulse',
       'Sin configurar': 'bg-gray-300 dark:bg-gray-600'
     };
+
+    if (!integridadLegal.valido) {
+      return (
+        <div className="group/tip relative inline-block">
+          <button
+            onClick={() => onGestionarContrato(usuario)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase border bg-red-50 text-tkd-red border-red-200 dark:bg-red-900/20 dark:text-tkd-red dark:border-red-800 transition-all cursor-pointer"
+          >
+            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-tkd-red animate-ping"></span>
+            ⚠️ Alerta Legal
+          </button>
+          <div className="hidden group-hover/tip:block absolute bottom-full mb-2 left-0 w-48 bg-gray-900 text-white text-[8px] p-2 rounded-lg shadow-xl z-10 font-bold leading-tight">
+            ⚠️ ACLARA DATOS DEL CLUB EN CONFIGURACIÓN:
+            <ul className="mt-1 list-disc ml-2">
+              {integridadLegal.faltantes.map(f => <li key={f}>{f}</li>)}
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    if (!integridadContrato.valido && estado !== 'Firmado') {
+      return (
+        <button
+          onClick={() => onGestionarContrato(usuario)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800 transition-all cursor-pointer"
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500"></span>
+          Incompleto
+        </button>
+      );
+    }
 
     return (
       <button

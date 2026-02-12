@@ -72,6 +72,32 @@ let usuariosMock: UsuarioSimulado[] = [
     }
 ];
 
+/**
+ * REGLA DE ORO / AUTO-CURACIÓN:
+ * Si el usuario existe en Firebase Auth pero su documento en Firestore no,
+ * lo reconstruimos inmediatamente con valores seguros.
+ */
+export const autoCurarPerfil = async (firebaseUser: any): Promise<Usuario> => {
+    const email = firebaseUser.email!;
+    const uid = firebaseUser.uid;
+
+    const perfilAutoCurado = {
+        id: uid,
+        email: email.toLowerCase().trim(),
+        nombreUsuario: firebaseUser.displayName || 'Administrador',
+        numeroIdentificacion: '00000000',
+        whatsapp: '0000000000',
+        rol: email.toLowerCase() === 'aliantlab@gmail.com' ? RolUsuario.SuperAdmin : RolUsuario.Admin,
+        tenantId: uid.startsWith('tnt-') ? uid : (email.split('@')[0] + '-default'),
+        estadoContrato: 'Activo',
+        fcmTokens: []
+    };
+
+    console.warn(`[Auto-Curación] Reparando perfil para ${email} (UID: ${uid})`);
+    await setDoc(doc(db, 'usuarios', uid), perfilAutoCurado);
+    return perfilAutoCurado as Usuario;
+};
+
 export const autenticarUsuario = async (email: string, contrasena: string): Promise<Usuario> => {
     if (!isFirebaseConfigured) {
         const encontrado = usuariosMock.find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -115,8 +141,8 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
         intentos++;
     }
 
-    console.error(`[autenticarUsuario] Error final: Imposible encontrar perfil para ${email} (UID: ${uid})`);
-    throw new Error("Tu perfil no existe o no se ha sincronizado correctamente. Por favor, contacta a soporte técnico.");
+    // Si llegamos aquí, el usuario no existe en Firestore, invocamos auto-curación
+    return await autoCurarPerfil(userCredential.user);
 };
 
 export const agregarUsuario = async (datos: {

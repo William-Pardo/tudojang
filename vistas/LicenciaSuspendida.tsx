@@ -3,38 +3,63 @@ import React from 'react';
 import { useEstadoLicencia } from '../hooks/useEstadoLicencia';
 import { IconoLogoOficial, IconoGuardar, IconoInformacion, IconoWhatsApp } from '../components/Iconos';
 import { formatearPrecio } from '../utils/formatters';
-import { PLANES_SAAS } from '../constantes';
+import * as C from '../constantes';
 
 const LicenciaSuspendida: React.FC = () => {
     const { diasRestantes, fechaVencimiento, plan, diasGracia, configClub } = useEstadoLicencia();
 
-    const planActual = (PLANES_SAAS as any)[plan || 'starter'] || PLANES_SAAS.starter;
+    const planActual = (C.PLANES_SAAS as any)[plan || 'starter'] || C.PLANES_SAAS.starter;
 
     const handlePagarConWompi = async () => {
         try {
+            console.log("Iniciando pago Wompi...", C.CONFIGURACION_WOMPI);
+
+            if (!C.CONFIGURACION_WOMPI) {
+                throw new Error("La configuración de pagos no está cargada.");
+            }
+
+            if (!window.crypto || !window.crypto.subtle) {
+                alert("Error de seguridad: El navegador no soporta criptografía segura o no estás en HTTPS. Intenta desde un dispositivo seguro.");
+                return;
+            }
+
             const precio = planActual.precio;
             const precioEnCentavos = precio * 100;
             const moneda = 'COP';
             const referencia = `RENOVACION_${configClub?.tenantId || 'TEST'}_${Date.now()}`;
 
             // Generar firma de integridad
-            const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
+            const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${C.CONFIGURACION_WOMPI.integrityKey}`;
 
             const encondedText = new TextEncoder().encode(cadenaFirma);
             const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-            const urlRetorno = `${window.location.origin}/#/`;
+            // Mover el parámetro de pago antes del hash para mayor confiabilidad en el retorno
+            const urlBase = window.location.origin + window.location.pathname;
+            const urlRetorno = `${urlBase}?pago=exito#/configuracion`;
+
+            console.log('[LicenciaSuspendida] URL Base:', urlBase);
+            console.log('[LicenciaSuspendida] URL Retorno:', urlRetorno);
+
+            console.log('[LicenciaSuspendida] URL Retorno Encoded:', encodeURIComponent(urlRetorno));
+
             const urlWompi = `https://checkout.wompi.co/p/?` +
-                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
+                `public-key=${C.CONFIGURACION_WOMPI.publicKey}&` +
                 `currency=${moneda}&` +
                 `amount-in-cents=${precioEnCentavos}&` +
                 `reference=${referencia}&` +
                 `signature:integrity=${signature}&` +
                 `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
+            console.log('[LicenciaSuspendida] URL Wompi completa:', urlWompi);
+
+            // Marca optimista de pago iniciado
+            localStorage.setItem('tkd_pago_reciente', Date.now().toString());
+
             window.location.assign(urlWompi);
+
         } catch (error) {
             console.error("Error al iniciar pago:", error);
             alert("No se pudo iniciar el proceso de pago. Por favor intenta de nuevo o contacta a soporte.");

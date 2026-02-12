@@ -62,16 +62,16 @@ exports.bienvenida = (data) => `
                 🥋 ¡Acceso Activado!
             </h1>
             <p style="color: #4b5563; font-size: 18px; line-height: 1.625; text-align: left; margin-top: 24px;">
-                Saludos <span style="font-weight: bold; color: #003366; font-style: italic;">Sabonim ${data.nombreUsuario}</span>,
+                Saludos <span style="font-weight: bold; color: #003366; font-style: italic;">${data.nombreUsuario}</span>,
             </p>
             <p style="color: #4b5563; font-size: 18px; line-height: 1.625; text-align: left; margin-top: 16px;">
-                Es un honor informarte que la academia <span style="color: #cc3333; font-weight: 900; text-transform: uppercase;">${data.nombreAcademia}</span> ha sido dada de alta exitosamente en **Tudojang.com**.
+                Es un honor informarte que la academia <span style="color: #cc3333; font-weight: 900; text-transform: uppercase;">${data.nombreAcademia}</span> te ha dado de alta como parte de su equipo técnico en **Tudojang.com**.
             </p>
             <div class="brush-stroke" style="text-align: left;">
                 "La autoridad técnica se construye con disciplina, el control de la academia con Tudojang."
             </div>
             <div class="credentials-box" style="margin-top: 32px; text-align: left;">
-                <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #003366; font-weight: bold; margin-bottom: 16px;">Credenciales de Acceso:</p>
+                <p style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #003366; font-weight: bold; margin-bottom: 16px;">Tus Credenciales de Acceso:</p>
                 <div style="margin-bottom: 8px;">
                     <span style="color: #6b7280;">Usuario:</span>
                     <span style="font-weight: bold; color: #003366; float: right;">${data.emailUsuario}</span>
@@ -85,7 +85,7 @@ exports.bienvenida = (data) => `
                 <div style="clear: both;"></div>
             </div>
             <div style="margin-top: 40px;">
-                <a href="https://tudojang.com" class="btn-primary">Iniciar sesión en mi Dojo</a>
+                <a href="${data.loginUrl || 'https://tudojang.com'}" class="btn-primary">Iniciar sesión en mi Panel</a>
             </div>
             <p style="font-size: 11px; color: #9ca3af; margin-top: 32px; font-style: italic; text-align: left;">
                 * Por seguridad, se le solicitará cambiar su contraseña al ingresar por primera vez.

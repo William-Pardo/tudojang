@@ -4,8 +4,9 @@ import React, { createContext, useState, useEffect, useCallback, ReactNode, useC
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
+import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion, autoCurarPerfil } from '../servicios/api';
 import type { Usuario } from '../tipos';
+import { RolUsuario } from '../tipos';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -61,12 +62,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...userData
               } as Usuario);
             } else {
-              console.warn(`[AuthContext] No se encontró perfil para el usuario autenticado.`);
-              setUsuario(null);
+              console.warn(`[AuthContext] No se encontró perfil para el usuario autenticado. Intentando auto-curación...`);
+              const perfilReparado = await autoCurarPerfil(firebaseUser);
+              setUsuario(perfilReparado);
             }
           }
         } catch (e) {
-          console.error("Error al obtener perfil de usuario:", e);
+          console.error("Error al obtener perfil de usuario o en auto-curación:", e);
           setUsuario(null);
         }
       } else {

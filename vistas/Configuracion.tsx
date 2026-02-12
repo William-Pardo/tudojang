@@ -1,6 +1,6 @@
 
 // vistas/Configuracion.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio, formatearFecha } from '../utils/formatters';
 import {
@@ -15,7 +15,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
 import { actualizarCapacidadClub, actualizarPlanClub } from '../servicios/configuracionApi';
-import { COSTOS_ADICIONALES, PLANES_SAAS } from '../constantes';
+import * as C from '../constantes'; // IMPORTACIÓN ROBUSTA
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
@@ -23,6 +23,7 @@ import ModalContratoUsuario from '../components/ModalContratoUsuario';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import Loader from '../components/Loader';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -57,7 +58,7 @@ const ModalFormPrograma: React.FC<{
                         <div className="relative">
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Modalidad</label>
                             <select value={tipo} onChange={e => setTipo(e.target.value as any)} className={selectStyle}>
-                                <option value={TipoCobroPrograma.Recurrente}>MembresÍA</option>
+                                <option value={TipoCobroPrograma.Recurrente}>Membresía</option>
                                 <option value={TipoCobroPrograma.Unico}>Taller Corto</option>
                             </select>
                         </div>
@@ -100,25 +101,46 @@ const ModalPagoCheckout: React.FC<{
     const ejecutarPagoYActivacion = async () => {
         setPaso('procesando');
         try {
-            await new Promise(r => setTimeout(r, 2500));
-
-            if (tipo === 'addon') {
-                const mapeoCampos: Record<string, any> = {
-                    'estudiantes': 'limiteEstudiantes',
-                    'instructor': 'limiteUsuarios',
-                    'sede': 'limiteSedes'
-                };
-                const campoAIncrementar = mapeoCampos[item.key];
-                await actualizarCapacidadClub(tenantId, campoAIncrementar, item.cantidad);
-                onExito({ tipo: 'addon', [campoAIncrementar]: item.cantidad });
-            } else {
-                await actualizarPlanClub(tenantId, item);
-                onExito({ tipo: 'plan', plan: item });
+            if (!C.CONFIGURACION_WOMPI) {
+                throw new Error("Configuración de pagos no disponible.");
             }
 
-            setPaso('exito');
+            if (!window.crypto || !window.crypto.subtle) {
+                alert("Error de seguridad: El navegador no soporta criptografía segura o no estás en HTTPS. Intenta desde un dispositivo seguro.");
+                setPaso('checkout');
+                return;
+            }
+
+            const precioEnCentavos = item.precio * 100;
+            const moneda = 'COP';
+            const referencia = `${tipo.toUpperCase()}_${tenantId}_${Date.now()}`;
+
+            // Generar firma de integridad
+            const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${C.CONFIGURACION_WOMPI.integrityKey}`;
+
+            const encondedText = new TextEncoder().encode(cadenaFirma);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+            // Asegurar que la URL de retorno use HashRouter correctamente
+            const urlBase = window.location.origin + window.location.pathname;
+            const urlRetorno = `${urlBase}#/configuracion?pago=exito`;
+
+            const urlWompi = `https://checkout.wompi.co/p/?` +
+                `public-key=${C.CONFIGURACION_WOMPI.publicKey}&` +
+                `currency=${moneda}&` +
+                `amount-in-cents=${precioEnCentavos}&` +
+                `reference=${referencia}&` +
+                `signature:integrity=${signature}&` +
+                `redirect-url=${encodeURIComponent(urlRetorno)}`;
+
+            // Marca optimista de pago iniciado
+            localStorage.setItem('tkd_pago_reciente', Date.now().toString());
+            window.location.assign(urlWompi);
         } catch (error) {
-            mostrarNotificacion("La transacción fue rechazada por el banco.", "error");
+            console.error("Error al iniciar pago:", error);
+            mostrarNotificacion("No se pudo iniciar el proceso de pago. Por favor intenta de nuevo.", "error");
             setPaso('checkout');
         }
     };
@@ -186,6 +208,8 @@ const VistaConfiguracion: React.FC = () => {
     const { programas, agregarPrograma, actualizarPrograma, eliminarPrograma } = useProgramas();
     const { sedes, agregarSede, actualizarSede, eliminarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
+    const navigate = useNavigate();
+    const location = useLocation();
 
     const [activeTab, setActiveTab] = useState<'institucional' | 'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('institucional');
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
@@ -194,6 +218,69 @@ const VistaConfiguracion: React.FC = () => {
     const [sedeEdit, setSedeEdit] = useState<Sede | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
     const [usuarioContrato, setUsuarioContrato] = useState<Usuario | null>(null);
+
+    // Usar ref para evitar ejecuciones múltiples
+    const pagoProcesadoRef = useRef(false);
+
+    // Detectar retorno desde Wompi con pago exitoso (Rastreo Inteligente)
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const windowParams = new URLSearchParams(window.location.search);
+
+        const pagoExitoso = queryParams.get('pago') || windowParams.get('pago') || (location.hash.includes('pago=exito') ? 'exito' : null);
+        const transactionId = queryParams.get('id') || windowParams.get('id');
+
+        if (pagoExitoso === 'exito' && !pagoProcesadoRef.current) {
+            console.log('[Configuracion] Iniciando rastreo inteligente de pago. ID:', transactionId);
+            pagoProcesadoRef.current = true;
+
+            const iniciarRastreo = async () => {
+                mostrarNotificacion('Detectamos tu pago. Sincronizando con el servidor...', 'info');
+
+                let intentos = 0;
+                const maxIntentos = 25; // ~1 minuto de rastreo (25 * 2.5s)
+
+                const rastrear = async () => {
+                    intentos++;
+                    console.log(`[Configuracion] Rastreo activo #${intentos}...`);
+
+                    if (transactionId) {
+                        try {
+                            const res = await fetch('/api/verificarTransaccion', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ data: { transactionId } })
+                            });
+                            const data = await res.json();
+                            if (data?.data?.success) {
+                                localStorage.removeItem('tkd_pago_reciente');
+                                console.log('[Configuracion] ¡Éxito confirmado por API!');
+                            }
+                        } catch (e) { }
+                    }
+
+                    await cargarConfiguracion();
+
+                    if (intentos < maxIntentos) {
+                        setTimeout(rastrear, 2500);
+                    } else {
+                        localStorage.removeItem('tkd_pago_reciente');
+                        mostrarNotificacion('Sincronización finalizada.', 'success');
+                    }
+                };
+
+
+                rastrear();
+                setActiveTab('licencia');
+                navigate('/configuracion', { replace: true });
+            };
+
+            iniciarRastreo();
+        }
+    }, [location.search, cargarConfiguracion, mostrarNotificacion, navigate]);
+
+
+
 
     const handleExitoPago = (datos: any) => {
         setLocalConfigClub(prev => {
@@ -335,13 +422,39 @@ const VistaConfiguracion: React.FC = () => {
                                         <input type="text" name="nombreClub" value={localConfigClub.nombreClub} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">NIT / Registro</label>
-                                        <input type="text" name="nit" value={localConfigClub.nit} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
+                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest flex items-center gap-1">
+                                            NIT / Registro <span className="text-tkd-red text-xs">🔴</span>
+                                        </label>
+                                        <input type="text" name="nit" value={localConfigClub.nit} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} placeholder="900.xxx.xxx-x" />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Representante Legal</label>
-                                    <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest flex items-center gap-1">
+                                            Representante Legal <span className="text-tkd-red text-xs">🔴</span>
+                                        </label>
+                                        <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} placeholder="Nombre del Director" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest flex items-center gap-1">
+                                            Documento Representante <span className="text-tkd-red text-xs">🔴</span>
+                                        </label>
+                                        <input type="text" name="ccRepresentante" value={localConfigClub.ccRepresentante} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} placeholder="CC / Pasaporte" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest flex items-center gap-1">
+                                            Ciudad de Firma <span className="text-tkd-red text-xs">🔴</span>
+                                        </label>
+                                        <input type="text" name="lugarFirma" value={localConfigClub.lugarFirma} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} placeholder="Ej: Bogotá D.C." />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest flex items-center gap-1">
+                                            Dirección Dojang <span className="text-tkd-red text-xs">🔴</span>
+                                        </label>
+                                        <input type="text" name="direccionClub" value={localConfigClub.direccionClub} onChange={(e) => handleConfigChange(e, setLocalConfigClub)} className={inputClasses} placeholder="Calle 123 #45-67" />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -632,6 +745,28 @@ const VistaConfiguracion: React.FC = () => {
 
                 {activeTab === 'licencia' && (
                     <div className="space-y-10 animate-fade-in">
+                        {window.location.search.includes('pago=exito') && (
+                            <div className="bg-tkd-blue/10 border-2 border-tkd-blue/30 p-6 rounded-3xl flex items-center justify-between mb-8 animate-pulse">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-tkd-blue p-3 rounded-2xl">
+                                        <IconoInformacion className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black uppercase text-sm text-tkd-blue">Pago Recibido Correctamente</h4>
+                                        <p className="text-[10px] text-tkd-blue/60 uppercase font-black tracking-widest">
+                                            Tu transacción {new URLSearchParams(window.location.search).get('id')} está siendo validada por el servidor.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                                >
+                                    Refrescar Ahora
+                                </button>
+                            </div>
+                        )}
+
                         <div className="bg-tkd-dark text-white p-10 rounded-[3rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8 border border-white/5 relative overflow-hidden">
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black text-tkd-red uppercase tracking-[0.4em] mb-2">Estado de Suscripción</p>
@@ -639,13 +774,18 @@ const VistaConfiguracion: React.FC = () => {
                                 <p className="text-gray-400 text-xs mt-4 font-bold uppercase tracking-widest">Vence el: {formatearFecha(localConfigClub.fechaVencimiento)}</p>
                             </div>
                             <div className="flex gap-4 relative z-10">
-                                <button className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Renovar Licencia</button>
+                                <button
+                                    onClick={() => setItemAPagar({ item: (C.PLANES_SAAS as any)[localConfigClub.plan || 'starter'], tipo: 'plan' })}
+                                    className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95"
+                                >
+                                    Renovar Licencia
+                                </button>
                             </div>
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {Object.values(COSTOS_ADICIONALES).map(addon => (
+                            {Object.values(C.COSTOS_ADICIONALES).map(addon => (
                                 <div key={addon.key} className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
                                     <div>
                                         <p className="text-[10px] font-black text-tkd-blue uppercase tracking-[0.2em] mb-1">Add-on de Capacidad</p>
@@ -670,6 +810,7 @@ const VistaConfiguracion: React.FC = () => {
                 <ModalContratoUsuario
                     abierto={!!usuarioContrato}
                     usuario={usuarioContrato}
+                    configClub={localConfigClub}
                     onCerrar={() => setUsuarioContrato(null)}
                     onGuardar={async (usuarioActualizado) => {
                         try {

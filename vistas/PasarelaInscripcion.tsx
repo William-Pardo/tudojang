@@ -8,7 +8,7 @@ import { IconoLogoOficial, IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUs
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
-import { CONFIGURACION_WOMPI } from '../constantes';
+import * as C from '../constantes';
 
 const PasarelaInscripcion: React.FC = () => {
     const { tenant, estaCargado } = useTenant();

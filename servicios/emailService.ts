@@ -1,5 +1,6 @@
 // servicios/emailService.ts
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { isFirebaseConfigured } from '../firebase/config';
 
 interface EnviarBienvenidaParams {
     email: string;
@@ -38,7 +39,6 @@ interface EnviarSoporteParams {
  */
 const callApi = async (functionName: string, data: any) => {
     // SOPORTE PARA MOCK MODE (Desarrollo sin Firebase configurado)
-    const { isFirebaseConfigured } = await import('../firebase/config');
     if (!isFirebaseConfigured) {
         console.warn(`[MOCK MODE] Simulando llamada exitosa a: ${functionName}`);
         return { success: true, message: 'Operación simulada con éxito' };

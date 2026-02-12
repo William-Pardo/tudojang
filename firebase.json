@@ -10,10 +10,29 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/webhookWompi",
         "function": "webhookWompi"
+      },
+      {
+        "source": "/api/debugLogs",
+        "function": "getDebugLogs"
+      },
+      {
+        "source": "/api/verificarTransaccion",
+        "function": "verificarTransaccionWompi"
       },
       {
         "source": "/api/enviarBienvenidaTudojang",

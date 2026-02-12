@@ -7,7 +7,9 @@ import { GrupoEdad, EstadoPago, TipoNotificacion } from '../tipos';
 import { enviarNotificacion } from '../servicios/api';
 import { generarMensajePersonalizado } from '../servicios/geminiService';
 import { useNotificacion } from '../context/NotificacionContext';
+import { useAuth } from '../context/AuthContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
+import { RolUsuario } from '../tipos';
 import { generarUrlAbsoluta } from '../utils/formatters';
 
 const ITEMS_PER_PAGE = 10;
@@ -16,6 +18,8 @@ export const useGestionEstudiantes = () => {
     const { estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante, cargarEstudiantes } = useEstudiantes();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
+    const { usuario } = useAuth();
+    const navigate = ReactRouterDOM.useNavigate();
     const location = ReactRouterDOM.useLocation();
 
     // Estado local para UI
@@ -112,6 +116,10 @@ export const useGestionEstudiantes = () => {
                 }
             }
             cerrarFormulario();
+            // Redirigir a configuración si es admin para evitar loops de firmas/perfil
+            if (usuario?.rol === RolUsuario.Admin) {
+                navigate('/configuracion');
+            }
         } catch (error) {
             mostrarNotificacion("No se pudo guardar el estudiante.", "error");
             throw error;

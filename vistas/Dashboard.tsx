@@ -1,3 +1,4 @@
+// vistas/Dashboard.tsx
 import React from 'react';
 import { useDashboard } from '../hooks/useDashboard';
 import { useSedes } from '../context/DataContext';
@@ -39,7 +40,7 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
             </div>
         );
     }
-    
+
     if (error) {
         return <div className="p-8"><ErrorState mensaje={error} onReintentar={recargarTodo} /></div>;
     }
@@ -60,15 +61,15 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
             )}
 
             {/* Alertas Críticas (Solicitudes de Tienda) */}
-            <SolicitudesCompraPendientes 
-                solicitudes={solicitudesCompra} 
+            <SolicitudesCompraPendientes
+                solicitudes={solicitudesCompra}
                 onGestionar={manejarGestionCompra}
                 cargandoAccion={cargandoAccion}
             />
 
             {/* Panel de Filtros Técnicos */}
             <div className="animate-slide-in-right">
-                <FiltrosDashboard 
+                <FiltrosDashboard
                     filtros={filtros}
                     sedes={sedes}
                     onFiltroChange={handleFiltroChange}
@@ -78,8 +79,8 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
 
             {/* Núcleo de KPIs */}
             <section className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                <ResumenKPIs 
-                    estudiantes={datosFiltrados.estudiantesFiltrados} 
+                <ResumenKPIs
+                    estudiantes={datosFiltrados.estudiantesFiltrados}
                     finanzas={datosFiltrados.finanzas}
                 />
             </section>
@@ -91,7 +92,7 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
                         <ProximosEventos eventos={datosFiltrados.eventosParaMostrar} />
                     </div>
                 </div>
-                
+
                 <div className="space-y-10">
                     <div className="tkd-card p-1">
                         <ResumenPagos estudiantes={datosFiltrados.estudiantesFiltrados} />

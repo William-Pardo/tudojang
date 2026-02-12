@@ -2,18 +2,21 @@
 import React, { useState } from 'react';
 import type { Usuario } from '../tipos';
 import { TipoVinculacionColaborador } from '../tipos';
-import { IconoCerrar, IconoContrato, IconoAprobar, IconoWhatsApp, IconoCopiar } from './Iconos';
+import { IconoCerrar, IconoContrato, IconoAprobar, IconoWhatsApp, IconoCopiar, IconoInformacion } from './Iconos';
 import { formatearPrecio, generarUrlAbsoluta } from '../utils/formatters';
+import { validarIntegridadLegalTenant, validarIntegridadContratoUsuario } from '../utils/validaciones';
+import type { ConfiguracionClub } from '../tipos';
 import ModalVerFirma from './ModalVerFirma';
 
 interface Props {
     abierto: boolean;
     usuario: Usuario;
+    configClub: ConfiguracionClub;
     onCerrar: () => void;
     onGuardar: (usuario: Usuario) => void;
 }
 
-const ModalContratoUsuario: React.FC<Props> = ({ abierto, usuario, onCerrar, onGuardar }) => {
+const ModalContratoUsuario: React.FC<Props> = ({ abierto, usuario, configClub, onCerrar, onGuardar }) => {
     const [contrato, setContrato] = useState(usuario.contrato || {
         valorPago: 0,
         tipoVinculacion: TipoVinculacionColaborador.Mes,
@@ -26,6 +29,9 @@ const ModalContratoUsuario: React.FC<Props> = ({ abierto, usuario, onCerrar, onG
     });
     const [verFirma, setVerFirma] = useState(false);
     const [copiado, setCopiado] = useState(false);
+
+    const integridadLegal = validarIntegridadLegalTenant(configClub);
+    const integridadContrato = validarIntegridadContratoUsuario(usuario);
 
     if (!abierto) return null;
 
@@ -90,6 +96,21 @@ const ModalContratoUsuario: React.FC<Props> = ({ abierto, usuario, onCerrar, onG
                             <IconoCerrar className="w-5 h-5" />
                         </button>
                     </div>
+
+                    {/* Alerta de Integridad Institucional */}
+                    {!integridadLegal.valido && (
+                        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-tkd-red/20 space-y-2 animate-shake">
+                            <div className="flex items-center gap-2 text-tkd-red font-black uppercase text-[10px]">
+                                <IconoInformacion className="w-4 h-4" /> Academia Incompleta Legalmente
+                            </div>
+                            <p className="text-[9px] font-bold text-gray-500 uppercase leading-tight">
+                                Antes de emitir este contrato, debe completar los datos de la academia en Configuración:
+                                <ul className="mt-1 list-disc ml-4">
+                                    {integridadLegal.faltantes.map(f => <li key={f}>{f}</li>)}
+                                </ul>
+                            </p>
+                        </div>
+                    )}
 
                     {/* Estado Badge */}
                     <div className={`flex items-center gap-3 p-4 rounded-2xl border ${estiloEstado.bg} ${estiloEstado.border}`}>
@@ -233,7 +254,8 @@ const ModalContratoUsuario: React.FC<Props> = ({ abierto, usuario, onCerrar, onG
                         {!contrato.firmado && (
                             <button
                                 onClick={handleGuardarContrato}
-                                className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95"
+                                disabled={!integridadLegal.valido}
+                                className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95 disabled:bg-gray-400 disabled:shadow-none"
                             >
                                 <IconoAprobar className="w-6 h-6" /> {usuario.contrato ? 'Actualizar Contrato' : 'Configurar Contrato'}
                             </button>

@@ -1,4 +1,3 @@
-
 // vistas/PublicLanding.tsx
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,7 +32,7 @@ const PublicLanding: React.FC = () => {
                 </Link>
             </nav>
 
-            {/* HERO SECTION: PUNTO DE CIERRE 1 */}
+            {/* HERO SECTION: RECUPERACIÓN DE AUTORIDAD */}
             <section className="relative pt-32 pb-20 px-6 sm:px-12 overflow-hidden">
                 <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
                     <motion.div
@@ -43,11 +42,11 @@ const PublicLanding: React.FC = () => {
                         <div className="inline-block bg-[#0047A0]/10 text-[#0047A0] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
                             Software Técnico para Academias en Colombia
                         </div>
-                        <h1 className="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.9]">
-                            Recupere su tiempo <br /> y asegure su <span className="text-[#0047A0]">Recaudo</span>
+                        <h1 className="text-5xl md:text-6xl font-black uppercase tracking-tighter leading-[0.95]">
+                            RECUPERE SU TIEMPO <br /> Y ASEGURE EL <span className="text-[#0047A0]">RECAUDO</span> DE SU ACADEMIA
                         </h1>
                         <p className="text-lg text-gray-500 font-medium uppercase leading-relaxed max-w-md">
-                            Gestione cobranzas por WhatsApp con IA, formalice contratos digitales con validez legal y controle su academia con autoridad técnica.
+                            La plataforma técnica que automatiza el cobro de mensualidades, blinda legalmente sus matrículas y ordena su Dojang sin complicaciones.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
                             <a
@@ -61,7 +60,7 @@ const PublicLanding: React.FC = () => {
                                 to="/registro-escuela"
                                 className="bg-white border-2 border-gray-100 text-[#111111] px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:border-[#0047A0] transition-all text-center"
                             >
-                                Iniciar prueba sin costo
+                                Probar 7 días sin costo
                             </Link>
                         </div>
                     </motion.div>
@@ -89,30 +88,30 @@ const PublicLanding: React.FC = () => {
                 </div>
             </section>
 
-            {/* CARACTERÍSTICAS CORE */}
+            {/* CARACTERÍSTICAS CORE: ALIVIO OPERATIVO */}
             <section id="caracteristicas" className="py-24 bg-gray-50 px-6 sm:px-12">
                 <div className="max-w-7xl mx-auto space-y-20">
                     <div className="text-center space-y-4">
                         <h2 className="text-4xl font-black uppercase tracking-tighter">Potencia su Ecosistema</h2>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Respaldo Administrativo y Legal</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em]">Solidez Financiera y Legal</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                         {[
                             {
                                 icon: IconoWhatsApp,
-                                title: "Cobranza Diplomática con IA",
-                                text: "Recupere mensualidades sin confrontaciones. Nuestra IA gestiona recordatorios por WhatsApp de forma respetuosa, manteniendo la armonía con los padres."
+                                title: "COBRANZA PUNTUAL Y RESPETUOSA",
+                                text: "Evite el desgaste de cobrar. Nuestra IA envía recordatorios automáticos por WhatsApp con tacto y profesionalismo, asegurando el pago sin afectar la relación con los padres."
                             },
                             {
                                 icon: IconoFirma,
-                                title: "Seguridad Jurídica Integral",
-                                text: "Matrículas y consentimientos con firma digital válida en Colombia. Documentación trazable que protege su escuela ante cualquier eventualidad legal."
+                                title: "SEGURIDAD JURÍDICA BLINDADA",
+                                text: "Contratos y exoneraciones con firma digital válida en Colombia (Ley 527). Tenga la tranquilidad absoluta de que cada alumno está documentado y su academia protegida."
                             },
                             {
                                 icon: IconoCampana,
-                                title: "Control Operativo en Vivo",
-                                text: "Asistencias por QR y alertas en tiempo real. Brinde tranquilidad total a los padres mientras mantiene el registro técnico exhaustivo de cada alumno."
+                                title: "CONTROL DE PISO Y ASISTENCIA",
+                                text: "Registro de ingresos con QR y seguimiento técnico de grados. Mantenga la disciplina en el tatami y brinde reportes claros de asistencia a los acudientes en tiempo real."
                             }
                         ].map((feat, i) => (
                             <div key={i} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all space-y-6">
@@ -127,13 +126,13 @@ const PublicLanding: React.FC = () => {
                 </div>
             </section>
 
-            {/* TARIFAS: PUNTO DE CIERRE 2 */}
+            {/* TARIFAS: INVERSIÓN INTELIGENTE */}
             <section id="tarifas" className="py-24 px-6 sm:px-12">
                 <div className="max-w-6xl mx-auto space-y-16">
                     <div className="text-center space-y-6">
                         <div>
                             <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
-                            <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento de su escuela</p>
+                            <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento y control de su escuela</p>
                         </div>
 
                         {/* Toggle Mensual / Anual */}
@@ -252,25 +251,26 @@ const PublicLanding: React.FC = () => {
                             );
                         })}
                     </div>
-                    <div className="text-center mt-12 bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
+                    {/* Justificación Económica */}
+                    <div className="text-center mt-12 bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/10 max-w-2xl mx-auto">
                         <p className="text-sm font-black uppercase text-tkd-blue tracking-tight">
-                            "Con solo 1 o 2 mensualidades recuperadas que antes se perdían en mora, Tudojang se paga solo."
+                            "Una inversión operativa inteligente: con recuperar solo 1 o 2 mensualidades perdidas, Tudojang se paga a sí mismo cada mes."
                         </p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Inversión operativa con protección de datos y pagos seguros</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Tecnología con ROI positivo desde el primer mes</p>
                     </div>
                 </div>
             </section>
 
-            {/* MISIÓN KICHO: REFUERZO DE COMPRA */}
+            {/* MISIÓN KICHO: MIGRACIÓN SIN DOLOR */}
             <section id="kicho" className="py-24 bg-tkd-blue text-white px-6 sm:px-12 relative overflow-hidden">
                 <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-20 items-center relative z-10">
                     <div className="space-y-8">
                         <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
                             <IconoCampana className="w-8 h-8 text-tkd-red" />
                         </div>
-                        <h2 className="text-5xl font-black uppercase tracking-tighter">Protocolo de <br /> Misión Kicho</h2>
+                        <h2 className="text-5xl font-black uppercase tracking-tighter">Misión Kicho: <br /> Migración Sin Interrupciones</h2>
                         <p className="text-white/80 text-lg font-medium leading-relaxed uppercase tracking-tight">
-                            Active Tudojang en su academia en solo 72 horas sin interrumpir sus clases. Migramos su base de datos y formalizamos a sus alumnos bajo un despliegue técnico profesional.
+                            Entendemos que su tiempo es para enseñar. En 72 horas, nuestro equipo deja su academia 100% configurada y lista para operar, migrando sus estudiantes y planes mientras usted sigue dando clases.
                         </p>
                     </div>
                     <div className="bg-black/10 p-12 rounded-[4rem] border border-white/10 backdrop-blur-sm text-center">
@@ -289,7 +289,7 @@ const PublicLanding: React.FC = () => {
                 <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-[150px]"></div>
             </section>
 
-            {/* FINAL CTA: PUNTO DE CIERRE 3 */}
+            {/* FINAL CTA: CONFIANZA TÉCNICA */}
             <section className="py-32 px-6 text-center space-y-10">
                 <div className="max-w-2xl mx-auto space-y-6">
                     <h2 className="text-5xl font-black uppercase tracking-tighter">¿Aún posee dudas, Sabonim?</h2>
@@ -299,7 +299,7 @@ const PublicLanding: React.FC = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row justify-center gap-6">
                     <a
-                        href="https://wa.me/573007654321?text=Hola!%20Deseo%20hablar%20con%20un%20consultor%20sobre%20Tudojang"
+                        href="https://wa.me/573007654321?text=Hola!%20Deseo%20hablar%20con%20un%20consultor%20técnico%20sobre%20Tudojang"
                         target="_blank"
                         className="bg-green-600 text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-green-700 transition-all flex items-center justify-center gap-4"
                     >
