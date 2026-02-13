@@ -1,6 +1,6 @@
 
 // vistas/Configuracion.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
@@ -234,87 +234,40 @@ const VistaConfiguracion: React.FC = () => {
     // --- LÓGICA DE ONBOARDING ---
     const [onboardingStep, setOnboardingStep] = useState(localConfigClub?.onboardingStep || 0);
 
-    // Efecto para calcular el paso real basado en datos (Autocorrección)
-    useEffect(() => {
+    const isWizardMode = onboardingStep < 5;
+
+    const restaurarColores = () => {
+        if (window.confirm("¿Deseas restaurar los colores originales?")) {
+            setLocalConfigClub(prev => prev ? { ...prev, colorPrimario: '#1a365d', colorSecundario: '#e53e3e', colorAcento: '#2b6cb0' } : null);
+            mostrarNotificacion("Colores restaurados a valores originales.", "info");
+        }
+    };
+
+    const avanzarPaso = async (pasoCompletado: number) => {
         if (!localConfigClub) return;
-
-        // Paso 0 -> 1: Inicio
-        let step = 1;
-
-        // Paso 1: Info Institucional (Dirección, NIT, etc)
-        if (localConfigClub.direccionClub && localConfigClub.nit && localConfigClub.representanteLegal) {
-            step = 2;
-        }
-
-        // Paso 2: Branding (Opcional, siempre pasa)
-        if (step === 2) {
-            step = 3; // Branding es opcional, así que si estamos en 2, podemos ir a 3
-        }
-
-        // Paso 3: Sedes
-        if (step >= 3 && sedes.length > 0) {
-            step = 4;
-        }
-
-        // Paso 4: Equipo (Admin + 1 o Admin con contrato?)
-        // Requerimiento: "Creación de miembro de equipo... parámetros de contratación obligatoria"
-        // Validamos si hay al menos 2 usuarios (Admin + 1) o si el usuario actual tiene contrato.
-        // Asumiremos que si hay > 1 usuario, se cumplió.
-        if (step >= 4 && usuarios.length > 1) {
-            step = 5; // Completo
-        }
-
-        // Sincronizar con backend si es mayor
-        if (step > (localConfigClub.onboardingStep || 0)) {
-            // Actualizaríamos el backend aquí, pero lo haremos al guardar cada paso o al final.
-            // Por ahora solo manejo local UI para bloqueo.
-            // setOnboardingStep(step); // No, mejor dejar que el usuario avance visualmente
-        }
-    }, [localConfigClub, sedes, usuarios]);
-
-    // Función para avanzar paso manual (guardar y continuar)
-    const avanzarPaso = async (pasoActual: number) => {
-        const nuevoPaso = pasoActual + 1;
-        // Guardar en backend
-        setLocalConfigClub(prev => ({ ...prev!, onboardingStep: nuevoPaso }));
-        await guardarConfiguracionesHandler(); // Esto guarda todo localConfigClub
-        setActiveTab(getTabForStep(nuevoPaso));
-    };
-
-    const getTabForStep = (step: number) => {
-        switch (step) {
-            case 1: return 'branding'; // Info está en Tab "branding" (Identidad & Pagos) section 1
-            case 2: return 'branding'; // Branding sección 2
-            case 3: return 'sedes';
-            case 4: return 'equipo';
-            default: return 'branding';
+        const nuevoPaso = pasoCompletado + 1;
+        try {
+            await guardarConfiguracionesHandler();
+            const nuevaConfig = { ...localConfigClub, onboardingStep: nuevoPaso };
+            setLocalConfigClub(nuevaConfig);
+            setOnboardingStep(nuevoPaso);
+            mostrarNotificacion(`Paso ${pasoCompletado} superado!`, "success");
+        } catch (error) {
+            mostrarNotificacion("Error al avanzar de paso", "error");
         }
     };
-
-    // Renderizado Condicional del Wizard
-    const isWizardMode = (localConfigClub?.onboardingStep || 0) < 5;
 
     const pasosWizard = [
-        { num: 1, label: 'Institucional', icon: IconoLogoOficial, tab: 'branding', bloqueado: false },
-        { num: 2, label: 'Look & Feel', icon: IconoImagen, tab: 'branding', bloqueado: (localConfigClub?.onboardingStep || 0) < 1 },
-        { num: 3, label: 'Sedes', icon: IconoCasa, tab: 'sedes', bloqueado: (localConfigClub?.onboardingStep || 0) < 2 },
-        { num: 4, label: 'Equipo', icon: IconoUsuario, tab: 'equipo', bloqueado: (localConfigClub?.onboardingStep || 0) < 3 },
+        { num: 1, label: 'Institucional', bloqueado: false },
+        { num: 2, label: 'Branding', bloqueado: false },
+        { num: 3, label: 'Sedes', bloqueado: true },
+        { num: 4, label: 'Equipo', bloqueado: true },
+        { num: 5, label: 'Finalizado', bloqueado: true }
     ];
 
-    if (!localConfigClub) return <Loader texto="Cargando configuración..." />;
+    if (!localConfigClub || cargando) return <Loader texto="Cargando configuración..." />;
 
-    const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner";
-
-    // Función RESTAURAR COLORES
-    const restaurarColores = () => {
-        setLocalConfigClub(prev => ({
-            ...prev!,
-            colorPrimario: '#111111',
-            colorSecundario: '#0047A0',
-            colorAcento: '#CD2E3A'
-        }));
-        mostrarNotificacion("Colores restaurados a valores originales.", "info");
-    };
+    const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all";
 
     return (
         <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
@@ -429,17 +382,28 @@ const VistaConfiguracion: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Representante Legal</label>
-                                    <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                    <input type="text" name="representanteLegal" value={localConfigClub.representanteLegal} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Cédula y Nombre Completo" />
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800">
-                                        <label className="text-[9px] font-black uppercase text-tkd-blue block mb-2 ml-1 tracking-widest">Inscripción Inicial (COP)</label>
-                                        <input type="number" name="valorInscripcion" value={localConfigClub.valorInscripcion} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <label className="text-[9px] font-black uppercase text-tkd-blue block mb-2 ml-1 tracking-widest">Valor Mensualidad Base</label>
+                                        <input type="number" name="valorMensualidad" value={localConfigClub.valorMensualidad} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
                                     </div>
                                     <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-100 dark:border-red-800">
                                         <label className="text-[9px] font-black uppercase text-tkd-red block mb-2 ml-1 tracking-widest">Mora Mensual (%)</label>
                                         <input type="number" name="moraPorcentaje" value={localConfigClub.moraPorcentaje} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
                                     </div>
+                                </div>
+                                <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-800/20 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black uppercase text-green-700 dark:text-green-400 tracking-widest">Valor Matrícula / Formulario</label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black uppercase text-gray-400">¿Cobro Anual?</span>
+                                            <input type="checkbox" name="activarMatriculaAnual" checked={localConfigClub.activarMatriculaAnual} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className="w-5 h-5 accent-tkd-blue" />
+                                        </div>
+                                    </div>
+                                    <input type="number" name="valorMatricula" value={localConfigClub.valorMatricula} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="$40.000 sugerido" />
+                                    <p className="text-[9px] text-gray-400 uppercase font-bold italic">Este valor se sugerirá en el registro de cada alumno nuevo.</p>
                                 </div>
                             </div>
                             {isWizardMode && (localConfigClub.onboardingStep || 0) <= 1 && (
@@ -500,10 +464,31 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
 
                             <div className="flex flex-col items-center justify-center border-4 border-dashed border-gray-100 dark:border-white/5 rounded-[3rem] p-8 text-center space-y-4">
-                                <div className="w-32 h-32 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl">
+                                <div className="w-32 h-32 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl group relative">
                                     {localConfigClub.logoUrl ? <img src={localConfigClub.logoUrl} className="w-full h-full object-contain" /> : <IconoLogoOficial className="w-16 h-16 opacity-20" />}
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <IconoImagen className="w-8 h-8 text-white" />
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                // Simulación de carga (En prod esto iría a bucket y devolvería URL)
+                                                // Por ahora usamos FileReader para vista previa inmediata
+                                                const reader = new FileReader();
+                                                reader.onload = (ev) => {
+                                                    setLocalConfigClub(prev => prev ? { ...prev, logoUrl: ev.target?.result as string } : null);
+                                                    mostrarNotificacion("Nuevo logotipo seleccionado. Recuerda guardar.", "info");
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                    />
                                 </div>
-                                <button className="px-6 py-2 bg-tkd-dark text-white rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg active:scale-95 transition-all">Cambiar Logo</button>
+                                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Click en el círculo para subir logo</p>
                             </div>
 
                             {isWizardMode && (localConfigClub.onboardingStep || 0) === 2 && (

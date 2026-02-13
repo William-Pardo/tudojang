@@ -26,12 +26,12 @@ const schema = yup.object({
 
 const FormularioSede: React.FC<Props> = ({ abierto, onCerrar, onGuardar, sedeActual, cargando }) => {
     const { register, handleSubmit, formState: { errors }, reset } = useForm<Omit<Sede, 'id'>>({
-        resolver: yupResolver(schema),
-        defaultValues: sedeActual || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 }
+        resolver: yupResolver(schema) as any,
+        defaultValues: (sedeActual as any) || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 }
     });
 
-    useEffect(() => { 
-        if (abierto) reset(sedeActual || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 }); 
+    useEffect(() => {
+        if (abierto) reset(sedeActual || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 });
     }, [abierto, sedeActual, reset]);
 
     const onSubmit = (data: Omit<Sede, 'id'>) => {

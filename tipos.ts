@@ -107,8 +107,10 @@ export interface ConfiguracionClub {
     lugarFirma: string;
     duracionContratoMeses: number;
     valorMensualidad: number;
-    valorInscripcion: number; // Nuevo: Valor inscripción inicial
-    moraPorcentaje: number;   // Nuevo: % recargo por mora
+    valorInscripcion: number;
+    moraPorcentaje: number;
+    valorMatricula: number;   // Nuevo: Valor del formulario de matrícula
+    activarMatriculaAnual: boolean; // Nuevo: Opción de activar cobro anual
     metodoPago: string;
     pagoNequi: string;
     pagoDaviplata: string;
@@ -127,6 +129,7 @@ export interface ConfiguracionClub {
     limiteUsuarios: number;
     limiteSedes: number;
     logoUrl?: string;
+    logoOriginalUrl?: string; // Para backups
     passwordTemporal?: string;
     onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
 }
@@ -337,6 +340,8 @@ export interface Usuario {
     estadoContrato?: 'Pendiente' | 'Firmado' | 'Sin configurar';
     contrato?: {
         valorPago: number;
+        sueldoBase: number;
+        duracionMeses: number;
         tipoVinculacion: TipoVinculacionColaborador;
         tipoVinculacionOtro?: string;
         fechaInicio: string;
