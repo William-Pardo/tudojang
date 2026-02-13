@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { buscarAsistenciaHoyPorIdAlumno } from '../servicios/asistenciaApi';
 import { EstadoEntrega } from '../tipos';
-import { IconoLogoOficial, IconoBuscar, IconoAprobar } from '../components/Iconos';
+import { IconoBuscar, IconoAprobar } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 
 const VistaSalidaPublica: React.FC = () => {
@@ -38,15 +39,15 @@ const VistaSalidaPublica: React.FC = () => {
         <div className="min-h-screen bg-tkd-blue flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden p-8 space-y-8">
                 <div className="text-center">
-                    <IconoLogoOficial className="w-20 h-20 mx-auto mb-4" />
+                    <LogoDinamico className="w-20 h-20 mx-auto mb-4" />
                     <h1 className="text-2xl font-black text-tkd-dark dark:text-white uppercase tracking-tight">Monitor de Salida</h1>
                     <p className="text-gray-500 text-sm">Ingrese el ID del estudiante para ver su estado</p>
                 </div>
 
                 <form onSubmit={manejarBusqueda} className="space-y-4">
                     <div className="relative">
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             placeholder="Ej: 10102030"
                             value={idAlumno}
                             onChange={(e) => setIdAlumno(e.target.value)}
@@ -54,7 +55,7 @@ const VistaSalidaPublica: React.FC = () => {
                         />
                         <IconoBuscar className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
                     </div>
-                    <button 
+                    <button
                         type="submit"
                         disabled={cargando}
                         className="w-full bg-tkd-red text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2"
@@ -75,7 +76,7 @@ const VistaSalidaPublica: React.FC = () => {
                             <span className="text-xs font-black text-blue-500 uppercase">Estudiante</span>
                             <span className="text-lg font-black dark:text-white">{resultado.nombres}</span>
                         </div>
-                        
+
                         <div className="flex flex-col items-center py-4">
                             {resultado.asistencia.estadoEntrega === EstadoEntrega.Listo ? (
                                 <>
@@ -88,7 +89,7 @@ const VistaSalidaPublica: React.FC = () => {
                             ) : resultado.asistencia.estadoEntrega === EstadoEntrega.EnClase ? (
                                 <>
                                     <div className="w-16 h-16 bg-tkd-blue rounded-full flex items-center justify-center mb-2 animate-pulse">
-                                        <IconoLogoOficial className="w-10 h-10" />
+                                        <LogoDinamico className="w-10 h-10" />
                                     </div>
                                     <p className="text-xl font-black text-tkd-blue uppercase">En Clase</p>
                                     <p className="text-sm text-gray-500 text-center mt-2">La práctica aún no ha terminado.</p>
@@ -105,7 +106,7 @@ const VistaSalidaPublica: React.FC = () => {
 
                 <div className="text-center pt-4">
                     <p className="text-[10px] text-gray-400 italic">
-                        Sistema de seguridad TaekwondoGa Jog. <br/> Datos encriptados y válidos solo por sesión.
+                        Sistema de seguridad TaekwondoGa Jog. <br /> Datos encriptados y válidos solo por sesión.
                     </p>
                 </div>
             </div>

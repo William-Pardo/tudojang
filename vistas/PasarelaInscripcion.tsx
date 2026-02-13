@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
 import { registrarAspirantePublico } from '../servicios/censoApi';
-import { IconoLogoOficial, IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUsuario, IconoInformacion, IconoCandado } from '../components/Iconos';
+import { IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUsuario, IconoInformacion, IconoCandado } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';

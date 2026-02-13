@@ -8,7 +8,8 @@ import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
 
 // Componentes
-import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoLogoOficial, IconoCertificado, IconoInformacion, IconoCampana } from '../components/Iconos';
+import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificado, IconoInformacion, IconoCampana } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import ModalVerFirma from '../components/ModalVerFirma';
@@ -65,6 +66,7 @@ export const VistaEstudiantes: React.FC = () => {
         goToNextPage,
         goToPreviousPage,
         exportarCSV,
+        configClub,
     } = useGestionEstudiantes();
 
     const [modalImportMasivaAbierto, setModalImportMasivaAbierto] = useState(false);
@@ -97,7 +99,7 @@ export const VistaEstudiantes: React.FC = () => {
     const renderDirectorio = () => {
         if (cargando) return <TablaEstudiantesSkeleton />;
         if (error) return <ErrorState mensaje={error} onReintentar={cargarEstudiantes} />;
-        
+
         const tieneEstudiantes = estudiantes.length > 0;
         const filtrosSinResultados = tieneEstudiantes && estudiantesFiltrados.length === 0;
 
@@ -108,7 +110,7 @@ export const VistaEstudiantes: React.FC = () => {
             return (
                 <div className="animate-fade-in space-y-4">
                     <FiltrosEstudiantes filtroNombre={filtroNombre} setFiltroNombre={setFiltroNombre} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} filtroEstado={filtroEstado} setFiltroEstado={setFiltroEstado} />
-                    
+
                     <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
                         <div>
                             {estudiantesFiltrados.length > 0 ? (
@@ -125,7 +127,7 @@ export const VistaEstudiantes: React.FC = () => {
             );
         }
         return (
-             <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
+            <EmptyState Icono={IconoEstudiantes} titulo="Aún no hay estudiantes" mensaje="Empieza a gestionar tu escuela agregando tu primer estudiante.">
                 <div className="flex flex-col gap-4 max-w-xs mx-auto">
                     <button onClick={() => abrirFormulario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2">
                         <IconoAgregar className="w-5 h-5" /><span>Agregar Uno a Uno</span>
@@ -152,7 +154,7 @@ export const VistaEstudiantes: React.FC = () => {
     const tabs = [
         { id: 'kicho', label: 'Misión KICHO', icono: IconoCampana, visible: usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor },
         { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor },
-        { id: 'asistencia', label: 'Clase en Vivo', icono: IconoLogoOficial, visible: true },
+        { id: 'asistencia', label: 'Clase en Vivo', icono: LogoDinamico, visible: true },
         { id: 'certificados', label: 'Certificaciones', icono: IconoCertificado, visible: !esTutor },
         { id: 'carnets', label: 'Carnetización', icono: IconoExportar, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente },
     ].filter(t => t.visible);
@@ -162,7 +164,7 @@ export const VistaEstudiantes: React.FC = () => {
             {/* BANNER GLOBAL DE MISIÓN KICHO ACTIVA */}
             <AnimatePresence>
                 {misionActiva && activeTab !== 'kicho' && (
-                    <motion.div 
+                    <motion.div
                         initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
                         className="bg-tkd-blue/10 border border-tkd-blue/20 p-4 rounded-[1.5rem] flex flex-col sm:flex-row justify-between items-center gap-4 shadow-sm"
                     >
@@ -184,13 +186,40 @@ export const VistaEstudiantes: React.FC = () => {
             <header className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Hub de Estudiantes</h1>
-                    <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
+                    <div className="flex items-center gap-4 mt-2">
+                        <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
+                        <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
+                                <div
+                                    className={`h-full transition-all duration-1000 ${(estudiantes.length / configClub.limiteEstudiantes) > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
+                                    style={{ width: `${Math.min((estudiantes.length / configClub.limiteEstudiantes) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter whitespace-nowrap">
+                                {estudiantes.length}/{configClub.limiteEstudiantes} cupos
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                
+
                 {activeTab === 'directorio' && (
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition-all shadow-lg" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
                         <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"><IconoInformacion className="w-4 h-4" /><span>Importar CSV</span></button>
+                        {usuario?.email === 'aliantlab@gmail.com' && (
+                            <button
+                                onClick={async () => {
+                                    if (window.confirm("¿Generar 10 estudiantes de prueba?")) {
+                                        await import('../utils/userSeeder').then(m => m.generarEstudiantesFicticios(10, usuario.sedeId || '1', usuario.tenantId));
+                                        cargarEstudiantes();
+                                    }
+                                }}
+                                className="bg-purple-600 text-white px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-purple-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                <span>Generar Data Test</span>
+                            </button>
+                        )}
                         <button onClick={() => abrirFormulario()} className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"><IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span></button>
                     </div>
                 )}
@@ -200,9 +229,9 @@ export const VistaEstudiantes: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
-                        <button 
-                            key={tab.id} 
-                            onClick={() => setActiveTab(tab.id as TabId)} 
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as TabId)}
                             className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             title={tab.label}
                         >

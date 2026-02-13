@@ -129,7 +129,42 @@ const AppLayout: React.FC = () => {
 
     if (!usuario) return null;
 
+    const { tenant, estaCargado } = useTenant();
     const esSuperAdmin = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
+    const location = ReactRouterDOM.useLocation();
+
+    // SPINNER DE CARGA INICIAL
+    if (!estaCargado) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-tkd-dark text-white">
+                <div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    // ONBOARDING GUARD: Si el club no ha terminado configuración obligatoria
+    // Paso 5 = Completo. Si es menor, y es Admin, forzar Configuración.
+    // Si no es Admin, mostrar pantalla de espera.
+    if (tenant && (tenant.onboardingStep || 0) < 5 && !esSuperAdmin) {
+        if (usuario.rol === RolUsuario.Admin) {
+            // Si el Admin intenta ir a otro lado, redirigir a config
+            if (location.pathname !== '/configuracion') {
+                return <ReactRouterDOM.Navigate to="/configuracion" replace />;
+            }
+            // Si ya está en /configuracion, dejarlo pasar (el componente VistaConfiguracion manejará el wizard)
+        } else {
+            return (
+                <div className="h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-center p-10">
+                    <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                        <IconoConfiguracion className="w-10 h-10 text-yellow-600" />
+                    </div>
+                    <h1 className="text-3xl font-black uppercase text-gray-900 dark:text-white mb-2">Plataforma en Configuración</h1>
+                    <p className="text-gray-500 max-w-md mx-auto">El administrador está terminando de configurar los parámetros iniciales del Dojang.</p>
+                    <button onClick={logout} className="mt-8 text-tkd-blue text-xs font-black uppercase tracking-widest hover:underline">Cerrar Sesión</button>
+                </div>
+            );
+        }
+    }
 
     return (
         <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950 overflow-hidden">

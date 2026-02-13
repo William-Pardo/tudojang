@@ -2,12 +2,13 @@
 import React from 'react';
 // FIX: Changed to namespace import to fix module resolution issues.
 import * as ReactRouterDOM from 'react-router-dom';
-import { IconoLogoOficial, IconoCasa } from '../components/Iconos';
+import { IconoCasa } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 
 const Vista404: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-tkd-gray dark:bg-tkd-dark text-center p-4">
-      <IconoLogoOficial className="w-32 h-32 text-tkd-blue mb-4" />
+      <LogoDinamico className="w-32 h-32 mb-4" />
       <h1 className="text-6xl font-extrabold text-tkd-blue">404</h1>
       <h2 className="text-2xl font-bold text-tkd-dark dark:text-white mt-4">
         Página No Encontrada

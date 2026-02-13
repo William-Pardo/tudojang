@@ -101,7 +101,7 @@ interface SedesContextType {
 const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { tenant } = useTenant();
+    const { tenant, cargarTenant } = useTenant();
 
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({
@@ -194,6 +194,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
+                // Forzar recarga de branding para que el logo y colores cambien inmediatamente
+                console.log("[DataContext] Configuración guardada, refrescando branding...");
+                await cargarTenant();
             },
             agregarUsuario: async (d) => { d.tenantId = (tenant || CONFIGURACION_CLUB_POR_DEFECTO).tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); return u; },
             actualizarUsuario: api.actualizarUsuario,

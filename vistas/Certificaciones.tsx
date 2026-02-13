@@ -4,7 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { GradoTKD, GrupoEdad, type Estudiante } from '../tipos';
-import { IconoCertificado, IconoBuscar, IconoExportar, IconoInformacion, IconoAprobar, IconoUsuario, IconoHistorial, IconoLogoOficial } from '../components/Iconos';
+import { IconoCertificado, IconoBuscar, IconoExportar, IconoInformacion, IconoAprobar, IconoUsuario, IconoHistorial } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import { generarCertificadoPdf } from '../utils/certificateGenerator';
 import Loader from '../components/Loader';
 
@@ -96,7 +97,7 @@ const VistaCertificaciones: React.FC = () => {
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
+
                 {/* PANEL DE CONFIGURACIÓN - ESTILO SEDE EN MONITOREO */}
                 <div className="lg:col-span-1 space-y-6">
                     <section className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
@@ -108,13 +109,13 @@ const VistaCertificaciones: React.FC = () => {
                         <div className="space-y-6">
                             {/* Selector de Modo */}
                             <div className="bg-gray-100 dark:bg-gray-900 p-1 rounded-2xl flex gap-1 shadow-inner">
-                                <button 
+                                <button
                                     onClick={() => setModo('individual')}
                                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modo === 'individual' ? 'bg-white dark:bg-gray-800 shadow-md text-tkd-blue scale-[1.02]' : 'text-gray-400'}`}
                                 >
                                     Individual
                                 </button>
-                                <button 
+                                <button
                                     onClick={() => setModo('grupal')}
                                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modo === 'grupal' ? 'bg-white dark:bg-gray-800 shadow-md text-tkd-blue scale-[1.02]' : 'text-gray-400'}`}
                                 >
@@ -129,11 +130,11 @@ const VistaCertificaciones: React.FC = () => {
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-tkd-blue">
                                         <IconoUsuario className="w-5 h-5" />
                                     </div>
-                                    <input 
-                                        type="text" 
-                                        value={dirigidoA} 
-                                        onChange={e => setDirigidoA(e.target.value)} 
-                                        className={inputClasses} 
+                                    <input
+                                        type="text"
+                                        value={dirigidoA}
+                                        onChange={e => setDirigidoA(e.target.value)}
+                                        className={inputClasses}
                                         placeholder="EJ: A QUIEN INTERESE"
                                     />
                                 </div>
@@ -146,15 +147,15 @@ const VistaCertificaciones: React.FC = () => {
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-tkd-blue">
                                         <IconoHistorial className="w-5 h-5" />
                                     </div>
-                                    <select 
-                                        value={periodo} 
-                                        onChange={e => setPeriodo(Number(e.target.value))} 
+                                    <select
+                                        value={periodo}
+                                        onChange={e => setPeriodo(Number(e.target.value))}
                                         className={selectClasses}
                                     >
                                         {PERIODOS.map(p => <option key={p.dias} value={p.dias}>{p.label}</option>)}
                                     </select>
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 transition-transform group-hover:translate-y-[-40%]">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                                     </div>
                                 </div>
                             </div>
@@ -164,24 +165,24 @@ const VistaCertificaciones: React.FC = () => {
                                 <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 tracking-widest">Cinturón:</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-tkd-blue">
-                                        <IconoLogoOficial className="w-5 h-5" />
+                                        <LogoDinamico className="w-5 h-5" />
                                     </div>
-                                    <select 
-                                        value={filtroGrado} 
-                                        onChange={e => setFiltroGrado(e.target.value as any)} 
+                                    <select
+                                        value={filtroGrado}
+                                        onChange={e => setFiltroGrado(e.target.value as any)}
                                         className={selectClasses}
                                     >
                                         <option value="todos">Todos los Grados</option>
                                         {Object.values(GradoTKD).map(g => <option key={g} value={g}>{g}</option>)}
                                     </select>
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 transition-transform group-hover:translate-y-[-40%]">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7"/></svg>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                                     </div>
                                 </div>
                             </div>
 
                             {modo === 'grupal' && (
-                                <button 
+                                <button
                                     onClick={() => handleGenerar()}
                                     disabled={procesando || estudiantesFiltrados.length === 0}
                                     className="w-full bg-tkd-red text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-3 hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50"
@@ -209,9 +210,9 @@ const VistaCertificaciones: React.FC = () => {
                                 {modo === 'individual' ? 'Seleccionar Estudiante' : 'Alumnos Incluidos en Grupo'}
                             </h2>
                             <div className="relative w-full sm:w-64">
-                                <input 
-                                    type="text" 
-                                    placeholder="BUSCAR POR NOMBRE..." 
+                                <input
+                                    type="text"
+                                    placeholder="BUSCAR POR NOMBRE..."
                                     value={busqueda}
                                     onChange={e => setBusqueda(e.target.value)}
                                     className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-700 rounded-xl text-[10px] font-black uppercase border-none focus:ring-2 focus:ring-tkd-blue transition-all shadow-sm"
@@ -242,7 +243,7 @@ const VistaCertificaciones: React.FC = () => {
                                             </td>
                                             <td className="px-8 py-5 text-right">
                                                 {modo === 'individual' ? (
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleGenerar(e)}
                                                         disabled={procesando}
                                                         className="bg-tkd-dark text-white p-3 rounded-xl hover:bg-tkd-blue transition-all active:scale-95 shadow-md"

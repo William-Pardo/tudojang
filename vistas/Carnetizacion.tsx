@@ -3,9 +3,10 @@
 import React, { useState, useMemo } from 'react';
 import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
-import { generarLoteCarnetsPdf } from '../utils/pdfBatchGenerator';
+import { generarLoteCarnetsPdf, FormatoPapel } from '../utils/pdfBatchGenerator';
 import { marcarCarnetsComoGenerados } from '../servicios/api';
-import { IconoLogoOficial, IconoExportar, IconoHistorial, IconoEstudiantes } from '../components/Iconos';
+import { IconoExportar, IconoHistorial, IconoEstudiantes, IconoCasa } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import { formatearFecha } from '../utils/formatters';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
@@ -16,20 +17,28 @@ const VistaCarnetizacion: React.FC = () => {
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
     const [procesando, setProcesando] = useState(false);
+    const [formato, setFormato] = useState<FormatoPapel>(FormatoPapel.Carta);
 
-    const pendientes = useMemo(() => 
+    const pendientes = useMemo(() =>
         estudiantes.filter(e => !e.carnetGenerado),
-    [estudiantes]);
+        [estudiantes]);
 
     const handleGenerarLote = async () => {
         if (pendientes.length === 0) return;
         setProcesando(true);
         try {
-            await generarLoteCarnetsPdf(pendientes, sedes, configClub, `Lote_Carnets_${new Date().toISOString().split('T')[0]}`);
+            await generarLoteCarnetsPdf(
+                pendientes,
+                sedes,
+                configClub,
+                `Lote_Carnets_${new Date().toISOString().split('T')[0]}`,
+                formato
+            );
             await marcarCarnetsComoGenerados(pendientes.map(p => p.id));
             mostrarNotificacion("Lote de carnets generado exitosamente. Descarga iniciada.", "success");
             await cargarEstudiantes();
         } catch (error) {
+            console.error(error);
             mostrarNotificacion("Error al procesar el lote", "error");
         } finally {
             setProcesando(false);
@@ -40,44 +49,77 @@ const VistaCarnetizacion: React.FC = () => {
 
     return (
         <div className="p-4 sm:p-8 space-y-8 animate-fade-in">
-            <header>
-                <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Emisión de Carnets por Lote</h1>
-                <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">Gestiona la impresión masiva para nuevos integrantes</p>
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Emisión Técnica de Carnets</h1>
+                    <p className="text-[10px] font-black text-gray-400 mt-3 uppercase tracking-[0.3em]">Gestión de producción gráfica y control de identidad</p>
+                </div>
+                <div className="flex items-center gap-3 bg-white dark:bg-gray-800 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                    <div className="p-3 bg-tkd-blue/10 rounded-xl"><IconoCasa className="w-5 h-5 text-tkd-blue" /></div>
+                    <div className="pr-4">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Sede Actual</p>
+                        <p className="text-xs font-black dark:text-white uppercase tracking-tight">{sedes[0]?.nombre || 'Global'}</p>
+                    </div>
+                </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Panel de Acción */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700">
-                        <h2 className="text-[10px] font-black mb-1 uppercase text-gray-400 tracking-[0.2em]">Próximo Lote</h2>
-                        <div className="text-6xl font-black text-gray-900 dark:text-white mb-2">{pendientes.length}</div>
-                        <p className="text-[10px] text-tkd-blue font-black uppercase mb-8 tracking-widest">Alumnos esperando carnet</p>
-                        
-                        <button 
-                            onClick={handleGenerarLote}
-                            disabled={pendientes.length === 0 || procesando}
-                            className="w-full bg-tkd-red text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-lg hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95 disabled:bg-gray-300 disabled:scale-100 flex items-center justify-center gap-3"
-                        >
-                            {procesando ? (
-                                <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                                <IconoExportar className="w-6 h-6" />
-                            )}
-                            {procesando ? 'Procesando...' : 'Generar Carnets'}
-                        </button>
-                        
-                        <p className="mt-6 text-[9px] text-gray-400 text-center font-bold uppercase tracking-tighter leading-relaxed">
-                            Formato estándar CR80 (85.6mm x 54mm)
-                        </p>
+                    <div className="bg-tkd-dark p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden text-white">
+                        <div className="relative z-10">
+                            <h2 className="text-[10px] font-black mb-6 uppercase text-tkd-red tracking-[0.3em]">Cola de Impresión</h2>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-7xl font-black tracking-tighter">{pendientes.length}</span>
+                                <span className="text-xs font-bold opacity-60 uppercase">Registros</span>
+                            </div>
+
+                            <div className="mt-10 space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest ml-1">Mesa de Salida (Formato)</label>
+                                    <select
+                                        value={formato}
+                                        onChange={(e) => setFormato(e.target.value as FormatoPapel)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-black uppercase tracking-widest outline-none focus:border-tkd-blue transition-all"
+                                    >
+                                        {Object.values(FormatoPapel).map(f => <option key={f} value={f} className="text-black">{f}</option>)}
+                                    </select>
+                                </div>
+
+                                <button
+                                    onClick={handleGenerarLote}
+                                    disabled={pendientes.length === 0 || procesando}
+                                    className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95 disabled:bg-gray-600 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3 mt-4"
+                                >
+                                    {procesando ? (
+                                        <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <IconoExportar className="w-5 h-5" />
+                                    )}
+                                    {procesando ? 'Procesando Lote...' : 'Procesar Impresión'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-tkd-blue/20 rounded-full blur-3xl"></div>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-2xl border border-blue-100 dark:border-blue-800">
-                        <h3 className="text-xs font-black text-tkd-blue mb-2 flex items-center gap-2 uppercase tracking-wider">
-                            <IconoLogoOficial className="w-4 h-4" /> Recomendación Sabonim
-                        </h3>
-                        <p className="text-[11px] text-blue-800 dark:text-blue-300 font-bold leading-relaxed uppercase">
-                            Este proceso marcará a los alumnos como carnetizados automáticamente en su ficha técnica.
-                        </p>
+                    <div className="p-8 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <LogoDinamico className="w-6 h-6" />
+                            <h3 className="text-[10px] font-black text-tkd-blue uppercase tracking-widest">Estándares de Producción</h3>
+                        </div>
+                        <ul className="space-y-3">
+                            <li className="text-[9px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed flex gap-2">
+                                <span className="text-tkd-blue">•</span> Calidad de inyección: 300 DPI
+                            </li>
+                            <li className="text-[9px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed flex gap-2">
+                                <span className="text-tkd-blue">•</span> Regla de legibilidad WCAG activa
+                            </li>
+                            <li className="text-[9px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed flex gap-2">
+                                <span className="text-tkd-blue">•</span> Inclusión de marcas de corte
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
@@ -88,7 +130,7 @@ const VistaCarnetizacion: React.FC = () => {
                             <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Alumnos en Cola de Impresión</h2>
                             <span className="px-3 py-1 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 rounded-full text-[9px] font-black uppercase tracking-tighter">Pendientes</span>
                         </div>
-                        
+
                         {pendientes.length === 0 ? (
                             <div className="p-12">
                                 <EmptyState Icono={IconoHistorial} titulo="Todo al día" mensaje="No hay nuevos alumnos esperando carnet en este momento." />

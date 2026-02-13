@@ -119,8 +119,8 @@ export const useGestionConfiguracion = () => {
         setConfig((prev: any) => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
     };
 
-    const guardarConfiguracionesHandler = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const guardarConfiguracionesHandler = async (e?: React.FormEvent | React.MouseEvent) => {
+        if (e && e.preventDefault) e.preventDefault();
         if (!localConfigClub) {
             mostrarNotificacion("Error: Configuración del club no disponible.", "error");
             return;

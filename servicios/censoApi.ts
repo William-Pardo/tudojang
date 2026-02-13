@@ -64,7 +64,7 @@ export const registrarAspirantePublico = async (misionId: string, tenantId: stri
         datos
     };
     await addDoc(collection(db, 'registros_temporales'), nuevoRegistro);
-    
+
     // Incrementar contador en la misión
     try {
         const misionRef = doc(db, 'misiones_kicho', misionId);
@@ -102,14 +102,14 @@ export const legalizarLoteKicho = async (misionId: string, firmaBase64: string):
  */
 export const inyectarEstudiantesKicho = async (misionId: string, registros: RegistroTemporal[]): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    
+
     const batch = writeBatch(db);
     const hoy = new Date().toISOString().split('T')[0];
 
     registros.forEach(reg => {
         const estRef = doc(collection(db, 'estudiantes'));
         const { datos } = reg;
-        
+
         const payload: Omit<Estudiante, 'id'> = {
             tenantId: reg.tenantId,
             nombres: datos.nombres.toUpperCase().trim(),
@@ -126,20 +126,24 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
             estadoPago: EstadoPago.AlDia,
             saldoDeudor: 0,
             historialPagos: [],
-            consentimientoInformado: false,
-            contratoServiciosFirmado: false,
-            consentimientoImagenFirmado: false,
-            consentimientoFotosVideos: false,
+            consentimientoInformado: true,
+            contratoServiciosFirmado: true,
+            consentimientoImagenFirmado: true,
+            consentimientoFotosVideos: true,
             carnetGenerado: false,
+            eps: datos.eps || '',
+            rh: datos.rh || '',
+            direccion: datos.direccion || '',
+            barrio: datos.barrio || '',
             tutor: datos.tutorNombre ? {
                 nombres: datos.tutorNombre.toUpperCase().trim(),
-                apellidos: '',
-                numeroIdentificacion: '',
+                apellidos: datos.tutorApellidos?.toUpperCase().trim() || '',
+                numeroIdentificacion: datos.tutorCedula || '',
                 telefono: datos.tutorTelefono || '',
                 correo: datos.tutorEmail || ''
             } : undefined
         };
-        
+
         batch.set(estRef, payload);
         batch.update(doc(db, 'registros_temporales', reg.id), { estado: 'procesado' });
     });

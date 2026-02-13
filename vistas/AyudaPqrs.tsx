@@ -2,13 +2,14 @@
 // vistas/AyudaPqrs.tsx
 import React, { useState } from 'react';
 import { BASE_CONOCIMIENTO_PQRS, ADMIN_WHATSAPP } from '../constantes';
-import { IconoLogoOficial, IconoBuscar, IconoWhatsApp, IconoInformacion } from '../components/Iconos';
+import { IconoBuscar, IconoWhatsApp, IconoInformacion } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 
 const VistaAyudaPqrs: React.FC = () => {
     const [busqueda, setBusqueda] = useState('');
-    
-    const faqsFiltradas = BASE_CONOCIMIENTO_PQRS.filter(f => 
-        f.pregunta.toLowerCase().includes(busqueda.toLowerCase()) || 
+
+    const faqsFiltradas = BASE_CONOCIMIENTO_PQRS.filter(f =>
+        f.pregunta.toLowerCase().includes(busqueda.toLowerCase()) ||
         f.respuesta.toLowerCase().includes(busqueda.toLowerCase())
     );
 
@@ -16,13 +17,13 @@ const VistaAyudaPqrs: React.FC = () => {
         <div className="min-h-screen bg-tkd-gray dark:bg-tkd-dark p-4 sm:p-8">
             <div className="max-w-3xl mx-auto space-y-8">
                 <header className="text-center">
-                    <IconoLogoOficial className="w-20 h-20 mx-auto mb-4" />
+                    <LogoDinamico className="w-20 h-20 mx-auto mb-4" />
                     <h1 className="text-3xl font-black text-tkd-blue uppercase">Centro de Ayuda</h1>
                     <p className="text-gray-500">¿Tienes dudas? Encuentra respuestas rápidas aquí.</p>
                 </header>
 
                 <div className="relative">
-                    <input 
+                    <input
                         type="text"
                         placeholder="Busca por palabra clave (pago, uniforme, sede...)"
                         value={busqueda}
@@ -49,7 +50,7 @@ const VistaAyudaPqrs: React.FC = () => {
                     <IconoWhatsApp className="w-12 h-12 mb-4" />
                     <h2 className="text-xl font-black uppercase mb-2">¿Aún necesitas ayuda?</h2>
                     <p className="text-blue-100 text-sm mb-6">Si no encontraste lo que buscabas o quieres radicar una PQRS formal, habla directamente con nuestra administración.</p>
-                    <a 
+                    <a
                         href={`https://wa.me/57${ADMIN_WHATSAPP}?text=Hola,%20tengo%20una%20duda/solicitud%20para%20TaekwondoGa%20Jog:`}
                         target="_blank"
                         className="bg-tkd-red text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg"

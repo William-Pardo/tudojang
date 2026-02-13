@@ -128,6 +128,7 @@ export interface ConfiguracionClub {
     limiteSedes: number;
     logoUrl?: string;
     passwordTemporal?: string;
+    onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
 }
 
 export interface Estudiante {
@@ -156,6 +157,10 @@ export interface Estudiante {
     lesiones?: string;
     personasAutorizadas?: string;
     programasInscritos?: InscripcionPrograma[];
+    eps?: string;
+    rh?: string;
+    direccion?: string;
+    barrio?: string;
     tutor?: {
         nombres: string;
         apellidos: string;
@@ -305,7 +310,13 @@ export interface RegistroTemporal {
         email: string;
         telefono: string;
         fechaNacimiento: string;
+        eps?: string;
+        rh?: string;
+        direccion?: string;
+        barrio?: string;
         tutorNombre?: string;
+        tutorApellidos?: string;
+        tutorCedula?: string;
         tutorTelefono?: string;
         tutorEmail?: string;
         parentesco?: string;

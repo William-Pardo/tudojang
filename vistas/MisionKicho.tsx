@@ -8,11 +8,12 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho } from '../servicios/censoApi';
 import { useEstudiantes } from '../context/DataContext';
 import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
-import { 
-    IconoLogoOficial, IconoWhatsApp, IconoCopiar, IconoAprobar, 
-    IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion, 
+import {
+    IconoWhatsApp, IconoCopiar, IconoAprobar,
+    IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
     IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar
 } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
@@ -64,13 +65,13 @@ const VistaMisionKicho: React.FC = () => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
     const { mostrarNotificacion } = useNotificacion();
-    
+
     const [mision, setMision] = useState<MisionKicho | null>(null);
     const [registros, setRegistros] = useState<RegistroTemporal[]>([]);
     const [cargando, setCargando] = useState(true);
     const [activando, setActivando] = useState(false);
     const [showExitoModal, setShowExitoModal] = useState(false);
-    
+
     const [mostrarFirma, setMostrarFirma] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [dibujando, setDibujando] = useState(false);
@@ -102,7 +103,7 @@ const VistaMisionKicho: React.FC = () => {
             // Generar fecha de expiración: Ahora + 72 horas
             const expDate = new Date();
             expDate.setHours(expDate.getHours() + 72);
-            
+
             await crearMisionKicho({
                 tenantId: usuario.tenantId,
                 nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",
@@ -162,7 +163,7 @@ const VistaMisionKicho: React.FC = () => {
                     <div className="bg-gradient-to-br from-tkd-blue to-blue-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden border border-white/10">
                         <div className="relative z-10 space-y-8 max-w-2xl">
                             <div className="bg-white/20 w-20 h-20 rounded-3xl flex items-center justify-center backdrop-blur-md">
-                                <IconoLogoOficial className="w-12 h-12 text-white" />
+                                <LogoDinamico className="w-12 h-12" />
                             </div>
                             <div className="space-y-4">
                                 <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">¿Tienes muchos alumnos por registrar?</h2>
@@ -171,7 +172,7 @@ const VistaMisionKicho: React.FC = () => {
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                                <button 
+                                <button
                                     onClick={handleActivarKichoAuto}
                                     disabled={activando}
                                     className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
@@ -191,27 +192,27 @@ const VistaMisionKicho: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <EmptyState 
-                        Icono={IconoLogoOficial} 
-                        titulo="Sin Misiones Activas" 
+                    <EmptyState
+                        Icono={LogoDinamico}
+                        titulo="Sin Misiones Activas"
                         mensaje="No tienes un protocolo de captura de datos activo. Si necesitas realizar un censo masivo, contacta con Aliant Master Control."
                     />
                 )}
-                
+
                 {/* MODAL DE ÉXITO AL ACTIVAR */}
                 <AnimatePresence>
                     {showExitoModal && (
                         <div className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
-                            <motion.div 
+                            <motion.div
                                 initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
                                 className="bg-white dark:bg-gray-900 rounded-[4rem] p-12 text-center max-w-md shadow-[0_0_100px_rgba(31,62,144,0.3)] border border-white/10"
                             >
                                 <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
                                 <h2 className="text-3xl font-black uppercase text-gray-900 dark:text-white mt-6 tracking-tighter">¡Protocolo Iniciado!</h2>
                                 <p className="text-gray-500 mt-4 font-bold uppercase text-xs tracking-widest leading-relaxed">
-                                    Tienes **72 horas** para completar la captura. <br/> El QR de registro ya está disponible.
+                                    Tienes **72 horas** para completar la captura. <br /> El QR de registro ya está disponible.
                                 </p>
-                                <button 
+                                <button
                                     onClick={() => setShowExitoModal(false)}
                                     className="mt-10 w-full bg-tkd-blue text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:bg-blue-800 transition-all"
                                 >
@@ -277,7 +278,7 @@ const VistaMisionKicho: React.FC = () => {
                                 <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Validando {registros.length} registros capturados</p>
                             </div>
                             {usuario?.rol === RolUsuario.Admin && (
-                                <button 
+                                <button
                                     onClick={iniciarLegalizacion}
                                     className="px-8 py-4 bg-tkd-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-blue-800 transition-all active:scale-95 flex items-center gap-2"
                                 >
@@ -308,10 +309,9 @@ const VistaMisionKicho: React.FC = () => {
                                                 <div className="text-[9px] text-gray-400 uppercase font-bold">{reg.datos.telefono}</div>
                                             </td>
                                             <td className="px-6 py-6">
-                                                <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border ${
-                                                    reg.estado === 'verificado' ? 'bg-green-100 text-green-700 border-green-200' : 
-                                                    reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-                                                }`}>
+                                                <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border ${reg.estado === 'verificado' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                                                    }`}>
                                                     {reg.estado}
                                                 </span>
                                             </td>
@@ -337,7 +337,7 @@ const VistaMisionKicho: React.FC = () => {
             <AnimatePresence>
                 {mostrarFirma && (
                     <div className="fixed inset-0 z-[200] bg-tkd-dark/95 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-                        <motion.div 
+                        <motion.div
                             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                             className="bg-white dark:bg-gray-900 rounded-[3.5rem] p-12 max-w-md w-full shadow-2xl border border-white/5 space-y-8"
                         >
@@ -356,8 +356,8 @@ const VistaMisionKicho: React.FC = () => {
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Firma del Director</label>
                                 <div className="relative">
-                                    <canvas 
-                                        ref={canvasRef} 
+                                    <canvas
+                                        ref={canvasRef}
                                         width={400} height={200}
                                         onMouseDown={() => setDibujando(true)}
                                         onMouseUp={() => setDibujando(false)}
@@ -375,10 +375,10 @@ const VistaMisionKicho: React.FC = () => {
                                         }}
                                         className="w-full h-44 bg-gray-50 dark:bg-gray-800 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-gray-700 cursor-crosshair shadow-inner"
                                     />
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             const ctx = canvasRef.current?.getContext('2d');
-                                            if (ctx) { ctx.clearRect(0,0,400,200); ctx.beginPath(); }
+                                            if (ctx) { ctx.clearRect(0, 0, 400, 200); ctx.beginPath(); }
                                         }}
                                         className="absolute bottom-4 right-4 text-[8px] font-black uppercase bg-white/80 dark:bg-black/50 px-3 py-1 rounded-full text-gray-500"
                                     >

@@ -175,146 +175,243 @@ const ModalPagoCheckout: React.FC<{
 
 const VistaConfiguracion: React.FC = () => {
     const {
-        usuarios, cargando, cargarConfiguracion,
-        localConfigClub, localConfigNotificaciones, cargandoAccion,
-        modalUsuarioAbierto, usuarioEnEdicion, abrirFormularioUsuario, cerrarFormularioUsuario, guardarUsuarioHandler,
-        modalConfirmacionAbierto, usuarioAEliminar, abrirConfirmacionEliminar, cerrarConfirmacion, confirmarEliminacion,
-        handleConfigChange, guardarConfiguracionesHandler, setLocalConfigClub, setLocalConfigNotificaciones
+        usuarios, localConfigClub, localConfigNotificaciones, cargando, error,
+        cargandoAccion, handleConfigChange, guardarConfiguracionesHandler,
+        modalUsuarioAbierto, cerrarFormularioUsuario, guardarUsuarioHandler, usuarioEnEdicion,
+        modalConfirmacionAbierto, usuarioAEliminar, cerrarConfirmacion, confirmarEliminacion,
+        abrirFormularioUsuario, abrirConfirmacionEliminar, setLocalConfigClub, setLocalConfigNotificaciones
     } = useGestionConfiguracion();
 
-    const { programas, agregarPrograma, actualizarPrograma, eliminarPrograma } = useProgramas();
-    const { sedes, agregarSede, actualizarSede, eliminarSede } = useSedes();
+    const { programas, eliminarPrograma, agregarPrograma, actualizarPrograma } = useProgramas();
+    const { estudiantes } = useEstudiantes();
+    const { sedes, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
-    const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
-    const [sedeEdit, setSedeEdit] = useState<Sede | null>(null);
+    const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
+    const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
 
-    const handleExitoPago = (datos: any) => {
-        if (datos.tipo === 'addon') {
-            setLocalConfigClub(prev => ({
-                ...prev,
-                limiteEstudiantes: prev.limiteEstudiantes + (datos.limiteEstudiantes || 0),
-                limiteUsuarios: prev.limiteUsuarios + (datos.limiteUsuarios || 0),
-                limiteSedes: prev.limiteSedes + (datos.limiteSedes || 0)
-            }));
-        } else {
-            setLocalConfigClub(prev => ({
-                ...prev,
-                plan: datos.plan.id,
-                limiteEstudiantes: datos.plan.limiteEstudiantes,
-                limiteUsuarios: datos.plan.limiteUsuarios,
-                limiteSedes: datos.plan.limiteSedes
-            }));
-        }
-        setItemAPagar(null);
-    };
-
-    // Added comment above fix: implemented handleGuardarPrograma to manage creation and update of programs.
-    const handleGuardarPrograma = async (datos: any) => {
-        try {
-            if (datos.id) {
-                await actualizarPrograma(datos);
-                mostrarNotificacion("Programa técnico actualizado.", "success");
-            } else {
-                await agregarPrograma(datos);
-                mostrarNotificacion("Nuevo programa vinculado al catálogo.", "success");
-            }
-            setModalProgramaAbierto(false);
-        } catch (error) {
-            mostrarNotificacion("Error al procesar la solicitud del programa.", "error");
-        }
-    };
-
-    // Added comment above fix: implemented handleGuardarSede to manage creation and update of dojang locations.
     const handleGuardarSede = async (datos: any) => {
         try {
-            if (datos.id) {
-                await actualizarSede(datos);
-                mostrarNotificacion("Sede actualizada correctamente.", "success");
-            } else {
-                await agregarSede(datos);
-                mostrarNotificacion("Sede registrada en el ecosistema.", "success");
-            }
+            if (datos.id) await actualizarSede(datos);
+            else await agregarSede(datos);
             setModalSedeAbierto(false);
-        } catch (error) {
-            mostrarNotificacion("Error al procesar la solicitud de la sede.", "error");
+            mostrarNotificacion("Sede guardada correctamente.", "success");
+        } catch (e) {
+            mostrarNotificacion("Error al guardar la sede.", "error");
         }
     };
 
-    // Modificado: Mejoramos la resiliencia de carga y el feedback visual
-    if (!localConfigClub) {
-        return (
-            <div className="h-screen flex flex-col items-center justify-center bg-tkd-dark/5 gap-6 animate-pulse p-10 text-center">
-                <Loader texto="Configurando Dojang..." />
-                {(!cargando || error) && (
-                    <div className="space-y-4 max-w-sm animate-fade-in">
-                        {error && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-4 rounded-2xl mb-4">
-                                <p className="text-red-600 dark:text-red-400 text-xs font-black uppercase tracking-tight">{error}</p>
-                            </div>
-                        )}
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-relaxed">
-                            Si la carga se detiene, es posible que haya un problema con la conexión a la base de datos o el tenant no se haya sincronizado correctamente.
-                        </p>
-                        <button
-                            onClick={() => cargarConfiguracion()}
-                            className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
-                        >
-                            Forzar Reintento
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    }
+    const handleGuardarPrograma = async (datos: any) => {
+        try {
+            if (datos.id) await actualizarPrograma(datos);
+            else await agregarPrograma(datos);
+            setModalProgramaAbierto(false);
+            mostrarNotificacion("Programa actualizado en el catálogo.", "success");
+        } catch (e) {
+            mostrarNotificacion("Error al guardar el programa.", "error");
+        }
+    };
+
+    const handleExitoPago = (datos: any) => {
+        setItemAPagar(null);
+        mostrarNotificacion("Transacción exitosa. Tu capacidad ha sido ampliada.", "success");
+        // Forzamos recarga de configuración para ver los nuevos límites
+        if (localConfigClub) {
+            setLocalConfigClub({
+                ...localConfigClub,
+                ...(datos.limiteEstudiantes ? { limiteEstudiantes: localConfigClub.limiteEstudiantes + datos.limiteEstudiantes } : {}),
+                ...(datos.limiteUsuarios ? { limiteUsuarios: localConfigClub.limiteUsuarios + datos.limiteUsuarios } : {}),
+                ...(datos.limiteSedes ? { limiteSedes: localConfigClub.limiteSedes + datos.limiteSedes } : {}),
+                ...(datos.plan ? { plan: datos.plan.nombre, limiteEstudiantes: datos.plan.estudiantes, limiteUsuarios: datos.plan.usuarios, limiteSedes: datos.plan.sedes } : {})
+            });
+        }
+    };
+
+    // --- LÓGICA DE ONBOARDING ---
+    const [onboardingStep, setOnboardingStep] = useState(localConfigClub?.onboardingStep || 0);
+
+    // Efecto para calcular el paso real basado en datos (Autocorrección)
+    useEffect(() => {
+        if (!localConfigClub) return;
+
+        // Paso 0 -> 1: Inicio
+        let step = 1;
+
+        // Paso 1: Info Institucional (Dirección, NIT, etc)
+        if (localConfigClub.direccionClub && localConfigClub.nit && localConfigClub.representanteLegal) {
+            step = 2;
+        }
+
+        // Paso 2: Branding (Opcional, siempre pasa)
+        if (step === 2) {
+            step = 3; // Branding es opcional, así que si estamos en 2, podemos ir a 3
+        }
+
+        // Paso 3: Sedes
+        if (step >= 3 && sedes.length > 0) {
+            step = 4;
+        }
+
+        // Paso 4: Equipo (Admin + 1 o Admin con contrato?)
+        // Requerimiento: "Creación de miembro de equipo... parámetros de contratación obligatoria"
+        // Validamos si hay al menos 2 usuarios (Admin + 1) o si el usuario actual tiene contrato.
+        // Asumiremos que si hay > 1 usuario, se cumplió.
+        if (step >= 4 && usuarios.length > 1) {
+            step = 5; // Completo
+        }
+
+        // Sincronizar con backend si es mayor
+        if (step > (localConfigClub.onboardingStep || 0)) {
+            // Actualizaríamos el backend aquí, pero lo haremos al guardar cada paso o al final.
+            // Por ahora solo manejo local UI para bloqueo.
+            // setOnboardingStep(step); // No, mejor dejar que el usuario avance visualmente
+        }
+    }, [localConfigClub, sedes, usuarios]);
+
+    // Función para avanzar paso manual (guardar y continuar)
+    const avanzarPaso = async (pasoActual: number) => {
+        const nuevoPaso = pasoActual + 1;
+        // Guardar en backend
+        setLocalConfigClub(prev => ({ ...prev!, onboardingStep: nuevoPaso }));
+        await guardarConfiguracionesHandler(); // Esto guarda todo localConfigClub
+        setActiveTab(getTabForStep(nuevoPaso));
+    };
+
+    const getTabForStep = (step: number) => {
+        switch (step) {
+            case 1: return 'branding'; // Info está en Tab "branding" (Identidad & Pagos) section 1
+            case 2: return 'branding'; // Branding sección 2
+            case 3: return 'sedes';
+            case 4: return 'equipo';
+            default: return 'branding';
+        }
+    };
+
+    // Renderizado Condicional del Wizard
+    const isWizardMode = (localConfigClub?.onboardingStep || 0) < 5;
+
+    const pasosWizard = [
+        { num: 1, label: 'Institucional', icon: IconoLogoOficial, tab: 'branding', bloqueado: false },
+        { num: 2, label: 'Look & Feel', icon: IconoImagen, tab: 'branding', bloqueado: (localConfigClub?.onboardingStep || 0) < 1 },
+        { num: 3, label: 'Sedes', icon: IconoCasa, tab: 'sedes', bloqueado: (localConfigClub?.onboardingStep || 0) < 2 },
+        { num: 4, label: 'Equipo', icon: IconoUsuario, tab: 'equipo', bloqueado: (localConfigClub?.onboardingStep || 0) < 3 },
+    ];
+
+    if (!localConfigClub) return <Loader texto="Cargando configuración..." />;
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner";
 
+    // Función RESTAURAR COLORES
+    const restaurarColores = () => {
+        setLocalConfigClub(prev => ({
+            ...prev!,
+            colorPrimario: '#111111',
+            colorSecundario: '#0047A0',
+            colorAcento: '#CD2E3A'
+        }));
+        mostrarNotificacion("Colores restaurados a valores originales.", "info");
+    };
+
     return (
-        <div className="p-4 sm:p-10 space-y-10 animate-fade-in">
+        <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
             <header className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center">
                 <div>
-                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Centro de Control</h1>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Configuración Global y Parámetros del Dojang</p>
+                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">
+                        {isWizardMode ? 'Configuración Inicial' : 'Centro de Control'}
+                    </h1>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">
+                        {isWizardMode ? 'Pasos obligatorios para activar tu plataforma' : 'Gestión Global del Dojang'}
+                    </p>
                 </div>
-                <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="w-full md:w-auto bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                    <IconoGuardar className="w-5 h-5" /> Guardar Cambios
-                </button>
+                {!isWizardMode && (
+                    <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
+                        <IconoGuardar className="w-5 h-5" /> Guardar Cambios
+                    </button>
+                )}
             </header>
 
-            {/* BARRA DE NAVEGACIÓN */}
-            <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
-                <div className="flex flex-row gap-1">
-                    {[
-                        { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
-                        { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
-                        { id: 'sedes', label: 'Sedes', icon: IconoCasa },
-                        { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
-                        { id: 'alertas', label: 'Alertas', icon: IconoCampana },
-                        { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                        >
-                            <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
+            {/* WIZARD PROGRESS BAR */}
+            {isWizardMode && (
+                <div className="w-full bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xl border border-gray-100 dark:border-gray-700 flex justify-between relative overflow-hidden">
+                    {/* Línea de conexión de fondo */}
+                    <div className="absolute top-1/2 left-10 right-10 h-1 bg-gray-200 dark:bg-gray-700 -translate-y-1/2 z-0" />
+
+                    {pasosWizard.map((p) => {
+                        const completado = (localConfigClub.onboardingStep || 0) > p.num;
+                        const actual = (localConfigClub.onboardingStep || 0) === p.num || ((localConfigClub.onboardingStep || 0) === 0 && p.num === 1);
+                        const Bloqueado = p.bloqueado && !actual && !completado;
+
+                        return (
+                            <div key={p.num} className="relative z-10 flex flex-col items-center gap-3">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-4 transition-all duration-500
+                                    ${completado ? 'bg-green-500 border-green-500 text-white' :
+                                        actual ? 'bg-tkd-blue border-tkd-blue text-white scale-110 shadow-lg shadow-tkd-blue/30' :
+                                            'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'}`}>
+                                    {completado ? <IconoExitoAnimado className="w-6 h-6" /> :
+                                        Bloqueado ? <div className="w-full h-full flex items-center justify-center"><div className="w-3 h-3 bg-gray-400 rounded-full" /></div> : // Candado implícito
+                                            <span className="font-black text-lg">{p.num}</span>}
+                                </div>
+                                <span className={`text-[9px] font-black uppercase tracking-widest ${actual ? 'text-tkd-blue' : 'text-gray-400'}`}>
+                                    {p.label}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
-            </div>
+            )}
+
+            {/* BARRA DE NAVEGACIÓN (Solo visible si NO estamos en wizard mode o controlada por wizard) */}
+            {!isWizardMode && (
+                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
+                    <div className="flex flex-row gap-1">
+                        {[
+                            { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
+                            { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
+                            { id: 'sedes', label: 'Sedes', icon: IconoCasa },
+                            { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
+                            { id: 'alertas', label: 'Alertas', icon: IconoCampana },
+                            { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                            >
+                                <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                                <span>{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* CONTENIDO DE PESTAÑAS */}
             <div className="min-h-[500px]">
-                {activeTab === 'branding' && (
+                {/* 
+                    LÓGICA WIZARD:
+                    Si estamos en wizard, Forzar la vista correspondiente al paso.
+                    PASO 1: Info Institucional -> Botón "Guardar y Continuar"
+                    PASO 2: Branding -> Botón "Continuar" (Opcional)
+                    PASO 3: Sedes -> Botón "He registrado mi sede" (Validar > 0)
+                    PASO 4: Equipo -> Botón "Finalizar Configuración" (Validar)
+                */}
+
+                {/* TAB BRANDING (Usada para Pasos 1 y 2) */}
+                {(activeTab === 'branding' || (isWizardMode && ((localConfigClub.onboardingStep || 0) <= 2))) && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
-                        <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Información Institucional</h3>
+                        {/* SECCIÓN 1: INFO INSTITUCIONAL (PASO 1) */}
+                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && (localConfigClub.onboardingStep || 0) !== 1 && (localConfigClub.onboardingStep || 0) !== 0 ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">1. Información Institucional</h3>
+                                {isWizardMode && (localConfigClub.onboardingStep || 0) <= 1 && (
+                                    <span className="bg-red-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase">Obligatorio</span>
+                                )}
+                            </div>
+
                             <div className="space-y-6">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div>
@@ -325,6 +422,10 @@ const VistaConfiguracion: React.FC = () => {
                                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">NIT / Registro</label>
                                         <input type="text" name="nit" value={localConfigClub.nit} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
                                     </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dirección Principal <span className="text-red-500">*</span></label>
+                                    <input type="text" name="direccionClub" value={localConfigClub.direccionClub} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Calle 123... (Obligatorio)" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Representante Legal</label>
@@ -341,56 +442,126 @@ const VistaConfiguracion: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                            {isWizardMode && (localConfigClub.onboardingStep || 0) <= 1 && (
+                                <button
+                                    onClick={() => {
+                                        if (!localConfigClub.direccionClub || !localConfigClub.nombreClub) {
+                                            mostrarNotificacion("Diligencia los campos obligatorios", "error");
+                                            return;
+                                        }
+                                        avanzarPaso(1);
+                                    }}
+                                    className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all"
+                                >
+                                    Guardar y Continuar a Branding
+                                </button>
+                            )}
                         </section>
 
-                        <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Branding & Logo</h3>
-                            <div className="flex flex-col items-center justify-center border-4 border-dashed border-gray-100 dark:border-white/5 rounded-[3rem] p-12 text-center space-y-6">
-                                <div className="w-40 h-40 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl">
-                                    {localConfigClub.logoUrl ? <img src={localConfigClub.logoUrl} className="w-full h-full object-contain" /> : <IconoLogoOficial className="w-20 h-20 opacity-20" />}
-                                </div>
-                                <button className="px-8 py-3 bg-tkd-dark text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">Cambiar Logo Oficial</button>
-                                <p className="text-[9px] text-gray-400 font-bold uppercase">Formato recomendado: PNG Transparente 512x512px</p>
+                        {/* SECCIÓN 2: BRANDING (PASO 2) */}
+                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && (localConfigClub.onboardingStep || 0) !== 2 && (localConfigClub.onboardingStep || 0) !== 5 ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">2. Look & Feel</h3>
+                                {isWizardMode && (localConfigClub.onboardingStep || 0) === 2 && (
+                                    <button
+                                        onClick={restaurarColores}
+                                        className="text-[9px] font-black uppercase text-gray-400 hover:text-tkd-red underline"
+                                    >
+                                        Restaurar Originales
+                                    </button>
+                                )}
                             </div>
+
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 tracking-widest">Primario</label>
+                                        <div className="flex items-center gap-2">
+                                            <input type="color" name="colorPrimario" value={localConfigClub.colorPrimario} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className="w-10 h-10 rounded-full border-none cursor-pointer" />
+                                            <span className="text-[9px] font-mono">{localConfigClub.colorPrimario}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 tracking-widest">Secundario</label>
+                                        <div className="flex items-center gap-2">
+                                            <input type="color" name="colorSecundario" value={localConfigClub.colorSecundario} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className="w-10 h-10 rounded-full border-none cursor-pointer" />
+                                            <span className="text-[9px] font-mono">{localConfigClub.colorSecundario}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 tracking-widest">Acento</label>
+                                        <div className="flex items-center gap-2">
+                                            <input type="color" name="colorAcento" value={localConfigClub.colorAcento} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className="w-10 h-10 rounded-full border-none cursor-pointer" />
+                                            <span className="text-[9px] font-mono">{localConfigClub.colorAcento}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-[9px] text-gray-400">Estos colores se aplicarán globalmente en carnets, documentos y UI.</p>
+                            </div>
+
+                            <div className="flex flex-col items-center justify-center border-4 border-dashed border-gray-100 dark:border-white/5 rounded-[3rem] p-8 text-center space-y-4">
+                                <div className="w-32 h-32 bg-gray-50 dark:bg-black/20 rounded-full flex items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-xl">
+                                    {localConfigClub.logoUrl ? <img src={localConfigClub.logoUrl} className="w-full h-full object-contain" /> : <IconoLogoOficial className="w-16 h-16 opacity-20" />}
+                                </div>
+                                <button className="px-6 py-2 bg-tkd-dark text-white rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg active:scale-95 transition-all">Cambiar Logo</button>
+                            </div>
+
+                            {isWizardMode && (localConfigClub.onboardingStep || 0) === 2 && (
+                                <button
+                                    onClick={() => avanzarPaso(2)}
+                                    className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4"
+                                >
+                                    Continuar a Sedes (Opcional)
+                                </button>
+                            )}
                         </section>
                     </div>
                 )}
 
-                {activeTab === 'equipo' && (
+                {/* TAB SEDES (PASO 3) */}
+                {(activeTab === 'sedes' || (isWizardMode && (localConfigClub.onboardingStep || 0) === 3)) && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Nómina Técnica y Personal</h3>
-                            <button onClick={() => abrirFormularioUsuario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Vincular Miembro
+                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Gestión de Sedes</h3>
+                            <button onClick={() => {
+                                if (sedes.length >= localConfigClub.limiteSedes) {
+                                    mostrarNotificacion(`Límite de Sedes alcanzado (${localConfigClub.limiteSedes}). Por favor, amplíe su plan para registrar más sedes.`, "warning");
+                                    return;
+                                }
+                                // Pre-fill con datos de config
+                                setSedeEdit({
+                                    nombre: 'Sede Principal',
+                                    direccion: localConfigClub.direccionClub,
+                                    ciudad: 'Ciudad Principal',
+                                    telefono: '',
+                                    id: '', tenantId: localConfigClub.tenantId,
+                                    valorMensualidad: localConfigClub.valorMensualidad || 0
+                                });
+                                setModalSedeAbierto(true);
+                            }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+                                <IconoAgregar className="w-4 h-4" /> Registrar Sede Inicial
                             </button>
                         </div>
-                        <div className="tkd-card p-0">
-                            <TablaUsuarios
-                                usuarios={usuarios}
-                                onEditar={abrirFormularioUsuario}
-                                onEliminar={abrirConfirmacionEliminar}
-                                onGestionarContrato={() => mostrarNotificacion("Módulo legal en actualización.", "info")}
-                            />
-                        </div>
-                    </div>
-                )}
 
-                {activeTab === 'sedes' && (
-                    <div className="space-y-8 animate-fade-in">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Gestión de Sedes / Dojangs</h3>
-                            <button onClick={() => setModalSedeAbierto(true)} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Registrar Sede
-                            </button>
-                        </div>
+                        {sedes.length === 0 && (
+                            <div className="p-10 text-center bg-yellow-50 dark:bg-yellow-900/10 rounded-3xl border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400 font-bold uppercase text-xs">
+                                Debes registrar al menos una sede para continuar.
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {sedes.map(s => (
                                 <div key={s.id} className="tkd-card p-8 space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
-                                            <button onClick={() => eliminarSede(s.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
+                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue" title="Editar Sede"><IconoEditar className="w-4 h-4" /></button>
+                                            <button onClick={() => {
+                                                if (window.confirm(`¿Seguro que deseas eliminar la sede ${s.nombre}? Esta acción no se puede deshacer.`)) {
+                                                    eliminarSede(s.id);
+                                                    mostrarNotificacion("Sede eliminada satisfactoriamente.", "success");
+                                                }
+                                            }} className="p-2 text-gray-400 hover:text-tkd-red" title="Eliminar Sede"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div>
@@ -404,11 +575,67 @@ const VistaConfiguracion: React.FC = () => {
                                 </div>
                             ))}
                         </div>
+
+                        {isWizardMode && (localConfigClub.onboardingStep || 0) === 3 && (
+                            <button
+                                onClick={() => {
+                                    if (sedes.length === 0) {
+                                        mostrarNotificacion("Registra al menos una sede", "error");
+                                        return;
+                                    }
+                                    avanzarPaso(3);
+                                }}
+                                className={`w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4 ${sedes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                Sede Registrada - Continuar a Equipo
+                            </button>
+                        )}
                     </div>
                 )}
 
-                {activeTab === 'programas' && (
+                {/* TAB EQUIPO (PASO 4) */}
+                {(activeTab === 'equipo' || (isWizardMode && (localConfigClub.onboardingStep || 0) === 4)) && (
                     <div className="space-y-8 animate-fade-in">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">4. Nómina Inicial</h3>
+                            <button onClick={() => abrirFormularioUsuario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+                                <IconoAgregar className="w-4 h-4" /> Vincular Instructor
+                            </button>
+                        </div>
+                        <div className="tkd-card p-0">
+                            <TablaUsuarios
+                                usuarios={usuarios}
+                                onEditar={abrirFormularioUsuario}
+                                onEliminar={abrirConfirmacionEliminar}
+                                onGestionarContrato={() => mostrarNotificacion("Contrato gestionado en edición", "info")}
+                            />
+                        </div>
+                        {isWizardMode && (localConfigClub.onboardingStep || 0) === 4 && (
+                            <button
+                                onClick={() => {
+                                    // Validar que exista contrato?
+                                    // Asumimos que si hay > 1 usuario (el admin + otro), se hizo.
+                                    if (usuarios.length < 2 && !window.confirm("¿Seguro de avanzar sin registrar instructores adicionales?")) {
+                                        return;
+                                    }
+                                    setLocalConfigClub(prev => ({ ...prev!, onboardingStep: 5 }));
+                                    guardarConfiguracionesHandler();
+                                    mostrarNotificacion("¡Configuración Completada! Bienvenido.", "success");
+                                    // Redirigir o recargar
+                                    window.location.href = '/';
+                                }}
+                                className="w-full py-6 bg-green-500 text-white rounded-xl font-black uppercase text-sm shadow-xl hover:bg-green-600 transition-all mt-8 animate-pulse-slow"
+                            >
+                                Finalizar Configuración y Entrar
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* OTRAS TABS (Solo visibles si terminado) */}
+                {!isWizardMode && activeTab === 'programas' && (
+                    <div className="space-y-8 animate-fade-in">
+                        {/* Contenido Programas Existente */}
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Catálogo de Programas Extra</h3>
                             <button onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
@@ -422,13 +649,17 @@ const VistaConfiguracion: React.FC = () => {
                                         <div className="p-3 bg-tkd-red/10 rounded-2xl"><IconoLogoOficial className="w-6 h-6 text-tkd-red" /></div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setProgramaEdit(p); setModalProgramaAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
-                                            <button onClick={() => eliminarPrograma(p.id)} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
+                                            <button onClick={() => {
+                                                if (window.confirm(`¿Seguro que deseas eliminar el programa ${p.nombre}?`)) {
+                                                    eliminarPrograma(p.id);
+                                                    mostrarNotificacion("Programa eliminado del catálogo.", "success");
+                                                }
+                                            }} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div>
                                         <h4 className="font-black uppercase text-lg leading-tight">{p.nombre}</h4>
                                         <p className="text-[10px] font-black text-tkd-blue uppercase mt-1">{p.tipoCobro}</p>
-                                        <p className="text-xs text-gray-500 mt-4 uppercase font-medium line-clamp-2">{p.descripcion || 'Sin descripción técnica registrada.'}</p>
                                     </div>
                                     <div className="pt-4 border-t dark:border-white/5 flex justify-between items-center">
                                         <p className="text-sm font-black text-gray-900 dark:text-white">+{formatearPrecio(p.valor)}</p>
@@ -439,9 +670,9 @@ const VistaConfiguracion: React.FC = () => {
                         </div>
                     </div>
                 )}
-
-                {activeTab === 'alertas' && (
+                {!isWizardMode && activeTab === 'alertas' && (
                     <div className="max-w-4xl space-y-8 animate-fade-in">
+                        {/* Contenido Alertas Existente */}
                         <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-10">
                             <div className="flex items-center gap-4">
                                 <IconoCampana className="w-10 h-10 text-tkd-blue" />
@@ -450,7 +681,6 @@ const VistaConfiguracion: React.FC = () => {
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Business Intelligence Rules</p>
                                 </div>
                             </div>
-
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 tracking-widest">Día de Cobro Mensual (1-28)</label>
@@ -465,14 +695,13 @@ const VistaConfiguracion: React.FC = () => {
                                     <input type="number" name="diasGraciaSuspension" value={localConfigNotificaciones.diasGraciaSuspension} onChange={(e) => handleConfigChange(e as any, setLocalConfigNotificaciones)} className={inputClasses} />
                                 </div>
                             </div>
-
                             <GestionNotificacionesPush />
                         </section>
                     </div>
                 )}
-
-                {activeTab === 'licencia' && (
+                {!isWizardMode && activeTab === 'licencia' && (
                     <div className="space-y-10 animate-fade-in">
+                        {/* Contenido Licencia Existente */}
                         <div className="bg-tkd-dark text-white p-10 rounded-[3rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8 border border-white/5 relative overflow-hidden">
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black text-tkd-red uppercase tracking-[0.4em] mb-2">Estado de Suscripción</p>
@@ -485,6 +714,33 @@ const VistaConfiguracion: React.FC = () => {
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
 
+                        {/* MÉTRICAS DE USO */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {[
+                                { label: 'Estudiantes', used: estudiantes.length, limit: localConfigClub.limiteEstudiantes, icon: IconoEstudiantes, color: 'text-tkd-blue' },
+                                { label: 'Docentes / Staff', used: usuarios.length, limit: localConfigClub.limiteUsuarios, icon: IconoUsuario, color: 'text-green-500' },
+                                { label: 'Sedes Activas', used: sedes.length, limit: localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
+                            ].map((metric) => {
+                                const percent = Math.min((metric.used / metric.limit) * 100, 100);
+                                return (
+                                    <div key={metric.label} className="bg-white dark:bg-white/5 p-6 rounded-[2.5rem] border border-gray-100 dark:border-white/10 space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className={`p-3 rounded-2xl bg-gray-50 dark:bg-white/5 ${metric.color}`}><metric.icon className="w-5 h-5" /></div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{metric.label}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-end">
+                                                <span className="text-2xl font-black dark:text-white leading-none">{metric.used} <span className="text-xs text-gray-400 font-bold lowercase">de</span> {metric.limit}</span>
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{Math.round(percent)}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                                <div className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-tkd-red' : percent > 70 ? 'bg-orange-500' : 'bg-tkd-blue'}`} style={{ width: `${percent}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {Object.values(COSTOS_ADICIONALES).map(addon => (
                                 <div key={addon.key} className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">

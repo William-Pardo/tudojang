@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTenant } from '../components/BrandingProvider';
 import { registrarAspirantePublico } from '../servicios/censoApi';
-import { IconoLogoOficial, IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar } from '../components/Iconos';
+import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
@@ -15,11 +15,12 @@ const CensoPublico: React.FC = () => {
     const [edad, setEdad] = useState<number | null>(null);
     const [enviado, setEnviado] = useState(false);
     const [cargando, setCargando] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
-        fechaNacimiento: '', tutorNombre: '', tutorEmail: '',
-        tutorTelefono: '', parentesco: 'Padre'
+        fechaNacimiento: '', eps: '', rh: '', direccion: '', barrio: '',
+        tutorNombre: '', tutorApellidos: '', tutorCedula: '',
+        tutorEmail: '', tutorTelefono: '', parentesco: 'Padre'
     });
 
     const calcularEdad = (fecha: string) => {
@@ -127,6 +128,31 @@ const CensoPublico: React.FC = () => {
                         {edad !== null && <p className="mt-3 text-[10px] font-black uppercase text-tkd-red tracking-widest">Edad Detectada: {edad} Años</p>}
                     </div>
 
+                    <div className="grid grid-cols-2 gap-6">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">EPS / Salud</label>
+                            <input name="eps" type="text" required className={inputClass} placeholder="EPS" onChange={handleInputChange} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">RH / Sangre</label>
+                            <select name="rh" required className={inputClass} onChange={handleInputChange}>
+                                <option value="">Seleccionar...</option>
+                                {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Dirección Residencia</label>
+                            <input name="direccion" type="text" required className={inputClass} placeholder="CALLE/CARRERA..." onChange={handleInputChange} />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Barrio</label>
+                            <input name="barrio" type="text" required className={inputClass} placeholder="BARRIO" onChange={handleInputChange} />
+                        </div>
+                    </div>
+
                     {edad !== null && edad < 18 && (
                         <div className="pt-8 border-t dark:border-gray-800 animate-slide-in-right space-y-6">
                             <div className="flex items-center gap-3">
@@ -135,11 +161,19 @@ const CensoPublico: React.FC = () => {
                                 </div>
                                 <h3 className="text-sm font-black uppercase text-tkd-dark dark:text-white tracking-widest">Acudiente Responsable</h3>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div className="sm:col-span-2">
-                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Nombre Completo Tutor</label>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Nombres Tutor</label>
                                     <input name="tutorNombre" type="text" required className={inputClass} onChange={handleInputChange} />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Apellidos Tutor</label>
+                                    <input name="tutorApellidos" type="text" required className={inputClass} onChange={handleInputChange} />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Cédula Tutor</label>
+                                    <input name="tutorCedula" type="text" required className={inputClass} onChange={handleInputChange} />
                                 </div>
                                 <div>
                                     <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp Tutor</label>
@@ -165,7 +199,7 @@ const CensoPublico: React.FC = () => {
                     </button>
                 </div>
             </form>
-            
+
             <footer className="mt-12 text-center">
                 <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.3 • Protocolo de Carga Masiva</p>
             </footer>

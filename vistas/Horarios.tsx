@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useProgramas, useSedes, useConfiguracion } from '../context/DataContext';
 // Added fix: Imported IconoInformacion from Icons module.
-import { IconoLogoOficial, IconoCasa, IconoUsuario, IconoCampana, IconoAgregar, IconoInformacion } from '../components/Iconos';
+import { IconoCasa, IconoUsuario, IconoCampana, IconoAgregar, IconoInformacion } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -21,8 +22,8 @@ const VistaHorarios: React.FC = () => {
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">Planificación de Clases y Uso de Sedes</p>
                 </div>
                 <div className="flex gap-4 w-full md:w-auto">
-                    <select 
-                        value={filtroSede} 
+                    <select
+                        value={filtroSede}
                         onChange={(e) => setFiltroSede(e.target.value)}
                         className="bg-white dark:bg-gray-800 border-none rounded-xl px-6 py-3 text-[10px] font-black uppercase tracking-widest shadow-sm focus:ring-2 focus:ring-tkd-blue outline-none"
                     >
@@ -39,33 +40,33 @@ const VistaHorarios: React.FC = () => {
                         <div className="bg-tkd-dark text-white p-4 rounded-2xl text-center shadow-lg border border-white/10">
                             <p className="text-[10px] font-black uppercase tracking-[0.3em]">{dia}</p>
                         </div>
-                        
+
                         <div className="space-y-3">
                             {programas
                                 .filter(p => p.horario.includes(dia)) // Simulación basada en texto legacy
                                 .map(p => (
-                                <div key={p.id} className="bg-white dark:bg-gray-800 p-5 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-premium transition-all group overflow-hidden relative">
-                                    <div className="relative z-10 space-y-3">
-                                        <div className="flex justify-between items-start">
-                                            <div className="p-2 bg-tkd-blue/10 rounded-xl text-tkd-blue">
-                                                <IconoLogoOficial className="w-4 h-4" />
+                                    <div key={p.id} className="bg-white dark:bg-gray-800 p-5 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-soft hover:shadow-premium transition-all group overflow-hidden relative">
+                                        <div className="relative z-10 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div className="p-2 bg-tkd-blue/10 rounded-xl text-tkd-blue">
+                                                    <LogoDinamico className="w-4 h-4" />
+                                                </div>
+                                                <span className="text-[8px] font-black text-tkd-red uppercase bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full">PM</span>
                                             </div>
-                                            <span className="text-[8px] font-black text-tkd-red uppercase bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-full">PM</span>
+                                            <div>
+                                                <h4 className="text-[11px] font-black uppercase text-gray-900 dark:text-white leading-tight">{p.nombre}</h4>
+                                                <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">Sede Principal</p>
+                                            </div>
+                                            <div className="pt-2 border-t dark:border-white/5">
+                                                <p className="text-[9px] font-black text-tkd-blue uppercase">{p.horario.split(dia)[1] || '6:00 PM'}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="text-[11px] font-black uppercase text-gray-900 dark:text-white leading-tight">{p.nombre}</h4>
-                                            <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">Sede Principal</p>
-                                        </div>
-                                        <div className="pt-2 border-t dark:border-white/5">
-                                            <p className="text-[9px] font-black text-tkd-blue uppercase">{p.horario.split(dia)[1] || '6:00 PM'}</p>
+                                        <div className="absolute -bottom-4 -right-4 opacity-5 group-hover:scale-110 transition-transform">
+                                            <LogoDinamico className="w-16 h-16" />
                                         </div>
                                     </div>
-                                    <div className="absolute -bottom-4 -right-4 opacity-5 group-hover:scale-110 transition-transform">
-                                        <IconoLogoOficial className="w-16 h-16" />
-                                    </div>
-                                </div>
-                            ))}
-                            
+                                ))}
+
                             <button className="w-full py-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl flex items-center justify-center text-gray-300 hover:border-tkd-blue hover:text-tkd-blue transition-all">
                                 <IconoAgregar className="w-5 h-5" />
                             </button>

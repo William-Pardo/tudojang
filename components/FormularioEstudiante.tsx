@@ -56,8 +56,13 @@ const schema = yup.object({
     consentimientoFotosVideos: yup.boolean().default(false),
     alergias: yup.string().optional(),
     lesiones: yup.string().optional(),
+    eps: yup.string().optional(),
+    rh: yup.string().optional(),
+    direccion: yup.string().optional(),
+    barrio: yup.string().optional(),
     programasInscritos: yup.array().optional().default([]),
-    tutor: yup.object().optional().nullable()
+    tutor: yup.object().optional().nullable(),
+    cobrarInscripcion: yup.boolean().default(true)
 }).required();
 
 const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando }) => {
@@ -74,7 +79,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
             estadoPago: EstadoPago.AlDia,
             programasInscritos: [],
             fechaIngreso: new Date().toISOString().split('T')[0],
-            horasAcumuladasGrado: 0
+            horasAcumuladasGrado: 0,
+            cobrarInscripcion: true,
+            eps: '',
+            rh: '',
+            direccion: '',
+            barrio: ''
         }
     });
 
@@ -105,7 +115,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
             estadoPago: EstadoPago.AlDia,
             programasInscritos: [],
             fechaIngreso: new Date().toISOString().split('T')[0],
-            horasAcumuladasGrado: 0
+            horasAcumuladasGrado: 0,
+            cobrarInscripcion: true,
+            eps: '',
+            rh: '',
+            direccion: '',
+            barrio: ''
         });
     }, [abierto, estudianteActual, reset]);
 
@@ -127,12 +142,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             <div className="space-y-1">
                                 <label htmlFor="nombres" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombres</label>
                                 <input id="nombres" {...register('nombres')} placeholder="NOMBRES" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.nombres?.message} />
+                                <FormInputError mensaje={errors.nombres?.message as string} />
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="apellidos" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Apellidos</label>
                                 <input id="apellidos" {...register('apellidos')} placeholder="APELLIDOS" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.apellidos?.message} />
+                                <FormInputError mensaje={errors.apellidos?.message as string} />
                             </div>
                         </div>
 
@@ -140,12 +155,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             <div className="space-y-1">
                                 <label htmlFor="numeroIdentificacion" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identificación</label>
                                 <input id="numeroIdentificacion" {...register('numeroIdentificacion')} placeholder="ID / DOCUMENTO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.numeroIdentificacion?.message} />
+                                <FormInputError mensaje={errors.numeroIdentificacion?.message as string} />
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="fechaNacimiento" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nacimiento</label>
                                 <input id="fechaNacimiento" type="date" {...register('fechaNacimiento')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white uppercase" />
-                                <FormInputError mensaje={errors.fechaNacimiento?.message} />
+                                <FormInputError mensaje={errors.fechaNacimiento?.message as string} />
                             </div>
                         </div>
 
@@ -155,14 +170,14 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                 <select id="grado" {...register('grado')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     {Object.values(GradoTKD).map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
-                                <FormInputError mensaje={errors.grado?.message} />
+                                <FormInputError mensaje={errors.grado?.message as string} />
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="grupo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Grupo Técnico</label>
                                 <select id="grupo" {...register('grupo')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     {Object.values(GrupoEdad).map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
-                                <FormInputError mensaje={errors.grupo?.message} />
+                                <FormInputError mensaje={errors.grupo?.message as string} />
                             </div>
                         </div>
 
@@ -170,19 +185,19 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             <div className="space-y-1">
                                 <label htmlFor="fechaIngreso" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ingreso</label>
                                 <input id="fechaIngreso" type="date" {...register('fechaIngreso')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.fechaIngreso?.message} />
+                                <FormInputError mensaje={errors.fechaIngreso?.message as string} />
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="horasAcumuladasGrado" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Horas Acum.</label>
                                 <input id="horasAcumuladasGrado" type="number" {...register('horasAcumuladasGrado')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.horasAcumuladasGrado?.message} />
+                                <FormInputError mensaje={errors.horasAcumuladasGrado?.message as string} />
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="estadoPago" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Estado</label>
                                 <select id="estadoPago" {...register('estadoPago')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     {Object.values(EstadoPago).map(e => <option key={e} value={e}>{e}</option>)}
                                 </select>
-                                <FormInputError mensaje={errors.estadoPago?.message} />
+                                <FormInputError mensaje={errors.estadoPago?.message as string} />
                             </div>
                         </div>
 
@@ -190,22 +205,49 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             <label htmlFor="sedeId" className="text-[10px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Sede de Entrenamiento</label>
                             <select id="sedeId" {...register('sedeId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                 <option value="">Seleccionar Sede...</option>
+                                <option value="1">Sede Principal</option>
                                 {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
                             </select>
-                            <FormInputError mensaje={errors.sedeId?.message} />
+                            <FormInputError mensaje={errors.sedeId?.message as string} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label htmlFor="telefono" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
-                                <input id="telefono" {...register('telefono')} placeholder="TELÉFONO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.telefono?.message} />
+                                <label htmlFor="eps" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">EPS / Salud</label>
+                                <input id="eps" {...register('eps')} placeholder="EPS" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
                             </div>
                             <div className="space-y-1">
-                                <label htmlFor="correo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
-                                <input id="correo" {...register('correo')} placeholder="EMAIL" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                <FormInputError mensaje={errors.correo?.message} />
+                                <label htmlFor="rh" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">RH / Sangre</label>
+                                <select id="rh" {...register('rh')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
+                                    <option value="">Seleccionar...</option>
+                                    {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-1">
+                                <label htmlFor="direccion" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de Residencia</label>
+                                <input id="direccion" {...register('direccion')} placeholder="DIRECCIÓN" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label htmlFor="barrio" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Barrio</label>
+                                <input id="barrio" {...register('barrio')} placeholder="BARRIO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                            </div>
+                            <div className="space-y-1">
+                                <label htmlFor="telefono" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
+                                <input id="telefono" {...register('telefono')} placeholder="TELÉFONO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                <FormInputError mensaje={errors.telefono?.message as string} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label htmlFor="correo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                            <input id="correo" {...register('correo')} placeholder="EMAIL" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                            <FormInputError mensaje={errors.correo?.message as string} />
                         </div>
 
                         <div className="space-y-4">
@@ -253,11 +295,27 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                         </div>
 
                         <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-[2.5rem] space-y-6">
+                            {/* Toggle Cobro Inscripción */}
+                            {!estudianteActual && (
+                                <div className="flex items-center justify-between bg-white dark:bg-gray-700/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-600 shadow-sm relative overflow-hidden">
+                                    <div className="z-10 relative">
+                                        <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.2em] mb-1">Pago Inicial</p>
+                                        <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white">Cobrar Inscripción</h4>
+                                        <p className="text-[10px] font-bold text-gray-400 mt-2">Valor Estándar: <span className="text-tkd-dark dark:text-gray-200">{formatearPrecio(configClub.valorInscripcion || 40000)}</span></p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer z-10">
+                                        <input type="checkbox" {...register('cobrarInscripcion')} className="sr-only peer" />
+                                        <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 dark:peer-focus:ring-blue-900 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-500 peer-checked:bg-tkd-blue"></div>
+                                    </label>
+                                    <div className="absolute right-0 top-0 w-20 h-full bg-gradient-to-l from-white/80 dark:from-black/20 to-transparent pointer-events-none"></div>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-3">
                                 <IconoInformacion className="w-5 h-5 text-gray-400" />
-                                <p className="text-[10px] font-bold text-gray-500 uppercase leading-relaxed">Este valor se generará como cobro recurrente cada día {configClub.diasSuspension / 6} de mes.</p>
+                                <p className="text-[10px] font-bold text-gray-500 uppercase leading-relaxed">Este valor se generará como cobro recurrente cada día {Math.round(configClub.diasSuspension / 6) || 5} de mes.</p>
                             </div>
-                            <button type="submit" disabled={!isValid || cargando} className="w-full bg-tkd-red text-white py-6 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all flex items-center justify-center gap-3">
+                            <button type="submit" disabled={!isValid || cargando} className="w-full bg-tkd-red text-white py-6 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-red-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 disabled:scale-100">
                                 {cargando ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoAprobar className="w-6 h-6" />}
                                 Finalizar y Registrar
                             </button>

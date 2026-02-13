@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useConfiguracion } from '../context/DataContext';
 import EscanerAsistencia from '../components/EscanerAsistencia';
-import { IconoLogoOficial, IconoDashboard, IconoExportar, IconoCampana, IconoAprobar, IconoCasa } from '../components/Iconos';
+import { IconoUsuario, IconoDashboard, IconoExportar, IconoCampana, IconoAprobar, IconoCasa } from '../components/Iconos';
+import LogoDinamico from '../components/LogoDinamico';
 import { formatearPrecio, formatearFecha } from '../utils/formatters';
 import { generarReciboPagoPdf } from '../utils/receiptGenerator';
 
@@ -54,17 +55,17 @@ const VistaPerfilTutor: React.FC = () => {
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mt-2">Bienvenido, {usuario?.nombreUsuario}. Área de gestión técnica.</p>
                 </div>
                 <div className="flex w-full sm:w-auto gap-3">
-                    <button 
+                    <button
                         onClick={toggleAsistenciaPropia}
                         className={`flex-1 sm:flex-none px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl active:scale-95 ${registrandoSalida ? 'bg-tkd-red text-white hover:bg-red-700' : 'bg-green-600 text-white hover:bg-green-700'}`}
                     >
                         Registrar {registrandoSalida ? 'Salida' : 'Entrada'}
                     </button>
-                    <button 
+                    <button
                         onClick={() => setEscanerAbierto(true)}
                         className="flex-1 sm:flex-none bg-tkd-blue text-white px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-blue-800 active:scale-95 transition-all"
                     >
-                        <IconoLogoOficial className="w-5 h-5" />
+                        <LogoDinamico className="w-5 h-5" />
                         Escanear Alumno
                     </button>
                 </div>
@@ -123,7 +124,7 @@ const VistaPerfilTutor: React.FC = () => {
                                     <p className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">{formatearPrecio(t.monto)}</p>
                                     <p className="text-[9px] font-bold text-gray-400 uppercase">Emitido: {formatearFecha(t.fecha)}</p>
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => handleDescargarPDF(t)}
                                     disabled={descargandoId === t.id}
                                     className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm hover:shadow-lg hover:scale-110 active:scale-95 transition-all text-tkd-blue disabled:opacity-50"
@@ -141,9 +142,9 @@ const VistaPerfilTutor: React.FC = () => {
             </div>
 
             {escanerAbierto && (
-                <EscanerAsistencia 
-                    sedeId={usuario?.sedeId || '1'} 
-                    onClose={() => setEscanerAbierto(false)} 
+                <EscanerAsistencia
+                    sedeId={usuario?.sedeId || '1'}
+                    onClose={() => setEscanerAbierto(false)}
                 />
             )}
         </div>
