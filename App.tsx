@@ -254,7 +254,7 @@ const AppRoutes: React.FC = () => {
     const isRootDomain = host === 'tudojang.com' || host === 'www.tudojang.com' || host === 'localhost' || host === '127.0.0.1';
 
     // Mostrar rutas públicas SOLO si: dominio raíz + sin tenant + sin usuario autenticado
-    if (isRootDomain && (!tenant || tenant.slug === 'gajog') && !usuario) {
+    if (isRootDomain && (!tenant || tenant.slug === 'tudojang') && !usuario) {
         return (
             <>
                 <ReactRouterDOM.Routes>

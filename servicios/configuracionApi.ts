@@ -28,13 +28,13 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
 export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionClub | null> => {
     if (!isFirebaseConfigured) {
         // En modo mock, solo existe 'gajog' y 'dragones' por defecto
-        if (slug !== 'gajog' && slug !== 'dragones') return null;
+        if (slug !== 'tudojang' && slug !== 'dragones') return null;
 
         return {
             ...CONFIGURACION_CLUB_POR_DEFECTO,
             slug: slug,
             tenantId: `id-${slug}`,
-            nombreClub: slug === 'gajog' ? 'Taekwondo Ga Jog' : `Academia ${slug.toUpperCase()}`,
+            nombreClub: slug === 'tudojang' ? 'Tudojang SaaS' : `Academia ${slug.toUpperCase()}`,
             colorPrimario: slug === 'dragones' ? '#4c1d95' : '#1f3e90',
             estadoSuscripcion: 'activo',
             fechaVencimiento: '2025-12-31',

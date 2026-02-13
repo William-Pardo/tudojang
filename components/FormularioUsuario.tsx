@@ -36,7 +36,8 @@ const crearEsquemaValidacion = (esEdicion: boolean) => {
       otherwise: (schema) => schema.transform(v => v === "" ? undefined : v).min(6, 'Mínimo 6 caracteres.').optional(),
     }),
     // Contrato Fields
-    valorPago: yup.number().typeError('Debe ser un valor numérico').required('El valor de pago es obligatorio.'),
+    sueldoBase: yup.number().typeError('Debe ser un valor numérico').required('El sueldo base es obligatorio.'),
+    duracionContratoMeses: yup.number().typeError('Debe ser número').required('La duración es obligatoria.'),
     tipoVinculacion: yup.string().required('El tipo de vinculación es obligatorio.'),
     fechaInicio: yup.string().required('La fecha de inicio es obligatoria.'),
     lugarEjecucion: yup.string().required('El lugar de ejecución es obligatorio.'),
@@ -91,7 +92,8 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           rol: usuarioActual.rol,
           sedeId: usuarioActual.sedeId || '',
           contrasena: '',
-          valorPago: usuarioActual.contrato?.valorPago || 0,
+          sueldoBase: usuarioActual.contrato?.sueldoBase || 0,
+          duracionContratoMeses: usuarioActual.contrato?.duracionMeses || 12,
           tipoVinculacion: usuarioActual.contrato?.tipoVinculacion || '',
           fechaInicio: usuarioActual.contrato?.fechaInicio || new Date().toISOString().split('T')[0],
           lugarEjecucion: usuarioActual.contrato?.lugarEjecucion || ''
@@ -105,7 +107,8 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           rol: RolUsuario.Asistente,
           sedeId: '',
           contrasena: '',
-          valorPago: 0,
+          sueldoBase: 0,
+          duracionContratoMeses: 12,
           tipoVinculacion: '',
           fechaInicio: new Date().toISOString().split('T')[0],
           lugarEjecucion: ''
@@ -152,7 +155,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 placeholder="Ej: Sabonim Carlos Ruiz"
               />
             </div>
-            <FormInputError mensaje={errors.nombreUsuario?.message} />
+            <FormInputError mensaje={errors.nombreUsuario?.message as string} />
           </div>
 
           {/* DOCUMENTO Y WHATSAPP EN GRID */}
@@ -170,7 +173,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                   placeholder="1.000.xxx.xxx"
                 />
               </div>
-              <FormInputError mensaje={errors.numeroIdentificacion?.message} />
+              <FormInputError mensaje={errors.numeroIdentificacion?.message as string} />
             </div>
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">WhatsApp</label>
@@ -185,7 +188,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                   placeholder="3001234567"
                 />
               </div>
-              <FormInputError mensaje={errors.whatsapp?.message} />
+              <FormInputError mensaje={errors.whatsapp?.message as string} />
             </div>
           </div>
 
@@ -209,7 +212,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
             {rolSeleccionado && (
               <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-start gap-3 border border-blue-200 dark:border-blue-800">
                 <IconoInformacion className="w-5 h-5 text-tkd-blue flex-shrink-0" />
-                <p className="text-[11px] font-bold text-blue-800 dark:text-blue-300 leading-tight uppercase">{DESCRIPCIONES_ROLES[rolSeleccionado]}</p>
+                <p className="text-[11px] font-bold text-blue-800 dark:text-blue-300 leading-tight uppercase">{(DESCRIPCIONES_ROLES as any)[rolSeleccionado]}</p>
               </div>
             )}
           </div>
@@ -236,7 +239,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
-              <FormInputError mensaje={errors.sedeId?.message} />
+              <FormInputError mensaje={errors.sedeId?.message as string} />
             </div>
           )}
 
@@ -255,7 +258,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 placeholder="ejemplo@email.com"
               />
             </div>
-            <FormInputError mensaje={errors.email?.message} />
+            <FormInputError mensaje={errors.email?.message as string} />
           </div>
 
           {/* CONTRASEÑA */}
@@ -281,7 +284,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 </button>
               </div>
             </div>
-            <FormInputError mensaje={errors.contrasena?.message} />
+            <FormInputError mensaje={errors.contrasena?.message as string} />
           </div>
 
           {/* DATOS DE CONTRATACIÓN (OBLIGATORIO) */}
@@ -290,10 +293,17 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Honorarios / Salario</label>
-                  <input type="number" {...register('valorPago')} className={inputClasses} placeholder="0" />
-                  <FormInputError mensaje={errors.valorPago?.message} />
+                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Sueldo / Honorarios Base</label>
+                  <input type="number" {...register('sueldoBase')} className={inputClasses} placeholder="0" />
+                  <FormInputError mensaje={errors.sueldoBase?.message as string} />
                 </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Duración (Meses)</label>
+                  <input type="number" {...register('duracionContratoMeses')} className={inputClasses} placeholder="12" />
+                  <FormInputError mensaje={errors.duracionContratoMeses?.message as string} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Tipo Vinculación</label>
                   <select {...register('tipoVinculacion')} className={inputClasses}>
@@ -303,19 +313,19 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                     <option value="Evento">Por Evento</option>
                     <option value="Otro">Otro</option>
                   </select>
-                  <FormInputError mensaje={errors.tipoVinculacion?.message} />
+                  <FormInputError mensaje={errors.tipoVinculacion?.message as string} />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Fecha Inicio</label>
                   <input type="date" {...register('fechaInicio')} className={inputClasses} />
-                  <FormInputError mensaje={errors.fechaInicio?.message} />
+                  <FormInputError mensaje={errors.fechaInicio?.message as string} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Lugar Ejecución</label>
                   <input type="text" {...register('lugarEjecucion')} className={inputClasses} placeholder="Sede Principal" />
-                  <FormInputError mensaje={errors.lugarEjecucion?.message} />
+                  <FormInputError mensaje={errors.lugarEjecucion?.message as string} />
                 </div>
               </div>
             </div>
