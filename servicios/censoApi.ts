@@ -103,6 +103,12 @@ export const legalizarLoteKicho = async (misionId: string, firmaBase64: string):
 export const inyectarEstudiantesKicho = async (misionId: string, registros: RegistroTemporal[]): Promise<void> => {
     if (!isFirebaseConfigured) return;
 
+    // Obtener la misión para conocer su sede asignada
+    const misionRef = doc(db, 'misiones_kicho', misionId);
+    const misionSnap = await getDoc(misionRef);
+    const misionData = misionSnap.exists() ? misionSnap.data() as MisionKicho : null;
+    const sedeDefault = misionData?.sedeId || '1';
+
     const batch = writeBatch(db);
     const hoy = new Date().toISOString().split('T')[0];
 
@@ -119,7 +125,7 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
             grado: GradoTKD.Blanco,
             grupo: GrupoEdad.NoAsignado,
             horasAcumuladasGrado: 0,
-            sedeId: datos.sedeSugeridaId || '1',
+            sedeId: datos.sedeSugeridaId || sedeDefault,
             telefono: datos.telefono,
             correo: datos.email.toLowerCase().trim(),
             fechaIngreso: hoy,
@@ -148,7 +154,7 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
         batch.update(doc(db, 'registros_temporales', reg.id), { estado: 'procesado' });
     });
 
-    batch.update(doc(db, 'misiones_kicho', misionId), { estadoLote: 'procesado' });
+    batch.update(misionRef, { estadoLote: 'procesado' });
     await batch.commit();
 };
 

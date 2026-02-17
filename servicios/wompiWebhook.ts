@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 // Este archivo es una representación de lo que iría en tus Firebase Cloud Functions
 // No se ejecuta directamente en el navegador, sino en el servidor de Google.
 

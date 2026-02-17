@@ -3,7 +3,7 @@ import React from 'react';
 import { useEstadoLicencia } from '../hooks/useEstadoLicencia';
 import { IconoLogoOficial, IconoGuardar, IconoInformacion, IconoWhatsApp } from '../components/Iconos';
 import { formatearPrecio } from '../utils/formatters';
-import { PLANES_SAAS } from '../constantes';
+import { PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
 
 const LicenciaSuspendida: React.FC = () => {
     const { diasRestantes, fechaVencimiento, plan, diasGracia, configClub } = useEstadoLicencia();

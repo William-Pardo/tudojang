@@ -3,8 +3,8 @@ import '@testing-library/jest-dom';
 import { jest } from '@jest/globals';
 import { TextEncoder, TextDecoder } from 'util';
 
-global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder as any;
+(global as any).TextEncoder = TextEncoder;
+(global as any).TextDecoder = TextDecoder;
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -27,7 +27,7 @@ Object.defineProperty(navigator, 'share', {
   writable: true,
   configurable: true,
   // FIX: Use mockResolvedValue(undefined) for Promises that resolve to void to fix type inference issues.
-  value: jest.fn().mockResolvedValue(undefined),
+  value: jest.fn().mockImplementation(() => Promise.resolve()),
 });
 
 // Mock navigator.clipboard
@@ -36,6 +36,6 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
   value: {
     // FIX: Use mockResolvedValue(undefined) for Promises that resolve to void to fix type inference issues.
-    writeText: jest.fn().mockResolvedValue(undefined),
+    writeText: jest.fn().mockImplementation(() => Promise.resolve()),
   },
 });

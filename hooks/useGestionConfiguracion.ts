@@ -22,7 +22,17 @@ export const useGestionConfiguracion = () => {
     const [usuarioAEliminar, setUsuarioAEliminar] = useState<Usuario | null>(null);
 
     // Forzar inicialización con valores por defecto si el contexto aún no los tiene (evita estancamiento en Loader)
-    const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(configNotificaciones || {});
+    const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(() => {
+        if (configNotificaciones && Object.keys(configNotificaciones).length > 0) return configNotificaciones;
+        return {
+            tenantId: usuarioActual?.tenantId || '',
+            diaCobroMensual: 5,
+            diasAnticipoRecordatorio: 3,
+            diasGraciaSuspension: 5,
+            frecuenciaSyncHoras: 24,
+            frecuenciaQueryApiDias: 7
+        } as ConfiguracionNotificaciones;
+    });
     const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub || null);
 
     console.log("[useGestionConfiguracion] Render:", {
@@ -32,16 +42,32 @@ export const useGestionConfiguracion = () => {
         tenantId: usuarioActual?.tenantId
     });
 
+    const isInitialSync = React.useRef(true);
+
     useEffect(() => {
         if (configNotificaciones && Object.keys(configNotificaciones).length > 0) {
             setLocalConfigNotificaciones(configNotificaciones);
+        } else if (usuarioActual?.tenantId && (!localConfigNotificaciones.tenantId)) {
+            setLocalConfigNotificaciones(prev => ({
+                ...prev,
+                tenantId: usuarioActual.tenantId
+            }));
         }
 
-        // Sincronización proactiva: si el contexto nos da el club, lo tomamos.
-        // Si no lo tenemos pero tenemos el usuario con su tenantId, intentamos forzar carga.
+        // Sincronización inteligente: 
+        // Solo sobreescribimos el estado local si es la CARGA INICIAL o si el estado local está vacío.
+        // Esto evita que al guardar (y disparar refresco de contexto), el estado local 
+        // "salte" a valores viejos antes de que la DB confirme.
         if (configClub) {
-            console.log("[useGestionConfiguracion] Sincronizando configClub desde contexto");
-            setLocalConfigClub(configClub);
+            const tenantCambio = localConfigClub && localConfigClub.tenantId !== configClub.tenantId;
+
+            if (isInitialSync.current || !localConfigClub || tenantCambio) {
+                console.log("[useGestionConfiguracion] Sincronización desde contexto (Motivo: " + (tenantCambio ? "Cambio de Tenant" : "Carga Inicial") + ")");
+                setLocalConfigClub(configClub);
+                isInitialSync.current = false;
+            } else {
+                console.log("[useGestionConfiguracion] Contexto actualizado, ignorando sobreescritura para preservar edición local");
+            }
         } else if (usuarioActual?.tenantId && !cargando) {
             console.log("[useGestionConfiguracion] Intentando cargar configuración forzada para:", usuarioActual.tenantId);
             cargarConfiguracion();
@@ -159,6 +185,7 @@ export const useGestionConfiguracion = () => {
         confirmarEliminacion,
         handleConfigChange,
         guardarConfiguracionesHandler,
+        guardarConfiguraciones,
         setLocalConfigClub,
         setLocalConfigNotificaciones,
     };

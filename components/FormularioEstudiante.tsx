@@ -201,15 +201,22 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             </div>
                         </div>
 
-                        <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
-                            <label htmlFor="sedeId" className="text-[10px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Sede de Entrenamiento</label>
-                            <select id="sedeId" {...register('sedeId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
-                                <option value="">Seleccionar Sede...</option>
-                                <option value="1">Sede Principal</option>
-                                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
-                            </select>
-                            <FormInputError mensaje={errors.sedeId?.message as string} />
-                        </div>
+                        {sedes.length > 0 ? (
+                            <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
+                                <label htmlFor="sedeId" className="text-[10px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Sede de Entrenamiento <span className="text-tkd-red">*</span></label>
+                                <select id="sedeId" {...register('sedeId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
+                                    <option value="">Seleccionar Sede...</option>
+                                    {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                </select>
+                                <FormInputError mensaje={errors.sedeId?.message as string} />
+                            </div>
+                        ) : (
+                            <div className="p-6 bg-red-50 dark:bg-red-900/10 rounded-3xl border border-red-100 dark:border-red-900/30">
+                                <p className="text-[10px] font-black uppercase text-tkd-red tracking-widest">⚠️ Error Crítico</p>
+                                <p className="text-xs font-bold text-gray-600 dark:text-gray-300 mt-2">No has configurado ninguna sede. Debes registrar al menos una sede en Configuración para poder agregar alumnos.</p>
+                                <input type="hidden" {...register('sedeId')} value="" />
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">

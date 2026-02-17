@@ -3,9 +3,17 @@
 import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
-import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
+import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
 
 const KEY_CONF_NOTIF = 'tkd_mock_conf_notif';
+
+const limpiarObjeto = (obj: any) => {
+    const nuevo = { ...obj };
+    Object.keys(nuevo).forEach(key => {
+        if (nuevo[key] === undefined) delete nuevo[key];
+    });
+    return nuevo;
+};
 
 export const obtenerConfiguracionNotificaciones = async (tenantId: string): Promise<ConfiguracionNotificaciones> => {
     if (!isFirebaseConfigured) {
@@ -22,7 +30,8 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
         localStorage.setItem(KEY_CONF_NOTIF, JSON.stringify(config));
         return;
     }
-    await setDoc(doc(db, 'notificaciones_config', config.tenantId), config, { merge: true });
+    if (!config.tenantId) throw new Error("Falta tenantId en configuración de notificaciones");
+    await setDoc(doc(db, 'notificaciones_config', config.tenantId), limpiarObjeto(config), { merge: true });
 };
 
 export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionClub | null> => {
@@ -37,9 +46,11 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
             nombreClub: slug === 'tudojang' ? 'Tudojang SaaS' : `Academia ${slug.toUpperCase()}`,
             colorPrimario: slug === 'dragones' ? '#4c1d95' : '#1f3e90',
             estadoSuscripcion: 'activo',
-            fechaVencimiento: '2025-12-31',
-            plan: 'pro',
-            limiteEstudiantes: 100
+            fechaVencimiento: '2030-12-31',
+            plan: 'starter',
+            limiteEstudiantes: PLANES_SAAS.starter.limiteEstudiantes,
+            limiteUsuarios: PLANES_SAAS.starter.limiteUsuarios,
+            limiteSedes: PLANES_SAAS.starter.limiteSedes
         } as ConfiguracionClub;
     }
 
@@ -59,10 +70,15 @@ export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): 
     if (!isFirebaseConfigured) return '';
 
     const nuevoTenantId = datos.tenantId || `tnt-${Date.now()}`;
+    const planSeleccionado = (datos.plan && (PLANES_SAAS as any)[datos.plan]) || PLANES_SAAS.starter;
+
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
         estadoSuscripcion: 'demo', // Valor por defecto
         fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de gracia
+        limiteEstudiantes: planSeleccionado.limiteEstudiantes,
+        limiteUsuarios: planSeleccionado.limiteUsuarios,
+        limiteSedes: planSeleccionado.limiteSedes,
         ...datos,
         tenantId: nuevoTenantId,
         slug: datos.slug?.toLowerCase().trim() || '',
@@ -94,7 +110,8 @@ export const obtenerConfiguracionClub = async (tenantId?: string): Promise<Confi
 
 export const guardarConfiguracionClub = async (config: ConfiguracionClub): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    await setDoc(doc(db, 'tenants', config.tenantId), config, { merge: true });
+    if (!config.tenantId) throw new Error("Falta tenantId en configuración de club");
+    await setDoc(doc(db, 'tenants', config.tenantId), limpiarObjeto(config), { merge: true });
 };
 
 export const actualizarCapacidadClub = async (

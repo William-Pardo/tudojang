@@ -26,11 +26,25 @@ export const agregarSede = async (sede: Omit<Sede, 'id'>): Promise<Sede> => {
 export const actualizarSede = async (sede: Sede): Promise<Sede> => {
     if (!isFirebaseConfigured) return sede;
     const { id, ...data } = sede;
+    if (!id) throw new Error("ID de sede inválido para actualización");
     await updateDoc(doc(db, 'sedes', id), data);
     return sede;
 };
 
 export const eliminarSede = async (id: string): Promise<void> => {
-    if (!isFirebaseConfigured) return;
-    await deleteDoc(doc(db, 'sedes', id));
+    if (!isFirebaseConfigured) {
+        console.warn("[sedesApi] Firebase no configurado. Eliminación simulada localmente.");
+        return;
+    }
+    if (!id) {
+        console.warn("[sedesApi] Intento de eliminar sede sin ID. Probablemente una sede local no guardada.");
+        throw new Error("ID de sede inválido para eliminación");
+    }
+    try {
+        await deleteDoc(doc(db, 'sedes', id));
+        console.log(`[sedesApi] Sede ${id} eliminada correctamente de Firestore`);
+    } catch (error) {
+        console.error("[sedesApi] Error al eliminar sede de Firestore:", error);
+        throw error;
+    }
 };

@@ -37,9 +37,9 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
 
   const { register, control, handleSubmit, formState: { errors }, reset, setValue } = useForm<any>({
     resolver: yupResolver(schema),
-    defaultValues: itemActual || { 
-      nombre: '', descripcion: '', categoria: CategoriaImplemento.Uniformes, imagenUrl: '', 
-      variaciones: [{ id: `v-${Date.now()}`, descripcion: 'TALLA ÚNICA', precio: 0 }] 
+    defaultValues: itemActual || {
+      nombre: '', descripcion: '', categoria: CategoriaImplemento.Uniformes, imagenUrl: '',
+      variaciones: [{ id: `v-${Date.now()}`, descripcion: 'TALLA ÚNICA', precio: 0 }]
     }
   });
 
@@ -47,9 +47,9 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
 
   useEffect(() => {
     if (abierto) {
-      reset(itemActual || { 
-        nombre: '', descripcion: '', categoria: CategoriaImplemento.Uniformes, imagenUrl: '', 
-        variaciones: [{ id: `v-${Date.now()}`, descripcion: 'TALLA ÚNICA', precio: 0 }] 
+      reset(itemActual || {
+        nombre: '', descripcion: '', categoria: CategoriaImplemento.Uniformes, imagenUrl: '',
+        variaciones: [{ id: `v-${Date.now()}`, descripcion: 'TALLA ÚNICA', precio: 0 }]
       });
       setPreview(itemActual?.imagenUrl || null);
     }
@@ -92,9 +92,9 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Nombre Comercial</label>
                 <input {...register('nombre')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner" placeholder="EJ: DOBOK COMPETICIÓN" />
-                <FormInputError mensaje={errors.nombre?.message} />
+                <FormInputError mensaje={errors.nombre?.message as string} />
               </div>
-              
+
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Categoría Técnica</label>
                 <select {...register('categoria')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner appearance-none cursor-pointer">
@@ -105,7 +105,7 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Descripción del Implemento</label>
                 <textarea {...register('descripcion')} rows={4} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-5 text-xs font-bold text-gray-700 dark:text-gray-300 uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner resize-none" placeholder="ESPECIFICACIONES DE TELA, PESO Y USO..." />
-                <FormInputError mensaje={errors.descripcion?.message} />
+                <FormInputError mensaje={errors.descripcion?.message as string} />
               </div>
             </div>
 
@@ -134,28 +134,28 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
                 <label className="text-[11px] font-black uppercase text-tkd-blue tracking-[0.2em]">Variaciones Técnicas</label>
                 <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Configura tallas, colores y precios específicos</p>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => append({ id: `v-${Date.now()}`, descripcion: '', precio: 0 })}
                 className="bg-tkd-blue/10 text-tkd-blue px-6 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-tkd-blue hover:text-white transition-all shadow-sm"
               >
                 + Nueva Opción
               </button>
             </div>
-            
+
             <div className="space-y-4">
               {fields.map((field, index) => (
                 <div key={field.id} className="flex gap-4 items-center animate-slide-in-right">
                   <div className="flex-grow grid grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-inner">
                     <input {...register(`variaciones.${index}.descripcion`)} placeholder="EJ: TALLA XL / ROJO" className="bg-transparent border-none p-0 text-xs font-black dark:text-white uppercase outline-none" />
                     <div className="flex items-center gap-2 border-l pl-4 dark:border-gray-700">
-                        <span className="text-tkd-blue font-black text-xs">$</span>
-                        <input type="number" {...register(`variaciones.${index}.precio`)} placeholder="PRECIO" className="bg-transparent border-none p-0 text-xs font-black text-gray-900 dark:text-white outline-none w-full" />
+                      <span className="text-tkd-blue font-black text-xs">$</span>
+                      <input type="number" {...register(`variaciones.${index}.precio`)} placeholder="PRECIO" className="bg-transparent border-none p-0 text-xs font-black text-gray-900 dark:text-white outline-none w-full" />
                     </div>
                   </div>
-                  <button 
-                    type="button" 
-                    onClick={() => remove(index)} 
+                  <button
+                    type="button"
+                    onClick={() => remove(index)}
                     className="p-4 text-tkd-red hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all group"
                   >
                     <IconoEliminar className="w-5 h-5 group-hover:scale-110" />
@@ -169,19 +169,19 @@ const FormularioImplemento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, i
 
         <footer className="p-8 border-t dark:border-gray-800 flex flex-col sm:flex-row justify-between items-center gap-6 bg-gray-50 dark:bg-gray-950/50">
           <div className="flex items-center gap-3">
-              <IconoInformacion className="w-5 h-5 text-gray-400" />
-              <p className="text-[9px] text-gray-500 font-bold uppercase max-w-xs">Los cambios se reflejarán instantáneamente en el catálogo público para padres.</p>
+            <IconoInformacion className="w-5 h-5 text-gray-400" />
+            <p className="text-[9px] text-gray-500 font-bold uppercase max-w-xs">Los cambios se reflejarán instantáneamente en el catálogo público para padres.</p>
           </div>
           <div className="flex gap-4 w-full sm:w-auto">
-              <button onClick={onCerrar} className="flex-1 sm:flex-none px-8 py-4 text-[10px] font-black uppercase text-gray-400 hover:text-tkd-red transition-all">Cancelar</button>
-              <button 
-                onClick={handleSubmit(onSubmit)} 
-                disabled={cargando}
-                className="flex-1 sm:flex-none bg-tkd-red text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center gap-3"
-              >
-                {cargando ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoGuardar className="w-5 h-5" />}
-                {itemActual ? 'Actualizar Registro' : 'Registrar en Catálogo'}
-              </button>
+            <button onClick={onCerrar} className="flex-1 sm:flex-none px-8 py-4 text-[10px] font-black uppercase text-gray-400 hover:text-tkd-red transition-all">Cancelar</button>
+            <button
+              onClick={handleSubmit(onSubmit)}
+              disabled={cargando}
+              className="flex-1 sm:flex-none bg-tkd-red text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
+              {cargando ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoGuardar className="w-5 h-5" />}
+              {itemActual ? 'Actualizar Registro' : 'Registrar en Catálogo'}
+            </button>
           </div>
         </footer>
       </div>

@@ -2,7 +2,7 @@
 // Este archivo es el Service Worker para la Progressive Web App (PWA).
 // Se encarga de gestionar el caché para permitir el funcionamiento offline.
 
-const CACHE_NAME = 'taekwondogajog-gestion-cache-v2';
+const CACHE_NAME = 'taekwondogajog-gestion-cache-v4-feb16-2026';
 
 // Lista de los recursos fundamentales de la aplicación (el "app shell").
 const APP_SHELL_URLS = [
@@ -51,42 +51,32 @@ self.addEventListener('activate', (event) => {
 
 // --- Evento Fetch ---
 // Se dispara cada vez que la aplicación realiza una petición de red (fetch).
-// Intercepta la petición y decide si responder desde el caché o desde la red.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // No interceptar peticiones que no sean GET (como POST, PUT, etc.)
+  // No interceptar peticiones que no sean GET
   if (request.method !== 'GET') {
     return;
   }
 
-  // Estrategia: "Cache First, falling back to Network" (Primero caché, si no, red).
-  // Es ideal para los recursos estáticos del App Shell (CSS, JS, imágenes).
+  // ESTRATEGIA: "Network First" (Red primero, luego caché)
+  // Esto asegura que si hay internet, siempre se vea la ULTIMA VERSIÓN.
+  // Si falla la red, se usa lo que esté en caché (modo offline).
   event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        // Si la respuesta está en el caché, la devolvemos directamente.
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // Si no está en el caché, la pedimos a la red.
-        return fetch(request)
-          .then((networkResponse) => {
-            // Si la petición de red fue exitosa, la guardamos en el caché para el futuro.
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone(); // Clonamos la respuesta porque es un stream que solo se puede leer una vez.
-              caches.open(CACHE_NAME)
-                .then((cache) => {
-                  cache.put(request, responseToCache);
-                });
-            }
-            return networkResponse;
-          })
-          .catch(error => {
-            // Este catch se activa si la petición de red falla (ej: sin conexión).
-            // Opcionalmente, se podría devolver una página de "offline" genérica.
+    fetch(request)
+      .then((networkResponse) => {
+        // Si la red responde bien, actualizamos el caché y devolvemos la respuesta.
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
           });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // Si falla la red (offline), intentamos buscar en el caché.
+        return caches.match(request);
       })
   );
 });

@@ -305,16 +305,16 @@ const App: React.FC = () => {
     return (
         <ReactRouterDOM.HashRouter>
             <NotificacionProvider>
-                <BrandingProvider>
-                    <AuthProvider>
+                <AuthProvider>
+                    <BrandingProvider>
                         <AnalyticsProvider>
                             <DataProvider>
                                 <NotificacionToast />
                                 <AppRoutes />
                             </DataProvider>
                         </AnalyticsProvider>
-                    </AuthProvider>
-                </BrandingProvider>
+                    </BrandingProvider>
+                </AuthProvider>
             </NotificacionProvider>
         </ReactRouterDOM.HashRouter>
     );

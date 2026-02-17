@@ -2,7 +2,7 @@
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
 import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
 import type { Usuario } from '../tipos';
@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Usuario ha iniciado sesión, obtener datos de Firestore
           const userDocRef = doc(db, 'usuarios', firebaseUser.uid);
           const userDocSnap = await getDoc(userDocRef);
+
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
             setUsuario({
@@ -49,10 +50,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } else {
             // FALLBACK: Buscar por email si el UID falla
             console.log(`[AuthContext] UID ${firebaseUser.uid} no encontrado, intentando por email: ${firebaseUser.email}`);
-            const q = query(collection(db, 'usuarios'), where('email', '==', firebaseUser.email?.toLowerCase().trim()));
-            const qSnap = await getDocs(q);
 
-            if (!qSnap.empty) {
+            let qSnap;
+            try {
+              const q = query(collection(db, 'usuarios'), where('email', '==', firebaseUser.email?.toLowerCase().trim()));
+              qSnap = await getDocs(q);
+            } catch (queryError: any) {
+              console.error("[AuthContext] Error al buscar por email:", queryError);
+              // Si el query falla por bloqueo, no intentamos reparación
+              if (queryError?.message?.includes('blocked-by-client')) return;
+              throw queryError;
+            }
+
+            if (qSnap && !qSnap.empty) {
               const userData = qSnap.docs[0].data();
               console.log(`[AuthContext] Perfil recuperado por email query.`);
               setUsuario({
@@ -61,12 +71,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...userData
               } as Usuario);
             } else {
-              console.warn(`[AuthContext] No se encontró perfil para el usuario autenticado.`);
-              setUsuario(null);
+              // 3. RECUPERACIÓN PROACTIVA (Solo para Admins que vienen de Onboarding)
+              if (firebaseUser.uid.startsWith('tnt-')) {
+                console.log(`[AuthContext] Detectado UID tipo Tenant (${firebaseUser.uid}) sin perfil. Reparando...`);
+                // Doble check: Asegurarnos de que no fue un error de red lo que dio "empty"
+                const fallbackUserData = {
+                  nombreUsuario: firebaseUser.email?.split('@')[0].toUpperCase() || 'ADMIN',
+                  email: firebaseUser.email?.toLowerCase().trim() || '',
+                  numeroIdentificacion: 'PENDIENTE',
+                  whatsapp: '3000000000',
+                  rol: 'Admin',
+                  tenantId: firebaseUser.uid,
+                  sedeId: '',
+                  fcmTokens: []
+                };
+                try {
+                  await setDoc(doc(db, 'usuarios', firebaseUser.uid), fallbackUserData);
+                  setUsuario({ id: firebaseUser.uid, ...fallbackUserData } as Usuario);
+                } catch (recoveryError) {
+                  console.error("[AuthContext] Error en auto-recuperación:", recoveryError);
+                  setUsuario(null);
+                }
+              } else {
+                console.warn(`[AuthContext] No se encontró perfil para el usuario autenticado.`);
+                setUsuario(null);
+              }
             }
           }
-        } catch (e) {
-          console.error("Error al obtener perfil de usuario:", e);
+        } catch (e: any) {
+          console.error("[AuthContext] Error al obtener perfil de usuario:", e);
+          if (e?.message?.includes('blocked-by-client')) {
+            setError("Base de datos bloqueada por el navegador (Shields/AdBlock).");
+          }
           setUsuario(null);
         }
       } else {

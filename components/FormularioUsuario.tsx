@@ -36,11 +36,11 @@ const crearEsquemaValidacion = (esEdicion: boolean) => {
       otherwise: (schema) => schema.transform(v => v === "" ? undefined : v).min(6, 'Mínimo 6 caracteres.').optional(),
     }),
     // Contrato Fields
-    sueldoBase: yup.number().typeError('Debe ser un valor numérico').required('El sueldo base es obligatorio.'),
-    duracionContratoMeses: yup.number().typeError('Debe ser número').required('La duración es obligatoria.'),
+    sueldoBase: yup.number().transform((value, originalValue) => originalValue === "" ? 0 : value).typeError('Debe ser un valor numérico').required('El sueldo base es obligatorio.'),
+    duracionContratoMeses: yup.number().transform((value, originalValue) => originalValue === "" ? 0 : value).typeError('Debe ser número').required('La duración es obligatoria.'),
     tipoVinculacion: yup.string().required('El tipo de vinculación es obligatorio.'),
     fechaInicio: yup.string().required('La fecha de inicio es obligatoria.'),
-    lugarEjecucion: yup.string().required('El lugar de ejecución es obligatorio.'),
+    lugarEjecucion: yup.string().required('La sede de ejecución es obligatoria.'),
   }).required();
 };
 
@@ -105,7 +105,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           whatsapp: '',
           email: '',
           rol: RolUsuario.Asistente,
-          sedeId: '',
+          sedeId: '1',
           contrasena: '',
           sueldoBase: 0,
           duracionContratoMeses: 12,
@@ -233,6 +233,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                             focus:ring-2 focus:ring-tkd-red ${errors.sedeId ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                 >
                   <option value="">Seleccione Sede...</option>
+                  <option value="1">Sede Principal (Institucional)</option>
                   {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-tkd-red/50">
@@ -323,8 +324,19 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                   <FormInputError mensaje={errors.fechaInicio?.message as string} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Lugar Ejecución</label>
-                  <input type="text" {...register('lugarEjecucion')} className={inputClasses} placeholder="Sede Principal" />
+                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 tracking-widest">Sede Ejecución</label>
+                  <div className="relative">
+                    <select {...register('lugarEjecucion')} className={`${inputClasses} appearance-none cursor-pointer`}>
+                      <option value="">Seleccionar Sede...</option>
+                      <option value="1">Sede Principal</option>
+                      {sedes.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                      <option value="Sede Administrativa">Sede Administrativa</option>
+                      <option value="Campo / Eventos">Campo / Eventos</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+                  </div>
                   <FormInputError mensaje={errors.lugarEjecucion?.message as string} />
                 </div>
               </div>

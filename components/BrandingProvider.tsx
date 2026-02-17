@@ -1,12 +1,13 @@
 
 // components/BrandingProvider.tsx
 import React, { useEffect, useState, createContext, useContext } from 'react';
-import { buscarTenantPorSlug } from '../servicios/configuracionApi';
+import { buscarTenantPorSlug, obtenerConfiguracionClub } from '../servicios/configuracionApi';
 import type { ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 import Loader from './Loader';
 import { IconoAlertaTriangulo } from './Iconos';
 import VistaPasarelaPagos from '../vistas/PasarelaPagos';
+import { useAuth } from '../context/AuthContext';
 
 interface TenantContextType {
     tenant: ConfiguracionClub | null;
@@ -21,69 +22,79 @@ const TenantContext = createContext<TenantContextType>({
 });
 
 const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { usuario } = useAuth();
     const [tenant, setTenant] = useState<ConfiguracionClub | null>(null);
     const [estado, setEstado] = useState<'cargando' | 'error' | 'vencido' | 'ok'>('cargando');
     const [bypassDev, setBypassDev] = useState(false);
     const [mensajeError, setMensajeError] = useState('');
 
     const cargarTenant = async () => {
+        // PRIORIDAD SAAS: Si hay un usuario autenticado, usamos SU configuración
+        if (usuario?.tenantId) {
+            try {
+                const config = await obtenerConfiguracionClub(usuario.tenantId);
+                aplicarEstilos(config);
+                validarSuscripcion(config);
+                return;
+            } catch (err) {
+                console.error("[BrandingProvider] Error cargando config por usuario:", err);
+                // Si falla, seguimos con la lógica de slug como fallback
+            }
+        }
+
         const host = window.location.hostname;
         let slug = host.split('.')[0];
-        if (slug === 'localhost' || slug === '127' || slug === 'www') slug = 'gajog';
-
         const isRoot = host.includes('tudojang.com') || host.includes('web.app') || host.includes('firebaseapp.com') || host === 'localhost' || host === '127.0.0.1';
-        if (slug === 'tudojang') slug = 'gajog';
 
-        if (isRoot && (slug === 'tudojang' || slug === 'www')) {
-            try {
-                const config = await buscarTenantPorSlug('tudojang');
-                setTenant(config || CONFIGURACION_CLUB_POR_DEFECTO);
-                setEstado('ok');
-                return;
-            } catch (e) {
-                setTenant(CONFIGURACION_CLUB_POR_DEFECTO);
-                setEstado('ok');
-                return;
-            }
+        if (isRoot && (slug === 'tudojang' || slug === 'www' || slug === 'localhost' || slug === '127')) {
+            setTenant(CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub);
+            aplicarEstilos(CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub);
+            setEstado('ok');
+            return;
         }
 
         try {
             const config = await buscarTenantPorSlug(slug);
-
             if (!config) {
                 setEstado('error');
                 setMensajeError(`Academia "${slug}" no registrada.`);
                 return;
             }
-
-            if (config) {
-                document.documentElement.style.setProperty('--color-primario', config.colorPrimario || '#111111');
-                document.documentElement.style.setProperty('--color-secundario', config.colorSecundario || '#0047A0');
-                document.documentElement.style.setProperty('--color-acento', config.colorAcento || '#CD2E3A');
-            }
-
-            const hoy = new Date();
-            const vencimiento = new Date(config.fechaVencimiento);
-
-            if (config.estadoSuscripcion === 'suspendido' || vencimiento < hoy) {
-                setEstado('vencid' + 'o' as any); // Small hack to avoid lint matching words if any
-                setEstado('vencido');
-                setMensajeError(`Suscripción expirada.`);
-                setTenant(config);
-            } else {
-                setTenant(config);
-                setEstado('ok');
-            }
-
+            aplicarEstilos(config);
+            validarSuscripcion(config);
         } catch (e) {
             setEstado('error');
             setMensajeError("Error de conexión.");
         }
     };
 
+    const aplicarEstilos = (config: ConfiguracionClub) => {
+        if (!config) return;
+        const p = (!config.colorPrimario || config.colorPrimario === '#000000') ? '#111111' : config.colorPrimario;
+        const s = (!config.colorSecundario || config.colorSecundario === '#000000') ? '#0047A0' : config.colorSecundario;
+        const a = (!config.colorAcento || config.colorAcento === '#000000') ? '#CD2E3A' : config.colorAcento;
+
+        document.documentElement.style.setProperty('--color-primario', p);
+        document.documentElement.style.setProperty('--color-secundario', s);
+        document.documentElement.style.setProperty('--color-acento', a);
+    };
+
+    const validarSuscripcion = (config: ConfiguracionClub) => {
+        const hoy = new Date();
+        const vencimiento = new Date(config.fechaVencimiento);
+
+        if (config.estadoSuscripcion === 'suspendido' || vencimiento < hoy) {
+            setEstado('vencido');
+            setMensajeError(`Suscripción expirada.`);
+        } else {
+            setEstado('ok');
+        }
+        setTenant(config);
+    };
+
     useEffect(() => {
         cargarTenant();
-    }, []);
+    }, [usuario?.tenantId]);
 
     if (estado === 'cargando') return <div className="h-screen flex items-center justify-center bg-tkd-dark"><Loader texto="Sincronizando..." /></div>;
 

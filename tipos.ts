@@ -132,6 +132,7 @@ export interface ConfiguracionClub {
     logoOriginalUrl?: string; // Para backups
     passwordTemporal?: string;
     onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
+    activarFormularioInscripcion?: boolean; // Nuevo: Toggle para el formulario público
 }
 
 export interface Estudiante {
@@ -299,6 +300,7 @@ export interface MisionKicho {
     estadoLote: 'captura' | 'legalizado' | 'procesado';
     firmaLegalizacion?: string;
     fechaLegalizacion?: string;
+    sedeId?: string; // Nuevo: Sede asignada a esta generación de Misión Kicho
 }
 
 export interface RegistroTemporal {
@@ -339,7 +341,7 @@ export interface Usuario {
     fcmTokens?: string[];
     estadoContrato?: 'Pendiente' | 'Firmado' | 'Sin configurar';
     contrato?: {
-        valorPago: number;
+        valorPago?: number; // Legacy: reemplazado por sueldoBase
         sueldoBase: number;
         duracionMeses: number;
         tipoVinculacion: TipoVinculacionColaborador;

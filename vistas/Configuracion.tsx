@@ -21,6 +21,7 @@ import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
+import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
@@ -177,6 +178,7 @@ const VistaConfiguracion: React.FC = () => {
     const {
         usuarios, localConfigClub, localConfigNotificaciones, cargando, error,
         cargandoAccion, handleConfigChange, guardarConfiguracionesHandler,
+        guardarConfiguraciones,
         modalUsuarioAbierto, cerrarFormularioUsuario, guardarUsuarioHandler, usuarioEnEdicion,
         modalConfirmacionAbierto, usuarioAEliminar, cerrarConfirmacion, confirmarEliminacion,
         abrirFormularioUsuario, abrirConfirmacionEliminar, setLocalConfigClub, setLocalConfigNotificaciones
@@ -232,14 +234,32 @@ const VistaConfiguracion: React.FC = () => {
     };
 
     // --- LÓGICA DE ONBOARDING ---
-    const [onboardingStep, setOnboardingStep] = useState(localConfigClub?.onboardingStep || 0);
+    const currentStep = localConfigClub?.onboardingStep || 0;
+    const isWizardMode = currentStep < 5;
 
-    const isWizardMode = onboardingStep < 5;
-
-    const restaurarColores = () => {
+    const restaurarColores = async () => {
+        if (!localConfigClub) return;
         if (window.confirm("¿Deseas restaurar los colores originales?")) {
-            setLocalConfigClub(prev => prev ? { ...prev, colorPrimario: '#1a365d', colorSecundario: '#e53e3e', colorAcento: '#2b6cb0' } : null);
-            mostrarNotificacion("Colores restaurados a valores originales.", "info");
+            const configRestaurada = {
+                ...localConfigClub,
+                colorPrimario: '#111111',
+                colorSecundario: '#0047A0',
+                colorAcento: '#CD2E3A'
+            };
+
+            try {
+                await guardarConfiguraciones(localConfigNotificaciones, configRestaurada);
+                setLocalConfigClub(configRestaurada);
+
+                // Forzar actualización visual inmediata
+                document.documentElement.style.setProperty('--color-primario', '#111111');
+                document.documentElement.style.setProperty('--color-secundario', '#0047A0');
+                document.documentElement.style.setProperty('--color-acento', '#CD2E3A');
+
+                mostrarNotificacion("Colores restaurados y guardados.", "success");
+            } catch (error) {
+                mostrarNotificacion("Error al restaurar colores.", "error");
+            }
         }
     };
 
@@ -247,22 +267,49 @@ const VistaConfiguracion: React.FC = () => {
         if (!localConfigClub) return;
         const nuevoPaso = pasoCompletado + 1;
         try {
-            await guardarConfiguracionesHandler();
+            // CRÍTICO: Guardamos el estado ACTUAL antes de avanzar
             const nuevaConfig = { ...localConfigClub, onboardingStep: nuevoPaso };
+            await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
+
             setLocalConfigClub(nuevaConfig);
-            setOnboardingStep(nuevoPaso);
-            mostrarNotificacion(`Paso ${pasoCompletado} superado!`, "success");
+            mostrarNotificacion(`¡Paso ${pasoCompletado} completado y guardado!`, "success");
         } catch (error) {
-            mostrarNotificacion("Error al avanzar de paso", "error");
+            console.error('[Configuracion] Error al avanzar paso:', error);
+            mostrarNotificacion("Error al guardar la configuración. Intenta de nuevo.", "error");
+        }
+    };
+
+    const reiniciarWizard = async () => {
+        if (!localConfigClub) return;
+        if (window.confirm("¿Estás SEGURO? Se borrarán los datos institucionales y volverás al paso 1.")) {
+            try {
+                const nuevaConfig: ConfiguracionClub = {
+                    ...localConfigClub,
+                    onboardingStep: 1,
+                    nombreClub: '',
+                    nit: '',
+                    representanteLegal: '',
+                    direccionClub: '',
+                    valorMensualidad: 0,
+                    moraPorcentaje: 0,
+                    valorMatricula: 0,
+                    activarMatriculaAnual: false
+                };
+                await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
+                setLocalConfigClub(nuevaConfig);
+                mostrarNotificacion("Onboarding reiniciado con éxito.", "success");
+            } catch (error) {
+                mostrarNotificacion("Error al reiniciar onboarding", "error");
+            }
         }
     };
 
     const pasosWizard = [
         { num: 1, label: 'Institucional', bloqueado: false },
         { num: 2, label: 'Branding', bloqueado: false },
-        { num: 3, label: 'Sedes', bloqueado: true },
-        { num: 4, label: 'Equipo', bloqueado: true },
-        { num: 5, label: 'Finalizado', bloqueado: true }
+        { num: 3, label: 'Sedes', bloqueado: currentStep < 2 },
+        { num: 4, label: 'Equipo', bloqueado: currentStep < 3 },
+        { num: 5, label: 'Finalizado', bloqueado: currentStep < 4 }
     ];
 
     if (!localConfigClub || cargando) return <Loader texto="Cargando configuración..." />;
@@ -272,19 +319,34 @@ const VistaConfiguracion: React.FC = () => {
     return (
         <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
             <header className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center">
-                <div>
-                    <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">
-                        {isWizardMode ? 'Configuración Inicial' : 'Centro de Control'}
-                    </h1>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">
+                            {isWizardMode ? 'Configuración Inicial' : 'Centro de Control'}
+                        </h1>
+                        <span className="bg-tkd-red text-white text-[9px] font-black px-2 py-1 rounded-full animate-pulse">
+                            V: 1.0.6 - ACTUALIZADO
+                        </span>
+                    </div>
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">
                         {isWizardMode ? 'Pasos obligatorios para activar tu plataforma' : 'Gestión Global del Dojang'}
                     </p>
                 </div>
-                {!isWizardMode && (
-                    <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
-                        <IconoGuardar className="w-5 h-5" /> Guardar Cambios
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                        onClick={reiniciarWizard}
+                        className="px-6 py-3 bg-tkd-red/10 text-tkd-red border border-tkd-red/20 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-tkd-red hover:text-white transition-all shadow-sm active:scale-95"
+                    >
+                        ⚠️ Reiniciar Todo el Proceso
                     </button>
-                )}
+
+                    {!isWizardMode && (
+                        <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
+                            <IconoGuardar className="w-5 h-5" /> Guardar Cambios
+                        </button>
+                    )}
+                </div>
             </header>
 
             {/* WIZARD PROGRESS BAR */}
@@ -354,13 +416,13 @@ const VistaConfiguracion: React.FC = () => {
                 */}
 
                 {/* TAB BRANDING (Usada para Pasos 1 y 2) */}
-                {(activeTab === 'branding' || (isWizardMode && ((localConfigClub.onboardingStep || 0) <= 2))) && (
+                {(activeTab === 'branding' || (isWizardMode && currentStep <= 2)) && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
                         {/* SECCIÓN 1: INFO INSTITUCIONAL (PASO 1) */}
-                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && (localConfigClub.onboardingStep || 0) !== 1 && (localConfigClub.onboardingStep || 0) !== 0 ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && currentStep !== 1 && currentStep !== 0 ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">1. Información Institucional</h3>
-                                {isWizardMode && (localConfigClub.onboardingStep || 0) <= 1 && (
+                                {isWizardMode && currentStep <= 1 && (
                                     <span className="bg-red-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase">Obligatorio</span>
                                 )}
                             </div>
@@ -405,15 +467,39 @@ const VistaConfiguracion: React.FC = () => {
                                     <input type="number" name="valorMatricula" value={localConfigClub.valorMatricula} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="$40.000 sugerido" />
                                     <p className="text-[9px] text-gray-400 uppercase font-bold italic">Este valor se sugerirá en el registro de cada alumno nuevo.</p>
                                 </div>
+
+                                {/* TOGGLE FORMULARIO PÚBLICO */}
+                                <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-3xl border border-purple-100 dark:border-purple-800/20 flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h4 className="text-xs font-black uppercase text-purple-900 dark:text-purple-300">Formulario de Inscripción</h4>
+                                        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Activar/Desactivar portal público</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            name="activarFormularioInscripcion"
+                                            checked={localConfigClub.activarFormularioInscripcion !== false}
+                                            onChange={(e) => handleConfigChange({ target: { name: 'activarFormularioInscripcion', value: e.target.checked, type: 'checkbox' } } as any, setLocalConfigClub)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                                    </label>
+                                </div>
                             </div>
-                            {isWizardMode && (localConfigClub.onboardingStep || 0) <= 1 && (
+                            {isWizardMode && currentStep <= 1 && (
                                 <button
-                                    onClick={() => {
+                                    onClick={async () => {
                                         if (!localConfigClub.direccionClub || !localConfigClub.nombreClub) {
                                             mostrarNotificacion("Diligencia los campos obligatorios", "error");
                                             return;
                                         }
-                                        avanzarPaso(1);
+                                        // Guardar primero los datos institucionales
+                                        try {
+                                            await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
+                                            await avanzarPaso(1);
+                                        } catch (error) {
+                                            mostrarNotificacion("Error al guardar datos institucionales", "error");
+                                        }
                                     }}
                                     className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all"
                                 >
@@ -423,10 +509,10 @@ const VistaConfiguracion: React.FC = () => {
                         </section>
 
                         {/* SECCIÓN 2: BRANDING (PASO 2) */}
-                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && (localConfigClub.onboardingStep || 0) !== 2 && (localConfigClub.onboardingStep || 0) !== 5 ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && currentStep !== 2 && currentStep !== 5 ? 'opacity-50 pointer-events-none' : ''}`}>
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">2. Look & Feel</h3>
-                                {isWizardMode && (localConfigClub.onboardingStep || 0) === 2 && (
+                                {isWizardMode && currentStep === 2 && (
                                     <button
                                         onClick={restaurarColores}
                                         className="text-[9px] font-black uppercase text-gray-400 hover:text-tkd-red underline"
@@ -476,12 +562,17 @@ const VistaConfiguracion: React.FC = () => {
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                                // Simulación de carga (En prod esto iría a bucket y devolvería URL)
-                                                // Por ahora usamos FileReader para vista previa inmediata
                                                 const reader = new FileReader();
-                                                reader.onload = (ev) => {
-                                                    setLocalConfigClub(prev => prev ? { ...prev, logoUrl: ev.target?.result as string } : null);
-                                                    mostrarNotificacion("Nuevo logotipo seleccionado. Recuerda guardar.", "info");
+                                                reader.onload = async (ev) => {
+                                                    try {
+                                                        const base64 = ev.target?.result as string;
+                                                        // Optimizamos la imagen antes de guardarla localmente
+                                                        const optimizada = await optimizarImagenBase64(base64);
+                                                        setLocalConfigClub(prev => prev ? { ...prev, logoUrl: optimizada } : null);
+                                                        mostrarNotificacion("Logotipo optimizado y listo para guardar.", "success");
+                                                    } catch (error) {
+                                                        mostrarNotificacion("Error al procesar la imagen.", "error");
+                                                    }
                                                 };
                                                 reader.readAsDataURL(file);
                                             }
@@ -489,14 +580,39 @@ const VistaConfiguracion: React.FC = () => {
                                     />
                                 </div>
                                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Click en el círculo para subir logo</p>
+                                {localConfigClub.logoUrl && (
+                                    <button
+                                        onClick={async () => {
+                                            const configSinLogo = { ...localConfigClub, logoUrl: '' };
+                                            try {
+                                                await guardarConfiguraciones(localConfigNotificaciones, configSinLogo);
+                                                setLocalConfigClub(configSinLogo);
+                                                mostrarNotificacion("Logo removido. Usando logo oficial de Tudojang.", "success");
+                                            } catch (error) {
+                                                mostrarNotificacion("Error al remover logo", "error");
+                                            }
+                                        }}
+                                        className="text-[9px] font-black uppercase text-tkd-red hover:underline py-2 px-4 bg-tkd-red/5 rounded-full transition-all active:scale-95"
+                                    >
+                                        Remover Logo Personalizado
+                                    </button>
+                                )}
                             </div>
 
-                            {isWizardMode && (localConfigClub.onboardingStep || 0) === 2 && (
+                            {isWizardMode && currentStep <= 2 && (
                                 <button
-                                    onClick={() => avanzarPaso(2)}
+                                    onClick={async () => {
+                                        // Guardar branding antes de avanzar
+                                        try {
+                                            await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
+                                            await avanzarPaso(2);
+                                        } catch (error) {
+                                            mostrarNotificacion("Error al guardar branding", "error");
+                                        }
+                                    }}
                                     className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4"
                                 >
-                                    Continuar a Sedes (Opcional)
+                                    Guardar Branding y Continuar
                                 </button>
                             )}
                         </section>
@@ -504,7 +620,7 @@ const VistaConfiguracion: React.FC = () => {
                 )}
 
                 {/* TAB SEDES (PASO 3) */}
-                {(activeTab === 'sedes' || (isWizardMode && (localConfigClub.onboardingStep || 0) === 3)) && (
+                {(activeTab === 'sedes' || (isWizardMode && currentStep === 3)) && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Gestión de Sedes</h3>
@@ -524,13 +640,26 @@ const VistaConfiguracion: React.FC = () => {
                                 });
                                 setModalSedeAbierto(true);
                             }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Registrar Sede Inicial
+                                <IconoAgregar className="w-4 h-4" /> Registrar Sede Adicional
                             </button>
                         </div>
 
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-start gap-4">
+                            <IconoInformacion className="w-6 h-6 text-tkd-blue flex-shrink-0 mt-1" />
+                            <div>
+                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                    <span className="font-black text-tkd-blue uppercase">Información Importante:</span> La Sede Principal se configura automáticamente con los datos de la sección "Información Institucional".
+                                </p>
+                                <p className="text-[10px] text-gray-500 mt-1">
+                                    Utilice esta sección <strong>únicamente</strong> si su club cuenta con sucursales o sedes adicionales.
+                                </p>
+                            </div>
+                        </div>
+
                         {sedes.length === 0 && (
-                            <div className="p-10 text-center bg-yellow-50 dark:bg-yellow-900/10 rounded-3xl border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-400 font-bold uppercase text-xs">
-                                Debes registrar al menos una sede para continuar.
+                            <div className="p-10 text-center bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 font-bold uppercase text-xs">
+                                No es obligatorio crear una sede adicional si tu única ubicación es la registrada en Información Institucional. <br /><br />
+                                Este espacio debe ser usado solo para registrar sucursales o sedes satélite. Puedes continuar con confianza.
                             </div>
                         )}
 
@@ -541,10 +670,15 @@ const VistaConfiguracion: React.FC = () => {
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue" title="Editar Sede"><IconoEditar className="w-4 h-4" /></button>
-                                            <button onClick={() => {
+                                            <button onClick={async () => {
                                                 if (window.confirm(`¿Seguro que deseas eliminar la sede ${s.nombre}? Esta acción no se puede deshacer.`)) {
-                                                    eliminarSede(s.id);
-                                                    mostrarNotificacion("Sede eliminada satisfactoriamente.", "success");
+                                                    try {
+                                                        await eliminarSede(s.id);
+                                                        mostrarNotificacion("Sede eliminada satisfactoriamente.", "success");
+                                                    } catch (error) {
+                                                        console.error("[Configuracion] Error al eliminar sede:", error);
+                                                        mostrarNotificacion("Error al eliminar la sede. Intenta nuevamente.", "error");
+                                                    }
                                                 }
                                             }} className="p-2 text-gray-400 hover:text-tkd-red" title="Eliminar Sede"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
@@ -561,25 +695,21 @@ const VistaConfiguracion: React.FC = () => {
                             ))}
                         </div>
 
-                        {isWizardMode && (localConfigClub.onboardingStep || 0) === 3 && (
+                        {isWizardMode && currentStep === 3 && (
                             <button
                                 onClick={() => {
-                                    if (sedes.length === 0) {
-                                        mostrarNotificacion("Registra al menos una sede", "error");
-                                        return;
-                                    }
                                     avanzarPaso(3);
                                 }}
-                                className={`w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4 ${sedes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4`}
                             >
-                                Sede Registrada - Continuar a Equipo
+                                Sede Principal Confirmada - Continuar
                             </button>
                         )}
                     </div>
                 )}
 
                 {/* TAB EQUIPO (PASO 4) */}
-                {(activeTab === 'equipo' || (isWizardMode && (localConfigClub.onboardingStep || 0) === 4)) && (
+                {(activeTab === 'equipo' || (isWizardMode && currentStep === 4)) && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">4. Nómina Inicial</h3>
@@ -595,19 +725,22 @@ const VistaConfiguracion: React.FC = () => {
                                 onGestionarContrato={() => mostrarNotificacion("Contrato gestionado en edición", "info")}
                             />
                         </div>
-                        {isWizardMode && (localConfigClub.onboardingStep || 0) === 4 && (
+                        {isWizardMode && currentStep === 4 && (
                             <button
-                                onClick={() => {
-                                    // Validar que exista contrato?
-                                    // Asumimos que si hay > 1 usuario (el admin + otro), se hizo.
+                                onClick={async () => {
                                     if (usuarios.length < 2 && !window.confirm("¿Seguro de avanzar sin registrar instructores adicionales?")) {
                                         return;
                                     }
-                                    setLocalConfigClub(prev => ({ ...prev!, onboardingStep: 5 }));
-                                    guardarConfiguracionesHandler();
-                                    mostrarNotificacion("¡Configuración Completada! Bienvenido.", "success");
-                                    // Redirigir o recargar
-                                    window.location.href = '/';
+                                    try {
+                                        await avanzarPaso(4);
+                                        mostrarNotificacion("¡Configuración finalizada! Bienvenido a Tudojang.", "success");
+                                        setTimeout(() => {
+                                            window.location.hash = '/';
+                                            window.location.reload();
+                                        }, 1500);
+                                    } catch (err) {
+                                        mostrarNotificacion("Error al finalizar la configuración", "error");
+                                    }
                                 }}
                                 className="w-full py-6 bg-green-500 text-white rounded-xl font-black uppercase text-sm shadow-xl hover:bg-green-600 transition-all mt-8 animate-pulse-slow"
                             >
@@ -702,9 +835,27 @@ const VistaConfiguracion: React.FC = () => {
                         {/* MÉTRICAS DE USO */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
-                                { label: 'Estudiantes', used: estudiantes.length, limit: localConfigClub.limiteEstudiantes, icon: IconoEstudiantes, color: 'text-tkd-blue' },
-                                { label: 'Docentes / Staff', used: usuarios.length, limit: localConfigClub.limiteUsuarios, icon: IconoUsuario, color: 'text-green-500' },
-                                { label: 'Sedes Activas', used: sedes.length, limit: localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
+                                {
+                                    label: 'Estudiantes',
+                                    used: estudiantes.length,
+                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || localConfigClub.limiteEstudiantes,
+                                    icon: IconoEstudiantes,
+                                    color: 'text-tkd-blue'
+                                },
+                                {
+                                    label: 'Docentes / Staff',
+                                    used: usuarios.length,
+                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || localConfigClub.limiteUsuarios,
+                                    icon: IconoUsuario,
+                                    color: 'text-green-500'
+                                },
+                                {
+                                    label: 'Sedes Activas',
+                                    used: sedes.length,
+                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes,
+                                    icon: IconoCasa,
+                                    color: 'text-tkd-red'
+                                },
                             ].map((metric) => {
                                 const percent = Math.min((metric.used / metric.limit) * 100, 100);
                                 return (

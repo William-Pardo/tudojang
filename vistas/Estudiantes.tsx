@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
 import { useAuth } from '../context/AuthContext';
+import { useNotificacion } from '../context/NotificacionContext';
 import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
 
@@ -30,6 +31,7 @@ type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho';
 
 export const VistaEstudiantes: React.FC = () => {
     const { usuario } = useAuth();
+    const { mostrarNotificacion } = useNotificacion();
     const {
         estudiantes,
         estudiantesFiltrados,
@@ -72,6 +74,7 @@ export const VistaEstudiantes: React.FC = () => {
     const [modalImportMasivaAbierto, setModalImportMasivaAbierto] = useState(false);
     const [misionActiva, setMisionActiva] = useState<MisionKicho | null>(null);
     const [countdown, setCountdown] = useState('');
+    const [generandoData, setGenerandoData] = useState(false);
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
     const [activeTab, setActiveTab] = useState<TabId>(esTutor ? 'asistencia' : 'directorio');
@@ -207,26 +210,37 @@ export const VistaEstudiantes: React.FC = () => {
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button onClick={exportarCSV} disabled={estudiantesFiltrados.length === 0} className="bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition-all shadow-lg" title="Exportar CSV"><IconoExportar className="w-5 h-5" /></button>
                         <button onClick={() => setModalImportMasivaAbierto(true)} className="bg-white text-tkd-blue border-2 border-tkd-blue/20 px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"><IconoInformacion className="w-4 h-4" /><span>Importar CSV</span></button>
-                        {usuario?.email === 'aliantlab@gmail.com' && (
+                        {(usuario?.email === 'aliantlab@gmail.com' || usuario?.rol === 'SuperAdmin') && (
                             <button
+                                disabled={generandoData}
                                 onClick={async () => {
-                                    if (window.confirm("¿Generar 10 estudiantes de prueba?")) {
-                                        await import('../utils/userSeeder').then(m => m.generarEstudiantesFicticios(10, usuario.sedeId || '1', usuario.tenantId));
-                                        cargarEstudiantes();
+                                    if (window.confirm("¿Generar 10 estudiantes de prueba? (Se validará el límite de tu plan)")) {
+                                        setGenerandoData(true);
+                                        try {
+                                            const { generarEstudiantesFicticios } = await import('../utils/userSeeder');
+                                            await generarEstudiantesFicticios(10, usuario.sedeId || '1', usuario.tenantId);
+                                            mostrarNotificacion("10 Estudiantes ficticios inyectados con éxito.", "success");
+                                            cargarEstudiantes();
+                                        } catch (err: any) {
+                                            mostrarNotificacion(err.message || "Error al generar data de prueba", "error");
+                                        } finally {
+                                            setGenerandoData(false);
+                                        }
                                     }
                                 }}
-                                className="bg-purple-600 text-white px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-purple-700 transition-all flex items-center justify-center gap-2"
+                                className={`${generandoData ? 'opacity-50 cursor-not-allowed' : ''} bg-purple-600 text-white px-4 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-purple-700 transition-all flex items-center justify-center gap-2`}
                             >
-                                <span>Generar Data Test</span>
+                                {generandoData ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <span>Generar Data Test</span>}
                             </button>
                         )}
                         <button onClick={() => abrirFormulario()} className="flex-1 md:flex-none bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3"><IconoAgregar className="w-5 h-5" /><span>Nuevo Alumno</span></button>
                     </div>
-                )}
-            </header>
+                )
+                }
+            </header >
 
             {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
-            <div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden">
+            < div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden" >
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
                         <button
@@ -241,7 +255,7 @@ export const VistaEstudiantes: React.FC = () => {
                         </button>
                     ))}
                 </div>
-            </div>
+            </div >
 
             <div className="min-h-[400px]">
                 {activeTab === 'kicho' && <div className="animate-fade-in"><VistaMisionKicho /></div>}
@@ -255,6 +269,6 @@ export const VistaEstudiantes: React.FC = () => {
             {modalConfirmacionAbierto && estudianteAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Baja de Estudiante" mensaje={`¿Confirmas dar de baja definitiva a ${estudianteAEliminar.nombres} ${estudianteAEliminar.apellidos}?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
             {modalFirmaAbierto && firmaParaVer && <ModalVerFirma abierto={modalFirmaAbierto} onCerrar={cerrarModalFirma} firmaDigital={firmaParaVer.firma} nombreTutor={firmaParaVer.tutor} />}
             {modalImportMasivaAbierto && <ModalImportacionMasiva abierto={modalImportMasivaAbierto} onCerrar={() => setModalImportMasivaAbierto(false)} onExito={() => { setModalImportMasivaAbierto(false); cargarEstudiantes(); }} />}
-        </div>
+        </div >
     );
 };

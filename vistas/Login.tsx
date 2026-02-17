@@ -49,6 +49,9 @@ const Login: React.FC = () => {
                 Tudojang <span className="text-tkd-blue">SaaS</span>
               </h2>
               <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-widest leading-none">Gestión Premium para Dojangs</p>
+              <div className="mt-2 inline-block px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+                <span className="text-[8px] font-black text-green-700 dark:text-green-400 uppercase tracking-wider">✓ Versión Actualizada 16-FEB-2026</span>
+              </div>
             </div>
           </div>
 

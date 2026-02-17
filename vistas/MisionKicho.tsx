@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho } from '../servicios/censoApi';
-import { useEstudiantes } from '../context/DataContext';
+import { useEstudiantes, useSedes } from '../context/DataContext';
 import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
 import {
     IconoWhatsApp, IconoCopiar, IconoAprobar,
@@ -64,6 +64,7 @@ const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion
 const VistaMisionKicho: React.FC = () => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
+    const { sedes } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [mision, setMision] = useState<MisionKicho | null>(null);
@@ -71,6 +72,7 @@ const VistaMisionKicho: React.FC = () => {
     const [cargando, setCargando] = useState(true);
     const [activando, setActivando] = useState(false);
     const [showExitoModal, setShowExitoModal] = useState(false);
+    const [sedeSeleccionada, setSedeSeleccionada] = useState<string>('');
 
     const [mostrarFirma, setMostrarFirma] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -98,6 +100,11 @@ const VistaMisionKicho: React.FC = () => {
 
     const handleActivarKichoAuto = async () => {
         if (!usuario) return;
+        if (sedes.length > 0 && !sedeSeleccionada) {
+            mostrarNotificacion("Debes seleccionar una sede para este protocolo.", "warning");
+            return;
+        }
+
         setActivando(true);
         try {
             // Generar fecha de expiración: Ahora + 72 horas
@@ -108,6 +115,7 @@ const VistaMisionKicho: React.FC = () => {
                 tenantId: usuario.tenantId,
                 nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",
                 fechaExpiracion: expDate.toISOString(),
+                sedeId: sedeSeleccionada || (sedes[0]?.id || '1')
             });
 
             setShowExitoModal(true);
@@ -172,15 +180,30 @@ const VistaMisionKicho: React.FC = () => {
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                                <button
-                                    onClick={handleActivarKichoAuto}
-                                    disabled={activando}
-                                    className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
-                                >
-                                    {activando ? <div className="w-5 h-5 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div> : <IconoAgregar className="w-6 h-6" />}
-                                    Activar Misión (72h)
-                                </button>
-                                <div className="flex items-center gap-3 px-6 py-4 bg-black/20 rounded-2xl border border-white/10">
+                                <div className="flex-1 flex flex-col gap-3">
+                                    {sedes.length > 0 && (
+                                        <div className="bg-white/10 p-4 rounded-2xl border border-white/20">
+                                            <label className="text-[10px] font-black uppercase text-blue-200 mb-2 block tracking-widest">Asignar Sede para este Lote</label>
+                                            <select
+                                                value={sedeSeleccionada}
+                                                onChange={(e) => setSedeSeleccionada(e.target.value)}
+                                                className="w-full bg-white text-tkd-blue border-none rounded-xl py-3 px-4 text-xs font-black uppercase outline-none"
+                                            >
+                                                <option value="">SELECCIONAR SEDE...</option>
+                                                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleActivarKichoAuto}
+                                        disabled={activando}
+                                        className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    >
+                                        {activando ? <div className="w-5 h-5 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div> : <IconoAgregar className="w-6 h-6" />}
+                                        Activar Misión (72h)
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3 px-6 py-4 bg-black/20 rounded-2xl border border-white/10 h-fit">
                                     <IconoInformacion className="w-5 h-5 text-blue-300" />
                                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-200">Servicio de Onboarding Gratuito</span>
                                 </div>
@@ -310,7 +333,7 @@ const VistaMisionKicho: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-6">
                                                 <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border ${reg.estado === 'verificado' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                        reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                                                    reg.estado === 'rechazado' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-gray-100 text-gray-500 border-gray-200'
                                                     }`}>
                                                     {reg.estado}
                                                 </span>

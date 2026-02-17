@@ -45,7 +45,7 @@ export const CONFIGURACION_POR_DEFECTO = {
 };
 
 export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
-    tenantId: 'platform-default',
+    tenantId: 'PLATFORM_INIT_PENDING',
     slug: 'tudojang',
     nombreClub: 'Tudojang SaaS',
     nit: '000.000.000-0',
@@ -65,15 +65,15 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     pagoBanco: '',
     diasSuspension: 30,
     direccionClub: 'Calle de la Plataforma',
-    colorPrimario: '#1a365d',
-    colorSecundario: '#e53e3e',
-    colorAcento: '#2b6cb0',
+    colorPrimario: '#111111',
+    colorSecundario: '#0047A0',
+    colorAcento: '#CD2E3A',
     emailClub: 'soporte@tudojang.com',
     estadoSuscripcion: 'demo' as const,
     fechaVencimiento: '2029-12-31',
     plan: 'starter',
-    limiteEstudiantes: 10,
-    limiteUsuarios: 1,
+    limiteEstudiantes: 50,
+    limiteUsuarios: 2,
     limiteSedes: 1,
     onboardingStep: 0
 };

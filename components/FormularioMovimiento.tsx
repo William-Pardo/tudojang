@@ -49,7 +49,7 @@ const FormularioMovimiento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, s
 
     const categoriaSeleccionada = watch('categoria');
 
-    useEffect(() => { 
+    useEffect(() => {
         if (abierto) {
             if (movimientoActual) {
                 // Verificar si la categoría actual está en el Enum estándar
@@ -119,13 +119,13 @@ const FormularioMovimiento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, s
                     {categoriaSeleccionada === VALOR_NUEVA_CATEGORIA && (
                         <div className="animate-slide-in-right">
                             <label className="block text-xs font-black uppercase text-tkd-red mb-1">Nombre de la Categoría Personalizada</label>
-                            <input 
-                                type="text" 
-                                {...register('categoriaNueva')} 
+                            <input
+                                type="text"
+                                {...register('categoriaNueva')}
                                 placeholder="Eje: Publicidad, Mantenimiento..."
-                                className="block w-full border-red-300 rounded-md dark:bg-gray-700 dark:border-red-900/30 dark:text-white transition-colors focus:ring-tkd-red focus:border-tkd-red" 
+                                className="block w-full border-red-300 rounded-md dark:bg-gray-700 dark:border-red-900/30 dark:text-white transition-colors focus:ring-tkd-red focus:border-tkd-red"
                             />
-                            <FormInputError mensaje={errors.categoriaNueva?.message} />
+                            <FormInputError mensaje={errors.categoriaNueva?.message as string} />
                         </div>
                     )}
 
@@ -138,12 +138,12 @@ const FormularioMovimiento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, s
                     <div>
                         <label className="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1">Monto (COP)</label>
                         <input type="number" {...register('monto')} className="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue" />
-                        <FormInputError mensaje={errors.monto?.message} />
+                        <FormInputError mensaje={errors.monto?.message as string} />
                     </div>
                     <div>
                         <label className="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1">Descripción / Concepto</label>
                         <input type="text" {...register('descripcion')} className="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue" />
-                        <FormInputError mensaje={errors.descripcion?.message} />
+                        <FormInputError mensaje={errors.descripcion?.message as string} />
                     </div>
                     <div>
                         <label className="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1">Fecha de Registro</label>

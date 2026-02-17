@@ -92,22 +92,55 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
     while (intentos < 5) {
         console.log(`[autenticarUsuario] Buscando perfil en Firestore (uid: ${uid}, intento ${intentos + 1}/5)`);
 
-        // 1. Intentar por UID (estándar)
-        const userDocSnap = await getDoc(doc(db, 'usuarios', uid));
-        if (userDocSnap.exists()) {
-            console.log(`[autenticarUsuario] Perfil encontrado por UID`);
-            return { id: uid, ...userDocSnap.data() } as Usuario;
-        }
+        try {
+            // 1. Intentar por UID (estándar)
+            const userDocSnap = await getDoc(doc(db, 'usuarios', uid));
+            if (userDocSnap.exists()) {
+                console.log(`[autenticarUsuario] Perfil encontrado por UID`);
+                return { id: uid, ...userDocSnap.data() } as Usuario;
+            }
 
-        // 2. Intentar consulta por email (Más robusto)
-        console.log(`[autenticarUsuario] Buscando por query de email: ${email}`);
-        const q = query(collection(db, 'usuarios'), where('email', '==', email.toLowerCase().trim()));
-        const qSnap = await getDocs(q);
+            // 2. Intentar consulta por email (Más robusto)
+            console.log(`[autenticarUsuario] Buscando por query de email: ${email}`);
+            const q = query(collection(db, 'usuarios'), where('email', '==', email.toLowerCase().trim()));
+            const qSnap = await getDocs(q);
 
-        if (!qSnap.empty) {
-            console.log(`[autenticarUsuario] Perfil encontrado por Query de Email`);
-            const userData = qSnap.docs[0].data();
-            return { id: qSnap.docs[0].id, ...userData } as Usuario;
+            if (!qSnap.empty) {
+                console.log(`[autenticarUsuario] Perfil encontrado por Query de Email`);
+                const userData = qSnap.docs[0].data();
+                return { id: qSnap.docs[0].id, ...userData } as Usuario;
+            }
+
+            // 3. RECUPERACIÓN PROACTIVA (Solo para Admins que vienen de Onboarding)
+            // Solo intentamos esto si estamos SEGUROS de que la base de datos respondió que NO existe, 
+            // no si hubo un error de red o bloqueo.
+            if (uid.startsWith('tnt-')) {
+                console.log(`[autenticarUsuario] Detectado UID tipo Tenant (${uid}). Intentando recuperación de perfil Admin...`);
+                const fallbackUserData = {
+                    nombreUsuario: email.split('@')[0].toUpperCase(),
+                    email: email.toLowerCase().trim(),
+                    numeroIdentificacion: 'PENDIENTE',
+                    whatsapp: '3000000000',
+                    rol: RolUsuario.Admin,
+                    tenantId: uid,
+                    sedeId: '',
+                    fcmTokens: []
+                };
+                try {
+                    await setDoc(doc(db, 'usuarios', uid), fallbackUserData);
+                    console.log(`[autenticarUsuario] Perfil de emergencia creado para: ${uid}`);
+                    return { id: uid, ...fallbackUserData } as Usuario;
+                } catch (recoveryError) {
+                    console.error("[autenticarUsuario] Error en auto-recuperación:", recoveryError);
+                    // Si falla el setDoc, probablemente es un bloqueo real, no seguimos.
+                }
+            }
+        } catch (dbError: any) {
+            console.error("[autenticarUsuario] Error en consulta de base de datos:", dbError);
+            if (dbError?.message?.includes('blocked-by-client') || dbError?.code === 'failed-precondition') {
+                throw new Error("El acceso a la base de datos está siendo bloqueado por tu navegador (p.ej. Brave Shields o un AdBlocker). Por favor desactívalo para este sitio.");
+            }
+            // Si es otro error, esperamos y reintentamos
         }
 
         console.log(`[autenticarUsuario] Perfil no encontrado aún. Reintentando...`);
@@ -116,30 +149,30 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
     }
 
     console.error(`[autenticarUsuario] Error final: Imposible encontrar perfil para ${email} (UID: ${uid})`);
-    throw new Error("Tu perfil no existe o no se ha sincronizado correctamente. Por favor, contacta a soporte técnico.");
+    throw new Error("Tu perfil no existe o no se ha sincronizado correctamente. Por favor, revisa tu conexión o contacta a soporte.");
 };
 
-export const agregarUsuario = async (datos: {
-    email: string,
-    nombreUsuario: string,
-    numeroIdentificacion: string,
-    whatsapp: string,
-    contrasena: string,
-    rol: RolUsuario,
-    tenantId: string,
-    sedeId?: string
-}): Promise<Usuario> => {
+const limpiarObjeto = (obj: any) => {
+    const nuevo = { ...obj };
+    Object.keys(nuevo).forEach(key => {
+        if (nuevo[key] === undefined) delete nuevo[key];
+    });
+    return nuevo;
+};
+
+export const agregarUsuario = async (datos: any): Promise<Usuario> => {
     if (!isFirebaseConfigured) {
         const nuevo: UsuarioSimulado = {
             id: `user-${Date.now()}`,
-            email: datos.email,
-            nombreUsuario: datos.nombreUsuario,
-            numeroIdentificacion: datos.numeroIdentificacion,
-            whatsapp: datos.whatsapp,
-            rol: datos.rol,
-            tenantId: datos.tenantId,
-            sedeId: datos.sedeId,
-            contrasena: datos.contrasena
+            ...datos,
+            contrato: {
+                sueldoBase: datos.sueldoBase || 0,
+                duracionMeses: datos.duracionContratoMeses || 0,
+                tipoVinculacion: datos.tipoVinculacion || '',
+                fechaInicio: datos.fechaInicio || '',
+                lugarEjecucion: datos.lugarEjecucion || '',
+                firmado: false
+            }
         };
         usuariosMock.push(nuevo);
         const { contrasena: _, ...usuarioRetorno } = nuevo;
@@ -147,7 +180,13 @@ export const agregarUsuario = async (datos: {
     }
 
     const auth = getAuth();
+
+    // CRÍTICO: Guardar la sesión actual del admin ANTES de crear el nuevo usuario
+    const currentUser = auth.currentUser;
+
+    // Crear el nuevo usuario (esto automáticamente lo loguea)
     const userCredential = await createUserWithEmailAndPassword(auth, datos.email, datos.contrasena);
+
     const nuevoUsuarioData = {
         nombreUsuario: datos.nombreUsuario,
         email: datos.email,
@@ -156,10 +195,31 @@ export const agregarUsuario = async (datos: {
         rol: datos.rol,
         tenantId: datos.tenantId,
         sedeId: datos.sedeId || '',
+        contrato: {
+            sueldoBase: datos.sueldoBase || 0,
+            duracionMeses: datos.duracionContratoMeses || 0,
+            tipoVinculacion: datos.tipoVinculacion || '',
+            fechaInicio: datos.fechaInicio || '',
+            lugarEjecucion: datos.lugarEjecucion || '',
+            firmado: false
+        },
         fcmTokens: []
     };
-    await setDoc(doc(db, "usuarios", userCredential.user.uid), nuevoUsuarioData);
-    return { id: userCredential.user.uid, ...nuevoUsuarioData };
+
+    await setDoc(doc(db, "usuarios", userCredential.user.uid), limpiarObjeto(nuevoUsuarioData));
+
+    // CRÍTICO: Cerrar la sesión del usuario recién creado para evitar suplantación
+    await auth.signOut();
+
+    // CRÍTICO: Re-autenticar la sesión original del admin
+    // Nota: Si el admin está usando un provider OAuth o similar, esto puede fallar
+    // En producción, se debe usar Firebase Admin SDK desde el backend
+    if (currentUser) {
+        console.log('[agregarUsuario] Restaurando sesión original del admin');
+        await auth.updateCurrentUser(currentUser);
+    }
+
+    return { id: userCredential.user.uid, ...nuevoUsuarioData } as Usuario;
 };
 
 export const cerrarSesion = async (): Promise<void> => {
@@ -172,7 +232,7 @@ export const obtenerUsuarios = async (): Promise<Usuario[]> => {
     return userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Usuario));
 };
 
-export const actualizarUsuario = async (datos: Partial<UsuarioSimulado>, id: string): Promise<Usuario> => {
+export const actualizarUsuario = async (datos: any, id: string): Promise<Usuario> => {
     if (!isFirebaseConfigured) {
         usuariosMock = usuariosMock.map(u => u.id === id ? { ...u, ...datos } : u);
         const encontrado = usuariosMock.find(u => u.id === id);
@@ -180,8 +240,28 @@ export const actualizarUsuario = async (datos: Partial<UsuarioSimulado>, id: str
         const { contrasena: _, ...retorno } = encontrado;
         return retorno;
     }
+
+    // Si vienen campos de contrato, los anidamos correctamente
+    const updateData: any = { ...datos };
+    if (datos.sueldoBase !== undefined || datos.duracionContratoMeses !== undefined) {
+        updateData.contrato = {
+            ...(updateData.contrato || {}),
+            sueldoBase: datos.sueldoBase,
+            duracionMeses: datos.duracionContratoMeses,
+            tipoVinculacion: datos.tipoVinculacion,
+            fechaInicio: datos.fechaInicio,
+            lugarEjecucion: datos.lugarEjecucion
+        };
+        // Limpiamos los campos planos para no duplicar en raíz
+        delete updateData.sueldoBase;
+        delete updateData.duracionContratoMeses;
+        delete updateData.tipoVinculacion;
+        delete updateData.fechaInicio;
+        delete updateData.lugarEjecucion;
+    }
+
     const userDocRef = doc(db, "usuarios", id);
-    await updateDoc(userDocRef, datos);
+    await updateDoc(userDocRef, limpiarObjeto(updateData));
     const updatedDoc = await getDoc(userDocRef);
     return { id: updatedDoc.id, ...updatedDoc.data() } as Usuario;
 };
@@ -189,9 +269,19 @@ export const actualizarUsuario = async (datos: Partial<UsuarioSimulado>, id: str
 export const eliminarUsuario = async (id: string): Promise<void> => {
     if (!isFirebaseConfigured) {
         usuariosMock = usuariosMock.filter(u => u.id !== id);
+        console.log(`[usuariosApi] Usuario ${id} eliminado del mock local`);
         return;
     }
-    await deleteDoc(doc(db, "usuarios", id));
+    if (!id) {
+        throw new Error("ID de usuario inválido para eliminación");
+    }
+    try {
+        await deleteDoc(doc(db, "usuarios", id));
+        console.log(`[usuariosApi] Usuario ${id} eliminado correctamente de Firestore`);
+    } catch (error) {
+        console.error("[usuariosApi] Error al eliminar usuario de Firestore:", error);
+        throw error;
+    }
 };
 
 export const enviarCorreoRecuperacion = async (email: string): Promise<void> => {

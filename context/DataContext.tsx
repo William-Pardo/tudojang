@@ -198,26 +198,62 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.log("[DataContext] Configuración guardada, refrescando branding...");
                 await cargarTenant();
             },
-            agregarUsuario: async (d) => { d.tenantId = (tenant || CONFIGURACION_CLUB_POR_DEFECTO).tenantId; const u = await api.agregarUsuario(d); setUsuarios(p => [...p, u]); return u; },
+            agregarUsuario: async (d) => {
+                const currentTenant = tenant || CONFIGURACION_CLUB_POR_DEFECTO;
+                d.tenantId = currentTenant.tenantId;
+                const u = await api.agregarUsuario(d);
+                setUsuarios(p => [...p, u]);
+                return u;
+            },
             actualizarUsuario: api.actualizarUsuario,
-            eliminarUsuario: api.eliminarUsuario,
+            eliminarUsuario: async (id) => { await api.eliminarUsuario(id); setUsuarios(prev => prev.filter(u => u.id !== id)); },
             cargarConfiguracion: cargarTodo
         }}>
             <ProgramasContext.Provider value={{
                 programas, cargando, error,
                 cargarProgramas: cargarTodo,
-                agregarPrograma: async (p) => { const res = await api.agregarPrograma({ ...p, tenantId: tenant!.tenantId }); setProgramas(prev => [...prev, res]); return res; },
+                agregarPrograma: async (p) => {
+                    if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                    const res = await api.agregarPrograma({ ...p, tenantId: tenant.tenantId });
+                    setProgramas(prev => [...prev, res]);
+                    return res;
+                },
                 actualizarPrograma: async (p) => { const res = await api.actualizarPrograma(p); setProgramas(prev => prev.map(item => item.id === p.id ? res : item)); return res; },
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
-                <SedesContext.Provider value={{ sedes, cargando, error, cargarSedes: cargarTodo, agregarSede: async (s) => { const res = await api.agregarSede({ ...s, tenantId: tenant!.tenantId }); setSedes(p => [...p, res]); return res; }, actualizarSede: api.actualizarSede, eliminarSede: api.eliminarSede }}>
+                <SedesContext.Provider value={{
+                    sedes, cargando, error, cargarSedes: cargarTodo,
+                    agregarSede: async (s) => {
+                        if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                        const res = await api.agregarSede({ ...s, tenantId: tenant.tenantId });
+                        setSedes(p => [...p, res]);
+                        return res;
+                    },
+                    actualizarSede: api.actualizarSede,
+                    eliminarSede: async (id) => { await api.eliminarSede(id); setSedes(prev => prev.filter(s => s.id !== id)); }
+                }}>
                     <EstudiantesContext.Provider value={{
                         estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
-                        agregarEstudiante: async (datos) => { const res = await api.agregarEstudiante({ ...datos, tenantId: tenant!.tenantId, carnetGenerado: false }); setEstudiantes(prev => [...prev, res]); return res; },
+                        agregarEstudiante: async (datos) => {
+                            if (!tenant || tenant.tenantId === 'platform-default' || tenant.tenantId === 'escuela-gajog-001') throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                            const res = await api.agregarEstudiante({ ...datos, tenantId: tenant.tenantId, carnetGenerado: false });
+                            setEstudiantes(prev => [...prev, res]);
+                            return res;
+                        },
                         actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; },
                         eliminarEstudiante: api.eliminarEstudiante
                     }}>
-                        <EventosContext.Provider value={{ eventos, cargando, error, cargarEventos: cargarTodo, agregarEvento: async (e) => { const res = await api.agregarEvento({ ...e, tenantId: tenant!.tenantId }); setEventos(p => [...p, res]); return res; }, actualizarEvento: api.actualizarEvento, eliminarEvento: api.eliminarEvento }}>
+                        <EventosContext.Provider value={{
+                            eventos, cargando, error, cargarEventos: cargarTodo,
+                            agregarEvento: async (e) => {
+                                if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                                const res = await api.agregarEvento({ ...e, tenantId: tenant.tenantId });
+                                setEventos(p => [...p, res]);
+                                return res;
+                            },
+                            actualizarEvento: api.actualizarEvento,
+                            eliminarEvento: api.eliminarEvento
+                        }}>
                             <TiendaContext.Provider value={{
                                 implementos, solicitudesCompra, cargando, error,
                                 cargarDatosTienda: cargarTodo,
@@ -227,7 +263,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 actualizarImplemento: async (i) => { const res = await api.actualizarImplemento(i); setImplementos(p => p.map(item => item.id === i.id ? res : item)); return res; },
                                 eliminarImplemento: async (id) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
                             }}>
-                                <FinanzasContext.Provider value={{ movimientos, cargando, error, cargarMovimientos: cargarTodo, agregarMovimiento: async (m) => { const res = await api.agregarMovimiento({ ...m, tenantId: tenant!.tenantId }); setMovimientos(p => [res, ...p]); return res; }, actualizarMovimiento: api.actualizarMovimiento, eliminarMovimiento: api.eliminarMovimiento }}>
+                                <FinanzasContext.Provider value={{
+                                    movimientos, cargando, error, cargarMovimientos: cargarTodo,
+                                    agregarMovimiento: async (m) => {
+                                        if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                                        const res = await api.agregarMovimiento({ ...m, tenantId: tenant.tenantId });
+                                        setMovimientos(p => [res, ...p]);
+                                        return res;
+                                    },
+                                    actualizarMovimiento: api.actualizarMovimiento,
+                                    eliminarMovimiento: api.eliminarMovimiento
+                                }}>
                                     {children}
                                 </FinanzasContext.Provider>
                             </TiendaContext.Provider>

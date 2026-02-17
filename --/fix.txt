@@ -1,0 +1,52 @@
+
+## Capas de acceso
+HAS ESTOS AJUSTES:
+PUEDES AGREAGAR UNA AYDA VISUAL PARA QUE LA PRIMERA VEZ DEL TENANT SEA GUIADO VISUALMENTE POR ESTE PROCESO DE SETTING, QUE SEA EVIDENTE CLARA E INEQUIVOCA MUY INTUITOA ESA AYUDA VISUAL
+REDUCE LA POSIBILIDAD E ERROR POR PaRTE DEL TENANT ASIGNADO UN FLUJO POR CAPAS ASI BLOQUEANDO  CON CANDADO Y COLOR QUE IDENTIFIQUE EL BLOQUEO ASI;
+1 INGRESO A unicamente a CONFIGURACION
+2 HACE OBLIGATORIO EL DILIGENCIAMIENTO DE INFORMACION INSTITUCIONAL, EN GENERAL INCLUYENDO DIRECCION BASICA U ORIGINAL DEL CLUB., Nombre del Club
+NIT / Registro
+Representante Legal
+Inscripción Inicial (COP) que es le valor mensaual de las calses de taekwondo (ponle el nombre valor mensualidad)
+Mora Mensual (%)
+Agrega Valor formulario de matricula, con opcion de activar cobro anual por un valor sugerido de $40.000 (este formulario solo aplica por defecto a estudiantes nuevos, va en el formulario de nuevo alumno por defecto con opcion de que se pueda desactivar, es decir que no va incluido en la funcion mision kicho por defecto, pero que si se pueda incluir si globalmente se deja como cobro anual. 
+
+ACTIVA EL EDITOR DE COLORES DE LA SECCION BRANDING, AGREGA UN BOTON DE RESTAURAR COLORES A LA VERSION ORIGINAL DE LA APP. QUE LOS COLORES ASIGNADOS POR EL TENAN APLIQUEN A TODA LA APP, Y A LA DOCUMENTACION, Y CARNETS, IGUAL QUE LOGO A LO LARGO DE LA APP, PERO NO HAGAS QUE ESTA PARTE DEL BRANDING, pero que esta parte de la configuracion no SEA OBLIGARORIA EN EL PROCESO DE activacion por capas.
+
+3 QUESE CONFIGURE LA SEDE DEL CLUB, en el formulario ya vengan CARGados LA DIRECCION Y VALOR DE MENSUALIDAD QUE SE FIJO EN valor mensualidad.
+4 QUE despues SE HABILITE LA CREACION DE MIEMBRO DE EQUIPO, DONDE AL DILIGENCIAR EL FORMULACIO DE CREACION SE INCLUYAN LOS PARAMETROS DE CONTRATACION DE MANERA OBLIGATORIA, ASI NO SE GENERAN CONTRATOS INCOMPLETOS, Y QUE AL TERMINAR DE CREAR EL PERFIL Y EL CONTRATO, es decir DESPUES DE DAR GUARDAR REGRESE A CONFIGURACION, NO QUE SE ENVIE ALL PERFIL QUE E ACABA DE CREAR. y que se envie un correo de bienbenida y otro de recordacionde claves al correo registrado del perfil.
+5 DESPUES DE ESTO SE DE ACCESO AL RESTO DE LA APP.
+
+
+
+## estudiantes
+NESECITO QUE EN EL FORMULARIO DE INGRESO DE ESTUDIANTES(nuevo estudiantes y en mision kicho) LA SEDE SEA OBLIGATORIA, PARA ASI EVITAR QUE SE GENEREN ESTUDIANTES FANTASMAS, solo en la situacion que se incluya una o multiples sedes se habilite como lista desplegable, y para el caso de mison kicho se habilite una forma que le asigne una sede espcifica para esa generacion particular de mision kicho (setting de sede una por cada intento).
+Valida que el valor de formualrio de inscripcion al FORMULARIO DE NUEVO ESTUDIANTE este presetne y si no es asi implementalo, que por defecto este activo, e implemente un switch de desactivacion y que sea visible solo para los roles autorizados.
+DIME caul es LA MEJOR OPCION para este desarrollo de creacion de estudiantes ficticios.
+generar UNA HERRAMIENTA DE CREACION DE ESTUDIANTES FICTICIOS, QUE GENERE ESTUDIANTES POR LOTES DE A 10, PARA MEDIR las funciones de al app sin que la creacion de esta herramienta o creacion de estudiantes rompa la logica o limites de las membresias, o dame una alternativa.
+
+
+
+### carnets
+analiza esto y guiame:
+NESECITO CREAR UN ESTANDAR QUE ASEGURE LA LEGIBILIDAD DELOS CARNETS, PARA ELLO QUE SE APLIQUEN LOS COLORES EDITADOS POR EL TENANT AL CARNET PERO SI EL PRIMER COLOR ES = o mayor AL 75% DE LUMINOCIDAD ENTONCES SE TOME EL SEGUNDO COLOR DE LA PALETA, SI EL SEGUNDO ES =  o mayor AL 75 % DE LUMINOSIDAD ENTEONCES TOME EL TERCER COLOR, PERO SI ESTE COLOR ES = o mayor 75% DE LIMINOCIDAD ENTONCES APLICA LO QUE SUGIERO ABAJO, PERO SI TIENES UNAMEJOR OPCION O MAS ESTRUCTURADA LA ACEPTO
+IMPLEMENTA UNA REGLA PARA PRODUCCION GRAFICA DE CARNETS QUE SE PALIQUE ANTES DE DE SU CREACION:
+Regla de Legibilidad para Carnets:
+1 Detección de Fondo: Si el color de fondo seleccionado tiene una luminosidad superior al 90% (donde 100% es blanco puro), se debe sustituir automáticamente por el color de la paleta de branding con menor luminosidad (el más oscuro).
+
+2 Verificación de Contraste: Se debe garantizar un ratio de contraste mínimo de 4.5:1 para texto normal y 3:1 para logotipos o textos grandes.
+
+3 Excepción de Marca (Gris de Seguridad): Si todos los colores de la marca superan el 70% de luminosidad (paletas pasteles o muy claras), el fondo del carnet será un Gris Antracita (K: 75% o #333333) para asegurar que los datos del usuario sean legibles.
+Implementa la mejor opcion del mercado para que se generen archivos f¿inales para impresion de la mejor foram y con las mejores practicas de la industria
+Neseciso que al generar los carnets finales en el pdf exista la opcion de ajustar la mesa de salida, es decir carta, oficcio, y a su ves que se ajusten la cantidad de carnets que quepan, teniendo en cuenta las pinzas de impresion reles de para carnets, separacion entre carnets, y que asi mismo se pueda generar carnets individales por lotes, es decir un grupo de carnets pero uno a uno agrupados en un mimso pdf.
+
+## cofiguracion seguridad
+VERIFICA QUE LA APP TENGA ACTIVOS LOS TOPES DE CADA TIPO DE MEMBRESIA, limite DE ESTUDIAnTES, SEDES, MIEMBROS DE EQUIPO.
+GENERA INDICADORES VISUALES CON GRAFICO DE LOS TOPES DE CADA TIPO EJEMPLO: 15 DE 50 ESTUDIANTES, 1 DE 1 SEDE, ETC.
+NESECITO QUE ANALISES Y VERIFIQUES QUE EN CONFIGURACION REALMENTE SE ELIMINEN, SEDES, MIEMBROS DE EQUIPO Y PROGRAMAS, TANTO EN EL FRONTEND COMO EN EL BACKEND, DE LA MISMA MANERA QUE EL BOTON DE GUARDAR EN CONFIGURACION REALEMENTE LO HAGA EN TODAS LAS INSTANCIAS, Y QUE AL GUARDAR SE DISPARE UNA FUNCION DE REFRESH DE LA APP PARA QUE LOS CAMBIOS GUADADOS SE PROPAGUEN POR LA APP
+
+## Nesecito asignar links de pago para servicios add-on capacidad +10 alumnos, add-on capacidad +1 miembro equipo, add-on capacidad +1 sede adcional.
+
++10 Estudiantes
+Adiciona 10 cupos mas a tu memebresia actual
+15.000
