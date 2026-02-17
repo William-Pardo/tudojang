@@ -1,10 +1,10 @@
 
 // context/DataContext.tsx
-import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useContext, ReactNode, useMemo } from 'react';
 import type {
     Usuario, Estudiante, Evento, Implemento, SolicitudCompra,
     MovimientoFinanciero, Sede, ConfiguracionNotificaciones, ConfiguracionClub,
-    Programa
+    Programa, BloqueHorario
 } from '../tipos';
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
@@ -28,6 +28,7 @@ const ConfiguracionContext = createContext<ConfiguracionContextType | undefined>
 // --- PROGRAMAS ---
 interface ProgramasContextType {
     programas: Programa[];
+    agendaCompleta: BloqueHorario[];
     cargando: boolean;
     error: string | null;
     cargarProgramas: () => Promise<void>;
@@ -210,7 +211,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             cargarConfiguracion: cargarTodo
         }}>
             <ProgramasContext.Provider value={{
-                programas, cargando, error,
+                programas,
+                agendaCompleta: useMemo(() => {
+                    return programas.flatMap(p => (p.bloquesHorarios || []).map(b => ({ ...b, nombrePrograma: p.nombre, programaId: p.id })));
+                }, [programas]),
+                cargando, error,
                 cargarProgramas: cargarTodo,
                 agregarPrograma: async (p) => {
                     if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");

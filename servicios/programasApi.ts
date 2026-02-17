@@ -2,41 +2,39 @@
 // servicios/programasApi.ts
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { type Programa, TipoCobroPrograma } from '../tipos';
+import { type Programa, TipoCobroPrograma, GrupoEdad } from '../tipos';
 
 const programasCollection = collection(db, 'programas');
 
 // Memoria temporal para modo simulado
 let programasMock: Programa[] = [
-    { 
-        id: 'prog-001', 
-        tenantId: 'escuela-gajog-001', 
-        nombre: 'Poomsae Pro', 
-        descripcion: 'Entrenamiento avanzado de formas y técnica.', 
-        tipoCobro: TipoCobroPrograma.Recurrente, 
-        valor: 40000, 
-        horario: 'Sábados 10:00 AM - 12:00 PM',
-        activo: true 
+    {
+        id: 'prog-001',
+        tenantId: 'escuela-gajog-001',
+        nombre: 'Poomsae Pro',
+        descripcion: 'Entrenamiento avanzado de formas y técnica.',
+        tipoCobro: TipoCobroPrograma.Recurrente,
+        valor: 40000,
+        horario: 'Lunes y Miércoles 5:00 PM',
+        bloquesHorarios: [
+            { id: 'b1', dia: 'Lunes', horaInicio: '17:00', horaFin: '18:30', sedeId: '1', instructorId: 'admin-001', grupo: GrupoEdad.Cadetes, nombrePrograma: 'Poomsae Pro', programaId: 'prog-001' },
+            { id: 'b2', dia: 'Miércoles', horaInicio: '17:00', horaFin: '18:30', sedeId: '1', instructorId: 'asistente-001', grupo: GrupoEdad.Cadetes, nombrePrograma: 'Poomsae Pro', programaId: 'prog-001' }
+        ],
+        activo: true
     },
-    { 
-        id: 'prog-002', 
-        tenantId: 'escuela-gajog-001', 
-        nombre: 'TKD Terapéutico', 
-        descripcion: 'Clases enfocadas en movilidad y salud física.', 
-        tipoCobro: TipoCobroPrograma.Recurrente, 
-        valor: 60000, 
+    {
+        id: 'prog-002',
+        tenantId: 'escuela-gajog-001',
+        nombre: 'TKD Terapéutico',
+        descripcion: 'Clases enfocadas en movilidad y salud física.',
+        tipoCobro: TipoCobroPrograma.Recurrente,
+        valor: 60000,
         horario: 'Martes y Jueves 7:00 AM',
-        activo: true 
-    },
-    { 
-        id: 'prog-003', 
-        tenantId: 'escuela-gajog-001', 
-        nombre: 'Seminario Nunchaku', 
-        descripcion: 'Taller de 4 sesiones de manejo de armas.', 
-        tipoCobro: TipoCobroPrograma.Unico, 
-        valor: 100000, 
-        horario: 'Intensivo Fin de Semana',
-        activo: true 
+        bloquesHorarios: [
+            { id: 'b3', dia: 'Martes', horaInicio: '07:00', horaFin: '08:00', sedeId: '1', instructorId: 'admin-001', grupo: GrupoEdad.Adultos, nombrePrograma: 'TKD Terapéutico', programaId: 'prog-002' },
+            { id: 'b4', dia: 'Jueves', horaInicio: '07:00', horaFin: '08:00', sedeId: '1', instructorId: 'admin-001', grupo: GrupoEdad.Adultos, nombrePrograma: 'TKD Terapéutico', programaId: 'prog-002' }
+        ],
+        activo: true
     }
 ];
 

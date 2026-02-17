@@ -63,6 +63,7 @@ export enum GrupoEdad {
     Infantil = 'Infantil',
     Precadetes = 'Precadetes',
     Cadetes = 'Cadetes',
+    Adultos = 'Adultos',
     NoAsignado = 'No Asignado'
 }
 
@@ -78,11 +79,15 @@ export enum TipoCobroPrograma {
 }
 
 export interface BloqueHorario {
+    id: string; // ID único para el bloque
     dia: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo';
     horaInicio: string;
     horaFin: string;
     sedeId: string;
     instructorId: string;
+    grupo: GrupoEdad;
+    nombrePrograma?: string; // Para facilitar la visualización sin joins costosos
+    programaId?: string; // Referencia al programa padre
 }
 
 export interface Programa {
