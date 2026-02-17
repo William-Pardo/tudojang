@@ -97,7 +97,13 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
             const userDocSnap = await getDoc(doc(db, 'usuarios', uid));
             if (userDocSnap.exists()) {
                 console.log(`[autenticarUsuario] Perfil encontrado por UID`);
-                return { id: uid, ...userDocSnap.data() } as Usuario;
+                const userData = userDocSnap.data();
+                // Verificar si el usuario fue eliminado (soft delete)
+                if (userData.deletedAt) {
+                    console.warn(`[autenticarUsuario] Usuario ${email} fue eliminado (deletedAt: ${userData.deletedAt}). Denegando login.`);
+                    throw new Error("Esta cuenta ha sido eliminada. Contacta al administrador.");
+                }
+                return { id: uid, ...userData } as Usuario;
             }
 
             // 2. Intentar consulta por email (Más robusto)
@@ -108,6 +114,11 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
             if (!qSnap.empty) {
                 console.log(`[autenticarUsuario] Perfil encontrado por Query de Email`);
                 const userData = qSnap.docs[0].data();
+                // Verificar si el usuario fue eliminado (soft delete)
+                if (userData.deletedAt) {
+                    console.warn(`[autenticarUsuario] Usuario ${email} fue eliminado (deletedAt: ${userData.deletedAt}). Denegando login.`);
+                    throw new Error("Esta cuenta ha sido eliminada. Contacta al administrador.");
+                }
                 return { id: qSnap.docs[0].id, ...userData } as Usuario;
             }
 
