@@ -107,19 +107,23 @@ const PasarelaInscripcion: React.FC = () => {
 
                                     <div className="h-px bg-gray-200 dark:bg-gray-700 my-4"></div>
 
-                                    <div className="space-y-2">
+                                    {/* Costos Principales */}
+                                    <div className="space-y-3">
                                         <div className="flex justify-between items-center text-gray-400">
-                                            <span className="text-[9px] font-black uppercase tracking-widest">Inscripción Inicial</span>
-                                            <span className="font-bold text-xs">{formatearPrecio(tenant?.valorInscripcion || 0)}</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                                                Matrícula / Formulario
+                                                {tenant?.activarMatriculaAnual && <span className="bg-tkd-red/10 text-tkd-red px-2 py-0.5 rounded text-[8px] font-black">ANUAL</span>}
+                                            </span>
+                                            <span className="font-black text-xs text-tkd-dark dark:text-gray-200">{formatearPrecio(tenant?.valorMatricula || 0)}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-gray-400">
-                                            <span className="text-[9px] font-black uppercase tracking-widest">Primera Mensualidad</span>
-                                            <span className="font-bold text-xs">{formatearPrecio(tenant?.valorMensualidad || 0)}</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest">Inversión Mensual Base</span>
+                                            <span className="font-black text-xs text-tkd-dark dark:text-gray-200">{formatearPrecio(tenant?.valorMensualidad || 0)}</span>
                                         </div>
-                                        <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                            <span className="text-xs font-black uppercase text-tkd-blue tracking-widest">Total a Pagar</span>
-                                            <span className="text-3xl font-black text-tkd-dark dark:text-white tracking-tighter">{formatearPrecio(valorTotal)}</span>
-                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                        <span className="text-xs font-black uppercase text-tkd-blue tracking-widest">Total a Pagar</span>
+                                        <span className="text-3xl font-black text-tkd-dark dark:text-white tracking-tighter">{formatearPrecio(valorTotal)}</span>
                                     </div>
                                 </div>
 

@@ -89,8 +89,11 @@ const CensoPublico: React.FC = () => {
                             <IconoAprobar className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Inversión Inscripción</p>
-                            <p className="text-2xl font-black tracking-tighter">{formatearPrecio(tenant?.valorInscripcion || 0)}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest opacity-80">
+                                Matrícula / Formulario
+                                {tenant?.activarMatriculaAnual && <span className="ml-1 text-white underline"> (COBRO ANUAL)</span>}
+                            </p>
+                            <p className="text-2xl font-black tracking-tighter">{formatearPrecio(tenant?.valorMatricula || 0)}</p>
                         </div>
                     </div>
                     <div className="text-right">

@@ -302,13 +302,16 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                         </div>
 
                         <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-[2.5rem] space-y-6">
-                            {/* Toggle Cobro Inscripción */}
+                            {/* Toggle Cobro Matrícula */}
                             {!estudianteActual && (
                                 <div className="flex items-center justify-between bg-white dark:bg-gray-700/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-600 shadow-sm relative overflow-hidden">
                                     <div className="z-10 relative">
-                                        <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.2em] mb-1">Pago Inicial</p>
-                                        <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white">Cobrar Inscripción</h4>
-                                        <p className="text-[10px] font-bold text-gray-400 mt-2">Valor Estándar: <span className="text-tkd-dark dark:text-gray-200">{formatearPrecio(configClub.valorInscripcion || 40000)}</span></p>
+                                        <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.2em] mb-1">Pago Único Inicial</p>
+                                        <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white">Matrícula / Formulario</h4>
+                                        <p className="text-[10px] font-bold text-gray-400 mt-2">
+                                            Valor: <span className="text-tkd-dark dark:text-gray-200">{formatearPrecio(configClub.valorMatricula || 0)}</span>
+                                            {configClub.activarMatriculaAnual && <span className="ml-2 text-tkd-red font-black"> (ANUAL)</span>}
+                                        </p>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer z-10">
                                         <input type="checkbox" {...register('cobrarInscripcion')} className="sr-only peer" />
