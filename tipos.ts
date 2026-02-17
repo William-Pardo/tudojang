@@ -244,6 +244,7 @@ export interface Sede {
     ciudad: string;
     telefono: string;
     valorMensualidad?: number;
+    deletedAt?: string; // Para soft delete
 }
 
 export interface ConfiguracionNotificaciones {

@@ -1,7 +1,7 @@
 
 // vistas/Configuracion.tsx
 import React, { useState, useEffect } from 'react';
-import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede } from '../tipos';
+import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede, ConfiguracionClub } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
     IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar,
@@ -15,7 +15,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
 import { actualizarCapacidadClub, actualizarPlanClub } from '../servicios/configuracionApi';
-import { COSTOS_ADICIONALES, PLANES_SAAS } from '../constantes';
+import { COSTOS_ADICIONALES, PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
@@ -57,7 +57,7 @@ const ModalFormPrograma: React.FC<{
                         <div className="relative">
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Modalidad</label>
                             <select value={tipo} onChange={e => setTipo(e.target.value as any)} className={selectStyle}>
-                                <option value={TipoCobroPrograma.Recurrente}>MembresÍA</option>
+                                <option value={TipoCobroPrograma.Recurrente}>Membresía</option>
                                 <option value={TipoCobroPrograma.Unico}>Taller Corto</option>
                             </select>
                         </div>
@@ -94,79 +94,77 @@ const ModalPagoCheckout: React.FC<{
     onCerrar: () => void,
     onExito: (datos: any) => void
 }> = ({ item, tipo, tenantId, onCerrar, onExito }) => {
-    const [paso, setPaso] = useState<'checkout' | 'procesando' | 'exito'>('checkout');
     const { mostrarNotificacion } = useNotificacion();
 
-    const ejecutarPagoYActivacion = async () => {
-        setPaso('procesando');
+    const handleProcederAlPago = async () => {
         try {
-            await new Promise(r => setTimeout(r, 2500));
-
             if (tipo === 'addon') {
-                const mapeoCampos: Record<string, any> = {
-                    'estudiantes': 'limiteEstudiantes',
-                    'instructor': 'limiteUsuarios',
-                    'sede': 'limiteSedes'
-                };
-                const campoAIncrementar = mapeoCampos[item.key];
-                await actualizarCapacidadClub(tenantId, campoAIncrementar, item.cantidad);
-                onExito({ tipo: 'addon', [campoAIncrementar]: item.cantidad });
+                if (item.urlPago) {
+                    window.open(item.urlPago, '_blank');
+                    onExito({ tipo: 'addon', item: item.key });
+                    onCerrar();
+                } else {
+                    mostrarNotificacion("Link de pago no configurado.", "error");
+                }
             } else {
-                await actualizarPlanClub(tenantId, item);
-                onExito({ tipo: 'plan', plan: item });
-            }
+                const precio = item.precio;
+                const precioEnCentavos = precio * 100;
+                const moneda = 'COP';
+                // Usamos el formato SUSC_ para que el webhook lo reconozca
+                const referencia = `SUSC_${tenantId}_${item.id}_${Date.now()}`;
+                const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
 
-            setPaso('exito');
+                const encondedText = new TextEncoder().encode(cadenaFirma);
+                const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+                const urlRetorno = `${window.location.origin}/#/`;
+                const urlWompi = `https://checkout.wompi.co/p/?` +
+                    `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
+                    `currency=${moneda}&` +
+                    `amount-in-cents=${precioEnCentavos}&` +
+                    `reference=${referencia}&` +
+                    `signature:integrity=${signature}&` +
+                    `redirect-url=${encodeURIComponent(urlRetorno)}`;
+
+                window.open(urlWompi, '_blank');
+                onExito({ tipo: 'plan', plan: item.id });
+                onCerrar();
+            }
         } catch (error) {
-            mostrarNotificacion("La transacción fue rechazada por el banco.", "error");
-            setPaso('checkout');
+            console.error("Error al redireccionar a pasarela:", error);
+            mostrarNotificacion("Error al conectar con la pasarela de pagos.", "error");
         }
     };
 
     return (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-tkd-dark/90 p-4 animate-fade-in backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-md p-10 overflow-hidden relative">
-                {paso === 'checkout' && (
-                    <div className="space-y-8 animate-slide-in-right">
-                        <div className="text-center">
-                            <h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Confirmar {tipo === 'plan' ? 'Cambio de Plan' : 'Compra'}</h3>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Activación instantánea por sistema</p>
-                        </div>
+                <div className="space-y-8 animate-slide-in-right">
+                    <div className="text-center">
+                        <h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Confirmar {tipo === 'plan' ? 'Cambio de Plan' : 'Compra'}</h3>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Serás redirigido a la pasarela segura de Wompi</p>
+                    </div>
 
-                        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-gray-400">Concepto</span>
-                                <span className="text-xs font-black dark:text-white uppercase">{item.label || item.nombre}</span>
-                            </div>
-                            <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
-                                <span className="text-[10px] font-black uppercase text-gray-400">Valor</span>
-                                <span className="text-2xl font-black text-tkd-blue">{formatearPrecio(item.precio)}</span>
-                            </div>
+                    <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black uppercase text-gray-400">Concepto</span>
+                            <span className="text-xs font-black dark:text-white uppercase">{item.label || item.nombre}</span>
                         </div>
-
-                        <div className="space-y-3">
-                            <button onClick={ejecutarPagoYActivacion} className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95">
-                                <IconoAprobar className="w-6 h-6" /> Pagar & Activar Ahora
-                            </button>
-                            <button onClick={onCerrar} className="w-full text-gray-400 font-black uppercase text-[10px] tracking-widest py-2">Cancelar Operación</button>
+                        <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
+                            <span className="text-[10px] font-black uppercase text-gray-400">Inversión</span>
+                            <span className="text-2xl font-black text-tkd-blue">{formatearPrecio(item.precio)}</span>
                         </div>
                     </div>
-                )}
 
-                {paso === 'procesando' && (
-                    <div className="text-center py-12 space-y-6 animate-pulse">
-                        <div className="w-24 h-24 border-8 border-tkd-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
-                        <h3 className="text-xl font-black uppercase dark:text-white">Procesando Pago</h3>
+                    <div className="space-y-3">
+                        <button onClick={handleProcederAlPago} className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95">
+                            <IconoAprobar className="w-6 h-6" /> Abrir Pasarela Segura
+                        </button>
+                        <button onClick={onCerrar} className="w-full text-gray-400 font-black uppercase text-[10px] tracking-widest py-2">Cancelar</button>
                     </div>
-                )}
-
-                {paso === 'exito' && (
-                    <div className="text-center py-8 space-y-6 animate-fade-in">
-                        <IconoExitoAnimado className="mx-auto text-green-500" />
-                        <h3 className="text-3xl font-black uppercase text-green-600 tracking-tighter">¡Listo!</h3>
-                        <button onClick={onCerrar} className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-xs">Regresar</button>
-                    </div>
-                )}
+                </div>
             </div>
         </div>
     );
@@ -194,6 +192,7 @@ const VistaConfiguracion: React.FC = () => {
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
+    const [planSeleccionado, setPlanSeleccionado] = useState<string>(localConfigClub?.plan || 'starter');
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
 
     const handleGuardarSede = async (datos: any) => {
@@ -220,17 +219,7 @@ const VistaConfiguracion: React.FC = () => {
 
     const handleExitoPago = (datos: any) => {
         setItemAPagar(null);
-        mostrarNotificacion("Transacción exitosa. Tu capacidad ha sido ampliada.", "success");
-        // Forzamos recarga de configuración para ver los nuevos límites
-        if (localConfigClub) {
-            setLocalConfigClub({
-                ...localConfigClub,
-                ...(datos.limiteEstudiantes ? { limiteEstudiantes: localConfigClub.limiteEstudiantes + datos.limiteEstudiantes } : {}),
-                ...(datos.limiteUsuarios ? { limiteUsuarios: localConfigClub.limiteUsuarios + datos.limiteUsuarios } : {}),
-                ...(datos.limiteSedes ? { limiteSedes: localConfigClub.limiteSedes + datos.limiteSedes } : {}),
-                ...(datos.plan ? { plan: datos.plan.nombre, limiteEstudiantes: datos.plan.estudiantes, limiteUsuarios: datos.plan.usuarios, limiteSedes: datos.plan.sedes } : {})
-            });
-        }
+        mostrarNotificacion("Solicitud de pago iniciada. Verifica tu correo tras completar la transacción.", "warning");
     };
 
     // --- LÓGICA DE ONBOARDING ---
@@ -267,7 +256,6 @@ const VistaConfiguracion: React.FC = () => {
         if (!localConfigClub) return;
         const nuevoPaso = pasoCompletado + 1;
         try {
-            // CRÍTICO: Guardamos el estado ACTUAL antes de avanzar
             const nuevaConfig = { ...localConfigClub, onboardingStep: nuevoPaso };
             await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
 
@@ -349,12 +337,9 @@ const VistaConfiguracion: React.FC = () => {
                 </div>
             </header>
 
-            {/* WIZARD PROGRESS BAR */}
             {isWizardMode && (
                 <div className="w-full bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-xl border border-gray-100 dark:border-gray-700 flex justify-between relative overflow-hidden">
-                    {/* Línea de conexión de fondo */}
                     <div className="absolute top-1/2 left-10 right-10 h-1 bg-gray-200 dark:bg-gray-700 -translate-y-1/2 z-0" />
-
                     {pasosWizard.map((p) => {
                         const completado = (localConfigClub.onboardingStep || 0) > p.num;
                         const actual = (localConfigClub.onboardingStep || 0) === p.num || ((localConfigClub.onboardingStep || 0) === 0 && p.num === 1);
@@ -367,7 +352,7 @@ const VistaConfiguracion: React.FC = () => {
                                         actual ? 'bg-tkd-blue border-tkd-blue text-white scale-110 shadow-lg shadow-tkd-blue/30' :
                                             'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400'}`}>
                                     {completado ? <IconoExitoAnimado className="w-6 h-6" /> :
-                                        Bloqueado ? <div className="w-full h-full flex items-center justify-center"><div className="w-3 h-3 bg-gray-400 rounded-full" /></div> : // Candado implícito
+                                        Bloqueado ? <div className="w-full h-full flex items-center justify-center"><div className="w-3 h-3 bg-gray-400 rounded-full" /></div> :
                                             <span className="font-black text-lg">{p.num}</span>}
                                 </div>
                                 <span className={`text-[9px] font-black uppercase tracking-widest ${actual ? 'text-tkd-blue' : 'text-gray-400'}`}>
@@ -379,7 +364,6 @@ const VistaConfiguracion: React.FC = () => {
                 </div>
             )}
 
-            {/* BARRA DE NAVEGACIÓN (Solo visible si NO estamos en wizard mode o controlada por wizard) */}
             {!isWizardMode && (
                 <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
                     <div className="flex flex-row gap-1">
@@ -404,21 +388,9 @@ const VistaConfiguracion: React.FC = () => {
                 </div>
             )}
 
-            {/* CONTENIDO DE PESTAÑAS */}
             <div className="min-h-[500px]">
-                {/* 
-                    LÓGICA WIZARD:
-                    Si estamos en wizard, Forzar la vista correspondiente al paso.
-                    PASO 1: Info Institucional -> Botón "Guardar y Continuar"
-                    PASO 2: Branding -> Botón "Continuar" (Opcional)
-                    PASO 3: Sedes -> Botón "He registrado mi sede" (Validar > 0)
-                    PASO 4: Equipo -> Botón "Finalizar Configuración" (Validar)
-                */}
-
-                {/* TAB BRANDING (Usada para Pasos 1 y 2) */}
                 {(activeTab === 'branding' || (isWizardMode && currentStep <= 2)) && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-fade-in">
-                        {/* SECCIÓN 1: INFO INSTITUCIONAL (PASO 1) */}
                         <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && currentStep !== 1 && currentStep !== 0 ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">1. Información Institucional</h3>
@@ -439,7 +411,7 @@ const VistaConfiguracion: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dirección Principal <span className="text-red-500">*</span></label>
+                                    <label className="text-[10px) font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dirección Principal <span className="text-red-500">*</span></label>
                                     <input type="text" name="direccionClub" value={localConfigClub.direccionClub} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Calle 123... (Obligatorio)" />
                                 </div>
                                 <div>
@@ -468,7 +440,6 @@ const VistaConfiguracion: React.FC = () => {
                                     <p className="text-[9px] text-gray-400 uppercase font-bold italic">Este valor se sugerirá en el registro de cada alumno nuevo.</p>
                                 </div>
 
-                                {/* TOGGLE FORMULARIO PÚBLICO */}
                                 <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-3xl border border-purple-100 dark:border-purple-800/20 flex items-center justify-between">
                                     <div className="space-y-1">
                                         <h4 className="text-xs font-black uppercase text-purple-900 dark:text-purple-300">Formulario de Inscripción</h4>
@@ -493,7 +464,6 @@ const VistaConfiguracion: React.FC = () => {
                                             mostrarNotificacion("Diligencia los campos obligatorios", "error");
                                             return;
                                         }
-                                        // Guardar primero los datos institucionales
                                         try {
                                             await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
                                             await avanzarPaso(1);
@@ -508,17 +478,11 @@ const VistaConfiguracion: React.FC = () => {
                             )}
                         </section>
 
-                        {/* SECCIÓN 2: BRANDING (PASO 2) */}
                         <section className={`bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-8 ${isWizardMode && currentStep !== 2 && currentStep !== 5 ? 'opacity-50 pointer-events-none' : ''}`}>
                             <div className="flex justify-between items-center">
                                 <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">2. Look & Feel</h3>
                                 {isWizardMode && currentStep === 2 && (
-                                    <button
-                                        onClick={restaurarColores}
-                                        className="text-[9px] font-black uppercase text-gray-400 hover:text-tkd-red underline"
-                                    >
-                                        Restaurar Originales
-                                    </button>
+                                    <button onClick={restaurarColores} className="text-[9px] font-black uppercase text-gray-400 hover:text-tkd-red underline">Restaurar Originales</button>
                                 )}
                             </div>
 
@@ -566,10 +530,9 @@ const VistaConfiguracion: React.FC = () => {
                                                 reader.onload = async (ev) => {
                                                     try {
                                                         const base64 = ev.target?.result as string;
-                                                        // Optimizamos la imagen antes de guardarla localmente
                                                         const optimizada = await optimizarImagenBase64(base64);
                                                         setLocalConfigClub(prev => prev ? { ...prev, logoUrl: optimizada } : null);
-                                                        mostrarNotificacion("Logotipo optimizado y listo para guardar.", "success");
+                                                        mostrarNotificacion("Logotipo optimizado.", "success");
                                                     } catch (error) {
                                                         mostrarNotificacion("Error al procesar la imagen.", "error");
                                                     }
@@ -587,7 +550,7 @@ const VistaConfiguracion: React.FC = () => {
                                             try {
                                                 await guardarConfiguraciones(localConfigNotificaciones, configSinLogo);
                                                 setLocalConfigClub(configSinLogo);
-                                                mostrarNotificacion("Logo removido. Usando logo oficial de Tudojang.", "success");
+                                                mostrarNotificacion("Logo removido.", "success");
                                             } catch (error) {
                                                 mostrarNotificacion("Error al remover logo", "error");
                                             }
@@ -602,7 +565,6 @@ const VistaConfiguracion: React.FC = () => {
                             {isWizardMode && currentStep <= 2 && (
                                 <button
                                     onClick={async () => {
-                                        // Guardar branding antes de avanzar
                                         try {
                                             await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
                                             await avanzarPaso(2);
@@ -619,21 +581,19 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
-                {/* TAB SEDES (PASO 3) */}
                 {(activeTab === 'sedes' || (isWizardMode && currentStep === 3)) && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Gestión de Sedes</h3>
                             <button onClick={() => {
                                 if (sedes.length >= localConfigClub.limiteSedes) {
-                                    mostrarNotificacion(`Límite de Sedes alcanzado (${localConfigClub.limiteSedes}). Por favor, amplíe su plan para registrar más sedes.`, "warning");
+                                    mostrarNotificacion(`Límite de Sedes alcanzado (${localConfigClub.limiteSedes}). Amplía tu plan.`, "warning");
                                     return;
                                 }
-                                // Pre-fill con datos de config
                                 setSedeEdit({
                                     nombre: 'Sede Principal',
                                     direccion: localConfigClub.direccionClub,
-                                    ciudad: 'Ciudad Principal',
+                                    ciudad: '',
                                     telefono: '',
                                     id: '', tenantId: localConfigClub.tenantId,
                                     valorMensualidad: localConfigClub.valorMensualidad || 0
@@ -644,75 +604,35 @@ const VistaConfiguracion: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-start gap-4">
-                            <IconoInformacion className="w-6 h-6 text-tkd-blue flex-shrink-0 mt-1" />
-                            <div>
-                                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                                    <span className="font-black text-tkd-blue uppercase">Información Importante:</span> La Sede Principal se configura automáticamente con los datos de la sección "Información Institucional".
-                                </p>
-                                <p className="text-[10px] text-gray-500 mt-1">
-                                    Utilice esta sección <strong>únicamente</strong> si su club cuenta con sucursales o sedes adicionales.
-                                </p>
-                            </div>
-                        </div>
-
-                        {sedes.length === 0 && (
-                            <div className="p-10 text-center bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 font-bold uppercase text-xs">
-                                No es obligatorio crear una sede adicional si tu única ubicación es la registrada en Información Institucional. <br /><br />
-                                Este espacio debe ser usado solo para registrar sucursales o sedes satélite. Puedes continuar con confianza.
-                            </div>
-                        )}
-
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {sedes.filter(s => s.id).map(s => (
                                 <div key={s.id} className="tkd-card p-8 space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue" title="Editar Sede"><IconoEditar className="w-4 h-4" /></button>
+                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
                                             <button onClick={async () => {
-                                                if (!s.id) {
-                                                    mostrarNotificacion("Esta sede no tiene ID válido y no puede ser eliminada.", "warning");
-                                                    return;
+                                                if (window.confirm(`¿Seguro de eliminar la sede ${s.nombre}?`)) {
+                                                    await eliminarSede(s.id!);
+                                                    mostrarNotificacion("Sede eliminada.", "success");
                                                 }
-                                                if (window.confirm(`¿Seguro que deseas eliminar la sede ${s.nombre}? Esta acción no se puede deshacer.`)) {
-                                                    try {
-                                                        await eliminarSede(s.id);
-                                                        mostrarNotificacion("Sede eliminada satisfactoriamente.", "success");
-                                                    } catch (error) {
-                                                        console.error("[Configuracion] Error al eliminar sede:", error);
-                                                        mostrarNotificacion("Error al eliminar la sede. Intenta nuevamente.", "error");
-                                                    }
-                                                }
-                                            }} className="p-2 text-gray-400 hover:text-tkd-red" title="Eliminar Sede"><IconoEliminar className="w-4 h-4" /></button>
+                                            }} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
                                     <div>
                                         <h4 className="font-black uppercase text-lg leading-tight">{s.nombre}</h4>
                                         <p className="text-[10px] font-black text-gray-400 uppercase mt-1">{s.ciudad} • {s.direccion}</p>
                                     </div>
-                                    <div className="pt-4 border-t dark:border-white/5 flex justify-between items-center">
-                                        <p className="text-[9px] font-black text-gray-400 uppercase">Tarifa Sede</p>
-                                        <p className="text-sm font-black text-tkd-blue">{s.valorMensualidad ? formatearPrecio(s.valorMensualidad) : 'TARIFA BASE'}</p>
-                                    </div>
                                 </div>
                             ))}
                         </div>
 
                         {isWizardMode && currentStep === 3 && (
-                            <button
-                                onClick={() => {
-                                    avanzarPaso(3);
-                                }}
-                                className={`w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-blue-800 transition-all mt-4`}
-                            >
-                                Sede Principal Confirmada - Continuar
-                            </button>
+                            <button onClick={() => avanzarPaso(3)} className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg mt-4">Sede Principal Confirmada - Continuar</button>
                         )}
                     </div>
                 )}
 
-                {/* TAB EQUIPO (PASO 4) */}
                 {(activeTab === 'equipo' || (isWizardMode && currentStep === 4)) && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
@@ -722,31 +642,16 @@ const VistaConfiguracion: React.FC = () => {
                             </button>
                         </div>
                         <div className="tkd-card p-0">
-                            <TablaUsuarios
-                                usuarios={usuarios}
-                                onEditar={abrirFormularioUsuario}
-                                onEliminar={abrirConfirmacionEliminar}
-                                onGestionarContrato={() => mostrarNotificacion("Contrato gestionado en edición", "info")}
-                            />
+                            <TablaUsuarios usuarios={usuarios} onEditar={abrirFormularioUsuario} onEliminar={abrirConfirmacionEliminar} onGestionarContrato={() => { }} />
                         </div>
                         {isWizardMode && currentStep === 4 && (
                             <button
                                 onClick={async () => {
-                                    if (usuarios.length < 2 && !window.confirm("¿Seguro de avanzar sin registrar instructores adicionales?")) {
-                                        return;
-                                    }
-                                    try {
-                                        await avanzarPaso(4);
-                                        mostrarNotificacion("¡Configuración finalizada! Bienvenido a Tudojang.", "success");
-                                        setTimeout(() => {
-                                            window.location.hash = '/';
-                                            window.location.reload();
-                                        }, 1500);
-                                    } catch (err) {
-                                        mostrarNotificacion("Error al finalizar la configuración", "error");
-                                    }
+                                    await avanzarPaso(4);
+                                    window.location.hash = '/';
+                                    window.location.reload();
                                 }}
-                                className="w-full py-6 bg-green-500 text-white rounded-xl font-black uppercase text-sm shadow-xl hover:bg-green-600 transition-all mt-8 animate-pulse-slow"
+                                className="w-full py-6 bg-green-500 text-white rounded-xl font-black uppercase text-sm shadow-xl mt-8"
                             >
                                 Finalizar Configuración y Entrar
                             </button>
@@ -754,10 +659,8 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
-                {/* OTRAS TABS (Solo visibles si terminado) */}
                 {!isWizardMode && activeTab === 'programas' && (
                     <div className="space-y-8 animate-fade-in">
-                        {/* Contenido Programas Existente */}
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Catálogo de Programas Extra</h3>
                             <button onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
@@ -771,30 +674,19 @@ const VistaConfiguracion: React.FC = () => {
                                         <div className="p-3 bg-tkd-red/10 rounded-2xl"><IconoLogoOficial className="w-6 h-6 text-tkd-red" /></div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setProgramaEdit(p); setModalProgramaAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
-                                            <button onClick={() => {
-                                                if (window.confirm(`¿Seguro que deseas eliminar el programa ${p.nombre}?`)) {
-                                                    eliminarPrograma(p.id);
-                                                    mostrarNotificacion("Programa eliminado del catálogo.", "success");
-                                                }
-                                            }} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
+                                            <button onClick={() => { if (window.confirm("¿Seguro?")) eliminarPrograma(p.id); }} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
                                         </div>
                                     </div>
-                                    <div>
-                                        <h4 className="font-black uppercase text-lg leading-tight">{p.nombre}</h4>
-                                        <p className="text-[10px] font-black text-tkd-blue uppercase mt-1">{p.tipoCobro}</p>
-                                    </div>
-                                    <div className="pt-4 border-t dark:border-white/5 flex justify-between items-center">
-                                        <p className="text-sm font-black text-gray-900 dark:text-white">+{formatearPrecio(p.valor)}</p>
-                                        <span className="text-[9px] font-black bg-gray-100 dark:bg-white/10 px-3 py-1 rounded-lg text-gray-400">ACTIVADO</span>
-                                    </div>
+                                    <h4 className="font-black uppercase text-lg leading-tight">{p.nombre}</h4>
+                                    <p className="text-sm font-black text-gray-900 dark:text-white">+{formatearPrecio(p.valor)}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
+
                 {!isWizardMode && activeTab === 'alertas' && (
                     <div className="max-w-4xl space-y-8 animate-fade-in">
-                        {/* Contenido Alertas Existente */}
                         <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-10">
                             <div className="flex items-center gap-4">
                                 <IconoCampana className="w-10 h-10 text-tkd-blue" />
@@ -821,9 +713,9 @@ const VistaConfiguracion: React.FC = () => {
                         </section>
                     </div>
                 )}
+
                 {!isWizardMode && activeTab === 'licencia' && (
                     <div className="space-y-10 animate-fade-in">
-                        {/* Contenido Licencia Existente */}
                         <div className="bg-tkd-dark text-white p-10 rounded-[3rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8 border border-white/5 relative overflow-hidden">
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black text-tkd-red uppercase tracking-[0.4em] mb-2">Estado de Suscripción</p>
@@ -831,35 +723,19 @@ const VistaConfiguracion: React.FC = () => {
                                 <p className="text-gray-400 text-xs mt-4 font-bold uppercase tracking-widest">Vence el: {localConfigClub.fechaVencimiento}</p>
                             </div>
                             <div className="flex gap-4 relative z-10">
-                                <button className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Renovar Licencia</button>
+                                <button onClick={() => {
+                                    const el = document.getElementById('grid-planes-saas');
+                                    el?.scrollIntoView({ behavior: 'smooth' });
+                                }} className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Ver Opciones de Mejora</button>
                             </div>
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
 
-                        {/* MÉTRICAS DE USO */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
-                                {
-                                    label: 'Estudiantes',
-                                    used: estudiantes.length,
-                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || localConfigClub.limiteEstudiantes,
-                                    icon: IconoEstudiantes,
-                                    color: 'text-tkd-blue'
-                                },
-                                {
-                                    label: 'Docentes / Staff',
-                                    used: usuarios.length,
-                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || localConfigClub.limiteUsuarios,
-                                    icon: IconoUsuario,
-                                    color: 'text-green-500'
-                                },
-                                {
-                                    label: 'Sedes Activas',
-                                    used: sedes.length,
-                                    limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes,
-                                    icon: IconoCasa,
-                                    color: 'text-tkd-red'
-                                },
+                                { label: 'Estudiantes', used: estudiantes.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || localConfigClub.limiteEstudiantes, icon: IconoEstudiantes, color: 'text-tkd-blue' },
+                                { label: 'Docentes / Staff', used: usuarios.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || localConfigClub.limiteUsuarios, icon: IconoUsuario, color: 'text-green-500' },
+                                { label: 'Sedes Activas', used: sedes.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
                             ].map((metric) => {
                                 const percent = Math.min((metric.used / metric.limit) * 100, 100);
                                 return (
@@ -881,14 +757,98 @@ const VistaConfiguracion: React.FC = () => {
                                 );
                             })}
                         </div>
+
+                        <div id="grid-planes-saas" className="space-y-10">
+                            <div className="text-center space-y-3">
+                                <h4 className="text-3xl font-black uppercase tracking-tight dark:text-white">Membresías del Ecosistema</h4>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/5 px-4 py-1 rounded-full inline-block">
+                                    Cobro recurrente mensual automático vía Wompi
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                {Object.values(PLANES_SAAS).map(plan => {
+                                    const esPlanActual = localConfigClub.plan === plan.id;
+                                    const esSeleccionado = planSeleccionado === plan.id;
+                                    const orden = { starter: 1, growth: 2, pro: 3 };
+                                    const actualOrden = (orden as any)[localConfigClub.plan || 'starter'] || 1;
+                                    const planOrden = (orden as any)[plan.id] || 1;
+                                    const esUpgrade = planOrden > actualOrden;
+
+                                    return (
+                                        <div
+                                            key={plan.id}
+                                            onClick={() => setPlanSeleccionado(plan.id)}
+                                            className={`group cursor-pointer p-8 rounded-[3.5rem] border-4 transition-all duration-500 relative flex flex-col justify-between
+                                                ${esSeleccionado
+                                                    ? 'border-tkd-blue bg-white dark:bg-gray-800 shadow-[0_30px_60px_-15px_rgba(31,62,144,0.3)] scale-105 z-10'
+                                                    : esUpgrade
+                                                        ? 'border-tkd-red/20 opacity-90 hover:border-tkd-red/40 hover:opacity-100 bg-gray-50/50 dark:bg-white/5'
+                                                        : 'border-transparent bg-gray-50/30 dark:bg-white/5 opacity-50 hover:opacity-100'
+                                                }`}
+                                        >
+                                            {esUpgrade && (
+                                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-tkd-red text-white px-5 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg z-20 animate-bounce">
+                                                    Upgrade Recomendado
+                                                </div>
+                                            )}
+
+                                            {esPlanActual && !esUpgrade && (
+                                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-tkd-blue text-white px-5 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg z-20">
+                                                    Plan Actual
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-6">
+                                                <div className="flex justify-between items-start">
+                                                    <h5 className={`text-xl font-black uppercase tracking-tighter ${esSeleccionado ? 'text-tkd-blue' : 'text-gray-400'}`}>
+                                                        {plan.nombre}
+                                                    </h5>
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${esSeleccionado ? 'border-tkd-blue bg-tkd-blue' : 'border-gray-200'}`}>
+                                                        {esSeleccionado && <div className="w-2 h-2 bg-white rounded-full" />}
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <p className="text-3xl font-black dark:text-white flex items-start gap-1">
+                                                        <span className="text-sm mt-1">$</span>
+                                                        {formatearPrecio(plan.precio).replace('$', '')}
+                                                        <span className="text-[10px] text-gray-400 uppercase self-end mb-1">/ mes</span>
+                                                    </p>
+                                                    <ul className="space-y-3">
+                                                        {plan.caracteristicas.map(c => (
+                                                            <li key={c} className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-2">
+                                                                <div className={`w-1.5 h-1.5 rounded-full ${esSeleccionado ? 'bg-tkd-blue' : 'bg-gray-300'}`} />
+                                                                {c}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex justify-center pt-8">
+                                <button
+                                    onClick={() => {
+                                        const p = (PLANES_SAAS as any)[planSeleccionado];
+                                        if (p) setItemAPagar({ item: p, tipo: 'plan' });
+                                    }}
+                                    className="group bg-tkd-red text-white px-12 py-6 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-[0_20px_50px_-10px_rgba(205,46,58,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
+                                >
+                                    <IconoAprobar className="w-6 h-6" />
+                                    {planSeleccionado === localConfigClub.plan ? 'Renovar Membresía Actual' : 'Cambiar a este Plan Premium'}
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             {Object.values(COSTOS_ADICIONALES).map(addon => (
                                 <div key={addon.key} className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
-                                    <div>
-                                        <p className="text-[10px] font-black text-tkd-blue uppercase tracking-[0.2em] mb-1">Add-on de Capacidad</p>
-                                        <h4 className="text-xl font-black uppercase tracking-tight dark:text-white">{addon.label}</h4>
-                                        <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">{formatearPrecio(addon.precio)} <span className="text-[9px] opacity-40">Pago único</span></p>
-                                    </div>
+                                    <h4 className="text-xl font-black uppercase tracking-tight dark:text-white">{addon.label}</h4>
+                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">{formatearPrecio(addon.precio)} <span className="text-[9px] opacity-40">Pago único</span></p>
                                     <button onClick={() => setItemAPagar({ item: addon, tipo: 'addon' })} className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm">Adquirir Capacidad</button>
                                 </div>
                             ))}
@@ -897,9 +857,8 @@ const VistaConfiguracion: React.FC = () => {
                 )}
             </div>
 
-            {/* MODALES DINÁMICOS */}
             {modalUsuarioAbierto && <FormularioUsuario abierto={modalUsuarioAbierto} onCerrar={cerrarFormularioUsuario} onGuardar={guardarUsuarioHandler} usuarioActual={usuarioEnEdicion} cargando={cargandoAccion} />}
-            {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva de ${usuarioAEliminar.nombreUsuario}?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
+            {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
             {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={() => setModalSedeAbierto(false)} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
             {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}

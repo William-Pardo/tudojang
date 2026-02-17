@@ -1,7 +1,7 @@
 
 // context/AuthContext.tsx
 import React, { createContext, useState, useEffect, useCallback, ReactNode, useContext } from 'react';
-import { getAuth, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
@@ -44,7 +44,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const userData = userDocSnap.data();
             // Verificar si el usuario fue eliminado (soft delete)
             if (userData.deletedAt) {
-              console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). No restaurando sesión.`);
+              console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). Cerrando sesión de Firebase Auth.`);
+              // CRÍTICO: Cerrar sesión de Firebase Auth para evitar estado intermedio
+              await signOut(getAuth());
               setUsuario(null);
               return;
             }
@@ -73,7 +75,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               console.log(`[AuthContext] Perfil recuperado por email query.`);
               // Verificar si el usuario fue eliminado (soft delete)
               if (userData.deletedAt) {
-                console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). No restaurando sesión.`);
+                console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). Cerrando sesión de Firebase Auth.`);
+                // CRÍTICO: Cerrar sesión de Firebase Auth para evitar estado intermedio
+                await signOut(getAuth());
                 setUsuario(null);
                 return;
               }

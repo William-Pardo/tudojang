@@ -125,15 +125,16 @@ export const PLANES_SAAS = {
 };
 
 export const COSTOS_ADICIONALES = {
-    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes' },
-    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor' },
-    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede' }
+    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes', urlPago: 'https://checkout.wompi.co/l/KeDBYo' },
+    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor', urlPago: 'https://checkout.wompi.co/l/QFugB2' },
+    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede', urlPago: 'https://checkout.wompi.co/l/nn6oHn' }
 };
 
 export const CONFIGURACION_WOMPI = {
-    publicKey: "pub_test_XsQuPPUIhtkAUjxpyZtof7fEh5zYs52q",
-    privateKey: "prv_test_VVkIyE0hBvHJpjKf2JJOl2dGoYG6PBXK",
-    eventsKey: "test_events_znXLPPCzTpxVNzn6ITFPEESQwTLwbGzd",
-    integrityKey: "test_integrity_Iq6lRgXaEjqD4YLSoQsvPCvjdUhpNalY",
-    webhookUrl: "https://tudojang.com/api/webhookWompi"
+    publicKey: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
+    privateKey: "prv_prod_hruawVEOZ8tsoL7NIEgqULsyzCx3QYBB",
+    eventsKey: "prod_events_Sliei3JBPRgw0zFfLFQ17OaGq70lRXhw",
+    integrityKey: "prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm",
+    webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
 };
+

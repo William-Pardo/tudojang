@@ -15,14 +15,19 @@ export const obtenerSedes = async (tenantId?: string): Promise<Sede[]> => {
     }
     
     try {
-        // Filtrar por tenantId si se proporciona
-        const q = tenantId 
+        // Solo filtrar por tenantId si es válido (no temporal como PLATFORM_INIT_PENDING)
+        const tenantIdValido = tenantId && !tenantId.includes('PLATFORM') && !tenantId.includes('PENDING');
+        
+        const q = tenantIdValido 
             ? query(sedesCollection, where('tenantId', '==', tenantId))
             : sedesCollection;
             
         const snapshot = await getDocs(q);
-        const sedes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sede));
-        console.log(`[sedesApi] Obtenidas ${sedes.length} sedes de Firestore`);
+        // Filtrar sedes que no tengan deletedAt (soft delete)
+        const sedes = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Sede))
+            .filter(s => !s.deletedAt);
+        console.log(`[sedesApi] Obtenidas ${sedes.length} sedes de Firestore (tenantId: ${tenantId || 'todos'})`);
         return sedes;
     } catch (error) {
         console.error("[sedesApi] Error al obtener sedes:", error);
@@ -54,8 +59,13 @@ export const eliminarSede = async (id: string): Promise<void> => {
         throw new Error("ID de sede inválido para eliminación");
     }
     try {
-        await deleteDoc(doc(db, 'sedes', id));
-        console.log(`[sedesApi] Sede ${id} eliminada correctamente de Firestore`);
+        // SOFT DELETE: Marcar como eliminado en lugar de borrar el documento
+        // Esto mantiene la consistencia y permite sincronización correcta
+        const sedeDocRef = doc(db, 'sedes', id);
+        await updateDoc(sedeDocRef, {
+            deletedAt: new Date().toISOString()
+        });
+        console.log(`[sedesApi] Sede ${id} marcada como eliminada (soft delete)`);
     } catch (error) {
         console.error("[sedesApi] Error al eliminar sede de Firestore:", error);
         throw error;

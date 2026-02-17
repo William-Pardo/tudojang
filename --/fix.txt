@@ -1,3 +1,4 @@
+PTJCXJHA
 
 ## Capas de acceso
 HAS ESTOS AJUSTES:
@@ -16,7 +17,7 @@ ACTIVA EL EDITOR DE COLORES DE LA SECCION BRANDING, AGREGA UN BOTON DE RESTAURAR
 3 QUESE CONFIGURE LA SEDE DEL CLUB, en el formulario ya vengan CARGados LA DIRECCION Y VALOR DE MENSUALIDAD QUE SE FIJO EN valor mensualidad.
 4 QUE despues SE HABILITE LA CREACION DE MIEMBRO DE EQUIPO, DONDE AL DILIGENCIAR EL FORMULACIO DE CREACION SE INCLUYAN LOS PARAMETROS DE CONTRATACION DE MANERA OBLIGATORIA, ASI NO SE GENERAN CONTRATOS INCOMPLETOS, Y QUE AL TERMINAR DE CREAR EL PERFIL Y EL CONTRATO, es decir DESPUES DE DAR GUARDAR REGRESE A CONFIGURACION, NO QUE SE ENVIE ALL PERFIL QUE E ACABA DE CREAR. y que se envie un correo de bienbenida y otro de recordacionde claves al correo registrado del perfil.
 5 DESPUES DE ESTO SE DE ACCESO AL RESTO DE LA APP.
-
+ /// Hecho
 
 
 ## estudiantes
@@ -25,7 +26,7 @@ Valida que el valor de formualrio de inscripcion al FORMULARIO DE NUEVO ESTUDIAN
 DIME caul es LA MEJOR OPCION para este desarrollo de creacion de estudiantes ficticios.
 generar UNA HERRAMIENTA DE CREACION DE ESTUDIANTES FICTICIOS, QUE GENERE ESTUDIANTES POR LOTES DE A 10, PARA MEDIR las funciones de al app sin que la creacion de esta herramienta o creacion de estudiantes rompa la logica o limites de las membresias, o dame una alternativa.
 
-
+ //// hecho
 
 ### carnets
 analiza esto y guiame:
@@ -40,13 +41,41 @@ Regla de Legibilidad para Carnets:
 Implementa la mejor opcion del mercado para que se generen archivos f¿inales para impresion de la mejor foram y con las mejores practicas de la industria
 Neseciso que al generar los carnets finales en el pdf exista la opcion de ajustar la mesa de salida, es decir carta, oficcio, y a su ves que se ajusten la cantidad de carnets que quepan, teniendo en cuenta las pinzas de impresion reles de para carnets, separacion entre carnets, y que asi mismo se pueda generar carnets individales por lotes, es decir un grupo de carnets pero uno a uno agrupados en un mimso pdf.
 
+
+
 ## cofiguracion seguridad
 VERIFICA QUE LA APP TENGA ACTIVOS LOS TOPES DE CADA TIPO DE MEMBRESIA, limite DE ESTUDIAnTES, SEDES, MIEMBROS DE EQUIPO.
 GENERA INDICADORES VISUALES CON GRAFICO DE LOS TOPES DE CADA TIPO EJEMPLO: 15 DE 50 ESTUDIANTES, 1 DE 1 SEDE, ETC.
 NESECITO QUE ANALISES Y VERIFIQUES QUE EN CONFIGURACION REALMENTE SE ELIMINEN, SEDES, MIEMBROS DE EQUIPO Y PROGRAMAS, TANTO EN EL FRONTEND COMO EN EL BACKEND, DE LA MISMA MANERA QUE EL BOTON DE GUARDAR EN CONFIGURACION REALEMENTE LO HAGA EN TODAS LAS INSTANCIAS, Y QUE AL GUARDAR SE DISPARE UNA FUNCION DE REFRESH DE LA APP PARA QUE LOS CAMBIOS GUADADOS SE PROPAGUEN POR LA APP
+
+
+
 
 ## Nesecito asignar links de pago para servicios add-on capacidad +10 alumnos, add-on capacidad +1 miembro equipo, add-on capacidad +1 sede adcional.
 
 +10 Estudiantes
 Adiciona 10 cupos mas a tu memebresia actual
 15.000
+https://tudojang.com/#/configuracion
+
+
+**Estudiantes
+https://checkout.wompi.co/l/KeDBYo
+**Equipo
+https://checkout.wompi.co/l/QFugB2
+**Sede
+https://checkout.wompi.co/l/nn6oHn
+
+El boton de renovar licencia asignale url de pago, necesito que funcione como la pasarela de pago del landpage, que tome la mebresia actual por defecto o si el tenant seleciona una difetente sea esta la que tome.
+Activa las diferentes lecencias, pero has visible o acentuadas las que lleven a un update, para incentivar la compra de la siguiente membresia. 
+Que su implementacion no genere cambios en las url internas de la app, solo que se limite a facilitar la compra de la membresia. Revisa y asegurate de las membresias esten configuradas como cobro recurrente calculado por periodos de un mes a partir de la primer compra. 
+que esta implemntacion no rompa nada de la app, no la modifique ni deteriore o genere errores o posibles fallos.
+
+
+
+
+cambiar icono agenda
+activar funciones agenda 
+corregir tema de sedes Lios en agenda, configuracion/ sedes/ sedes activas.
+
+
