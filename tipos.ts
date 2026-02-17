@@ -350,6 +350,7 @@ export interface Usuario {
         lugarEjecucion: string;
         firmado: boolean;
     };
+    deletedAt?: string; // Soft delete: fecha de eliminación (ISO string)
 }
 
 export enum TipoVinculacionColaborador {

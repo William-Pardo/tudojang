@@ -664,13 +664,17 @@ const VistaConfiguracion: React.FC = () => {
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {sedes.map(s => (
+                            {sedes.filter(s => s.id).map(s => (
                                 <div key={s.id} className="tkd-card p-8 space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
                                         <div className="flex gap-2">
                                             <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue" title="Editar Sede"><IconoEditar className="w-4 h-4" /></button>
                                             <button onClick={async () => {
+                                                if (!s.id) {
+                                                    mostrarNotificacion("Esta sede no tiene ID válido y no puede ser eliminada.", "warning");
+                                                    return;
+                                                }
                                                 if (window.confirm(`¿Seguro que deseas eliminar la sede ${s.nombre}? Esta acción no se puede deshacer.`)) {
                                                     try {
                                                         await eliminarSede(s.id);

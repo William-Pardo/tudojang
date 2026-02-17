@@ -143,7 +143,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 Promise.allSettled([
                     api.obtenerUsuarios(),
                     api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                    api.obtenerSedes(),
+                    api.obtenerSedes(tenant.tenantId),
                     api.obtenerEstudiantes(),
                     api.obtenerEventos(),
                     api.obtenerImplementos(),

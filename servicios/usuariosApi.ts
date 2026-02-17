@@ -229,7 +229,10 @@ export const cerrarSesion = async (): Promise<void> => {
 export const obtenerUsuarios = async (): Promise<Usuario[]> => {
     if (!isFirebaseConfigured) return usuariosMock.map(({ contrasena: _, ...u }) => u);
     const userSnapshot = await getDocs(collection(db, "usuarios"));
-    return userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Usuario));
+    // Filtrar usuarios que no tengan deletedAt (soft delete)
+    return userSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Usuario))
+        .filter(u => !u.deletedAt);
 };
 
 export const actualizarUsuario = async (datos: any, id: string): Promise<Usuario> => {
@@ -276,8 +279,13 @@ export const eliminarUsuario = async (id: string): Promise<void> => {
         throw new Error("ID de usuario inválido para eliminación");
     }
     try {
-        await deleteDoc(doc(db, "usuarios", id));
-        console.log(`[usuariosApi] Usuario ${id} eliminado correctamente de Firestore`);
+        // SOFT DELETE: Marcar como eliminado en lugar de borrar el documento
+        // Esto evita que el AuthContext "reviva" el usuario al detectar UID tipo tenant
+        const userDocRef = doc(db, "usuarios", id);
+        await updateDoc(userDocRef, {
+            deletedAt: new Date().toISOString()
+        });
+        console.log(`[usuariosApi] Usuario ${id} marcado como eliminado (soft delete)`);
     } catch (error) {
         console.error("[usuariosApi] Error al eliminar usuario de Firestore:", error);
         throw error;

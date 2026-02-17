@@ -189,7 +189,10 @@ export const VistaEstudiantes: React.FC = () => {
 
             <header className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Hub de Estudiantes</h1>
+                    <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none flex items-center gap-3">
+                        Hub de Estudiantes
+                        <span className="text-[10px] bg-tkd-blue/10 text-tkd-blue px-2 py-0.5 rounded-lg border border-tkd-blue/20">v2.1</span>
+                    </h1>
                     <div className="flex items-center gap-4 mt-2">
                         <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
                         <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
@@ -198,14 +201,14 @@ export const VistaEstudiantes: React.FC = () => {
                                 <span className="text-[10px] font-black text-tkd-blue/60 uppercase tracking-widest mb-1">Capacidad del Plan</span>
                                 <div className="w-32 h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
                                     <div
-                                        className={`h-full transition-all duration-1000 ${(estudiantes.length / (configClub.limiteEstudiantes || PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || 50)) > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
-                                        style={{ width: `${Math.min((estudiantes.length / (configClub.limiteEstudiantes || PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || 50)) * 100, 100)}%` }}
+                                        className={`h-full transition-all duration-1000 ${(estudiantes.length / (PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50)) > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
+                                        style={{ width: `${Math.min((estudiantes.length / (PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50)) * 100, 100)}%` }}
                                     />
                                 </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-xs font-black text-tkd-dark dark:text-white leading-none">
-                                    {estudiantes.length} / {configClub.limiteEstudiantes || PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || 50}
+                                    {estudiantes.length} / {PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50}
                                 </span>
                                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Estudiantes Activos</span>
                             </div>

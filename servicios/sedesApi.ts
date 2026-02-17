@@ -1,20 +1,33 @@
 
 // servicios/sedesApi.ts
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Sede } from '../tipos';
 
 const sedesCollection = collection(db, 'sedes');
 
-export const obtenerSedes = async (): Promise<Sede[]> => {
+export const obtenerSedes = async (tenantId?: string): Promise<Sede[]> => {
+    // En producción (Firebase configurado), SIEMPRE consultar Firestore
+    // No retornar mocks porque causan problemas con IDs inválidos
     if (!isFirebaseConfigured) {
-        return [
-            { id: '1', tenantId: 'escuela-gajog-001', nombre: 'Sede Central', direccion: 'Calle 10 # 5-20', ciudad: 'Bogotá', telefono: '3001112233', valorMensualidad: 0 },
-            { id: '2', tenantId: 'escuela-gajog-001', nombre: 'Sede Premium Norte', direccion: 'Av. Siempre Viva 123', ciudad: 'Bogotá', telefono: '3004445566', valorMensualidad: 220000 }
-        ];
+        console.warn("[sedesApi] Firebase no configurado. Retornando array vacío.");
+        return [];
     }
-    const snapshot = await getDocs(sedesCollection);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sede));
+    
+    try {
+        // Filtrar por tenantId si se proporciona
+        const q = tenantId 
+            ? query(sedesCollection, where('tenantId', '==', tenantId))
+            : sedesCollection;
+            
+        const snapshot = await getDocs(q);
+        const sedes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sede));
+        console.log(`[sedesApi] Obtenidas ${sedes.length} sedes de Firestore`);
+        return sedes;
+    } catch (error) {
+        console.error("[sedesApi] Error al obtener sedes:", error);
+        return [];
+    }
 };
 
 export const agregarSede = async (sede: Omit<Sede, 'id'>): Promise<Sede> => {

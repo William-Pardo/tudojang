@@ -42,6 +42,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           if (userDocSnap.exists()) {
             const userData = userDocSnap.data();
+            // Verificar si el usuario fue eliminado (soft delete)
+            if (userData.deletedAt) {
+              console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). No restaurando sesión.`);
+              setUsuario(null);
+              return;
+            }
             setUsuario({
               id: firebaseUser.uid,
               email: firebaseUser.email!,
@@ -65,6 +71,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (qSnap && !qSnap.empty) {
               const userData = qSnap.docs[0].data();
               console.log(`[AuthContext] Perfil recuperado por email query.`);
+              // Verificar si el usuario fue eliminado (soft delete)
+              if (userData.deletedAt) {
+                console.warn(`[AuthContext] Usuario ${firebaseUser.email} fue eliminado (deletedAt: ${userData.deletedAt}). No restaurando sesión.`);
+                setUsuario(null);
+                return;
+              }
               setUsuario({
                 id: qSnap.docs[0].id,
                 email: firebaseUser.email!,
