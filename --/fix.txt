@@ -51,25 +51,6 @@ NESECITO QUE ANALISES Y VERIFIQUES QUE EN CONFIGURACION REALMENTE SE ELIMINEN, S
 
 
 
-## Nesecito asignar links de pago para servicios add-on capacidad +10 alumnos, add-on capacidad +1 miembro equipo, add-on capacidad +1 sede adcional.
-
-+10 Estudiantes
-Adiciona 10 cupos mas a tu memebresia actual
-15.000
-https://tudojang.com/#/configuracion
-
-
-**Estudiantes
-https://checkout.wompi.co/l/KeDBYo
-**Equipo
-https://checkout.wompi.co/l/QFugB2
-**Sede
-https://checkout.wompi.co/l/nn6oHn
-
-El boton de renovar licencia asignale url de pago, necesito que funcione como la pasarela de pago del landpage, que tome la mebresia actual por defecto o si el tenant seleciona una difetente sea esta la que tome.
-Activa las diferentes lecencias, pero has visible o acentuadas las que lleven a un update, para incentivar la compra de la siguiente membresia. 
-Que su implementacion no genere cambios en las url internas de la app, solo que se limite a facilitar la compra de la membresia. Revisa y asegurate de las membresias esten configuradas como cobro recurrente calculado por periodos de un mes a partir de la primer compra. 
-que esta implemntacion no rompa nada de la app, no la modifique ni deteriore o genere errores o posibles fallos.
 
 
 
@@ -78,4 +59,5 @@ cambiar icono agenda
 activar funciones agenda 
 corregir tema de sedes Lios en agenda, configuracion/ sedes/ sedes activas.
 
+Agregar funcion de recepcion de pagos en efectivo como alternativa a la verificacion de  comprobantes de pago. Debe funcionar como opcion alterna, asi; un boton de pago en efectivo activo sobre el estudiante el cual envia una factura de pago al estudiante o tutor despues de que el tenant o roll con accesos lo presione. a su vez este botno tambine estara conectado a las funciones de finanzas de la app par registrar el movimiento y asi actualizar todas las realciones de flujo de deinero, membresias o clases a los que este inscrito, mora, o compras en la tienda, segun sea el pago. Para que se genere mun contro detallado de los posibles pagos que se generen de manera manual en efectivo se debera activar el boton de pago por cada tipo de producto o servicio que se compro y este pendiente por pago, Ejemplo: evento, aartuculo en tienda, membresia, curso o taller, para ser pagado individualemente, es decir una vez por cada tipo de compra o deuda por pagar.
 

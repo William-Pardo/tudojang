@@ -100,7 +100,9 @@ export const PLANES_SAAS = {
         limiteUsuarios: 2,
         limiteSedes: 1,
         caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede', 'Gestión de Tienda', 'Eventos Básicos'],
-        popular: false
+        popular: false,
+        urlPago: 'https://checkout.wompi.co/l/1GGerS',
+        wompiPlanId: ''
     },
     growth: {
         id: 'growth',
@@ -110,7 +112,9 @@ export const PLANES_SAAS = {
         limiteUsuarios: 5,
         limiteSedes: 2,
         caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
-        popular: true
+        popular: true,
+        urlPago: 'https://checkout.wompi.co/l/JeY7cH',
+        wompiPlanId: ''
     },
     pro: {
         id: 'pro',
@@ -120,14 +124,17 @@ export const PLANES_SAAS = {
         limiteUsuarios: 10,
         limiteSedes: 5,
         caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes', 'Soporte Sabonim AI', 'Exportación Pro'],
-        popular: false
+        popular: false,
+        urlPago: 'https://checkout.wompi.co/l/M3ayL6',
+        wompiPlanId: ''
     }
 };
 
+
 export const COSTOS_ADICIONALES = {
-    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes', urlPago: 'https://checkout.wompi.co/l/KeDBYo' },
-    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor', urlPago: 'https://checkout.wompi.co/l/QFugB2' },
-    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede', urlPago: 'https://checkout.wompi.co/l/nn6oHn' }
+    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes', urlPago: 'https://checkout.wompi.co/l/SmeaJa' },
+    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor', urlPago: 'https://checkout.wompi.co/l/CKvRj2' },
+    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede', urlPago: 'https://checkout.wompi.co/l/cNOILo' }
 };
 
 export const CONFIGURACION_WOMPI = {

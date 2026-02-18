@@ -9,6 +9,7 @@ import type {
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
+import { sanearSedes } from '../utils/dataIntegrity'; // Importar saneamiento
 
 // --- CONFIGURACIÓN ---
 interface ConfiguracionContextType {
@@ -144,7 +145,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 Promise.allSettled([
                     api.obtenerUsuarios(),
                     api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                    api.obtenerSedes(tenant.tenantId),
+                    api.obtenerSedes(tenant.tenantId).then(sanearSedes),
                     api.obtenerEstudiantes(),
                     api.obtenerEventos(),
                     api.obtenerImplementos(),

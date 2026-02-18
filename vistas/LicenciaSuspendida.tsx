@@ -12,10 +12,17 @@ const LicenciaSuspendida: React.FC = () => {
 
     const handlePagarConWompi = async () => {
         try {
+            // Priorizar URL de pago personalizada si existe
+            if (planActual.urlPago) {
+                window.location.assign(planActual.urlPago);
+                return;
+            }
+
             const precio = planActual.precio;
             const precioEnCentavos = precio * 100;
             const moneda = 'COP';
-            const referencia = `RENOVACION_${configClub?.tenantId || 'TEST'}_${Date.now()}`;
+            // IMPORTANTE: Referencia con prefijo SUSC_ para el Webhook
+            const referencia = `SUSC_${configClub?.tenantId || 'TEST'}_${planActual.id}_${Date.now()}`;
 
             // Generar firma de integridad
             const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
@@ -26,7 +33,7 @@ const LicenciaSuspendida: React.FC = () => {
             const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
             const urlRetorno = `${window.location.origin}/#/`;
-            const urlWompi = `https://checkout.wompi.co/p/?` +
+            let urlWompi = `https://checkout.wompi.co/p/?` +
                 `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
                 `currency=${moneda}&` +
                 `amount-in-cents=${precioEnCentavos}&` +
@@ -34,10 +41,15 @@ const LicenciaSuspendida: React.FC = () => {
                 `signature:integrity=${signature}&` +
                 `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
+            // Si el plan tiene ID de suscripción automática, lo activamos
+            if (planActual.wompiPlanId) {
+                urlWompi += `&subscription-plan-id=${planActual.wompiPlanId}`;
+            }
+
             window.location.assign(urlWompi);
         } catch (error) {
             console.error("Error al iniciar pago:", error);
-            alert("No se pudo iniciar el proceso de pago. Por favor intenta de nuevo o contacta a soporte.");
+            alert("No se pudo iniciar el proceso de pago. Por favor intenta de nuevo.");
         }
     };
 

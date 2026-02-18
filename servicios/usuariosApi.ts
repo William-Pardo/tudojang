@@ -148,6 +148,10 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
             }
         } catch (dbError: any) {
             console.error("[autenticarUsuario] Error en consulta de base de datos:", dbError);
+            // Si el error es de cuenta eliminada, propagar inmediatamente sin reintentos
+            if (dbError?.message?.includes('cuenta ha sido eliminada')) {
+                throw dbError;
+            }
             if (dbError?.message?.includes('blocked-by-client') || dbError?.code === 'failed-precondition') {
                 throw new Error("El acceso a la base de datos está siendo bloqueado por tu navegador (p.ej. Brave Shields o un AdBlocker). Por favor desactívalo para este sitio.");
             }

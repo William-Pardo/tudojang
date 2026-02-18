@@ -98,14 +98,18 @@ const ModalPagoCheckout: React.FC<{
 
     const handleProcederAlPago = async () => {
         try {
+            // Si el item tiene una urlPago directa (Links personalizados del dashboard)
+            // se prioriza para permitir pagos manuales mientras se activa recurrencia.
+            if (item.urlPago) {
+                window.open(item.urlPago, '_blank');
+                if (tipo === 'addon') onExito({ tipo: 'addon', item: item.key });
+                else onExito({ tipo: 'plan', plan: item.id });
+                onCerrar();
+                return;
+            }
+
             if (tipo === 'addon') {
-                if (item.urlPago) {
-                    window.open(item.urlPago, '_blank');
-                    onExito({ tipo: 'addon', item: item.key });
-                    onCerrar();
-                } else {
-                    mostrarNotificacion("Link de pago no configurado.", "error");
-                }
+                mostrarNotificacion("Link de pago no configurado.", "error");
             } else {
                 const precio = item.precio;
                 const precioEnCentavos = precio * 100;
@@ -120,13 +124,18 @@ const ModalPagoCheckout: React.FC<{
                 const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
                 const urlRetorno = `${window.location.origin}/#/`;
-                const urlWompi = `https://checkout.wompi.co/p/?` +
+                let urlWompi = `https://checkout.wompi.co/p/?` +
                     `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
                     `currency=${moneda}&` +
                     `amount-in-cents=${precioEnCentavos}&` +
                     `reference=${referencia}&` +
                     `signature:integrity=${signature}&` +
                     `redirect-url=${encodeURIComponent(urlRetorno)}`;
+
+                // Si el item tiene un ID de plan de Wompi, lo añadimos para habilitar recurrencia automática
+                if (item.wompiPlanId) {
+                    urlWompi += `&subscription-plan-id=${item.wompiPlanId}`;
+                }
 
                 window.open(urlWompi, '_blank');
                 onExito({ tipo: 'plan', plan: item.id });

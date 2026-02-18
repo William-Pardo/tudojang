@@ -1,0 +1,22 @@
+https://us-central1-tudojang.cloudfunctions.net/webhookWompi
+pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB
+prv_prod_hruawVEOZ8tsoL7NIEgqULsyzCx3QYBB
+prod_events_Sliei3JBPRgw0zFfLFQ17OaGq70lRXhw
+prod_integrity_K0vlATDmQxX3kY6aN7UmaBOYkwBrLVFm
+
+
+##Links individuales
+
+**Estudiantes
+https://checkout.wompi.co/l/SmeaJa
+**Equipo
+https://checkout.wompi.co/l/CKvRj2
+**Sede
+https://checkout.wompi.co/l/cNOILo
+
+**Starter
+https://checkout.wompi.co/l/1GGerS
+**Growth
+https://checkout.wompi.co/l/JeY7cH
+**Pro
+https://checkout.wompi.co/l/M3ayL6
