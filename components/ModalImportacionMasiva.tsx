@@ -41,7 +41,7 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
     const [procesandoImport, setProcesandoImport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { agregarEstudiante } = useEstudiantes();
     const { mostrarNotificacion } = useNotificacion();
 
@@ -211,7 +211,7 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
                     telefono: String(row["Telefono"] || ''),
                     correo: String(row["Correo"] || '').toLowerCase(),
                     grado: row["Grado_Actual"] || GradoTKD.Blanco,
-                    sedeId: sedes[0]?.id || '1',
+                    sedeId: sedesVisibles[0]?.id || 'principal',
                     fechaIngreso: new Date().toISOString().split('T')[0],
                     estadoPago: EstadoPago.AlDia,
                     alergias: String(row["Alergias"] || 'NINGUNA'),

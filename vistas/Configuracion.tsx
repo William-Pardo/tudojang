@@ -193,7 +193,7 @@ const VistaConfiguracion: React.FC = () => {
 
     const { programas, eliminarPrograma, agregarPrograma, actualizarPrograma } = useProgramas();
     const { estudiantes } = useEstudiantes();
-    const { sedes, eliminarSede, agregarSede, actualizarSede } = useSedes();
+    const { sedes, sedesVisibles, totalSedesActivas, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
@@ -595,13 +595,16 @@ const VistaConfiguracion: React.FC = () => {
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Gestión de Sedes</h3>
                             <button onClick={() => {
-                                if (sedes.length >= localConfigClub.limiteSedes) {
-                                    mostrarNotificacion(`Límite de Sedes alcanzado (${localConfigClub.limiteSedes}). Amplía tu plan.`, "warning");
+                                // El límite ahora es sobre sedes adicionales (totalSedesActivas - 1)
+                                const sedesAdicionalesActuales = totalSedesActivas - 1;
+                                const limiteSedesAdicionales = ((PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes) - 1;
+                                if (sedesAdicionalesActuales >= limiteSedesAdicionales) {
+                                    mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu plan.`, "warning");
                                     return;
                                 }
                                 setSedeEdit({
-                                    nombre: 'Sede Principal',
-                                    direccion: localConfigClub.direccionClub,
+                                    nombre: 'Nueva Sede',
+                                    direccion: '',
                                     ciudad: '',
                                     telefono: '',
                                     id: '', tenantId: localConfigClub.tenantId,
@@ -609,12 +612,27 @@ const VistaConfiguracion: React.FC = () => {
                                 });
                                 setModalSedeAbierto(true);
                             }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
-                                <IconoAgregar className="w-4 h-4" /> Registrar Sede Adicional
+                                <IconoAgregar className="w-4 h-4" /> Agregar Sede Adicional
                             </button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {sedes.filter(s => s.id).map(s => (
+                            {/* Sede Principal - Siempre visible, proviene de Información Institucional */}
+                            <div className="tkd-card p-8 space-y-6 border-2 border-tkd-blue/30 bg-tkd-blue/5">
+                                <div className="flex justify-between items-start">
+                                    <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-tkd-blue bg-tkd-blue/10 px-3 py-1 rounded-full">Principal</span>
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase">{localConfigClub.nombreClub || 'Sede Principal'}</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{localConfigClub.direccionClub || 'Sin dirección configurada'}</p>
+                                </div>
+                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    Configurada en "Información Institucional"
+                                </div>
+                            </div>
+                            {/* Sedes Adicionales - Solo activas (sin deletedAt) */}
+                            {sedes.filter(s => s.id && !s.deletedAt).map(s => (
                                 <div key={s.id} className="tkd-card p-8 space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
@@ -744,7 +762,7 @@ const VistaConfiguracion: React.FC = () => {
                             {[
                                 { label: 'Estudiantes', used: estudiantes.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || localConfigClub.limiteEstudiantes, icon: IconoEstudiantes, color: 'text-tkd-blue' },
                                 { label: 'Docentes / Staff', used: usuarios.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || localConfigClub.limiteUsuarios, icon: IconoUsuario, color: 'text-green-500' },
-                                { label: 'Sedes Activas', used: sedes.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
+                                { label: 'Sedes (Principal + Adicionales)', used: totalSedesActivas, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
                             ].map((metric) => {
                                 const percent = Math.min((metric.used / metric.limit) * 100, 100);
                                 return (

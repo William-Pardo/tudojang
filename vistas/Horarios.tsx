@@ -12,7 +12,7 @@ const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', '
 
 const VistaHorarios: React.FC = () => {
     const { agendaCompleta, programas, actualizarPrograma } = useProgramas();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { usuarios } = useDataConfig();
     const { usuario } = useAuth();
 
@@ -67,7 +67,7 @@ const VistaHorarios: React.FC = () => {
     };
 
     const getNombreSede = (id: string) => {
-        return sedes.find(s => s.id === id)?.nombre || 'Sede Desconocida';
+        return sedesVisibles.find(s => s.id === id)?.nombre || 'Sede Desconocida';
     };
 
     return (
@@ -87,7 +87,7 @@ const VistaHorarios: React.FC = () => {
                             className="bg-white dark:bg-gray-800 border-none rounded-xl pl-10 pr-6 py-3 text-[10px] font-black uppercase tracking-widest shadow-sm focus:ring-2 focus:ring-tkd-blue outline-none appearance-none cursor-pointer"
                         >
                             <option value="todas">Todas las Sedes</option>
-                            {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                            {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                         </select>
                     </div>
 
@@ -193,7 +193,7 @@ const VistaHorarios: React.FC = () => {
                 onGuardar={handleGuardarBloque}
                 bloqueActual={bloqueEdit}
                 programas={programas}
-                sedes={sedes}
+                sedes={sedesVisibles}
                 usuarios={usuarios}
             />
         </div>

@@ -64,7 +64,7 @@ const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion
 const VistaMisionKicho: React.FC = () => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [mision, setMision] = useState<MisionKicho | null>(null);
@@ -100,7 +100,7 @@ const VistaMisionKicho: React.FC = () => {
 
     const handleActivarKichoAuto = async () => {
         if (!usuario) return;
-        if (sedes.length > 0 && !sedeSeleccionada) {
+        if (sedesVisibles.length > 0 && !sedeSeleccionada) {
             mostrarNotificacion("Debes seleccionar una sede para este protocolo.", "warning");
             return;
         }
@@ -115,7 +115,7 @@ const VistaMisionKicho: React.FC = () => {
                 tenantId: usuario.tenantId,
                 nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",
                 fechaExpiracion: expDate.toISOString(),
-                sedeId: sedeSeleccionada || (sedes[0]?.id || '1')
+                sedeId: sedeSeleccionada || (sedesVisibles[0]?.id || 'principal')
             });
 
             setShowExitoModal(true);
@@ -181,7 +181,7 @@ const VistaMisionKicho: React.FC = () => {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4 pt-4">
                                 <div className="flex-1 flex flex-col gap-3">
-                                    {sedes.length > 0 && (
+                                    {sedesVisibles.length > 0 && (
                                         <div className="bg-white/10 p-4 rounded-2xl border border-white/20">
                                             <label className="text-[10px] font-black uppercase text-blue-200 mb-2 block tracking-widest">Asignar Sede para este Lote</label>
                                             <select
@@ -190,7 +190,7 @@ const VistaMisionKicho: React.FC = () => {
                                                 className="w-full bg-white text-tkd-blue border-none rounded-xl py-3 px-4 text-xs font-black uppercase outline-none"
                                             >
                                                 <option value="">SELECCIONAR SEDE...</option>
-                                                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                                {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
                                             </select>
                                         </div>
                                     )}

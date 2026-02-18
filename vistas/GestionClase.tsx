@@ -15,7 +15,7 @@ import Loader from '../components/Loader';
 
 const VistaGestionClase: React.FC = () => {
     const { usuario } = useAuth();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [sedeSeleccionadaId, setSedeSeleccionadaId] = useState<string>(usuario?.sedeId || '');
@@ -49,10 +49,10 @@ const VistaGestionClase: React.FC = () => {
     }, [sedeSeleccionadaId, mostrarNotificacion]);
 
     useEffect(() => {
-        if (esAdministrativo && !sedeSeleccionadaId && sedes.length > 0) {
-            setSedeSeleccionadaId(sedes[0].id);
+        if (esAdministrativo && !sedeSeleccionadaId && sedesVisibles.length > 0) {
+            setSedeSeleccionadaId(sedesVisibles[0].id);
         }
-    }, [esAdministrativo, sedes, sedeSeleccionadaId]);
+    }, [esAdministrativo, sedesVisibles, sedeSeleccionadaId]);
 
     const handleMarcarListo = async (asist: any) => {
         setProcesandoId(asist.id);
@@ -109,7 +109,7 @@ const VistaGestionClase: React.FC = () => {
                     </button>
                 </div>
 
-                {esAdministrativo && sedes.length > 0 && (
+                {esAdministrativo && sedesVisibles.length > 0 && (
                     <div className="pt-6 border-t dark:border-gray-700">
                         <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Sede en Monitoreo:</label>
                         <div className="relative group">
@@ -121,7 +121,7 @@ const VistaGestionClase: React.FC = () => {
                                 onChange={(e) => setSedeSeleccionadaId(e.target.value)}
                                 className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl pl-12 pr-10 py-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner appearance-none cursor-pointer transition-all"
                             >
-                                {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
                             </select>
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 transition-transform group-hover:translate-y-[-40%]">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>

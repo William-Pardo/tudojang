@@ -13,7 +13,7 @@ import EmptyState from '../components/EmptyState';
 
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
     const [procesando, setProcesando] = useState(false);
@@ -29,7 +29,7 @@ const VistaCarnetizacion: React.FC = () => {
         try {
             await generarLoteCarnetsPdf(
                 pendientes,
-                sedes,
+                sedesVisibles,
                 configClub,
                 `Lote_Carnets_${new Date().toISOString().split('T')[0]}`,
                 formato
@@ -58,7 +58,7 @@ const VistaCarnetizacion: React.FC = () => {
                     <div className="p-3 bg-tkd-blue/10 rounded-xl"><IconoCasa className="w-5 h-5 text-tkd-blue" /></div>
                     <div className="pr-4">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Sede Actual</p>
-                        <p className="text-xs font-black dark:text-white uppercase tracking-tight">{sedes[0]?.nombre || 'Global'}</p>
+                        <p className="text-xs font-black dark:text-white uppercase tracking-tight">{sedesVisibles[0]?.nombre || 'Global'}</p>
                     </div>
                 </div>
             </header>
@@ -155,7 +155,7 @@ const VistaCarnetizacion: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4 text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase">{p.grado}</td>
                                                 <td className="px-6 py-4 text-[11px] font-black text-tkd-blue uppercase tracking-tighter">
-                                                    {sedes.find(s => s.id === p.sedeId)?.nombre || 'Sede Local'}
+                                                    {sedesVisibles.find(s => s.id === p.sedeId)?.nombre || 'Sede Local'}
                                                 </td>
                                                 <td className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase">{p.fechaIngreso}</td>
                                             </tr>

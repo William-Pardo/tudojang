@@ -12,7 +12,7 @@ interface Props {
     abierto: boolean;
     onCerrar: () => void;
     onGuardar: (sede: Omit<Sede, 'id'> | Sede) => Promise<void>;
-    sedeActual: Sede | null;
+    sedeActual: Partial<Sede> | null;
     cargando: boolean;
 }
 

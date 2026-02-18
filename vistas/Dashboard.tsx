@@ -30,7 +30,7 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
         limpiarFiltros,
     } = useDashboard();
 
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
 
     if (cargando) {
         return (
@@ -70,7 +70,7 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
             <div className="animate-slide-in-right">
                 <FiltrosDashboard 
                     filtros={filtros}
-                    sedes={sedes}
+                    sedes={sedesVisibles}
                     onFiltroChange={handleFiltroChange}
                     onLimpiarFiltros={limpiarFiltros}
                 />

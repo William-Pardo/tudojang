@@ -54,7 +54,7 @@ const DESCRIPCIONES_ROLES = {
 const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usuarioActual, cargando }) => {
   const [visible, setVisible] = useState(false);
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
-  const { sedes } = useSedes();
+  const { sedesVisibles } = useSedes();
   const esEdicion = !!usuarioActual;
   const schema = crearEsquemaValidacion(esEdicion);
 
@@ -234,7 +234,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 >
                   <option value="">Seleccione Sede...</option>
                   <option value="1">Sede Principal (Institucional)</option>
-                  {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  {sedesVisibles.filter(s => s.id !== 'principal').map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-tkd-red/50">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -329,7 +329,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                     <select {...register('lugarEjecucion')} className={`${inputClasses} appearance-none cursor-pointer`}>
                       <option value="">Seleccionar Sede...</option>
                       <option value="1">Sede Principal</option>
-                      {sedes.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                      {sedesVisibles.filter(s => s.id !== 'principal').map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
                       <option value="Sede Administrativa">Sede Administrativa</option>
                       <option value="Campo / Eventos">Campo / Eventos</option>
                     </select>

@@ -66,7 +66,7 @@ const schema = yup.object({
 }).required();
 
 const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando }) => {
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { programas } = useProgramas();
     const { configClub } = useConfiguracion();
 
@@ -93,10 +93,10 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
 
     // Cálculos dinámicos de facturación para el resumen
     const resumenCobros = useMemo(() => {
-        const base = calcularTarifaBaseEstudiante({ sedeId: watchedSedeId } as any, configClub, sedes);
+        const base = calcularTarifaBaseEstudiante({ sedeId: watchedSedeId } as any, configClub, sedesVisibles);
         const extras = calcularSumaProgramasRecurrentes({ programasInscritos: watchedProgramas } as any, programas);
         return { base, extras, total: base + extras };
-    }, [watchedSedeId, watchedProgramas, configClub, sedes, programas]);
+    }, [watchedSedeId, watchedProgramas, configClub, sedesVisibles, programas]);
 
     const togglePrograma = (prog: any) => {
         const yaInscrito = watchedProgramas.find((i: any) => i.idPrograma === prog.id);
@@ -201,12 +201,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             </div>
                         </div>
 
-                        {sedes.length > 0 ? (
+                        {sedesVisibles.length > 0 ? (
                             <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
                                 <label htmlFor="sedeId" className="text-[10px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Sede de Entrenamiento <span className="text-tkd-red">*</span></label>
                                 <select id="sedeId" {...register('sedeId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     <option value="">Seleccionar Sede...</option>
-                                    {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                    {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
                                 </select>
                                 <FormInputError mensaje={errors.sedeId?.message as string} />
                             </div>

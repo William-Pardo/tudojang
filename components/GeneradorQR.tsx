@@ -17,11 +17,11 @@ interface Props {
 const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [procesando, setProcesando] = useState(false);
-  const { sedes } = useSedes();
+  const { sedesVisibles } = useSedes();
   const { configClub } = useConfiguracion();
   const { mostrarNotificacion } = useNotificacion();
 
-  const sedeEstudiante = sedes.find(s => s.id === estudiante.sedeId);
+  const sedeEstudiante = sedesVisibles.find(s => s.id === estudiante.sedeId);
   const visualGrado = getBeltStyle(estudiante.grado);
 
   const downloadCard = async () => {

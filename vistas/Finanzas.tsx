@@ -20,7 +20,7 @@ interface Props {
 
 const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diario' }) => {
     const { movimientos, cargando, cargarMovimientos, agregarMovimiento, actualizarMovimiento, eliminarMovimiento } = useFinanzas();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { estudiantes } = useEstudiantes();
     const { usuario } = useAuth();
     const { mostrarNotificacion } = useNotificacion();
@@ -123,7 +123,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
                     <label className="text-[10px] uppercase font-black text-gray-400 block mb-1 tracking-widest">Sede / Dojang</label>
                     <select value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} className={selectClasses}>
                         <option value="todas">Todas las Sedes</option>
-                        {sedes.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                        {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                     </select>
                 </div>
                 <div>
@@ -145,7 +145,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             </div>
 
             {vistaAnalitica ? (
-                <InformeVisualEjecutivo movimientos={movimientosFiltrados} estudiantes={estudiantes} sedes={sedes} />
+                <InformeVisualEjecutivo movimientos={movimientosFiltrados} estudiantes={estudiantes} sedes={sedesVisibles} />
             ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden">
                     {movimientosFiltrados.length === 0 ? (
@@ -191,7 +191,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             )}
 
             {modalAbierto && (
-                <FormularioMovimiento abierto={modalAbierto} onCerrar={() => setModalAbierto(false)} onGuardar={handleGuardarMovimiento} sedes={sedes} cargando={cargandoAccion} movimientoActual={movimientoEnEdicion} />
+                <FormularioMovimiento abierto={modalAbierto} onCerrar={() => setModalAbierto(false)} onGuardar={handleGuardarMovimiento} sedes={sedesVisibles} cargando={cargandoAccion} movimientoActual={movimientoEnEdicion} />
             )}
             {modalEliminarAbierto && movimientoAEliminar && (
                 <ModalConfirmacion abierto={modalEliminarAbierto} titulo="Anular Movimiento" mensaje={`¿Confirmas anular este registro por valor de ${formatearPrecio(movimientoAEliminar.monto)}?`} onCerrar={() => setModalEliminarAbierto(false)} onConfirmar={handleConfirmarEliminacion} cargando={cargandoAccion} />

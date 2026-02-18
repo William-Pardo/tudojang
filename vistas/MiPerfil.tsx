@@ -18,7 +18,7 @@ import EscanerAsistencia from '../components/EscanerAsistencia';
 const VistaMiPerfil: React.FC = () => {
     const { usuario } = useAuth();
     const { configClub } = useConfiguracion();
-    const { sedes } = useSedes();
+    const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
     const [escanerAbierto, setEscanerAbierto] = useState(false);
@@ -53,7 +53,7 @@ const VistaMiPerfil: React.FC = () => {
         }
     };
 
-    const sedeUsuario = sedes.find(s => s.id === usuario?.sedeId);
+    const sedeUsuario = sedesVisibles.find(s => s.id === usuario?.sedeId);
 
     return (
         <div className="p-4 sm:p-8 space-y-10 animate-fade-in pb-20">

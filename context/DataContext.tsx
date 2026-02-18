@@ -9,7 +9,7 @@ import type {
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
-import { sanearSedes } from '../utils/dataIntegrity'; // Importar saneamiento
+import { sanearSedes, getSedesVisibles, getTotalSedesActivas } from '../utils/dataIntegrity'; // Importar saneamiento y funciones de sedes
 
 // --- CONFIGURACIÓN ---
 interface ConfiguracionContextType {
@@ -93,6 +93,8 @@ const FinanzasContext = createContext<FinanzasContextType | undefined>(undefined
 // --- SEDES ---
 interface SedesContextType {
     sedes: Sede[];
+    sedesVisibles: Sede[];  // Sede Principal + Sedes Adicionales activas
+    totalSedesActivas: number;  // 1 (Principal) + N (Adicionales activas)
     cargando: boolean;
     error: string | null;
     cargarSedes: () => Promise<void>;
@@ -228,7 +230,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
                 <SedesContext.Provider value={{
-                    sedes, cargando, error, cargarSedes: cargarTodo,
+                    sedes, 
+                    sedesVisibles: getSedesVisibles(tenant || null, sedes),
+                    totalSedesActivas: getTotalSedesActivas(sedes),
+                    cargando, error, cargarSedes: cargarTodo,
                     agregarSede: async (s) => {
                         if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
                         const res = await api.agregarSede({ ...s, tenantId: tenant.tenantId });
