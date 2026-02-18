@@ -58,6 +58,12 @@ NESECITO QUE ANALISES Y VERIFIQUES QUE EN CONFIGURACION REALMENTE SE ELIMINEN, S
 cambiar icono agenda
 activar funciones agenda 
 corregir tema de sedes Lios en agenda, configuracion/ sedes/ sedes activas.
-
+aydame a planear y desarrollar esta nueva funcion:
 Agregar funcion de recepcion de pagos en efectivo como alternativa a la verificacion de  comprobantes de pago. Debe funcionar como opcion alterna, asi; un boton de pago en efectivo activo sobre el estudiante el cual envia una factura de pago al estudiante o tutor despues de que el tenant o roll con accesos lo presione. a su vez este botno tambine estara conectado a las funciones de finanzas de la app par registrar el movimiento y asi actualizar todas las realciones de flujo de deinero, membresias o clases a los que este inscrito, mora, o compras en la tienda, segun sea el pago. Para que se genere mun contro detallado de los posibles pagos que se generen de manera manual en efectivo se debera activar el boton de pago por cada tipo de producto o servicio que se compro y este pendiente por pago, Ejemplo: evento, aartuculo en tienda, membresia, curso o taller, para ser pagado individualemente, es decir una vez por cada tipo de compra o deuda por pagar.
+Necesito estructurarla y convertirla en un plan de desarrollo e implementacion. espera mi aprobacion
 
+
+
+Previamente elimine sedes de la seccion sedes, pero a pesar de no verse, en el resto de la app siguen apareciendo estas sedes, en el indicador de la licencia, en el formulario de estudiantes, en agenda maestro, etc, nsecesito que identificque por que si se eliminaron visualemnte de la seccion sedes, pero no se eliminaotn en realidad de la app.
+Genera una posible solucion, y diseña una regla que evite que pase de nuevo, que en escencia consista en que la sede principal sea la que sale de 1. Información Institucional, y que solo se agrege una sede en la seccionsdes acorde al plan o compras adicionales que haga el tenant, pero si en sedes no hay registro de alguna sede adicional entonces en el resto de la app no se visualicen sino la sede principal.
+No hagas cambios espera mi aprobacion

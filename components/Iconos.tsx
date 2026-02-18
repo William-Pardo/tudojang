@@ -72,6 +72,7 @@ export const IconoSol: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><
 export const IconoFlechaArriba: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><path d="M12 19V5" /><polyline points="5 12 12 5 19 12" /></BaseIcon>);
 export const IconoCasa: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></BaseIcon>);
 export const IconoBuscar: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></BaseIcon>);
+export const IconoBillete: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></BaseIcon>);
 
 
 // --- Iconos Adicionales ---

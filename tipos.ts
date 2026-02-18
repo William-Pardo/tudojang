@@ -393,6 +393,10 @@ export interface SolicitudInscripcion {
     };
     fechaSolicitud: string;
     estado: EstadoSolicitud;
+    pagado?: boolean;
+    fechaPago?: string;
+    metodoPago?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Otro';
+    reciboId?: string;
 }
 
 // Added fix: Exported VariacionImplemento interface.
@@ -438,4 +442,8 @@ export interface SolicitudCompra {
     };
     fechaSolicitud: string;
     estado: EstadoSolicitudCompra;
+    pagado?: boolean;
+    fechaPago?: string;
+    metodoPago?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Otro';
+    reciboId?: string;
 }

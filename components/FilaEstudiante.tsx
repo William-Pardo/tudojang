@@ -6,51 +6,53 @@ import type { Estudiante } from '../tipos';
 import { RolUsuario } from '../tipos';
 import { useAuth } from '../context/AuthContext';
 import EstadoPagoBadge from './EstadoPagoBadge';
-import { 
-    IconoContrato, 
-    IconoImagen, 
-    IconoEditar, 
-    IconoEliminar, 
-    IconoFirma, 
-    IconoLogoOficial 
+import ModalRegistrarPago from './ModalRegistrarPago';
+import {
+    IconoContrato,
+    IconoImagen,
+    IconoEditar,
+    IconoEliminar,
+    IconoFirma,
+    IconoLogoOficial,
+    IconoBillete
 } from './Iconos';
-import GeneradorQR from './GeneradorQR';
 
 interface Props {
-  estudiante: Estudiante;
-  onEditar: (estudiante: Estudiante) => void;
-  onEliminar: (estudiante: Estudiante) => void;
-  onVerFirma: (firma: string, tutor: Estudiante['tutor']) => void;
-  onCompartirLink: (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => void;
-  isCard: boolean;
+    estudiante: Estudiante;
+    onEditar: (estudiante: Estudiante) => void;
+    onEliminar: (estudiante: Estudiante) => void;
+    onVerFirma: (firma: string, tutor: Estudiante['tutor']) => void;
+    onCompartirLink: (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => void;
+    isCard: boolean;
 }
 
 export const FilaEstudiante: React.FC<Props> = ({
-  estudiante,
-  onEditar,
-  onEliminar,
-  onVerFirma,
-  onCompartirLink,
-  isCard,
+    estudiante,
+    onEditar,
+    onEliminar,
+    onVerFirma,
+    onCompartirLink,
+    isCard,
 }) => {
     const { usuario } = useAuth();
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
+    const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
     const esAdmin = usuario?.rol === RolUsuario.Admin;
 
     // Helper para renderizar el estado de cada documento
     const renderEstadoDoc = (
-        firmado: boolean, 
-        signature: string | undefined, 
-        tipo: 'firma' | 'contrato' | 'imagen', 
-        Icono: any, 
+        firmado: boolean,
+        signature: string | undefined,
+        tipo: 'firma' | 'contrato' | 'imagen',
+        Icono: any,
         label: string
     ) => {
         const estaFirmado = firmado && !!signature;
-        
+
         return (
             <div className="flex flex-col items-center px-2 border-r last:border-r-0 border-gray-200 dark:border-gray-700 group relative">
                 {estaFirmado ? (
-                    <button 
+                    <button
                         onClick={() => onVerFirma(signature!, estudiante.tutor)}
                         className="p-1.5 text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/20 rounded-md transition-all shadow-sm"
                         title={`Ver ${label} Firmado`}
@@ -59,7 +61,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                         <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
                     </button>
                 ) : (
-                    <button 
+                    <button
                         onClick={() => onCompartirLink(tipo, estudiante.id)}
                         className="p-1.5 text-tkd-red dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-md transition-all shadow-sm hover:scale-110 active:scale-95"
                         title={`PENDIENTE: Enviar enlace de ${label}`}
@@ -75,9 +77,9 @@ export const FilaEstudiante: React.FC<Props> = ({
         <div className="flex items-center bg-white dark:bg-gray-800 p-1.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
             {/* CARNET / QR */}
             <div className="px-2 border-r border-gray-200 dark:border-gray-700">
-                <button 
+                <button
                     onClick={() => setModalQrAbierto(true)}
-                    className="p-1.5 text-tkd-blue rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/50 transition-colors" 
+                    className="p-1.5 text-tkd-blue rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/50 transition-colors"
                     title="Ver Carnet y QR"
                 >
                     <IconoLogoOficial className="w-5 h-5" />
@@ -86,28 +88,28 @@ export const FilaEstudiante: React.FC<Props> = ({
 
             {/* CONTRATO */}
             {renderEstadoDoc(
-                estudiante.contratoServiciosFirmado, 
-                estudiante.tutor?.firmaContratoDigital, 
-                'contrato', 
-                IconoContrato, 
+                estudiante.contratoServiciosFirmado,
+                estudiante.tutor?.firmaContratoDigital,
+                'contrato',
+                IconoContrato,
                 'Contrato de Servicios'
             )}
 
             {/* CONSENTIMIENTO RIESGOS */}
             {renderEstadoDoc(
-                estudiante.consentimientoInformado, 
-                estudiante.tutor?.firmaDigital, 
-                'firma', 
-                IconoFirma, 
+                estudiante.consentimientoInformado,
+                estudiante.tutor?.firmaDigital,
+                'firma',
+                IconoFirma,
                 'Consentimiento Informado (Riesgos)'
             )}
 
             {/* AUTORIZACIÓN DE MANEJO DE IMAGEN */}
             {renderEstadoDoc(
-                estudiante.consentimientoImagenFirmado, 
-                estudiante.tutor?.firmaImagenDigital, 
-                'imagen', 
-                IconoImagen, 
+                estudiante.consentimientoImagenFirmado,
+                estudiante.tutor?.firmaImagenDigital,
+                'imagen',
+                IconoImagen,
                 'Autorización de Manejo de Imagen'
             )}
         </div>
@@ -115,6 +117,13 @@ export const FilaEstudiante: React.FC<Props> = ({
 
     const contenidoAcciones = (
         <div className="flex items-center space-x-1 justify-end">
+            <button
+                onClick={() => setModalPagoAbierto(true)}
+                className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                title="Registrar Pago en Efectivo"
+            >
+                <IconoBillete className="w-5 h-5" />
+            </button>
             <button onClick={() => onEditar(estudiante)} className="p-2 text-tkd-blue hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Editar"><IconoEditar className="w-5 h-5" /></button>
             {esAdmin && (
                 <button onClick={() => onEliminar(estudiante)} className="p-2 text-tkd-red hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Eliminar"><IconoEliminar className="w-5 h-5" /></button>
@@ -124,6 +133,15 @@ export const FilaEstudiante: React.FC<Props> = ({
 
     return (
         <>
+            <ModalRegistrarPago
+                estudiante={estudiante}
+                abierto={modalPagoAbierto}
+                onCerrar={() => setModalPagoAbierto(false)}
+                onPagoExitoso={() => {
+                    // Opcional: recargar datos si fuera necesario, pero el estado local se actualiza solo si el padre lo maneja
+                    // Podríamos llamar a una prop onRefresh si existiera
+                }}
+            />
             {isCard ? (
                 <motion.div
                     layout
@@ -190,7 +208,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                         <p className="text-[10px] font-bold text-center text-gray-500 mt-6 px-4 uppercase leading-relaxed">
                             Optimizado para impresión en PVC (85.6mm x 54mm)
                         </p>
-                        <button 
+                        <button
                             onClick={() => setModalQrAbierto(false)}
                             className="mt-6 w-full text-gray-500 hover:text-tkd-dark dark:hover:text-white font-black uppercase text-xs tracking-widest transition-colors"
                         >
