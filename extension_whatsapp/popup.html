@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Tudojang Sender</title>
+    <style>
+        body {
+            width: 320px;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+        }
+
+        .header {
+            background-color: #D32126;
+            /* Color Rojo Tudojang */
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 15px;
+        }
+
+        .status-box {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .status-value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button {
+            background-color: #1f3e90;
+            /* Azul Tudojang */
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #162c66;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 11px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        TUDOJANG SENDER
+    </div>
+    <div class="container">
+        <div class="status-box">
+            <div class="status-title">Estado</div>
+            <div class="status-value" id="status">Esperando conexión...</div>
+        </div>
+
+        <div class="status-box">
+            <div class="status-title">Prueba Rápida</div>
+            <input type="text" id="phone" placeholder="Número (Ej: 573001234567)"
+                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px;">
+            <textarea id="message" placeholder="Escribe un mensaje..."
+                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; min-height: 60px; font-family: inherit; resize: vertical;"></textarea>
+        </div>
+
+        <button id="sendBtn">ENVIAR AHORA</button>
+
+        <div class="footer">v1.0.0 - Uso exclusivo Tudojang SaaS</div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+
+</html>
