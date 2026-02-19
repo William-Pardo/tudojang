@@ -8,13 +8,24 @@ Tudojang es una plataforma SaaS diseñada para la gestión integral de escuelas 
 ---
 
 ## 🎯 Objetivo Actual
-Mantener la estabilidad de producción, monitorear la nueva funcionalidad de pagos en efectivo y continuar con las mejoras de UX.
+Mantener la estabilidad de producción, monitorear la nueva funcionalidad de pagos en efectivo y las mejoras de UX en el módulo de configuración.
 
 ---
 
 ## 🛠️ Hitos Recientes (Febrero 2026)
 
-### 1. **Implementación de Pagos en Efectivo (Caja Registradora)** (18/02)
+### 1. **Eliminación de Flickering y Mejora de Integridad de Sedes** (19/02)
+- **Problema de Flickering**: Se resolvió un parpadeo visual donde el asistente de configuración aparecía brevemente durante el login en cuentas ya configuradas.
+  - **Solución**: Implementación de guardias de identidad en `DataContext`, `BrandingProvider` y `Configuracion.tsx` para bloquear renders prematuros con datos temporales (`PLATFORM_INIT_PENDING`).
+- **Integridad de Sedes**: Se centralizó la lógica de des-duplicación de sedes en `dataIntegrity.ts`.
+  - **Funcionalidad**: Se eliminó la visualización de sedes duplicadas de la principal en el panel de administración y se corrigió el conteo de licencias.
+- **Archivos Modificados**:
+  - `vistas/Configuracion.tsx`
+  - `hooks/useGestionConfiguracion.ts`
+  - `context/DataContext.tsx`
+  - `utils/dataIntegrity.ts`
+
+### 2. **Implementación de Pagos en Efectivo (Caja Registradora)** (18/02)
 - **Funcionalidad**: Se implementó un sistema completo para registrar pagos en efectivo directamente desde la interfaz de administración.
   - **Componente**: Nuevo modal `ModalRegistrarPago.tsx` que actúa como punto de venta (POS).
   - **Lógica**: Detecta automáticamente deudas pendientes por:

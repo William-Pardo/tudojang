@@ -22,18 +22,26 @@ export const webhookWompi = functions.https.onRequest(async (req, res) => {
 
         // 2. Solo procesar si el pago es APROBADO
         if (transaction.status === 'APPROVED') {
-            const referencia = transaction.reference; // Ej: "SUSC_gajog_id123"
-            const [tipo, slug, id] = referencia.split('_');
+            const referencia = transaction.reference; // Ej: "SUSC_tenantId_planId_timestamp" o "RENOVACION_tenantId_itemId_timestamp"
+            const parts = referencia.split('_');
+            const tipo = parts[0];
+            const tenantId = parts[1];
+            const itemId = parts[2];
 
-            if (tipo === 'SUSC') {
-                // CASO 1: Es el pago de la suscripción de una escuela
-                await admin.firestore().collection('tenants').doc(id).update({
-                    estadoSuscripcion: 'activo',
-                    fechaVencimiento: admin.firestore.Timestamp.fromDate(
-                        new Date(Date.now() + 31 * 24 * 60 * 60 * 1000) // Sumar 31 días
-                    )
-                });
-                console.log(`Suscripción activada para: ${slug}`);
+            if (tipo === 'SUSC' || tipo === 'RENOVACION') {
+                const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
+                const tenantDoc = await tenantRef.get();
+
+                if (tenantDoc.exists) {
+                    // Actualizar fecha de vencimiento (31 días extra)
+                    await tenantRef.update({
+                        estadoSuscripcion: 'activo',
+                        fechaVencimiento: admin.firestore.Timestamp.fromDate(
+                            new Date(Date.now() + 31 * 24 * 60 * 60 * 1000)
+                        )
+                    });
+                    console.log(`Pago procesado exitosamente para: ${tenantId}`);
+                }
             }
         }
     }

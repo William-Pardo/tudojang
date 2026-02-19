@@ -423,7 +423,7 @@ const VistaConfiguracion: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px) font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dirección Principal <span className="text-red-500">*</span></label>
+                                    <label className="text-[10px] font-black uppercase text-gray-400 block mb-2 ml-1 tracking-widest">Dirección Principal <span className="text-red-500">*</span></label>
                                     <input type="text" name="direccionClub" value={localConfigClub.direccionClub} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Calle 123... (Obligatorio)" />
                                 </div>
                                 <div>
@@ -602,9 +602,12 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
                             <button onClick={() => {
                                 const sedesAdicionalesActuales = totalSedesActivas - 1;
-                                const limiteSedesAdicionales = ((PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes) - 1;
+                                const currentPlanLimit = (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || 1;
+                                const effectiveLimit = Math.max(localConfigClub.limiteSedes || 0, currentPlanLimit);
+                                const limiteSedesAdicionales = effectiveLimit - 1;
+
                                 if (sedesAdicionalesActuales >= limiteSedesAdicionales) {
-                                    mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu plan.`, "warning");
+                                    mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu plan para agregar más sucursales.`, "warning");
                                     return;
                                 }
                                 setSedeEdit({
@@ -788,16 +791,34 @@ const VistaConfiguracion: React.FC = () => {
                                 <button onClick={() => {
                                     const el = document.getElementById('grid-planes-saas');
                                     el?.scrollIntoView({ behavior: 'smooth' });
-                                }} className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Ver Opciones de Mejora</button>
+                                }} className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Renovar o Mejorar Licencia</button>
                             </div>
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
-                                { label: 'Estudiantes', used: estudiantes.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || localConfigClub.limiteEstudiantes, icon: IconoEstudiantes, color: 'text-tkd-blue' },
-                                { label: 'Docentes / Staff', used: usuarios.length, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || localConfigClub.limiteUsuarios, icon: IconoUsuario, color: 'text-green-500' },
-                                { label: 'Sedes (Principal + Adicionales)', used: totalSedesActivas, limit: (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes, icon: IconoCasa, color: 'text-tkd-red' },
+                                {
+                                    label: 'Estudiantes',
+                                    used: estudiantes.length,
+                                    limit: Math.max(localConfigClub.limiteEstudiantes || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || 0),
+                                    icon: IconoEstudiantes,
+                                    color: 'text-tkd-blue'
+                                },
+                                {
+                                    label: 'Docentes / Staff',
+                                    used: usuarios.length,
+                                    limit: Math.max(localConfigClub.limiteUsuarios || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || 0),
+                                    icon: IconoUsuario,
+                                    color: 'text-green-500'
+                                },
+                                {
+                                    label: 'Sedes (Principal + Adicionales)',
+                                    used: totalSedesActivas,
+                                    limit: Math.max(localConfigClub.limiteSedes || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || 0),
+                                    icon: IconoCasa,
+                                    color: 'text-tkd-red'
+                                }
                             ].map((metric) => {
                                 const percent = Math.min((metric.used / metric.limit) * 100, 100);
                                 return (
@@ -920,7 +941,7 @@ const VistaConfiguracion: React.FC = () => {
             </div>
 
             {modalUsuarioAbierto && <FormularioUsuario abierto={modalUsuarioAbierto} onCerrar={cerrarFormularioUsuario} onGuardar={guardarUsuarioHandler} usuarioActual={usuarioEnEdicion} cargando={cargandoAccion} />}
-            {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
+            {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva de ${usuarioAEliminar.nombreUsuario}?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
             {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={() => setModalSedeAbierto(false)} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
             {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}

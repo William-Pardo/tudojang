@@ -74,7 +74,7 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     plan: 'starter',
     limiteEstudiantes: 50,
     limiteUsuarios: 2,
-    limiteSedes: 1,
+    limiteSedes: 2, // 1 Principal + 1 Adicional por defecto
     onboardingStep: 0
 };
 
@@ -98,8 +98,8 @@ export const PLANES_SAAS = {
         precio: 160000,
         limiteEstudiantes: 50,
         limiteUsuarios: 2,
-        limiteSedes: 1,
-        caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede', 'Gestión de Tienda', 'Eventos Básicos'],
+        limiteSedes: 2, // 1 Principal + 1 Adicional
+        caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede Adicional', 'Gestión de Tienda', 'Eventos Básicos'],
         popular: false,
         urlPago: 'https://checkout.wompi.co/l/1GGerS',
         wompiPlanId: ''
@@ -110,8 +110,8 @@ export const PLANES_SAAS = {
         precio: 340000,
         limiteEstudiantes: 150,
         limiteUsuarios: 5,
-        limiteSedes: 2,
-        caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
+        limiteSedes: 3, // 1 Principal + 2 Adicionales
+        caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes Adicionales', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
         popular: true,
         urlPago: 'https://checkout.wompi.co/l/JeY7cH',
         wompiPlanId: ''
@@ -122,8 +122,8 @@ export const PLANES_SAAS = {
         precio: 580000,
         limiteEstudiantes: 350,
         limiteUsuarios: 10,
-        limiteSedes: 5,
-        caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes', 'Soporte Sabonim AI', 'Exportación Pro'],
+        limiteSedes: 6, // 1 Principal + 5 Adicionales
+        caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes Adicionales', 'Soporte Sabonim AI', 'Exportación Pro'],
         popular: false,
         urlPago: 'https://checkout.wompi.co/l/M3ayL6',
         wompiPlanId: ''
