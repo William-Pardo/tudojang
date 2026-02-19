@@ -25,7 +25,7 @@ export const useGestionConfiguracion = () => {
     const [localConfigNotificaciones, setLocalConfigNotificaciones] = useState<ConfiguracionNotificaciones>(() => {
         if (configNotificaciones && Object.keys(configNotificaciones).length > 0) return configNotificaciones;
         return {
-            tenantId: usuarioActual?.tenantId || '',
+            tenantId: (usuarioActual?.tenantId && usuarioActual.tenantId !== 'PLATFORM_INIT_PENDING') ? usuarioActual.tenantId : '',
             diaCobroMensual: 5,
             diasAnticipoRecordatorio: 3,
             diasGraciaSuspension: 5,
@@ -33,7 +33,13 @@ export const useGestionConfiguracion = () => {
             frecuenciaQueryApiDias: 7
         } as ConfiguracionNotificaciones;
     });
-    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(configClub || null);
+
+    // IMPORTANTE: Si configClub es el por defecto (PENDING), preferimos mantener null 
+    // para que la guardia de la vista dispare el Loader en lugar del Wizard.
+    const [localConfigClub, setLocalConfigClub] = useState<ConfiguracionClub | null>(() => {
+        if (configClub && configClub.tenantId !== 'PLATFORM_INIT_PENDING') return configClub;
+        return null;
+    });
 
     console.log("[useGestionConfiguracion] Render:", {
         hasLocal: !!localConfigClub,

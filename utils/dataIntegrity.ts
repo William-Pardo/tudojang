@@ -37,7 +37,12 @@ export const getSedesVisibles = (
     };
 
     // 2. Filtrar sedes adicionales activas (sin deletedAt)
-    const sedesAdicionales = sedes.filter(s => !s.deletedAt);
+    // Regla: Se excluyen sedes que tengan el mismo nombre y dirección que la principal (duplicados de onboarding)
+    const sedesAdicionales = sedes.filter(s =>
+        !s.deletedAt &&
+        !(s.nombre?.trim().toLowerCase() === configClub?.nombreClub?.trim().toLowerCase() &&
+            s.direccion?.trim().toLowerCase() === configClub?.direccionClub?.trim().toLowerCase())
+    );
 
     // 3. Retornar combinación: Principal + Adicionales
     return [sedePrincipal, ...sedesAdicionales];
@@ -47,12 +52,17 @@ export const getSedesVisibles = (
  * Calcula el total de sedes activas para el contador de licencia.
  * Siempre incluye la Sede Principal (1) + las sedes adicionales activas.
  * 
+ * @param configClub Configuración del club
  * @param sedes Lista de sedes adicionales de Firestore
  * @returns Total de sedes activas (mínimo 1)
  */
-export const getTotalSedesActivas = (sedes: Sede[]): number => {
-    // Filtrar sedes adicionales activas (sin deletedAt)
-    const sedesAdicionalesActivas = sedes.filter(s => !s.deletedAt);
+export const getTotalSedesActivas = (configClub: ConfiguracionClub | null, sedes: Sede[]): number => {
+    // Filtrar sedes adicionales activas (sin deletedAt) y que no sean duplicados de la principal
+    const sedesAdicionalesActivas = sedes.filter(s =>
+        !s.deletedAt &&
+        !(s.nombre?.trim().toLowerCase() === configClub?.nombreClub?.trim().toLowerCase() &&
+            s.direccion?.trim().toLowerCase() === configClub?.direccionClub?.trim().toLowerCase())
+    );
     // Siempre: 1 (Principal) + N (Adicionales activas)
     return 1 + sedesAdicionalesActivas.length;
 };

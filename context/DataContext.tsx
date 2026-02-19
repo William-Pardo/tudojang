@@ -128,8 +128,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [error, setError] = useState<string | null>(null);
 
     const cargarTodo = useCallback(async () => {
-        if (!tenant) {
-            console.warn("[DataContext] No hay tenant configurado, abortando carga.");
+        // Si no hay tenant o es el temporal, marcamos cargando pero no ejecutamos sync aún
+        // Esto permite que BrandingProvider termine su trabajo primero.
+        if (!tenant || tenant.tenantId === 'PLATFORM_INIT_PENDING') {
+            console.log("[DataContext] Esperando identificación de Tenant real...");
+            setCargando(true);
             return;
         }
 
@@ -230,9 +233,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 eliminarPrograma: async (id) => { await api.eliminarPrograma(id); setProgramas(prev => prev.filter(item => item.id !== id)); }
             }}>
                 <SedesContext.Provider value={{
-                    sedes, 
+                    sedes,
                     sedesVisibles: getSedesVisibles(tenant || null, sedes),
-                    totalSedesActivas: getTotalSedesActivas(sedes),
+                    totalSedesActivas: getTotalSedesActivas(tenant || null, sedes),
                     cargando, error, cargarSedes: cargarTodo,
                     agregarSede: async (s) => {
                         if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");

@@ -309,7 +309,10 @@ const VistaConfiguracion: React.FC = () => {
         { num: 5, label: 'Finalizado', bloqueado: currentStep < 4 }
     ];
 
-    if (!localConfigClub || cargando) return <Loader texto="Cargando configuración..." />;
+    // --- GUARDIA DE IDENTIDAD SAAS ---
+    // Si el tenantId es el de plataforma o pendiente, forzamos Loader para evitar flickering
+    const esTenantTemporal = localConfigClub?.tenantId === 'PLATFORM_INIT_PENDING' || !localConfigClub?.tenantId;
+    if (cargando || esTenantTemporal) return <Loader texto="Sincronizando Consola..." />;
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all";
 
@@ -645,14 +648,9 @@ const VistaConfiguracion: React.FC = () => {
                                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-full">Sedes Adicionales</span>
                                 <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
                             </div>
-                            {/* Filtro anti-duplicado: excluye sedes cuyo nombre Y dirección coincidan con los datos institucionales (duplicados de onboarding) */}
+                            {/* Filtro anti-duplicado: usamos sedesVisibles y excluimos la 'principal' */}
                             {(() => {
-                                const sedesAdicionales = sedes.filter(s =>
-                                    s.id &&
-                                    !s.deletedAt &&
-                                    !(s.nombre?.trim().toLowerCase() === localConfigClub.nombreClub?.trim().toLowerCase() &&
-                                        s.direccion?.trim().toLowerCase() === localConfigClub.direccionClub?.trim().toLowerCase())
-                                );
+                                const sedesAdicionales = sedesVisibles.filter(s => s.id !== 'principal');
                                 return sedesAdicionales.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-12 px-8 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-white/10 text-center space-y-3">
                                         <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
