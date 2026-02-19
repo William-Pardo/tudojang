@@ -304,7 +304,7 @@ const VistaConfiguracion: React.FC = () => {
     const pasosWizard = [
         { num: 1, label: 'Institucional', bloqueado: false },
         { num: 2, label: 'Branding', bloqueado: false },
-        { num: 3, label: 'Sedes', bloqueado: currentStep < 2 },
+        { num: 3, label: 'Mi Dojang', bloqueado: currentStep < 2 },
         { num: 4, label: 'Equipo', bloqueado: currentStep < 3 },
         { num: 5, label: 'Finalizado', bloqueado: currentStep < 4 }
     ];
@@ -379,7 +379,7 @@ const VistaConfiguracion: React.FC = () => {
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
                             { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
-                            { id: 'sedes', label: 'Sedes', icon: IconoCasa },
+                            { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
                             { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
                             { id: 'alertas', label: 'Alertas', icon: IconoCampana },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
@@ -591,11 +591,13 @@ const VistaConfiguracion: React.FC = () => {
                 )}
 
                 {(activeTab === 'sedes' || (isWizardMode && currentStep === 3)) && (
-                    <div className="space-y-8 animate-fade-in">
+                    <div className="space-y-10 animate-fade-in">
                         <div className="flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Gestión de Sedes</h3>
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">3. Mi Dojang y Sedes Adicionales</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Base operativa principal + sucursales registradas</p>
+                            </div>
                             <button onClick={() => {
-                                // El límite ahora es sobre sedes adicionales (totalSedesActivas - 1)
                                 const sedesAdicionalesActuales = totalSedesActivas - 1;
                                 const limiteSedesAdicionales = ((PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || localConfigClub.limiteSedes) - 1;
                                 if (sedesAdicionalesActuales >= limiteSedesAdicionales) {
@@ -616,46 +618,81 @@ const VistaConfiguracion: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {/* Sede Principal - Siempre visible, proviene de Información Institucional */}
-                            <div className="tkd-card p-8 space-y-6 border-2 border-tkd-blue/30 bg-tkd-blue/5">
+                        {/* ── BLOQUE 1: MI DOJANG (Base Operativa) ── */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-tkd-blue bg-tkd-blue/10 px-3 py-1.5 rounded-full">Base Operativa</span>
+                                <div className="flex-1 h-px bg-tkd-blue/10" />
+                            </div>
+                            <div className="tkd-card p-8 space-y-6 border-2 border-tkd-blue/30 bg-gradient-to-br from-tkd-blue/5 to-transparent max-w-lg">
                                 <div className="flex justify-between items-start">
                                     <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-tkd-blue bg-tkd-blue/10 px-3 py-1 rounded-full">Principal</span>
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-tkd-blue bg-tkd-blue/10 px-3 py-1 rounded-full">Mi Dojang</span>
                                 </div>
                                 <div>
-                                    <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase">{localConfigClub.nombreClub || 'Sede Principal'}</h4>
+                                    <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase">{localConfigClub.nombreClub || 'Mi Dojang'}</h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{localConfigClub.direccionClub || 'Sin dirección configurada'}</p>
                                 </div>
-                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                    Configurada en "Información Institucional"
+                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-t border-gray-100 dark:border-white/10 pt-4">
+                                    📍 Configurable en &ldquo;Información Institucional&rdquo;
                                 </div>
                             </div>
-                            {/* Sedes Adicionales - Solo activas (sin deletedAt) */}
-                            {sedes.filter(s => s.id && !s.deletedAt).map(s => (
-                                <div key={s.id} className="tkd-card p-8 space-y-6">
-                                    <div className="flex justify-between items-start">
-                                        <div className="p-3 bg-tkd-blue/10 rounded-2xl"><IconoCasa className="w-6 h-6 text-tkd-blue" /></div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-4 h-4" /></button>
-                                            <button onClick={async () => {
-                                                if (window.confirm(`¿Seguro de eliminar la sede ${s.nombre}?`)) {
-                                                    await eliminarSede(s.id!);
-                                                    mostrarNotificacion("Sede eliminada.", "success");
-                                                }
-                                            }} className="p-2 text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-4 h-4" /></button>
+                        </div>
+
+                        {/* ── BLOQUE 2: SEDES ADICIONALES ── */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 bg-gray-100 dark:bg-white/5 px-3 py-1.5 rounded-full">Sedes Adicionales</span>
+                                <div className="flex-1 h-px bg-gray-200 dark:bg-white/10" />
+                            </div>
+                            {/* Filtro anti-duplicado: excluye sedes cuyo nombre Y dirección coincidan con los datos institucionales (duplicados de onboarding) */}
+                            {(() => {
+                                const sedesAdicionales = sedes.filter(s =>
+                                    s.id &&
+                                    !s.deletedAt &&
+                                    !(s.nombre?.trim().toLowerCase() === localConfigClub.nombreClub?.trim().toLowerCase() &&
+                                        s.direccion?.trim().toLowerCase() === localConfigClub.direccionClub?.trim().toLowerCase())
+                                );
+                                return sedesAdicionales.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 px-8 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-white/10 text-center space-y-3">
+                                        <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl">
+                                            <IconoCasa className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                                         </div>
+                                        <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Sin sedes adicionales registradas</p>
+                                        <p className="text-[9px] text-gray-300 dark:text-gray-600 uppercase font-bold">Usa el botón &ldquo;Agregar Sede Adicional&rdquo; para registrar sucursales</p>
                                     </div>
-                                    <div>
-                                        <h4 className="font-black uppercase text-lg leading-tight">{s.nombre}</h4>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase mt-1">{s.ciudad} • {s.direccion}</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                        {sedesAdicionales.map(s => (
+                                            <div key={s.id} className="tkd-card p-8 space-y-6">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="p-3 bg-gray-100 dark:bg-white/5 rounded-2xl"><IconoCasa className="w-6 h-6 text-gray-500" /></div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue transition-colors"><IconoEditar className="w-4 h-4" /></button>
+                                                        <button onClick={async () => {
+                                                            if (window.confirm(`¿Seguro de eliminar la sede ${s.nombre}?`)) {
+                                                                await eliminarSede(s.id!);
+                                                                mostrarNotificacion("Sede eliminada.", "success");
+                                                            }
+                                                        }} className="p-2 text-gray-400 hover:text-tkd-red transition-colors"><IconoEliminar className="w-4 h-4" /></button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-black uppercase text-lg leading-tight dark:text-white">{s.nombre}</h4>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase mt-1">{s.ciudad} • {s.direccion}</p>
+                                                </div>
+                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                    {s.telefono && `📞 ${s.telefono}`}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })()}
                         </div>
 
                         {isWizardMode && currentStep === 3 && (
-                            <button onClick={() => avanzarPaso(3)} className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg mt-4">Sede Principal Confirmada - Continuar</button>
+                            <button onClick={() => avanzarPaso(3)} className="w-full py-4 bg-tkd-blue text-white rounded-xl font-black uppercase text-xs shadow-lg mt-4">Mi Dojang Confirmado — Continuar</button>
                         )}
                     </div>
                 )}
