@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useProgramas, useSedes, useConfiguracion, useConfiguracion as useDataConfig } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useNotificacion } from '../context/NotificacionContext';
 import { IconoCasa, IconoUsuario, IconoAgregar, IconoInformacion, IconoEditar, IconoEliminar } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import ModalAgendarClase from '../components/ModalAgendarClase';
@@ -11,10 +12,11 @@ import { BloqueHorario, RolUsuario } from '../tipos';
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 const VistaHorarios: React.FC = () => {
-    const { agendaCompleta, programas, actualizarPrograma } = useProgramas();
+    const { agendaCompleta, programas, actualizarPrograma, agregarPrograma } = useProgramas();
     const { sedesVisibles } = useSedes();
     const { usuarios } = useDataConfig();
     const { usuario } = useAuth();
+    const { mostrarNotificacion } = useNotificacion();
 
     const [filtroSede, setFiltroSede] = useState('todas');
     const [filtroInstructor, setFiltroInstructor] = useState('todos');
@@ -40,7 +42,30 @@ const VistaHorarios: React.FC = () => {
     }, [agendaCompleta, filtroSede, filtroInstructor]);
 
     const handleGuardarBloque = async (bloque: BloqueHorario) => {
-        const programa = programas.find(p => p.id === bloque.programaId);
+        let programa = programas.find(p => p.id === bloque.programaId);
+
+        // CASO: No existen programas configurados (Primer arranque o Limpieza)
+        if (!programa && bloque.programaId === 'programa-base') {
+            try {
+                // Importamos el tipo dinámicamente o usamos fallback si es necesario
+                const { TipoCobroPrograma } = await import('../tipos');
+                programa = await agregarPrograma({
+                    nombre: '🥋 Clase Regular (Base)',
+                    tipoCobro: TipoCobroPrograma.Recurrente,
+                    valor: 0,
+                    bloquesHorarios: [],
+                    descripcion: 'Sesión técnica regular de la academia.',
+                    horario: 'Horario según agenda',
+                    activo: true
+                } as any);
+                // Vinculamos el bloque al ID real generado por Firebase
+                bloque.programaId = programa!.id;
+            } catch (err) {
+                mostrarNotificacion("Error al auto-configurar el programa base.", "error");
+                return;
+            }
+        }
+
         if (!programa) return;
 
         const nuevosBloques = programa.bloquesHorarios ? [...programa.bloquesHorarios] : [];
@@ -51,6 +76,7 @@ const VistaHorarios: React.FC = () => {
 
         await actualizarPrograma({ ...programa, bloquesHorarios: nuevosBloques });
         setModalAbierto(false);
+        mostrarNotificacion("Agenda actualizada correctamente.", "success");
     };
 
     const handleEliminarBloque = async (bloque: BloqueHorario) => {
@@ -195,6 +221,7 @@ const VistaHorarios: React.FC = () => {
                 programas={programas}
                 sedes={sedesVisibles}
                 usuarios={usuarios}
+                mostrarNotificacion={mostrarNotificacion}
             />
         </div>
     );

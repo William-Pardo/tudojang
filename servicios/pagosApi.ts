@@ -254,16 +254,9 @@ export const procesarPagoEfectivo = async (
 
         await batch.commit();
 
-        // 5. Notificar (Fire & Forget)
-        // Por seguridad, envolvemos en try/catch independiente
-        if (estudiante.correo) {
-            try {
-                // Aquí se llamaría a enviarEmailConfirmacionPago
-                // enviarEmailConfirmacionPago(...)
-            } catch (emailErr) {
-                console.warn("No se pudo enviar email de confirmación", emailErr);
-            }
-        }
+        // 5. Notificar (Solo WhatsApp, según requerimiento de usuario)
+        // La notificación por correo para estudiantes ha sido desactivada.
+        // Se recomienda usar el flujo de WhatsApp del componente ModalRegistrarPago.
 
         return { exito: true, reciboId, nuevoSaldo };
 

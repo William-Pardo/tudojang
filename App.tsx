@@ -34,6 +34,7 @@ import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
 import VistaFirmaImagen from './vistas/FirmaImagen';
 import CensoPublico from './vistas/CensoPublico';
+import ReportarPagoPublico from './vistas/ReportarPagoPublico';
 
 import Footer from './components/Footer';
 import NotificacionToast from './components/NotificacionToast';
@@ -72,7 +73,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         if (isPC) {
             return `${baseClasses} py-5 border-r-4 ${estaAbierta ? 'px-8 gap-4' : 'px-0 justify-center'} ${isActive ? 'bg-white/10 border-tkd-red' : 'bg-transparent border-transparent hover:bg-white/5 opacity-80 hover:opacity-100'}`;
         } else {
-            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
+            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border gap-5 justify-start ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
         }
     };
 
@@ -167,7 +168,7 @@ const AppLayout: React.FC = () => {
     }
 
     return (
-        <div className="relative md:flex h-screen bg-tkd-gray dark:bg-gray-950 overflow-hidden">
+        <div className="relative flex flex-col md:flex-row h-screen md:h-screen bg-tkd-gray dark:bg-gray-950 overflow-hidden" style={{ height: '100dvh' }}>
             <HeatmapOverlay puntos={puntos} activo={heatmapActivo} />
             {menuAbierto && <div className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={() => setMenuAbierto(false)}></div>}
             <BarraLateral usuario={usuario} onLogout={logout} estaAbierta={menuAbierto} onCerrar={() => setMenuAbierto(false)} />
@@ -211,7 +212,7 @@ const AppLayout: React.FC = () => {
                 </header>
 
                 <div className="flex-1 overflow-y-auto" ref={scrollableContainerRef}>
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="h-full">
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="min-h-full">
                         <ReactRouterDOM.Outlet />
                     </motion.div>
                 </div>
@@ -273,7 +274,20 @@ const AppRoutes: React.FC = () => {
     return (
         <>
             <ReactRouterDOM.Routes>
-                <ReactRouterDOM.Route path="/login" element={usuario ? <ReactRouterDOM.Navigate to={usuario.rol === RolUsuario.Tutor ? "/mi-perfil" : "/"} replace /> : <Login />} />
+                <ReactRouterDOM.Route
+                    path="/login"
+                    element={usuario ? (
+                        <ReactRouterDOM.Navigate
+                            to={usuario.rol === RolUsuario.Tutor
+                                ? "/mi-perfil"
+                                : (tenant && (tenant.onboardingStep || 0) < 5 && usuario.rol === RolUsuario.Admin
+                                    ? "/configuracion"
+                                    : "/")
+                            }
+                            replace
+                        />
+                    ) : <Login />}
+                />
                 <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                 <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
                 <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
@@ -282,6 +296,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
+                <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
 
                 <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
                     <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />

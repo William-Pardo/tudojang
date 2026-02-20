@@ -40,7 +40,7 @@ Regla de Legibilidad para Carnets:
 3 Excepción de Marca (Gris de Seguridad): Si todos los colores de la marca superan el 70% de luminosidad (paletas pasteles o muy claras), el fondo del carnet será un Gris Antracita (K: 75% o #333333) para asegurar que los datos del usuario sean legibles.
 Implementa la mejor opcion del mercado para que se generen archivos f¿inales para impresion de la mejor foram y con las mejores practicas de la industria
 Neseciso que al generar los carnets finales en el pdf exista la opcion de ajustar la mesa de salida, es decir carta, oficcio, y a su ves que se ajusten la cantidad de carnets que quepan, teniendo en cuenta las pinzas de impresion reles de para carnets, separacion entre carnets, y que asi mismo se pueda generar carnets individales por lotes, es decir un grupo de carnets pero uno a uno agrupados en un mimso pdf.
-
+ ///hecho
 
 
 ## cofiguracion seguridad
@@ -63,12 +63,10 @@ corregir tema de sedes Lios en agenda, configuracion/ sedes/ sedes activas.
 aydame a planear y desarrollar esta nueva funcion:
 Agregar funcion de recepcion de pagos en efectivo como alternativa a la verificacion de  comprobantes de pago. Debe funcionar como opcion alterna, asi; un boton de pago en efectivo activo sobre el estudiante el cual envia una factura de pago al estudiante o tutor despues de que el tenant o roll con accesos lo presione. a su vez este botno tambine estara conectado a las funciones de finanzas de la app par registrar el movimiento y asi actualizar todas las realciones de flujo de deinero, membresias o clases a los que este inscrito, mora, o compras en la tienda, segun sea el pago. Para que se genere mun contro detallado de los posibles pagos que se generen de manera manual en efectivo se debera activar el boton de pago por cada tipo de producto o servicio que se compro y este pendiente por pago, Ejemplo: evento, aartuculo en tienda, membresia, curso o taller, para ser pagado individualemente, es decir una vez por cada tipo de compra o deuda por pagar.
 Necesito estructurarla y convertirla en un plan de desarrollo e implementacion. espera mi aprobacion
-
+ ///hecho
 
 ##sedes
-Tengo un conflicto, el el apartado de sedes se ve la sede principal, lacual coicide con la sede generada con los datos de Información Institucional, lo cual es correcto y funcional, pero genera un problema, es que el alojar esa sede dentro de sedes implica que esa misma sede ocupa el espacio de la que seria la sede adicional y al final la que seria la sede principal se convierte a la vez en la sede adicional y no queda la posibilidad de crear esa sede adicional, y el indicador de esta caracteristica lo rtifica en licencia. Necestito que la sede principal quede creada, pero esta sede y su configuracion no ocupen el espacio de la funcion sede, para ello pienso que se deba nombrar de una manera diferente la configuracion de la que seria la base operativa o un sinomimo quizas Mi Dojang y las otras serian sedes
-
-
+Tengo un conflicto, el el apartado de sedes se ve la sede principal, la cual coincide con la sede generada con los datos de Información Institucional, lo cual es correcto y funcional, pero genera un problema, es que se esta alojando esa sede dentro de sedes, y el apartado de sedes es para la sede o sedes adicionales, no para la principal o primera sede. Necestito que la sede principal quede creada, pero esta sede y su configuracion no ocupen el espacio de la funcion sedes, para ello pienso que se deba nombrar de una manera diferente la configuracion de la que seria la base operativa o un sinomimo quizas Mi Dojang y las otras serian sedes
 Previamente elimine sedes de la seccion sedes, pero a pesar de no verse, en el resto de la app siguen apareciendo estas sedes, en el indicador de la licencia, en el formulario de estudiantes, en agenda maestro, etc, nsecesito que identificque por que si se eliminaron visualemnte de la seccion sedes, pero no se eliminaotn en realidad de la app.
 Genera una posible solucion, y diseña una regla que evite que pase de nuevo, que en escencia consista en que la sede principal sea la que sale de 1. Información Institucional, y que solo se agrege una sede en la seccionsdes acorde al plan o compras adicionales que haga el tenant, pero si en sedes no hay registro de alguna sede adicional entonces en el resto de la app no se visualicen sino la sede principal.
 No hagas cambios espera mi aprobacion

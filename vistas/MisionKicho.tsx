@@ -11,8 +11,9 @@ import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
 import {
     IconoWhatsApp, IconoCopiar, IconoAprobar,
     IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
-    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar
+    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoAprobar as IconoLab
 } from '../components/Iconos';
+import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
@@ -130,6 +131,20 @@ const VistaMisionKicho: React.FC = () => {
     const handleCopiar = () => {
         navigator.clipboard.writeText(linkPublico);
         mostrarNotificacion("Link copiado. ¡Pégalo en WhatsApp!", "success");
+    };
+
+    const handleStressTest = async () => {
+        if (!mision || !usuario) return;
+        setActivando(true);
+        try {
+            await simularRegistrosMasivos(15, mision.id, usuario.tenantId);
+            mostrarNotificacion("¡15 aspirantes ficticios inyectados!", "info");
+            await cargarDatos();
+        } catch (e) {
+            mostrarNotificacion("Error en simulación", "error");
+        } finally {
+            setActivando(false);
+        }
     };
 
     const handleValidar = async (regId: string, estado: 'verificado' | 'rechazado') => {
@@ -275,6 +290,15 @@ const VistaMisionKicho: React.FC = () => {
                                 <a href={`https://wa.me/?text=🥋%20*PROTOCOLO%20DE%20REGISTRO%20TUDOJANG*%0A%0AHola!%20Por%20favor%20ingresa%20tus%20datos%20aquí%20para%20formalizar%20tu%20ingreso%20a%20la%20academia:%20${encodeURIComponent(linkPublico)}`} target="_blank" className="w-full py-4 bg-green-600 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-xl hover:bg-green-700 transition-all">
                                     <IconoWhatsApp className="w-5 h-5" /> Compartir en WhatsApp
                                 </a>
+
+                                {/* BOTÓN DE SIMULACIÓN PARA PRUEBAS */}
+                                <button
+                                    onClick={handleStressTest}
+                                    disabled={activando}
+                                    className="w-full py-4 bg-tkd-blue/10 border border-tkd-blue/20 rounded-2xl font-black uppercase text-[8px] tracking-[0.3em] flex items-center justify-center gap-3 text-tkd-blue hover:bg-tkd-blue/20 transition-all mt-4"
+                                >
+                                    <IconoLab className="w-4 h-4" /> Ejecutar Prueba Masiva (Stress Test)
+                                </button>
                             </div>
 
                             <div className="pt-6 border-t border-white/10 flex justify-center">

@@ -60,7 +60,24 @@ export const actualizarPrograma = async (programa: Programa): Promise<Programa> 
         return programa;
     }
     const { id, ...data } = programa;
-    await updateDoc(doc(db, 'programas', id), data);
+
+    // Función de limpieza profunda para eliminar undefined
+    const cleanObject = (obj: any): any => {
+        if (Array.isArray(obj)) {
+            return obj.map(item => cleanObject(item));
+        }
+        if (obj !== null && typeof obj === 'object') {
+            return Object.fromEntries(
+                Object.entries(obj)
+                    .filter(([_, v]) => v !== undefined)
+                    .map(([k, v]) => [k, cleanObject(v)])
+            );
+        }
+        return obj;
+    };
+
+    const cleanData = cleanObject(data);
+    await updateDoc(doc(db, 'programas', id), cleanData);
     return programa;
 };
 

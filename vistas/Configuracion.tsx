@@ -390,10 +390,10 @@ const VistaConfiguracion: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-8 py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
-                                <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                                <span>{tab.label}</span>
+                                <tab.icon className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                                <span className="hidden md:inline">{tab.label}</span>
                             </button>
                         ))}
                     </div>

@@ -8,10 +8,11 @@ import { escucharAsistenciasActivasSede, actualizarEstadoEntrega } from '../serv
 import { obtenerEstudiantePorId } from '../servicios/api';
 import { EstadoEntrega, type Estudiante, RolUsuario } from '../tipos';
 import { FRASES_SALIDA } from '../constantes';
-import { IconoAprobar, IconoCerrar, IconoCasa } from '../components/Iconos';
+import { IconoAprobar, IconoCerrar, IconoCasa, IconoAprobar as IconoLab } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import EscanerAsistencia from '../components/EscanerAsistencia';
 import Loader from '../components/Loader';
+import { simularAsistenciasMasivas } from '../utils/classSimulator';
 
 const VistaGestionClase: React.FC = () => {
     const { usuario } = useAuth();
@@ -75,6 +76,19 @@ const VistaGestionClase: React.FC = () => {
         }
     };
 
+    const handleSimularClase = async () => {
+        if (!sedeSeleccionadaId || !usuario) return;
+        setProcesandoId('SIM');
+        try {
+            await simularAsistenciasMasivas(sedeSeleccionadaId, usuario.tenantId);
+            mostrarNotificacion("5 Alumnos inyectados a clase", "success");
+        } catch (error: any) {
+            mostrarNotificacion(error.message, "error");
+        } finally {
+            setProcesandoId(null);
+        }
+    };
+
     const handleConfirmarEntrega = async (persona: string) => {
         if (!modalEntrega) return;
         setProcesandoId(modalEntrega.asist.id);
@@ -98,7 +112,16 @@ const VistaGestionClase: React.FC = () => {
                             <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Clase en Vivo</h1>
                             <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" title="Sincronizado en tiempo real"></span>
                         </div>
-                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">{asistencias.length} Alumnos presentes</p>
+                        <div className="flex items-center gap-4 mt-1">
+                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{asistencias.length} Alumnos presentes</p>
+                            <button
+                                onClick={handleSimularClase}
+                                disabled={procesandoId === 'SIM'}
+                                className="text-[9px] font-black text-tkd-blue/40 hover:text-tkd-blue uppercase tracking-tighter transition-colors"
+                            >
+                                {procesandoId === 'SIM' ? 'PROCESANDO...' : '[ SIMULAR ENTRADAS ]'}
+                            </button>
+                        </div>
                     </div>
                     <button
                         onClick={() => setEscanerAbierto(true)}
@@ -156,8 +179,8 @@ const VistaGestionClase: React.FC = () => {
                                 </div>
                             </div>
                             <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${a.estadoEntrega === EstadoEntrega.Listo
-                                    ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-500/20'
-                                    : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
+                                ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-500/20'
+                                : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600'
                                 }`}>
                                 {a.estadoEntrega}
                             </span>

@@ -447,3 +447,34 @@ export interface SolicitudCompra {
     metodoPago?: 'Efectivo' | 'Transferencia' | 'Tarjeta' | 'Otro';
     reciboId?: string;
 }
+
+export enum EstadoValidacion {
+    Pendiente = 'Pendiente',
+    Analizando = 'Analizando',
+    ValidadoIA = 'ValidadoIA',
+    ErrorIA = 'ErrorIA',
+    Aprobado = 'Aprobado',
+    Rechazado = 'Rechazado'
+}
+
+export interface ReportePagoEstudiante {
+    id: string;
+    tenantId: string;
+    estudianteId: string;
+    estudianteNombre: string;
+    montoInformado: number;
+    fechaReporte: string;
+    comprobanteUrl: string;
+    estado: EstadoValidacion;
+    // Datos extraídos por IA
+    datosIA?: {
+        referencia?: string;
+        montoExtraido?: number;
+        fechaExtraida?: string;
+        confianza?: number;
+        advertencias?: string[];
+    };
+    observaciones?: string;
+    validadoPor?: string; // ID del usuario que aprobó
+    fechaValidacion?: string;
+}

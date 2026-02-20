@@ -94,8 +94,8 @@ export const useGestionEstudiantes = () => {
                 const nuevoEstudiante = await agregarEstudiante(datosEstudiante);
                 mostrarNotificacion("Estudiante creado correctamente.", "success");
 
-                const canal = nuevoEstudiante.tutor?.telefono ? 'WhatsApp' : 'Email';
-                const destinatario = nuevoEstudiante.tutor?.telefono || nuevoEstudiante.tutor?.correo;
+                // Comunicación exclusiva por WhatsApp para estudiantes/tutores
+                const destinatario = nuevoEstudiante.tutor?.telefono;
 
                 if (destinatario && nuevoEstudiante.tutor) {
                     const links = [];
@@ -104,10 +104,9 @@ export const useGestionEstudiantes = () => {
                     if (!nuevoEstudiante.consentimientoImagenFirmado) links.push({ nombre: 'Autorización de Manejo de Imagen', url: generarUrlAbsoluta(`/imagen/${nuevoEstudiante.id}`) });
 
                     if (links.length > 0) {
-                        // Added comment above fix: Passed configClub as 3rd argument to generating personalized messages.
                         const mensaje = await generarMensajePersonalizado(TipoNotificacion.Bienvenida, nuevoEstudiante, configClub, { links });
-                        await enviarNotificacion(canal, destinatario, mensaje);
-                        mostrarNotificacion(`Notificación enviada a ${destinatario}.`, "info");
+                        await enviarNotificacion('WhatsApp', destinatario, mensaje);
+                        mostrarNotificacion(`Solicitud de firmas enviada a WhatsApp: ${destinatario}.`, "info");
                     }
                 }
             }

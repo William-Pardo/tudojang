@@ -16,6 +16,7 @@ import {
     IconoLogoOficial,
     IconoBillete
 } from './Iconos';
+import GeneradorQR from './GeneradorQR';
 
 interface Props {
     estudiante: Estudiante;
