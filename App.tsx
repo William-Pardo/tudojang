@@ -21,6 +21,8 @@ import VistaAdministracion from './vistas/Administracion';
 import { VistaEstudiantes } from './vistas/Estudiantes';
 import { VistaEventos } from './vistas/Eventos';
 import VistaTienda from './vistas/Tienda';
+import VistaMisionKicho from './MisionKicho';
+import MasterAccess from './vistas/MasterAccess';
 import VistaNotificaciones from './vistas/Notificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
 import Vista404 from './vistas/404';
@@ -262,6 +264,7 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/" element={<PublicLanding />} />
                     <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                     <ReactRouterDOM.Route path="/login" element={<Login />} />
+                    <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
                     <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
                 </ReactRouterDOM.Routes>
                 {debugDiv}
@@ -297,6 +300,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
+                <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
 
                 <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
                     <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />

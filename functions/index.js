@@ -10,27 +10,13 @@ const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
 
 const cors = require("cors")({ origin: true });
 
-/**
- * Helper para manejar CORS y errores en onRequest
- */
-const manejarRequest = (req, res, handler) => {
-  return cors(req, res, async () => {
-    try {
-      const result = await handler(req.body.data || req.body);
-      res.status(200).send({ data: result });
-    } catch (error) {
-      console.error("Error en función:", error);
-      res.status(500).send({ error: { message: error.message, status: "INTERNAL" } });
-    }
-  });
-};
-
-/**
- * Verifica si un email pertenece a un Tenant, un Perfil creado o un SuperAdmin
- */
 const verificarDestinatario = async (email) => {
   if (!email) return false;
   const emailLimpio = email.toLowerCase().trim();
+
+  // Whitelist de SuperAdmins (Control Maestro)
+  const superAdmins = ['aliantlab@gmail.com', 'gengepardo@gmail.com'];
+  if (superAdmins.includes(emailLimpio)) return true;
 
   // 1. Verificar en Usuarios (Tenants y Staff - Admin, Editor, Asistente)
   const userSnap = await admin.firestore().collection('usuarios')
@@ -38,12 +24,10 @@ const verificarDestinatario = async (email) => {
     .limit(1).get();
   if (!userSnap.empty) return true;
 
-  // 2. Whitelist de SuperAdmins (Control Maestro)
-  const superAdmins = ['aliantlab@gmail.com', 'gengepardo@gmail.com'];
-  if (superAdmins.includes(emailLimpio)) return true;
-
   return false;
 };
+
+const MASTER_EMAIL = 'aliantlab@gmail.com';
 
 /**
  * Estilos comunes para plantillas Premium
@@ -103,6 +87,26 @@ exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
       tenantId: tenantId,
       estadoContrato: 'Pendiente de Pago',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Notificar a Master sobre nuevo Tenant
+    await resend.emails.send({
+      from: "Tudojang System <sistema@tudojang.com>",
+      to: [MASTER_EMAIL],
+      subject: `🚨 NUEVO TENANT: ${nombreClub}`,
+      html: `
+        <div style="${ESTILOS_EMAIL}">
+          ${HEADER_HTML('Alerta Master Control')}
+          <div style="padding: 30px;">
+            <p>Se ha registrado una nueva academia:</p>
+            <ul>
+              <li><strong>Nombre:</strong> ${nombreClub}</li>
+              <li><strong>Email Admin:</strong> ${email}</li>
+              <li><strong>Tenant ID:</strong> ${tenantId}</li>
+            </ul>
+          </div>
+        </div>
+      `
     });
 
     return { success: true, uid: user.uid };
@@ -292,6 +296,27 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
 
   if (event === 'transaction.updated' && data.transaction.status === 'APPROVED') {
     const ref = data.transaction.reference;
+    const monto = data.transaction.amount_in_cents;
+    const montoFormateado = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(monto / 100);
+
+    // Notificar a Master sobre pago recibido
+    await resend.emails.send({
+      from: "Tudojang Finanzas <pagos@tudojang.com>",
+      to: [MASTER_EMAIL],
+      subject: `💰 PAGO RECIBIDO (${montoFormateado}): ${ref}`,
+      html: `
+        <div style="${ESTILOS_EMAIL}">
+          ${HEADER_HTML('Notificación de Ingreso')}
+          <div style="padding: 30px;">
+            <h2>Pago Aprobado en Wompi</h2>
+            <p><strong>Referencia:</strong> ${ref}</p>
+            <p><strong>Monto:</strong> ${montoFormateado}</p>
+            <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+        </div>
+      `
+    });
+
     if (ref && (ref.startsWith('SUSC_') || ref.startsWith('tnt-'))) {
       const tId = ref.includes('_') ? ref.split('_')[2] : ref;
       try {
@@ -432,4 +457,60 @@ exports.analizarComprobanteEstudiante = functions.firestore
       });
       return null;
     }
+  });
+
+/**
+ * TRIGGER: Notificar a Master sobre legalización de Misión Kicho
+ */
+exports.notificarMasterMisionKicho = functions.firestore
+  .document('misiones_kicho/{misionId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    if (before.estadoLote !== 'legalizado' && after.estadoLote === 'legalizado') {
+      await resend.emails.send({
+        from: "Tudojang Kicho <kicho@tudojang.com>",
+        to: [MASTER_EMAIL],
+        subject: `🧧 MISIÓN KICHO LEGALIZADA: ${after.tenantId}`,
+        html: `
+          <div style="${ESTILOS_EMAIL}">
+            ${HEADER_HTML('Censo Masivo Listos')}
+            <div style="padding: 30px;">
+              <p>El tenant <b>${after.tenantId}</b> ha legalizado un lote de Kicho.</p>
+              <p><strong>Registros:</strong> ${after.registrosRecibidos}</p>
+              <p><strong>Fecha:</strong> ${after.fechaLegalizacion}</p>
+              <p>Ya puedes proceder con la inyección desde el Master Dashboard.</p>
+            </div>
+          </div>
+        `
+      });
+    }
+    return null;
+  });
+
+/**
+ * TRIGGER: Notificar a Master sobre solicitud de Carnets
+ */
+exports.notificarMasterSolicitudCarnets = functions.firestore
+  .document('solicitudes_carnets/{solicitudId}')
+  .onCreate(async (snap, context) => {
+    const data = snap.data();
+    await resend.emails.send({
+      from: "Tudojang Producción <carnets@tudojang.com>",
+      to: [MASTER_EMAIL],
+      subject: `🪪 SOLICITUD DE CARNETS: ${data.nombreClub}`,
+      html: `
+        <div style="${ESTILOS_EMAIL}">
+          ${HEADER_HTML('Nueva Solicitud Gráfica')}
+          <div style="padding: 30px;">
+            <p>La academia <b>${data.nombreClub}</b> solicita la elaboración de carnets.</p>
+            <p><strong>Cantidad:</strong> ${data.cantidad}</p>
+            <p><strong>Sede:</strong> ${data.sedeNombre || 'Principal'}</p>
+            <p>Verifica los perfiles en el panel de carnetización.</p>
+          </div>
+        </div>
+      `
+    });
+    return null;
   });

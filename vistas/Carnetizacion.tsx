@@ -5,7 +5,7 @@ import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataConte
 import { useNotificacion } from '../context/NotificacionContext';
 import { generarLoteCarnetsPdf, FormatoPapel } from '../utils/pdfBatchGenerator';
 import { marcarCarnetsComoGenerados } from '../servicios/api';
-import { IconoExportar, IconoHistorial, IconoEstudiantes, IconoCasa } from '../components/Iconos';
+import { IconoExportar, IconoHistorial, IconoEstudiantes, IconoCasa, IconoAprobar } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import { formatearFecha } from '../utils/formatters';
 import Loader from '../components/Loader';
@@ -97,6 +97,36 @@ const VistaCarnetizacion: React.FC = () => {
                                         <IconoExportar className="w-5 h-5" />
                                     )}
                                     {procesando ? 'Procesando Lote...' : 'Procesar Impresión'}
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        if (pendientes.length === 0) return;
+                                        if (window.confirm(`¿Solicitar a Aliant la fabricación física de ${pendientes.length} carnets?`)) {
+                                            setProcesando(true);
+                                            try {
+                                                const { addDoc, collection } = await import('firebase/firestore');
+                                                const { db } = await import('../firebase/config');
+                                                await addDoc(collection(db, 'solicitudes_carnets'), {
+                                                    tenantId: configClub.tenantId,
+                                                    nombreClub: configClub.nombreClub,
+                                                    cantidad: pendientes.length,
+                                                    sedeNombre: sedesVisibles[0]?.nombre || 'Principal',
+                                                    fechaSolicitud: new Date().toISOString()
+                                                });
+                                                mostrarNotificacion("Solicitud enviada a producción. Aliant recibirá la notificación.", "success");
+                                            } catch (e) {
+                                                mostrarNotificacion("Error al enviar solicitud", "error");
+                                            } finally {
+                                                setProcesando(false);
+                                            }
+                                        }
+                                    }}
+                                    disabled={pendientes.length === 0 || procesando}
+                                    className="w-full bg-tkd-blue text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-blue-800 transition-all flex items-center justify-center gap-3 border-b-4 border-blue-900"
+                                >
+                                    <IconoAprobar className="w-5 h-5" />
+                                    Solicitar Fabricación
                                 </button>
                             </div>
                         </div>
