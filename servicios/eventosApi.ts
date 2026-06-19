@@ -23,13 +23,13 @@ const eventosCollection = collection(db, 'eventos');
 const solicitudesCollection = collection(db, 'solicitudesInscripcion');
 const storage = getStorage();
 
-const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: string): Promise<string> => {
+const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: string, tenantId: string): Promise<string> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Saltando subida de imagen de evento.");
         return imagenUrl || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
     if (imagenUrl && imagenUrl.startsWith('data:image')) {
-        const storageRef = ref(storage, `eventos/${eventoId}/imagen_${Date.now()}`);
+        const storageRef = ref(storage, `tenants/${tenantId}/eventos/${eventoId}/imagen_${Date.now()}`);
         const snapshot = await uploadString(storageRef, imagenUrl, 'data_url');
         return await getDownloadURL(snapshot.ref);
     }
@@ -94,9 +94,16 @@ export const agregarEvento = async (nuevoEventoData: Omit<Evento, 'id'>): Promis
     }
     const dataToSave = { ...nuevoEventoData, imagenUrl: '' };
     const docRef = await addDoc(eventosCollection, dataToSave);
-    const imageUrl = await procesarImagenEvento(nuevoEventoData.imagenUrl, docRef.id);
-    await updateDoc(docRef, { imagenUrl: imageUrl });
-    return { id: docRef.id, ...nuevoEventoData, imagenUrl: imageUrl } as Evento;
+    try {
+        const imageUrl = await procesarImagenEvento(nuevoEventoData.imagenUrl, docRef.id, nuevoEventoData.tenantId);
+        await updateDoc(docRef, { imagenUrl: imageUrl });
+        return { id: docRef.id, ...nuevoEventoData, imagenUrl: imageUrl } as Evento;
+    } catch (error) {
+        // Rollback: eliminar el documento huérfano si la subida de imagen falla
+        console.error('[agregarEvento] Fallo al procesar imagen, eliminando documento huérfano:', docRef.id);
+        await deleteDoc(docRef).catch(() => {});
+        throw error;
+    }
 };
 
 export const actualizarEvento = async (eventoActualizado: Evento): Promise<Evento> => {
@@ -105,7 +112,7 @@ export const actualizarEvento = async (eventoActualizado: Evento): Promise<Event
     }
     const { id, ...data } = eventoActualizado;
     const docRef = doc(db, 'eventos', id);
-    const imageUrl = await procesarImagenEvento(data.imagenUrl, id);
+    const imageUrl = await procesarImagenEvento(data.imagenUrl, id, data.tenantId);
     const dataToUpdate = { ...data, imagenUrl: imageUrl };
     await updateDoc(docRef, dataToUpdate);
     return { id, ...dataToUpdate } as Evento;
