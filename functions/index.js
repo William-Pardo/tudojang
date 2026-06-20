@@ -1,5 +1,4 @@
 const functions = require("firebase-functions");
-const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const { Resend } = require("resend");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -59,7 +58,7 @@ const FOOTER_HTML = `
   </div>
 `;
 
-exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) => {
+exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { tenantId, email, password, nombreClub } = data;
     if (!email || !password || !tenantId) throw new Error('Faltan parámetros');
@@ -114,7 +113,7 @@ exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) =>
   });
 });
 
-exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
+exports.activarSuscripcionManual = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { tenantId, email } = data;
     console.log(`Activación manual para: ${tenantId}`);
@@ -134,7 +133,7 @@ exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
+exports.enviarBienvenidaTudojang = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub, passwordTemporal } = data;
 
@@ -170,7 +169,7 @@ exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarConfirmacionPago = functionsV1.https.onRequest((req, res) => {
+exports.enviarConfirmacionPago = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub, montoPagado, referenciaPago } = data;
 
@@ -209,7 +208,7 @@ exports.enviarConfirmacionPago = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarRecuperacionPassword = functionsV1.https.onRequest((req, res) => {
+exports.enviarRecuperacionPassword = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, resetLink, nombreClub } = data;
 
@@ -240,7 +239,7 @@ exports.enviarRecuperacionPassword = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.notificarCambioPassword = functionsV1.https.onRequest((req, res) => {
+exports.notificarCambioPassword = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub } = data;
 
@@ -269,7 +268,7 @@ exports.notificarCambioPassword = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.testEmailResend = functionsV1.https.onRequest((req, res) => {
+exports.testEmailResend = functions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     await resend.emails.send({
       from: "Tudojang Academia <info@tudojang.com>",
@@ -291,7 +290,7 @@ exports.testEmailResend = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
+exports.webhookWompi = functions.https.onRequest(async (req, res) => {
   const { event, data } = req.body;
   console.log("Webhook recibido:", event);
 
@@ -380,7 +379,7 @@ exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
  * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)
  * Se activa cuando un estudiante sube un reporte de pago.
  */
-exports.analizarComprobanteEstudiante = functionsV1.firestore
+exports.analizarComprobanteEstudiante = functions.firestore
   .document('reportes_pagos_estudiantes/{reporteId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
@@ -463,7 +462,7 @@ exports.analizarComprobanteEstudiante = functionsV1.firestore
 /**
  * TRIGGER: Notificar a Master sobre legalización de Misión Kicho
  */
-exports.notificarMasterMisionKicho = functionsV1.firestore
+exports.notificarMasterMisionKicho = functions.firestore
   .document('misiones_kicho/{misionId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data();
@@ -493,7 +492,7 @@ exports.notificarMasterMisionKicho = functionsV1.firestore
 /**
  * TRIGGER: Notificar a Master sobre solicitud de Carnets
  */
-exports.notificarMasterSolicitudCarnets = functionsV1.firestore
+exports.notificarMasterSolicitudCarnets = functions.firestore
   .document('solicitudes_carnets/{solicitudId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
