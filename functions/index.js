@@ -1,4 +1,5 @@
 const functions = require("firebase-functions");
+const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const { Resend } = require("resend");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -379,7 +380,7 @@ exports.webhookWompi = functions.https.onRequest(async (req, res) => {
  * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)
  * Se activa cuando un estudiante sube un reporte de pago.
  */
-exports.analizarComprobanteEstudiante = functions.firestore
+exports.analizarComprobanteEstudiante = functionsV1.firestore
   .document('reportes_pagos_estudiantes/{reporteId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
@@ -397,7 +398,7 @@ exports.analizarComprobanteEstudiante = functions.firestore
       // 2. Configurar Gemini (Carga desde Secretos de Firebase)
       const apiKey = functions.config().gemini?.api_key;
       if (!apiKey) {
-        throw new Error("No se encontró la API Key de Gemini en la configuración del servidor.");
+        throw new Error("No se encontró la API Key de Gemini en los secrets de Firebase. Ejecuta: firebase functions:secrets:set gemini_api_key");
       }
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -462,7 +463,7 @@ exports.analizarComprobanteEstudiante = functions.firestore
 /**
  * TRIGGER: Notificar a Master sobre legalización de Misión Kicho
  */
-exports.notificarMasterMisionKicho = functions.firestore
+exports.notificarMasterMisionKicho = functionsV1.firestore
   .document('misiones_kicho/{misionId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data();
@@ -492,7 +493,7 @@ exports.notificarMasterMisionKicho = functions.firestore
 /**
  * TRIGGER: Notificar a Master sobre solicitud de Carnets
  */
-exports.notificarMasterSolicitudCarnets = functions.firestore
+exports.notificarMasterSolicitudCarnets = functionsV1.firestore
   .document('solicitudes_carnets/{solicitudId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
