@@ -59,7 +59,7 @@ const FOOTER_HTML = `
   </div>
 `;
 
-exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
+exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { tenantId, email, password, nombreClub } = data;
     if (!email || !password || !tenantId) throw new Error('Faltan parámetros');
@@ -114,7 +114,7 @@ exports.provisionarUsuarioOnboarding = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.activarSuscripcionManual = functions.https.onRequest((req, res) => {
+exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { tenantId, email } = data;
     console.log(`Activación manual para: ${tenantId}`);
@@ -134,7 +134,7 @@ exports.activarSuscripcionManual = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarBienvenidaTudojang = functions.https.onRequest((req, res) => {
+exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub, passwordTemporal } = data;
 
@@ -170,7 +170,7 @@ exports.enviarBienvenidaTudojang = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarConfirmacionPago = functions.https.onRequest((req, res) => {
+exports.enviarConfirmacionPago = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub, montoPagado, referenciaPago } = data;
 
@@ -209,7 +209,7 @@ exports.enviarConfirmacionPago = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarRecuperacionPassword = functions.https.onRequest((req, res) => {
+exports.enviarRecuperacionPassword = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, resetLink, nombreClub } = data;
 
@@ -240,7 +240,7 @@ exports.enviarRecuperacionPassword = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.notificarCambioPassword = functions.https.onRequest((req, res) => {
+exports.notificarCambioPassword = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub } = data;
 
@@ -269,7 +269,7 @@ exports.notificarCambioPassword = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.testEmailResend = functions.https.onRequest((req, res) => {
+exports.testEmailResend = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     await resend.emails.send({
       from: "Tudojang Academia <info@tudojang.com>",
@@ -291,7 +291,7 @@ exports.testEmailResend = functions.https.onRequest((req, res) => {
   });
 });
 
-exports.webhookWompi = functions.https.onRequest(async (req, res) => {
+exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
   const { event, data } = req.body;
   console.log("Webhook recibido:", event);
 
