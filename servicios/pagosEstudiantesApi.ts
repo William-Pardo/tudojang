@@ -35,8 +35,8 @@ export const reportarPagoEstudiante = async (
 
     const docRef = await addDoc(reportesCollection, nuevoReporte);
 
-    // 2. Subir imagen a Storage
-    const storageRef = ref(storage, `comprobantes/${tenantId}/${docRef.id}_${Date.now()}`);
+    // 2. Subir imagen a Storage con ruta aislada por tenant
+    const storageRef = ref(storage, `tenants/${tenantId}/comprobantes/${docRef.id}_${Date.now()}`);
     const snapshot = await uploadString(storageRef, imagenBase64, 'data_url');
     const downloadURL = await getDownloadURL(snapshot.ref);
 

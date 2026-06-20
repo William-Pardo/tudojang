@@ -236,6 +236,21 @@ export interface MovimientoFinanciero {
     sedeId: string;
 }
 
+export interface TransaccionPago {
+    id: string;
+    tenantId: string;
+    estudianteId: string;
+    reciboId: string;
+    montoTotal: number;
+    fecha: string;
+    estado: 'Completado' | 'Anulado';
+    itemsPagados: {
+        id: string;
+        tipo: 'Tienda' | 'Evento' | 'Mensualidad' | 'Mora' | 'Matricula';
+        monto: number;
+    }[];
+}
+
 export interface Sede {
     id: string;
     tenantId: string;

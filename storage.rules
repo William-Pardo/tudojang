@@ -1,19 +1,37 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /tenants/{tenantId}/eventos/{eventId}/{imageName} {
-      // Permitir lectura a cualquier usuario autenticado de la app
-      allow read: if request.auth != null;
-      
-      // Permitir escritura y eliminación solo si el usuario pertenece al tenant dueño del path.
-      // Se valida de dos formas (por la dualidad de tenantId en el modelo de datos):
-      //   1. El tenantId del perfil del usuario coincide directamente con la ruta
-      //   2. El documento tenant del usuario (tenants/{uid}) tiene el tenantId que coincide con la ruta
-      allow write, delete: if request.auth != null 
-        && (
-          firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.tenantId == tenantId
-          || firestore.get(/databases/(default)/documents/tenants/$(request.auth.uid)).data.tenantId == tenantId
-        );
+
+    // --- HELPERS ---
+    // Verifica que el usuario autenticado pertenece al tenant de la ruta
+    function perteneceAlTenant(tenantId) {
+      return request.auth != null && request.auth.token.tenantId == tenantId;
     }
+
+    // --- EVENTOS: Banners e imágenes de eventos por tenant ---
+    match /tenants/{tenantId}/eventos/{eventId}/{imageName} {
+      // Lectura pública: cualquiera puede ver el banner (incluso sin login, para la landing pública)
+      allow read: if true;
+      // Escritura/Eliminación: solo el admin del tenant correspondiente
+      allow write, delete: if perteneceAlTenant(tenantId);
+    }
+
+    // --- FIRMAS: Documentos de consentimiento por tenant y estudiante ---
+    match /tenants/{tenantId}/firmas/{estudianteId}/{fileName} {
+      // Lectura: solo usuarios autenticados del mismo tenant
+      allow read: if perteneceAlTenant(tenantId);
+      // Escritura: solo el tenant al que pertenece el estudiante
+      allow write, delete: if perteneceAlTenant(tenantId);
+    }
+
+    // --- COMPROBANTES: Imágenes de comprobantes de pago por tenant ---
+    match /tenants/{tenantId}/comprobantes/{fileName} {
+      // Lectura: solo el tenant dueño puede ver los comprobantes
+      allow read: if perteneceAlTenant(tenantId);
+      // Escritura: cualquier usuario autenticado del tenant puede subir su comprobante
+      allow write: if perteneceAlTenant(tenantId);
+      allow delete: if perteneceAlTenant(tenantId);
+    }
+
   }
 }

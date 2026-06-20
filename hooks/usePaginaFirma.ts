@@ -192,16 +192,16 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
 
             switch(tipo) {
                 case 'consentimiento':
-                    await api.guardarFirmaConsentimiento(idEstudiante, firmaBase64);
+                    await api.guardarFirmaConsentimiento(idEstudiante, estudiante!.tenantId, firmaBase64);
                     notificacionMsg = "Consentimiento enviado con éxito.";
                     break;
                 case 'contrato':
-                    await api.guardarFirmaContrato(idEstudiante, firmaBase64);
+                    await api.guardarFirmaContrato(idEstudiante, estudiante!.tenantId, firmaBase64);
                     notificacionMsg = "Contrato firmado y enviado exitosamente.";
                     break;
                 case 'imagen':
                     if (autorizacionFotos === undefined) throw new Error("Se requiere una elección de autorización.");
-                    await api.guardarFirmaImagen(idEstudiante, firmaBase64, autorizacionFotos);
+                    await api.guardarFirmaImagen(idEstudiante, estudiante!.tenantId, firmaBase64, autorizacionFotos);
                     notificacionMsg = "Autorización de imagen guardada exitosamente.";
                     break;
             }

@@ -20,12 +20,17 @@ import { GrupoEdad, EstadoPago, GradoTKD } from '../tipos';
 const estudiantesCollection = collection(db, 'estudiantes');
 const storage = getStorage();
 
-const uploadFirma = async (idEstudiante: string, firmaBase64: string, tipo: 'consentimiento' | 'contrato' | 'imagen'): Promise<string> => {
+const uploadFirma = async (
+    tenantId: string,
+    idEstudiante: string, 
+    firmaBase64: string, 
+    tipo: 'consentimiento' | 'contrato' | 'imagen'
+): Promise<string> => {
     if (!isFirebaseConfigured) {
       console.warn("MODO SIMULADO: Saltando subida de firma a Firebase Storage.");
       return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
-    const storageRef = ref(storage, `firmas/${idEstudiante}/${tipo}_${Date.now()}.png`);
+    const storageRef = ref(storage, `tenants/${tenantId}/firmas/${idEstudiante}/${tipo}_${Date.now()}.png`);
     const finalBase64 = firmaBase64.startsWith('data:') ? firmaBase64 : `data:image/png;base64,${firmaBase64}`;
     const snapshot = await uploadString(storageRef, finalBase64, 'data_url');
     const downloadURL = await getDownloadURL(snapshot.ref);
@@ -130,23 +135,23 @@ export const eliminarEstudiante = async (idEstudiante: string): Promise<void> =>
     await deleteDoc(docRef);
 };
 
-export const guardarFirmaConsentimiento = async (idEstudiante: string, firmaDigital: string): Promise<void> => {
+export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    const urlFirma = await uploadFirma(idEstudiante, firmaDigital, 'consentimiento');
+    const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'consentimiento');
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await updateDoc(docRef, { consentimientoInformado: true, 'tutor.firmaDigital': urlFirma });
 };
 
-export const guardarFirmaContrato = async (idEstudiante: string, firmaDigital: string): Promise<void> => {
+export const guardarFirmaContrato = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
      if (!isFirebaseConfigured) return;
-    const urlFirma = await uploadFirma(idEstudiante, firmaDigital, 'contrato');
+    const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'contrato');
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await updateDoc(docRef, { contratoServiciosFirmado: true, 'tutor.firmaContratoDigital': urlFirma });
 };
 
-export const guardarFirmaImagen = async (idEstudiante: string, firmaDigital: string, autorizaFotos: boolean): Promise<void> => {
+export const guardarFirmaImagen = async (idEstudiante: string, tenantId: string, firmaDigital: string, autorizaFotos: boolean): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    const urlFirma = await uploadFirma(idEstudiante, firmaDigital, 'imagen');
+    const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'imagen');
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await updateDoc(docRef, { consentimientoImagenFirmado: true, consentimientoFotosVideos: autorizaFotos, 'tutor.firmaImagenDigital': urlFirma });
 };

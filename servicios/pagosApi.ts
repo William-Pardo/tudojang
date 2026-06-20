@@ -12,7 +12,7 @@ import {
     Timestamp
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import type { Estudiante, SolicitudCompra, SolicitudInscripcion, MovimientoFinanciero } from '../tipos';
+import type { Estudiante, SolicitudCompra, SolicitudInscripcion, MovimientoFinanciero, TransaccionPago } from '../tipos';
 import { EstadoPago, EstadoSolicitud, EstadoSolicitudCompra, TipoMovimiento, CategoriaFinanciera } from '../tipos';
 import { enviarEmailConfirmacionPago } from './emailService';
 
@@ -48,6 +48,7 @@ export interface PagoProcesado {
 
 const solicitudesCompraCollection = collection(db, 'solicitudesCompra');
 const solicitudesInscripcionCollection = collection(db, 'solicitudesInscripcion');
+const transaccionesPagoCollection = collection(db, 'transaccionesPago');
 
 /**
  * Obtiene todas las deudas pendientes de un estudiante (Tienda, Eventos, Mensualidad calculada)
@@ -252,9 +253,23 @@ export const procesarPagoEfectivo = async (
         };
         batch.set(finanzaRef, nuevoIngreso);
 
+        // 5. Crear Registro Maestro de Transacción
+        const transaccionRef = doc(transaccionesPagoCollection);
+        const nuevaTransaccion: TransaccionPago = {
+            id: transaccionRef.id,
+            tenantId: estudiante.tenantId,
+            estudianteId: estudiante.id,
+            reciboId: reciboId,
+            montoTotal: montoTotalRecibido,
+            fecha: fechaHora,
+            estado: 'Completado',
+            itemsPagados: itemsAPagar.map(i => ({ id: i.id, tipo: i.tipo, monto: i.monto }))
+        };
+        batch.set(transaccionRef, nuevaTransaccion);
+
         await batch.commit();
 
-        // 5. Notificar (Solo WhatsApp, según requerimiento de usuario)
+        // 6. Notificar (Solo WhatsApp, según requerimiento de usuario)
         // La notificación por correo para estudiantes ha sido desactivada.
         // Se recomienda usar el flujo de WhatsApp del componente ModalRegistrarPago.
 
@@ -262,6 +277,126 @@ export const procesarPagoEfectivo = async (
 
     } catch (error: any) {
         console.error("Error al procesar pago:", error);
+        return { exito: false, mensaje: error.message };
+    }
+};
+
+/**
+ * Anula una transacción de pago específica, revirtiendo el saldo del estudiante 
+ * y restaurando el estado pendiente de los ítems involucrados.
+ */
+export const anularPagoEfectivo = async (
+    transaccionId: string, 
+    usuarioAdminId?: string
+): Promise<{ exito: boolean, mensaje?: string }> => {
+    if (!isFirebaseConfigured) {
+        return { exito: true, mensaje: "Pago anulado simulado exitosamente" };
+    }
+
+    try {
+        // 1. Obtener Transacción
+        const transaccionRef = doc(transaccionesPagoCollection, transaccionId);
+        const transaccionSnap = await getDoc(transaccionRef);
+        
+        if (!transaccionSnap.exists()) {
+            throw new Error("Transacción no encontrada");
+        }
+
+        const transaccion = { id: transaccionSnap.id, ...transaccionSnap.data() } as TransaccionPago;
+
+        if (transaccion.estado === 'Anulado') {
+            throw new Error("La transacción ya se encuentra anulada");
+        }
+
+        const batch = writeBatch(db);
+        const fechaHora = new Date().toISOString();
+
+        // 2. Obtener Estudiante y Revertir Saldo
+        const estRef = doc(db, 'estudiantes', transaccion.estudianteId);
+        const estSnap = await getDoc(estRef);
+        
+        if (estSnap.exists()) {
+            const estudiante = estSnap.data() as Estudiante;
+            const nuevoSaldo = estudiante.saldoDeudor + transaccion.montoTotal;
+            batch.update(estRef, {
+                saldoDeudor: nuevoSaldo,
+                estadoPago: nuevoSaldo === 0 ? EstadoPago.AlDia : EstadoPago.Pendiente
+            });
+        }
+
+        // 3. Revertir estado de los Items Pagados
+        for (const item of transaccion.itemsPagados) {
+            if (item.tipo === 'Tienda') {
+                const docRef = doc(db, 'solicitudesCompra', item.id);
+                batch.update(docRef, { pagado: false });
+            } else if (item.tipo === 'Evento') {
+                const docRef = doc(db, 'solicitudesInscripcion', item.id);
+                batch.update(docRef, { pagado: false });
+            }
+        }
+
+        // 4. Marcar Transacción como Anulada
+        batch.update(transaccionRef, {
+            estado: 'Anulado'
+        });
+
+        // 5. Crear Movimiento Negativo en Finanzas (Auditoría Contable)
+        const finanzaRef = doc(collection(db, 'finanzas'));
+        const egresoAnulacion: MovimientoFinanciero = {
+            id: finanzaRef.id,
+            tenantId: transaccion.tenantId,
+            tipo: TipoMovimiento.Egreso,
+            categoria: CategoriaFinanciera.Otros, // Opcionalmente otra categoría específica
+            monto: transaccion.montoTotal, // Contablemente se refleja como gasto/egreso
+            descripcion: `ANULACIÓN de recibo ${transaccion.reciboId} - Autorizado por ${usuarioAdminId || 'Admin'}`,
+            fecha: fechaHora.split('T')[0],
+            sedeId: estSnap.exists() ? (estSnap.data() as Estudiante).sedeId : 'N/A'
+        };
+        batch.set(finanzaRef, egresoAnulacion);
+
+        await batch.commit();
+
+        return { exito: true };
+
+    } catch (error: any) {
+        console.error("Error al anular pago:", error);
+        return { exito: false, mensaje: error.message };
+    }
+};
+
+/**
+ * Busca y anula la última transacción de pago completada de un estudiante.
+ */
+export const anularUltimoPagoEfectivo = async (
+    estudianteId: string,
+    usuarioAdminId?: string
+): Promise<{ exito: boolean, mensaje?: string }> => {
+    if (!isFirebaseConfigured) {
+        return { exito: true, mensaje: "Pago anulado simulado exitosamente" };
+    }
+
+    try {
+        const q = query(
+            transaccionesPagoCollection,
+            where('estudianteId', '==', estudianteId),
+            where('estado', '==', 'Completado')
+        );
+        
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            throw new Error("No hay pagos recientes para anular.");
+        }
+
+        // Ordenamos en memoria para obtener el más reciente (Firebase query compuesto necesita índice)
+        const transacciones = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransaccionPago));
+        transacciones.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+        
+        const ultimaTransaccion = transacciones[0];
+        
+        return await anularPagoEfectivo(ultimaTransaccion.id, usuarioAdminId);
+        
+    } catch (error: any) {
+        console.error("Error al buscar último pago:", error);
         return { exito: false, mensaje: error.message };
     }
 };
