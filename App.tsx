@@ -37,6 +37,7 @@ import VistaFirmaContrato from './vistas/FirmaContrato';
 import VistaFirmaImagen from './vistas/FirmaImagen';
 import CensoPublico from './vistas/CensoPublico';
 import ReportarPagoPublico from './vistas/ReportarPagoPublico';
+import EventoPublico from './vistas/EventoPublico';
 
 import Footer from './components/Footer';
 import NotificacionToast from './components/NotificacionToast';
@@ -294,6 +295,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                 <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
                 <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
+                <ReactRouterDOM.Route path="/evento/:id" element={<EventoPublico />} />
                 <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
