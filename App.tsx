@@ -300,6 +300,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
+                <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
                 <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />

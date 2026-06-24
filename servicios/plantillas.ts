@@ -47,6 +47,29 @@ Firmado en ${configClub.lugarFirma}, el día ${f.dia} de ${f.mes} de ${f.anio}.
 };
 
 /**
+ * Consentimiento informado de riesgos propios de la práctica deportiva.
+ */
+export const generarTextoConsentimientoRiesgos = (estudiante: Estudiante, configClub: ConfiguracionClub): string => {
+    if (!estudiante.tutor) return "Error: Sin datos de tutor.";
+    const f = FECHA_HOY_OBJ();
+    return `
+🥋 CONSENTIMIENTO INFORMADO DE RIESGOS DEPORTIVOS
+
+Yo, ${estudiante.tutor.nombres.toUpperCase()} ${estudiante.tutor.apellidos.toUpperCase()}, identificado(a) con C.C. No. ${estudiante.tutor.numeroIdentificacion}, en calidad de tutor y representante legal del menor ${estudiante.nombres.toUpperCase()} ${estudiante.apellidos.toUpperCase()}, manifiesto que:
+
+1. He sido informado(a) de que la práctica de Taekwondo y toda actividad deportiva implica riesgos inherentes, entre ellos caídas, golpes, esguinces, lesiones musculares y otras afectaciones accidentales.
+2. Autorizo la participación del menor en entrenamientos, evaluaciones, exhibiciones y competencias organizadas o acompañadas por ${configClub.nombreClub.toUpperCase()}.
+3. Declaro haber informado al club sobre las condiciones médicas, alergias, lesiones o restricciones relevantes del menor y me comprometo a mantener esta información actualizada.
+4. Autorizo al personal responsable a prestar primeros auxilios y gestionar atención médica de urgencia cuando las circunstancias lo requieran, procurando informar al tutor a la mayor brevedad.
+5. Comprendo que este consentimiento no exonera al club de su deber de cuidado ni limita los derechos legales del menor.
+
+Declaro que leí, comprendí y acepto voluntariamente el contenido de este consentimiento informado.
+
+Fecha de suscripción: ${f.dia}/${f.mes}/${f.anio}.
+    `.trim();
+};
+
+/**
  * Autorización de Imagen y Datos
  */
 export const generarTextoConsentimientoImagen = (estudiante: Estudiante, configClub: ConfiguracionClub): string => {
