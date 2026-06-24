@@ -41,7 +41,7 @@ const AsistenteVirtual: React.FC = () => {
     }, [historial, cargando]);
 
     const manejarEnviar = async () => {
-        if (!mensaje.trim() || cargando || restantes <= 0) return;
+        if (!mensaje.trim() || cargando) return;
 
         const miPregunta = mensaje;
         setMensaje('');
@@ -51,8 +51,11 @@ const AsistenteVirtual: React.FC = () => {
         setError(null);
 
         try {
-        const contextoPrevio = historial.slice(-3).map(h => h.texto).join(' | ');
-        const respuestaRaw = await consultarSabonimVirtual(miPregunta, contextoPrevio);
+        const contextoPrevio = historial.slice(-4).map(h => ({
+            role: h.soyYo ? 'user' as const : 'assistant' as const,
+            text: h.texto,
+        }));
+        const respuestaRaw = await consultarSabonimVirtual(miPregunta, contextoPrevio, usuario?.rol);
         
         let respuestaLimpia = respuestaRaw;
         if (respuestaRaw.includes('[ESCALAR_SOPORTE_MASTER]')) {
@@ -153,7 +156,7 @@ const AsistenteVirtual: React.FC = () => {
                                     {miTicket ? (
                                         <p className="text-[8px] font-bold text-green-400 uppercase mt-1">Caso: #{miTicket.id.slice(-4)}</p>
                                     ) : (
-                                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">Consultas IA: {restantes}/15</p>
+                                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">IA disponible: {restantes}/15 · Manual ilimitado</p>
                                     )}
                                 </div>
                             </div>
@@ -205,14 +208,14 @@ const AsistenteVirtual: React.FC = () => {
                                     value={mensaje}
                                     onChange={(e) => setMensaje(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && manejarEnviar()}
-                                    placeholder={restantes > 0 ? "Describa su inquietud..." : "Límite IA excedido"}
-                                    disabled={restantes <= 0 || cargando}
+                                    placeholder={restantes > 0 ? "Describa su inquietud..." : "Consulta el manual o solicita ayuda"}
+                                    disabled={cargando}
                                     className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 pl-5 pr-14 text-[11px] font-bold dark:text-white outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner"
                                 />
                                 <button 
                                     aria-label="Enviar mensaje"
                                     onClick={manejarEnviar}
-                                    disabled={!mensaje.trim() || cargando || restantes <= 0}
+                                    disabled={!mensaje.trim() || cargando}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 text-tkd-blue hover:scale-110 transition-transform disabled:opacity-30"
                                 >
                                     <IconoEnviar className="w-6 h-6" />

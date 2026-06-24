@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import AsistenteVirtual from './AsistenteVirtual';
 import { consultarSabonimVirtual, getRemainingQueries } from '../servicios/soporteService';
 import { crearTicketSoporte, escucharMiTicketActivo } from '../servicios/soporteApi';
+import { RolUsuario } from '../tipos';
 
 jest.mock('framer-motion', () => ({
   motion: {
@@ -126,13 +127,17 @@ describe('AsistenteVirtual', () => {
     }));
   });
 
-  it('deshabilita el input cuando no quedan consultas', async () => {
+  it('mantiene disponible el manual cuando no quedan consultas de IA', async () => {
     const user = userEvent.setup();
     (getRemainingQueries as jest.Mock).mockReturnValue(0);
+    (consultarSabonimVirtual as jest.Mock).mockResolvedValue('Respuesta desde el manual local.');
     render(<AsistenteVirtual />);
     await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
-    expect(screen.getByPlaceholderText(/L.*mite IA excedido/i)).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Enviar mensaje' })).toBeDisabled();
+    const input = screen.getByPlaceholderText(/Consulta el manual o solicita ayuda/i);
+    expect(input).not.toBeDisabled();
+    await user.type(input, 'Como registro asistencia');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    expect(await screen.findByText('Respuesta desde el manual local.')).toBeInTheDocument();
   });
 
   it('envía el mensaje al presionar Enter', async () => {
@@ -255,5 +260,39 @@ describe('AsistenteVirtual', () => {
 
     resolveFirst('Respuesta');
     expect(await screen.findByText('Respuesta')).toBeInTheDocument();
+  });
+
+  it('envía al motor local el rol autenticado y hasta cuatro turnos previos', async () => {
+    const user = userEvent.setup();
+    mockUsuario = {
+      id: 'u1',
+      tenantId: 't1',
+      nombreUsuario: 'Ana',
+      email: 'ana@test.com',
+      rol: RolUsuario.Admin,
+    };
+    (consultarSabonimVirtual as jest.Mock)
+      .mockResolvedValueOnce('Primera respuesta')
+      .mockResolvedValueOnce('Segunda respuesta');
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+
+    const input = screen.getByPlaceholderText(/Describa su inquietud/i);
+    await user.type(input, 'Primera pregunta');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    await screen.findByText('Primera respuesta');
+    await user.type(input, 'Segunda pregunta');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    await screen.findByText('Segunda respuesta');
+
+    expect(consultarSabonimVirtual).toHaveBeenLastCalledWith(
+      'Segunda pregunta',
+      [
+        expect.objectContaining({ role: 'assistant', text: expect.stringMatching(/Kyeong-rye/i) }),
+        { role: 'user', text: 'Primera pregunta' },
+        { role: 'assistant', text: 'Primera respuesta' },
+      ],
+      RolUsuario.Admin,
+    );
   });
 });
