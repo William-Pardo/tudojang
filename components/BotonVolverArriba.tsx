@@ -39,7 +39,7 @@ const BotonVolverArriba: React.FC<Props> = ({ scrollContainerRef }) => {
     <button
       onClick={scrollToTop}
       aria-label="Volver arriba"
-      className={`fixed bottom-8 right-8 z-50 p-3 rounded-full bg-tkd-red text-white shadow-lg transition-all duration-300 ease-in-out hover:bg-red-700 hover:scale-110 active:scale-100
+      className={`fixed bottom-28 right-8 z-50 p-3 rounded-full bg-tkd-red text-white shadow-lg transition-all duration-300 ease-in-out hover:bg-red-700 hover:scale-110 active:scale-100
       ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}
     >
       <IconoFlechaArriba className="w-6 h-6" />
