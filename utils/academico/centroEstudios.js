@@ -1,1 +1,1 @@
-module.exports = require('./centroEstudios.ts');
+export * from './centroEstudios.ts';
