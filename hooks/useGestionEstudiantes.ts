@@ -284,6 +284,20 @@ export const useGestionEstudiantes = () => {
 
     }, [estudiantesFiltrados, mostrarNotificacion]);
 
+    const limpiarFiltros = () => {
+        setFiltroNombre('');
+        setFiltroGrupo('todos');
+        setFiltroEstado('todos');
+        setFiltroGrado('todos');
+        setFiltroSede('todos');
+    };
+
+    const filtrosActivos = filtroNombre !== '' ||
+        filtroGrupo !== 'todos' ||
+        filtroEstado !== 'todos' ||
+        filtroGrado !== 'todos' ||
+        filtroSede !== 'todos';
+
     return {
         estudiantes,
         cargando,
@@ -326,5 +340,7 @@ export const useGestionEstudiantes = () => {
         handleShareLink,
         exportarCSV,
         configClub,
+        limpiarFiltros,
+        filtrosActivos,
     };
 };

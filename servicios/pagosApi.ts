@@ -368,6 +368,40 @@ export const anularPagoEfectivo = async (
 };
 
 /**
+ * Busca y retorna la última transacción de pago completada de un estudiante.
+ */
+export const obtenerUltimoPagoEfectivo = async (
+    estudianteId: string
+): Promise<TransaccionPago | null> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
+    if (!isFirebaseConfigured) {
+        return null;
+    }
+
+    try {
+        const q = query(
+            transaccionesPagoCollection,
+            where('estudianteId', '==', estudianteId),
+            where('estado', '==', 'Completado')
+        );
+        
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            return null;
+        }
+
+        // Ordenamos en memoria para obtener el más reciente
+        const transacciones = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransaccionPago));
+        transacciones.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+        
+        return transacciones[0];
+    } catch (error: any) {
+        console.error("Error al buscar último pago:", error);
+        return null;
+    }
+};
+
+/**
  * Busca y anula la última transacción de pago completada de un estudiante.
  */
 export const anularUltimoPagoEfectivo = async (
@@ -380,27 +414,15 @@ export const anularUltimoPagoEfectivo = async (
     }
 
     try {
-        const q = query(
-            transaccionesPagoCollection,
-            where('estudianteId', '==', estudianteId),
-            where('estado', '==', 'Completado')
-        );
-        
-        const snap = await getDocs(q);
-        if (snap.empty) {
+        const ultimaTransaccion = await obtenerUltimoPagoEfectivo(estudianteId);
+        if (!ultimaTransaccion) {
             throw new Error("No hay pagos recientes para anular.");
         }
-
-        // Ordenamos en memoria para obtener el más reciente (Firebase query compuesto necesita índice)
-        const transacciones = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TransaccionPago));
-        transacciones.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-        
-        const ultimaTransaccion = transacciones[0];
         
         return await anularPagoEfectivo(ultimaTransaccion.id, usuarioAdminId);
         
     } catch (error: any) {
-        console.error("Error al buscar último pago:", error);
+        console.error("Error al anular último pago:", error);
         return { exito: false, mensaje: error.message };
     }
 };

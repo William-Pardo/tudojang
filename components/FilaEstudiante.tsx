@@ -19,7 +19,6 @@ import {
 } from './Iconos';
 import GeneradorQR from './GeneradorQR';
 import ModalConfirmacion from './ModalConfirmacion';
-import { anularUltimoPagoEfectivo } from '../servicios/pagosApi';
 import { useNotificacion } from '../context/NotificacionContext';
 
 interface Props {
@@ -43,26 +42,7 @@ export const FilaEstudiante: React.FC<Props> = ({
     const { mostrarNotificacion } = useNotificacion();
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
     const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
-    const [modalAnularPagoAbierto, setModalAnularPagoAbierto] = useState(false);
-    const [cargandoAnulacion, setCargandoAnulacion] = useState(false);
     const esAdmin = usuario?.rol === RolUsuario.Admin;
-
-    const handleAnularPago = async () => {
-        setCargandoAnulacion(true);
-        try {
-            const res = await anularUltimoPagoEfectivo(estudiante.id, usuario?.id);
-            if (res.exito) {
-                mostrarNotificacion('Último pago anulado correctamente', 'success');
-                setModalAnularPagoAbierto(false);
-            } else {
-                mostrarNotificacion(res.mensaje || 'Error al anular pago', 'error');
-            }
-        } catch (error: any) {
-            mostrarNotificacion(error.message, 'error');
-        } finally {
-            setCargandoAnulacion(false);
-        }
-    };
 
     // Helper para renderizar el estado de cada documento
     const renderEstadoDoc = (
@@ -142,19 +122,10 @@ export const FilaEstudiante: React.FC<Props> = ({
 
     const contenidoAcciones = (
         <div className="flex items-center space-x-1 justify-end">
-            {esAdmin && (
-                <button
-                    onClick={() => setModalAnularPagoAbierto(true)}
-                    className="p-2 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 rounded-lg transition-colors"
-                    title="Deshacer Último Pago"
-                >
-                    <IconoDeshacer className="w-5 h-5" />
-                </button>
-            )}
             <button
                 onClick={() => setModalPagoAbierto(true)}
                 className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
-                title="Registrar Pago en Efectivo"
+                title="Gestión Financiera"
             >
                 <IconoBillete className="w-5 h-5" />
             </button>
@@ -167,16 +138,6 @@ export const FilaEstudiante: React.FC<Props> = ({
 
     return (
         <>
-            {modalAnularPagoAbierto && (
-                <ModalConfirmacion
-                    abierto={modalAnularPagoAbierto}
-                    titulo="Deshacer Último Pago"
-                    mensaje={`¿Estás seguro de que deseas anular el ÚLTIMO pago registrado de ${estudiante.nombres}? Esto restaurará su deuda y eliminará el pago del historial contable reciente.`}
-                    cargando={cargandoAnulacion}
-                    onConfirmar={handleAnularPago}
-                    onCerrar={() => setModalAnularPagoAbierto(false)}
-                />
-            )}
             <ModalRegistrarPago
                 estudiante={estudiante}
                 abierto={modalPagoAbierto}
