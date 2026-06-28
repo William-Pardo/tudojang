@@ -1,15 +1,13 @@
 
 // components/FormularioEstudiante.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import type { Estudiante, InscripcionPrograma } from '../tipos';
-import { GrupoEdad, EstadoPago, GradoTKD, TipoCobroPrograma } from '../tipos';
-import { IconoCerrar, IconoGuardar, IconoInformacion, IconoLogoOficial, IconoCasa, IconoAprobar } from './Iconos';
+import type { Estudiante } from '../tipos';
+import { GrupoEdad, EstadoPago, GradoTKD } from '../tipos';
+import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar } from './Iconos';
 import FormInputError from './FormInputError';
-import { useAutosave } from '../hooks/useAutosave';
-import AutosavePrompt from './AutosavePrompt';
 import { useSedes, useProgramas, useConfiguracion } from '../context/DataContext';
 import { formatearPrecio } from '../utils/formatters';
 import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes } from '../utils/calculations';
@@ -22,17 +20,19 @@ interface Props {
     cargando: boolean;
 }
 
-const calcularEdadYGrupo = (fechaNacimiento: string): { edad: number, grupo: GrupoEdad } => {
+export const calcularEdadYGrupo = (fechaNacimiento: string): { edad: number, grupo: GrupoEdad } => {
     if (!fechaNacimiento) return { edad: 0, grupo: GrupoEdad.NoAsignado };
     const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
+    const [anio, mesNacimiento, dia] = fechaNacimiento.split('-').map(Number);
+    const nacimiento = new Date(anio, mesNacimiento - 1, dia);
     if (isNaN(nacimiento.getTime())) return { edad: 0, grupo: GrupoEdad.NoAsignado };
     let edad = hoy.getFullYear() - nacimiento.getFullYear();
     const mes = hoy.getMonth() - nacimiento.getMonth();
     if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad--;
     if (edad >= 3 && edad <= 6) return { edad, grupo: GrupoEdad.Infantil };
     if (edad >= 7 && edad <= 12) return { edad, grupo: GrupoEdad.Precadetes };
-    if (edad >= 13) return { edad, grupo: GrupoEdad.Cadetes };
+    if (edad >= 13 && edad <= 17) return { edad, grupo: GrupoEdad.Cadetes };
+    if (edad >= 18) return { edad, grupo: GrupoEdad.Adultos };
     return { edad, grupo: GrupoEdad.NoAsignado };
 };
 
@@ -90,6 +90,11 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
 
     const watchedSedeId = watch('sedeId');
     const watchedProgramas = watch('programasInscritos') || [];
+    const watchedFechaNacimiento = watch('fechaNacimiento');
+
+    useEffect(() => {
+        setValue('grupo', calcularEdadYGrupo(watchedFechaNacimiento).grupo, { shouldValidate: true });
+    }, [watchedFechaNacimiento, setValue]);
 
     // Cálculos dinámicos de facturación para el resumen
     const resumenCobros = useMemo(() => {
@@ -206,7 +211,11 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                 <label htmlFor="sedeId" className="text-[10px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Sede de Entrenamiento <span className="text-tkd-red">*</span></label>
                                 <select id="sedeId" {...register('sedeId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     <option value="">Seleccionar Sede...</option>
-                                    {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.ciudad})</option>)}
+                                    {sedesVisibles.map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {`${s.nombre}${s.ciudad ? ` (${s.ciudad})` : ''}`}
+                                        </option>
+                                    ))}
                                 </select>
                                 <FormInputError mensaje={errors.sedeId?.message as string} />
                             </div>

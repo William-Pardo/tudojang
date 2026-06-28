@@ -31,11 +31,11 @@ const ModalVerFirma: React.FC<Props> = ({ abierto, onCerrar, firmaDigital, nombr
   }
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black transition-opacity duration-200 ease-out ${visible ? 'bg-opacity-60' : 'bg-opacity-0'}`} aria-modal="true" role="dialog" onClick={handleClose}>
+    <div data-testid="modal" className={`fixed inset-0 z-50 flex items-center justify-center bg-black transition-opacity duration-200 ease-out ${visible ? 'bg-opacity-60' : 'bg-opacity-0'}`} aria-modal="true" role="dialog" aria-labelledby="modal-title" onClick={handleClose}>
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 transform transition-all duration-200 ease-out ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} onClick={e => e.stopPropagation()}>
         <header className="flex items-center justify-between p-4 border-b dark:border-gray-700">
-          <h2 className="text-xl font-bold text-tkd-dark dark:text-white">Firma de {nombreTutor}</h2>
-          <button onClick={handleClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-600 transition-transform hover:scale-110 active:scale-100">
+          <h2 id="modal-title" className="text-xl font-bold text-tkd-dark dark:text-white">Firma de {nombreTutor}</h2>
+          <button onClick={handleClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-600 transition-transform hover:scale-110 active:scale-100" title="Cerrar modal" aria-label="Cerrar">
             <IconoCerrar className="w-6 h-6" />
           </button>
         </header>
@@ -57,6 +57,7 @@ const ModalVerFirma: React.FC<Props> = ({ abierto, onCerrar, firmaDigital, nombr
             type="button"
             onClick={handleClose}
             className="px-4 py-2 bg-tkd-blue text-white rounded-md hover:bg-blue-800 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95"
+            aria-label="Cerrar"
           >
             Cerrar
           </button>

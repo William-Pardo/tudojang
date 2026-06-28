@@ -1,0 +1,898 @@
+33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › validarRegistroTemporal › no debería hacer nada si isFirebaseConfigured es falso
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › legalizarLoteKicho › debería legalizar un lote Kicho
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › legalizarLoteKicho › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › inyectarEstudiantesKicho › debería inyectar estudiantes y actualizar la misión y registros
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › inyectarEstudiantesKicho › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › obtenerRegistrosMision › debería retornar los registros de una misión
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+  ● censoApi › obtenerRegistrosMision › debería retornar un array vacío si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      32 |   beforeEach(() => {
+      33 |     jest.clearAllMocks();
+    > 34 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      35 |   });
+      36 |
+      37 |   describe('crearMisionKicho', () => {
+
+      at Object.<anonymous> (servicios/censoApi.test.ts:34:97)
+
+ FAIL  servicios/configuracionApi.test.ts (11.015 s)
+  ● configuracionApi › obtenerConfiguracionNotificaciones › debería retornar la configuración por defecto si el documento no existe
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionNotificaciones › debería retornar la configuración existente si el documento existe
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionNotificaciones › debería usar localStorage si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionNotificaciones › debería usar CONFIGURACION_POR_DEFECTO si localStorage está vacío y isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionNotificaciones › debería guardar la configuración en Firestore
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionNotificaciones › debería lanzar un error si no hay tenantId
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionNotificaciones › debería guardar en localStorage si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › buscarTenantPorSlug › debería retornar null si no se encuentra el slug
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › buscarTenantPorSlug › debería retornar el tenant si se encuentra el slug
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › buscarTenantPorSlug › debería usar el modo mock si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › buscarTenantPorSlug › debería retornar null en modo mock si el slug no es tudojang ni dragones
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › registrarNuevaEscuela › debería registrar una nueva escuela con los datos proporcionados
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › registrarNuevaEscuela › debería generar un tenantId si no se proporciona uno
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › registrarNuevaEscuela › debería retornar string vacío si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionClub › debería retornar CONFIGURACION_CLUB_POR_DEFECTO si no se encuentra el tenantId
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionClub › debería retornar la configuración del club por tenantId
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionClub › debería buscar por slug si no se proporciona tenantId
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerConfiguracionClub › debería usar el modo mock si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionClub › debería guardar la configuración del club en Firestore
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionClub › debería lanzar un error si no hay tenantId
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › guardarConfiguracionClub › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › actualizarCapacidadClub › debería actualizar la capacidad del club en Firestore
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › actualizarCapacidadClub › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › actualizarPlanClub › debería actualizar el plan del club en Firestore
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › actualizarPlanClub › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerTodosLosTenants › debería retornar todos los tenants de Firestore
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › obtenerTodosLosTenants › debería retornar datos mock si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › cambiarEstadoSuscripcionTenant › debería actualizar el estado de suscripción del tenant en Firestore
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+  ● configuracionApi › cambiarEstadoSuscripcionTenant › no debería hacer nada si isFirebaseConfigured es falso
+
+    TypeError: jest.mocked(...).mockReturnValue is not a function
+
+      27 |   beforeEach(() => {
+      28 |     jest.clearAllMocks();
+    > 29 |     (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+         |                                                                                                 ^
+      30 |     Object.defineProperty(window, 'localStorage', {
+      31 |       value: {
+      32 |         getItem: jest.fn(),
+
+      at Object.<anonymous> (servicios/configuracionApi.test.ts:29:97)
+
+ FAIL  servicios/eventosApi.test.ts (8.529 s)
+  ● eventosApi storage isolation › sube imagen a la ruta correcta del tenant
+
+    ReferenceError: ref is not defined
+
+      141 |     (getDownloadURL as jest.Mock).mockResolvedValue('https://storage/ev42');
+      142 |     await expect(agregarEvento(eventoConImagen)).resolves.toEqual(expect.objectContaining({ id: 'ev42', imagenUrl: 'https://storage/ev42' }));
+    > 143 |     expect(ref).toHaveBeenCalledWith(expect.anything(), `tenants/${eventoConImagen.tenantId}/eventos/ev42/imagen_${expect.any(Number)}`);
+          |            ^
+      144 |   });
+      145 | });
+      146 |
+
+      at Object.<anonymous> (servicios/eventosApi.test.ts:143:12)
+
+ FAIL  components/FormularioMovimiento.test.tsx (30.548 s)
+  ● FormularioMovimiento › pre-rellena el formulario cuando se edita un movimiento con categoría estándar
+
+    expect(element).not.toBeInTheDocument()
+
+    expected document not to contain element, found <input class="block w-full border-red-300 rounded-md dark:bg-gray-700 dark:border-red-900/30 dark:text-white transition-colors focus:ring-tkd-red focus:border-tkd-red" name="categoriaNueva" placeholder="Eje: Publicidad, Mantenimiento..." type="text" /> instead
+
+      63 |     expect(container.querySelector('input[name="descripcion"]')).toHaveValue('Pago de luz');
+      64 |     expect(container.querySelector('select[name="sedeId"]')).toHaveValue('sede-2');
+    > 65 |     expect(container.querySelector('input[name="categoriaNueva"]')).not.toBeInTheDocument();
+         |                                                                         ^
+      66 |   });
+      67 |
+      68 |   it('pre-rellena el formulario cuando se edita un movimiento con categoría personalizada', () => {
+
+      at Object.<anonymous> (components/FormularioMovimiento.test.tsx:65:73)
+
+  ● FormularioMovimiento › llama a onGuardar con los datos unificados en modo de edición
+
+    expect(jest.fn()).toHaveBeenCalledWith(...expected)
+
+    Expected: {"categoria": undefined, "descripcion": "Inscripción Corregida", "fecha": "2026-06-21", "id": "mov-3", "monto": 80000, "sedeId": "sede-1", "tenantId": "test-tenant", "tipo": "Ingreso"}
+
+    Number of calls: 0
+
+    Ignored nodes: comments, script, style
+    <html>
+      <head />
+      <body>
+        <div>
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in"
+          >
+            <div
+              class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <header
+                class="p-4 border-b dark:border-gray-700 flex justify-between items-center"
+              >
+                <h2
+                  class="text-xl font-bold dark:text-white"
+                >
+                  Editar Movimiento
+                </h2>
+                <button
+                  class="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg
+                    class="transition-transform duration-200 w-6 h-6"
+                    fill="none"
+                    height="24"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                    width="24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <line
+                      x1="18"
+                      x2="6"
+                      y1="6"
+                      y2="18"
+                    />
+                    <line
+                      x1="6"
+                      x2="18"
+                      y1="6"
+                      y2="18"
+                    />
+                  </svg>
+                </button>
+              </header>
+              <form
+                class="p-6 space-y-4"
+              >
+                <div
+                  class="grid grid-cols-2 gap-4"
+                >
+                  <div>
+                    <label
+                      class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                    >
+                      Tipo
+                    </label>
+                    <select
+                      class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                      name="tipo"
+                    >
+                      <option
+                        value="Ingreso"
+                      >
+                        Ingreso
+                      </option>
+                      <option
+                        value="Egreso"
+                      >
+                        Egreso
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                    >
+                      Categoría
+                    </label>
+                    <select
+                      class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                      name="categoria"
+                    >
+                      <option
+                        value="Mensualidad"
+                      >
+                        Mensualidad
+                      </option>
+                      <option
+                        value="Implementos"
+                      >
+                        Implementos
+                      </option>
+                      <option
+                        value="Eventos"
+                      >
+                        Eventos
+                      </option>
+                      <option
+                        value="Arriendo"
+                      >
+                        Arriendo
+                      </option>
+                      <option
+                        value="Servicios"
+                      >
+                        Servicios
+                      </option>
+                      <option
+                        value="Nomina"
+                      >
+                        Nomina
+                      </option>
+                      <option
+                        value="Otros"
+                      >
+                        Otros
+                      </option>
+                      <option
+                        value="Recargo por Mora"
+                      >
+                        Recargo por Mora
+                      </option>
+                      <option
+                        value="Inscripción Nuevo Alumno"
+                      >
+                        Inscripción Nuevo Alumno
+                      </option>
+                      <option
+                        class="font-bold text-tkd-red"
+                        value="__NUEVA__"
+                      >
+                        + Nueva Categoría...
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div
+                  class="animate-slide-in-right"
+                >
+                  <label
+                    class="block text-xs font-black uppercase text-tkd-red mb-1"
+                  >
+                    Nombre de la Categoría Personalizada
+                  </label>
+                  <input
+                    class="block w-full border-red-300 rounded-md dark:bg-gray-700 dark:border-red-900/30 dark:text-white transition-colors focus:ring-tkd-red focus:border-tkd-red"
+                    name="categoriaNueva"
+                    placeholder="Eje: Publicidad, Mantenimiento..."
+                    type="text"
+                  />
+                  <div
+                    class="flex items-center text-sm text-red-600 dark:text-red-400 mt-1"
+                    role="alert"
+                  >
+                    <svg
+                      class="transition-transform duration-200 w-4 h-4 mr-1 flex-shrink-0"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                      />
+                      <line
+                        x1="12"
+                        x2="12"
+                        y1="9"
+                        y2="13"
+                      />
+                      <line
+                        x1="12"
+                        x2="12.01"
+                        y1="17"
+                        y2="17"
+                      />
+                    </svg>
+                    <span>
+                      Debes escribir el nombre de la nueva categoría.
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Sede
+                  </label>
+                  <select
+                    class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                    name="sedeId"
+                  >
+                    <option
+                      value="sede-1"
+                    >
+                      Sede Principal
+                    </option>
+                    <option
+                      value="sede-2"
+                    >
+                      Sede Secundaria
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Monto (COP)
+                  </label>
+                  <input
+                    class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                    name="monto"
+                    type="number"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Descripción / Concepto
+                  </label>
+                  <input
+                    class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                    name="descripcion"
+                    type="text"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block text-xs font-black uppercase text-gray-500 dark:text-gray-400 mb-1"
+                  >
+                    Fecha de Registro
+                  </label>
+                  <input
+                    class="block w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors focus:ring-tkd-blue focus:border-tkd-blue"
+                    name="fecha"
+                    type="date"
+                  />
+                </div>
+                <footer
+                  class="pt-4 flex justify-end space-x-3"
+                >
+                  <button
+                    class="px-4 py-2 text-gray-500 hover:text-tkd-dark dark:hover:text-white transition-colors"
+                    type="button"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    class="bg-tkd-red text-white px-6 py-2 rounded-md flex items-center space-x-2 shadow-md hover:bg-red-700 transition-all hover:scale-105 active:scale-95 disabled:bg-gray-400"
+                    type="submit"
+                  >
+                    <svg
+                      class="transition-transform duration-200 w-5 h-5"
+                      fill="none"
+                      height="24"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                      width="24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+                      />
+                      <polyline
+                        points="17 21 17 13 7 13 7 21"
+                      />
+                      <polyline
+                        points="7 3 7 8 15 8"
+                      />
+                    </svg>
+                    <span>
+                      Actualizar
+                    </span>
+                  </button>
+                </footer>
+              </form>
+            </div>
+          </div>
+        </div>
+      </body>
+    </html>
+
+      172 |
+      173 |     await waitFor(() => {
+    > 174 |       expect(onGuardarMock).toHaveBeenCalledWith({
+          |                             ^
+      175 |         id: 'mov-3',
+      176 |         tipo: TipoMovimiento.Ingreso,
+      177 |         categoria: CategoriaFinanciera.Matricula,
+
+      at components/FormularioMovimiento.test.tsx:174:29
+      at runWithExpensiveErrorDiagnosticsDisabled (node_modules/@testing-library/dom/dist/config.js:47:12)
+      at checkCallback (node_modules/@testing-library/dom/dist/wait-for.js:124:77)
+      at checkRealTimersCallback (node_modules/@testing-library/dom/dist/wait-for.js:118:16)
+      at Timeout.task [as _onTimeout] (node_modules/jsdom/lib/jsdom/browser/Window.js:520:19)
+
+ FAIL  vistas/Dashboard.test.tsx
+  ● Test suite failed to run
+
+    ReferenceError: TextEncoder is not defined
+
+      3 | import { render, screen } from '@testing-library/react';
+      4 | // FIX: Changed to namespace import to fix module resolution issues.
+    > 5 | import * as ReactRouterDOM from 'react-router-dom';
+        | ^
+      6 | // FIX: Added 'expect' to the import from '@jest/globals' to resolve type inference issues with jest-dom matchers.
+      7 | import { describe, it, jest, expect } from '@jest/globals';
+      8 | import VistaDashboard from './Dashboard';
+
+      at Object.<anonymous> (node_modules/react-router/dist/development/index.js:342:31)
+      at Object.<anonymous> (node_modules/react-router/dist/development/dom-export.js:40:20)
+      at Object.<anonymous> (node_modules/react-router-dom/dist/index.js:38:18)
+      at Object.<anonymous> (vistas/Dashboard.test.tsx:5:1)
+
+
+Test Suites: 5 failed, 32 passed, 37 total
+Tests:       49 failed, 320 passed, 369 total
+Snapshots:   0 total
+Time:        258.214 s
+Ran all test suites.
+
+E:\Apps\Tudojang>  --coverage \
+"--coverage" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+
+E:\Apps\Tudojang>  --coverageReporters=text \
+"--coverageReporters" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.
+
+E:\Apps\Tudojang>  --collectCoverageFrom="components/AsistenteVirtual.tsx"
+"--collectCoverageFrom" no se reconoce como un comando interno o externo,
+programa o archivo por lotes ejecutable.

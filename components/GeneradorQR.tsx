@@ -25,6 +25,7 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
   const visualGrado = getBeltStyle(estudiante.grado);
 
   const downloadCard = async () => {
+    /* istanbul ignore next -- el botón solo existe mientras la tarjeta referenciada está montada */
     if (!cardRef.current) return;
     setProcesando(true);
     try {

@@ -23,7 +23,14 @@ const eventosCollection = collection(db, 'eventos');
 const solicitudesCollection = collection(db, 'solicitudesInscripcion');
 const storage = getStorage();
 
+const validarFechasEvento = (evento: Pick<Evento, 'fechaInicioInscripcion' | 'fechaFinInscripcion'>) => {
+    if (evento.fechaFinInscripcion < evento.fechaInicioInscripcion) {
+        throw new Error("La fecha de fin de inscripción no puede ser menor que la fecha de inicio.");
+    }
+};
+
 const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: string, tenantId: string): Promise<string> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Saltando subida de imagen de evento.");
         return imagenUrl || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
@@ -37,6 +44,7 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
 };
 
 export const obtenerEventos = async (): Promise<Evento[]> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de eventos vacía.");
         return [];
@@ -61,6 +69,7 @@ export const obtenerEventos = async (): Promise<Evento[]> => {
 };
 
 export const obtenerEventoPorId = async (idEvento: string): Promise<Evento> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo evento mock.");
         // Added fix: Include required 'tenantId' property in mock event.
@@ -88,6 +97,8 @@ export const obtenerEventoPorId = async (idEvento: string): Promise<Evento> => {
 };
 
 export const agregarEvento = async (nuevoEventoData: Omit<Evento, 'id'>): Promise<Evento> => {
+    validarFechasEvento(nuevoEventoData);
+     /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
      if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Agregando evento.");
         return { id: `mock-evt-${Date.now()}`, ...nuevoEventoData } as Evento;
@@ -107,6 +118,8 @@ export const agregarEvento = async (nuevoEventoData: Omit<Evento, 'id'>): Promis
 };
 
 export const actualizarEvento = async (eventoActualizado: Evento): Promise<Evento> => {
+    validarFechasEvento(eventoActualizado);
+     /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
      if (!isFirebaseConfigured) {
         return eventoActualizado;
     }
@@ -119,6 +132,7 @@ export const actualizarEvento = async (eventoActualizado: Evento): Promise<Event
 };
 
 export const eliminarEvento = async (idEvento: string): Promise<void> => {
+     /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
      if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Eliminando evento.");
         return;
@@ -128,6 +142,7 @@ export const eliminarEvento = async (idEvento: string): Promise<void> => {
 };
 
 export const crearSolicitudInscripcion = async (idEvento: string, numIdentificacion: string): Promise<SolicitudInscripcion> => {
+     /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
      if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Creando solicitud de inscripción.");
         const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
@@ -167,6 +182,7 @@ export const crearSolicitudInscripcion = async (idEvento: string, numIdentificac
 };
 
 export const obtenerSolicitudesPorEvento = async (idEvento: string): Promise<SolicitudInscripcion[]> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de solicitudes vacía.");
         return [];
@@ -177,6 +193,7 @@ export const obtenerSolicitudesPorEvento = async (idEvento: string): Promise<Sol
 };
 
 export const gestionarSolicitud = async (idSolicitud: string, nuevoEstado: EstadoSolicitud): Promise<Estudiante | null> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Gestionando solicitud de inscripción.");
         if (nuevoEstado === EstadoSolicitud.Aprobada) {

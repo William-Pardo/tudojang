@@ -1,4 +1,3 @@
-
 // vistas/EventoPublico.tsx
 // Vista pública del detalle de un evento, optimizada para conversión.
 // Accesible sin autenticación. Orientada a competidores de OTROS clubes.
@@ -9,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { formatearPrecio, formatearFecha } from '../utils/formatters';
-import { IconoWhatsApp, IconoExitoAnimado, IconoEnviar, IconoEventos, IconoInformacion } from '../components/Iconos';
+import { IconoWhatsApp, IconoExitoAnimado, IconoEnviar, IconoEventos, IconoInformacion, IconoCampana, IconoCasa } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import type { Evento, ConfiguracionClub } from '../tipos';
@@ -53,7 +52,6 @@ const EventoPublico: React.FC = () => {
                 const eventoData = { id: eventoDoc.id, ...eventoDoc.data() } as Evento;
                 setEvento(eventoData);
 
-                // Cargar la configuración del tenant para branding y contacto
                 if (eventoData.tenantId) {
                     const tenantDoc = await getDoc(doc(db, 'tenants', eventoData.tenantId));
                     if (tenantDoc.exists()) {
@@ -70,7 +68,6 @@ const EventoPublico: React.FC = () => {
         cargarEvento();
     }, [id]);
 
-    // --- Manejo del formulario ---
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
@@ -95,7 +92,6 @@ const EventoPublico: React.FC = () => {
         }
     };
 
-    // --- Generar enlace de WhatsApp precalentado ---
     const generarEnlaceWhatsApp = (): string => {
         const telefonoClub = tenant?.pagoNequi || tenant?.pagoDaviplata || '';
         const telefonoLimpio = telefonoClub.replace(/\D/g, '');
@@ -105,22 +101,21 @@ const EventoPublico: React.FC = () => {
         return `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     };
 
-    // --- Estados de carga y error ---
-    const colorPrimario = tenant?.colorPrimario || '#1E3A5F';
-    const colorSecundario = tenant?.colorSecundario || '#F97316';
+    const colorPrimario = tenant?.colorPrimario || 'var(--color-primario, #111111)';
+    const colorSecundario = tenant?.colorSecundario || 'var(--color-acento, #CD2E3A)';
 
     if (cargando) return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+        <div className="min-h-screen bg-white flex items-center justify-center">
             <Loader />
         </div>
     );
 
     if (error || !evento) return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-6">
+        <div className="min-h-screen bg-white flex items-center justify-center p-6">
             <div className="text-center space-y-4">
-                <IconoInformacion className="w-16 h-16 text-red-400 mx-auto" />
-                <h1 className="text-2xl font-black text-white uppercase tracking-wider">{error || 'Evento no encontrado'}</h1>
-                <Link to="/" className="text-white/50 hover:text-white text-xs font-bold uppercase tracking-widest underline">
+                <IconoInformacion className="w-16 h-16 text-tkd-red mx-auto" />
+                <h1 className="text-2xl font-black text-tkd-dark uppercase tracking-tighter">{error || 'Evento no encontrado'}</h1>
+                <Link to="/" className="text-gray-400 hover:text-tkd-blue text-xs font-bold uppercase tracking-widest underline transition-colors">
                     Volver al inicio
                 </Link>
             </div>
@@ -130,222 +125,184 @@ const EventoPublico: React.FC = () => {
     const inscripcionAbierta = new Date(evento.fechaFinInscripcion + 'T23:59:59') >= new Date();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-
-            {/* --- HEADER con Branding --- */}
-            <header className="relative py-6 px-6 flex items-center justify-between">
+        <div className="min-h-screen bg-gray-50 text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white pb-20">
+            {/* NAVBAR ESTRATÉGICO */}
+            <nav className="fixed top-0 w-full z-[100] bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 px-6 flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-3">
                     {tenant?.logoUrl ? (
-                        <img src={tenant.logoUrl} alt={tenant.nombreClub} className="h-10 w-10 rounded-full object-cover border-2 border-white/20" />
+                        <img src={tenant.logoUrl} alt={tenant.nombreClub} className="h-10 w-10 rounded-full object-cover border border-gray-200 shadow-sm bg-white" />
                     ) : (
                         <LogoDinamico className="h-10 w-auto" />
                     )}
-                    <span className="text-xs font-black uppercase tracking-[0.2em] text-white/60">{tenant?.nombreClub || 'Tudojang'}</span>
+                    <span className="font-black text-lg tracking-tighter uppercase italic" style={{ color: colorPrimario }}>
+                        {tenant?.nombreClub || 'Tudojang'}
+                    </span>
                 </div>
-                <Link to="/login" className="text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors">
-                    ¿Sos de la academia? Iniciá sesión
+                <Link to="/login" className="hidden sm:inline-block bg-white border border-gray-200 text-tkd-dark px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:border-tkd-blue hover:text-tkd-blue shadow-sm transition-all">
+                    Portal Alumnos
                 </Link>
-            </header>
+            </nav>
 
-            {/* --- HERO: Flyer del Evento --- */}
-            <section className="relative overflow-hidden">
-                {evento.imagenUrl && (
-                    <div className="relative w-full max-w-3xl mx-auto px-4">
-                        <motion.img
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.5 }}
-                            src={evento.imagenUrl}
-                            alt={evento.nombre}
-                            className="w-full rounded-3xl shadow-2xl shadow-black/50 object-cover"
-                        />
+            {/* HERO SECTION */}
+            <section className="pt-32 pb-10 px-6 max-w-5xl mx-auto">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-6 mb-12">
+                    <div className="inline-block px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: `${colorSecundario}15`, color: colorSecundario }}>
+                        Evento Oficial
                     </div>
-                )}
-                {!evento.imagenUrl && (
-                    <div className="relative w-full max-w-3xl mx-auto px-4">
-                        <div className="w-full h-48 rounded-3xl flex items-center justify-center"
-                             style={{ background: `linear-gradient(135deg, ${colorPrimario}, ${colorSecundario})` }}>
-                            <IconoEventos className="w-20 h-20 text-white/30" />
-                        </div>
-                    </div>
+                    <h1 className="text-5xl sm:text-6xl font-black uppercase tracking-tighter leading-tight text-tkd-dark">
+                        {evento.nombre}
+                    </h1>
+                </motion.div>
+
+                {evento.imagenUrl ? (
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full rounded-[3rem] overflow-hidden shadow-premium border border-gray-100 bg-white group">
+                        <img src={evento.imagenUrl} alt={evento.nombre} className="w-full h-auto max-h-[60vh] object-cover transition-transform duration-700 group-hover:scale-105" />
+                    </motion.div>
+                ) : (
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-64 rounded-[3rem] flex items-center justify-center shadow-premium border border-gray-100 relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${colorPrimario}, ${colorSecundario})` }}>
+                        <IconoEventos className="w-32 h-32 text-white/20" />
+                        <div className="absolute inset-0 bg-black/10"></div>
+                    </motion.div>
                 )}
             </section>
 
-            {/* --- DETALLE DEL EVENTO --- */}
-            <motion.section
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="max-w-3xl mx-auto px-6 py-10 space-y-8"
-            >
-                <div className="text-center space-y-3">
-                    <h1 className="text-3xl sm:text-4xl font-black uppercase tracking-tight leading-tight">{evento.nombre}</h1>
-                    <p className="text-white/50 text-sm font-bold uppercase tracking-widest">{tenant?.nombreClub || 'Organiza'}</p>
-                </div>
-
-                {/* Info Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Fecha</p>
-                        <p className="text-lg font-black">{formatearFecha(evento.fechaEvento)}</p>
+            {/* MAIN CONTENT */}
+            <section className="px-6 max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10 -mt-8">
+                {/* Detalles (Izquierda) */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Tarjetas de Resumen */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-gray-100 flex items-start gap-5 hover:shadow-premium transition-shadow">
+                            <div className="p-4 rounded-3xl bg-blue-50 text-tkd-blue"><IconoCampana className="w-7 h-7" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cuándo</p>
+                                <p className="text-xl font-black mt-1 text-tkd-dark">{formatearFecha(evento.fechaEvento)}</p>
+                            </div>
+                        </motion.div>
+                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="bg-white p-8 rounded-[2.5rem] shadow-soft border border-gray-100 flex items-start gap-5 hover:shadow-premium transition-shadow">
+                            <div className="p-4 rounded-3xl bg-red-50 text-tkd-red"><IconoCasa className="w-7 h-7" /></div>
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Dónde</p>
+                                <p className="text-xl font-black mt-1 text-tkd-dark">{evento.lugar}</p>
+                            </div>
+                        </motion.div>
                     </div>
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Lugar</p>
-                        <p className="text-lg font-black">{evento.lugar}</p>
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Inscripción</p>
-                        <p className="text-lg font-black" style={{ color: colorSecundario }}>{formatearPrecio(evento.valor)}</p>
-                    </div>
-                </div>
 
-                {/* Descripción completa */}
-                {evento.descripcion && (
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 sm:p-8">
-                        <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-4">Acerca del Evento</h2>
-                        <p className="text-white/80 leading-relaxed whitespace-pre-line">{evento.descripcion}</p>
-                    </div>
-                )}
-
-                {/* Requisitos */}
-                {evento.requisitos && (
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 sm:p-8">
-                        <h2 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-4">Requisitos</h2>
-                        <p className="text-white/80 leading-relaxed whitespace-pre-line">{evento.requisitos}</p>
-                    </div>
-                )}
-
-                {/* Fechas de inscripción */}
-                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Periodo de Inscripción</p>
-                    <p className="text-white/70 font-bold text-sm">
-                        {formatearFecha(evento.fechaInicioInscripcion)} — {formatearFecha(evento.fechaFinInscripcion)}
-                    </p>
-                    {!inscripcionAbierta && (
-                        <p className="text-red-400 font-black text-xs uppercase tracking-widest mt-2">Inscripciones cerradas</p>
-                    )}
-                </div>
-
-                {/* --- LEAD MAGNET --- */}
-                {inscripcionAbierta && (
-                    <AnimatePresence mode="wait">
-                        {paso === 'detalle' && (
-                            <motion.div
-                                key="cta"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-4 text-center"
-                            >
-                                <div className="bg-gradient-to-r from-white/5 to-white/10 border border-white/10 rounded-2xl p-8 space-y-4">
-                                    <p className="text-white/60 font-bold text-sm uppercase tracking-wider">
-                                        🏆 Asegurá tu lugar y recibí el cronograma oficial antes que nadie
-                                    </p>
-                                    <button
-                                        onClick={() => setPaso('formulario')}
-                                        className="w-full sm:w-auto px-10 py-4 rounded-2xl font-black uppercase text-sm tracking-[0.2em] text-white shadow-2xl transition-all hover:scale-[1.03] active:scale-95"
-                                        style={{ background: `linear-gradient(135deg, ${colorPrimario}, ${colorSecundario})` }}
-                                    >
-                                        Quiero Participar
-                                    </button>
-                                </div>
-                            </motion.div>
+                    {/* Descripción y Requisitos */}
+                    <div className="bg-white p-10 sm:p-12 rounded-[3rem] shadow-soft border border-gray-100 space-y-12">
+                        {evento.descripcion && (
+                            <div className="space-y-6">
+                                <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3 text-tkd-dark">
+                                    <span className="w-3 h-8 rounded-full" style={{ backgroundColor: colorPrimario }}></span>
+                                    Acerca del Evento
+                                </h3>
+                                <p className="text-gray-500 leading-loose font-medium text-lg">{evento.descripcion}</p>
+                            </div>
                         )}
-
-                        {paso === 'formulario' && (
-                            <motion.div
-                                key="form"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                            >
-                                <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 sm:p-8 space-y-5">
-                                    <h2 className="text-center text-lg font-black uppercase tracking-wider">Registrá tu Interés</h2>
-                                    <p className="text-center text-white/50 text-xs font-bold uppercase tracking-widest">
-                                        Completá tus datos para coordinar la inscripción
-                                    </p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[9px] font-black uppercase text-white/40 mb-1 block tracking-widest">Nombre Completo *</label>
-                                            <input name="nombre" type="text" required value={formData.nombre} onChange={handleInputChange}
-                                                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all text-sm"
-                                                placeholder="Tu nombre completo" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-black uppercase text-white/40 mb-1 block tracking-widest">WhatsApp *</label>
-                                            <input name="whatsapp" type="tel" required value={formData.whatsapp} onChange={handleInputChange}
-                                                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all text-sm"
-                                                placeholder="300 123 4567" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-black uppercase text-white/40 mb-1 block tracking-widest">Email</label>
-                                            <input name="email" type="email" value={formData.email} onChange={handleInputChange}
-                                                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all text-sm"
-                                                placeholder="correo@ejemplo.com" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-black uppercase text-white/40 mb-1 block tracking-widest">Club / Academia</label>
-                                            <input name="clubOrigen" type="text" value={formData.clubOrigen} onChange={handleInputChange}
-                                                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all text-sm"
-                                                placeholder="Nombre de tu academia" />
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        disabled={enviando}
-                                        className="w-full py-4 rounded-2xl font-black uppercase text-sm tracking-[0.2em] text-white shadow-2xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
-                                        style={{ background: `linear-gradient(135deg, ${colorPrimario}, ${colorSecundario})` }}
-                                    >
-                                        {enviando ? (
-                                            <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                            <IconoEnviar className="w-5 h-5" />
-                                        )}
-                                        {enviando ? 'Registrando...' : 'Confirmar Interés'}
-                                    </button>
-                                    <button type="button" onClick={() => setPaso('detalle')} className="w-full text-center text-white/30 text-[10px] font-bold uppercase tracking-widest hover:text-white/60 transition-colors">
-                                        ← Volver a los detalles
-                                    </button>
-                                </form>
-                            </motion.div>
+                        {evento.requisitos && (
+                            <div className="space-y-6">
+                                <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3 text-tkd-dark">
+                                    <span className="w-3 h-8 rounded-full" style={{ backgroundColor: colorSecundario }}></span>
+                                    Requisitos Oficiales
+                                </h3>
+                                <p className="text-gray-500 leading-loose font-medium text-lg whitespace-pre-line">{evento.requisitos}</p>
+                            </div>
                         )}
+                    </div>
+                </div>
 
-                        {paso === 'exito' && (
-                            <motion.div
-                                key="exito"
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="text-center space-y-6 py-8"
-                            >
-                                <IconoExitoAnimado className="mx-auto w-24 h-24 text-green-400" />
-                                <h2 className="text-2xl font-black uppercase tracking-tight">¡Registro Exitoso!</h2>
-                                <p className="text-white/60 text-sm font-bold uppercase tracking-widest leading-relaxed max-w-md mx-auto">
-                                    Tu interés ha sido registrado. <br />
-                                    Para agilizar tu inscripción, contactá directamente a la organización por WhatsApp.
+                {/* Formulario/CTA (Derecha - Sticky) */}
+                <div className="lg:col-span-1">
+                    <div className="sticky top-28 bg-white p-8 sm:p-10 rounded-[3rem] shadow-premium border border-gray-100">
+                        {/* Info de Inscripción */}
+                        <div className="text-center mb-8 pb-8 border-b border-gray-100">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inversión Total</p>
+                            <p className="text-5xl font-black text-tkd-dark my-4 tracking-tighter" style={{ color: colorPrimario }}>{formatearPrecio(evento.valor)}</p>
+                            <div className="inline-block bg-gray-50 px-4 py-2 rounded-xl">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                    Cierre: {formatearFecha(evento.fechaFinInscripcion)}
                                 </p>
-                                {(tenant?.pagoNequi || tenant?.pagoDaviplata) && (
-                                    <a
-                                        href={generarEnlaceWhatsApp()}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase text-sm tracking-[0.15em] text-white bg-green-600 hover:bg-green-500 shadow-2xl shadow-green-900/50 transition-all hover:scale-[1.03] active:scale-95"
-                                    >
-                                        <IconoWhatsApp className="w-6 h-6" />
-                                        Contactar por WhatsApp
-                                    </a>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                )}
-            </motion.section>
+                            </div>
+                        </div>
 
-            {/* --- FOOTER --- */}
-            <footer className="py-8 text-center">
-                <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">
-                    Tudojang • Gestión Deportiva Inteligente
-                </p>
-            </footer>
+                        {!inscripcionAbierta ? (
+                            <div className="text-center p-6 bg-red-50 rounded-2xl border border-red-100">
+                                <p className="text-tkd-red font-black uppercase tracking-widest text-xs">Inscripciones Cerradas</p>
+                            </div>
+                        ) : (
+                            <AnimatePresence mode="wait">
+                                {paso === 'detalle' && (
+                                    <motion.div key="cta" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                                        <button
+                                            onClick={() => setPaso('formulario')}
+                                            className="w-full py-5 rounded-full font-black uppercase text-xs tracking-[0.2em] text-white shadow-xl hover:scale-105 active:scale-95 transition-all"
+                                            style={{ backgroundColor: colorPrimario }}
+                                        >
+                                            Inscribirme Ahora
+                                        </button>
+                                        <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-widest px-4 leading-relaxed">
+                                            Asegurá tu lugar antes del cierre. Cupos estrictamente limitados.
+                                        </p>
+                                    </motion.div>
+                                )}
+
+                                {paso === 'formulario' && (
+                                    <motion.div key="form" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+                                        <form onSubmit={handleSubmit} className="space-y-5">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Nombre Completo</label>
+                                                <input required name="nombre" value={formData.nombre} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Ej. Juan Pérez" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Celular / WhatsApp</label>
+                                                <input required name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Tu número principal" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Email (Opcional)</label>
+                                                <input name="email" type="email" value={formData.email} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="correo@ejemplo.com" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Academia (Opcional)</label>
+                                                <input name="clubOrigen" value={formData.clubOrigen} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Club de origen" />
+                                            </div>
+                                            
+                                            <div className="pt-6 space-y-4">
+                                                <button type="submit" disabled={enviando} className="w-full py-5 rounded-full font-black uppercase text-xs tracking-[0.2em] text-white shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex justify-center items-center gap-3 disabled:opacity-50" style={{ backgroundColor: colorPrimario }}>
+                                                    {enviando ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <IconoEnviar className="w-5 h-5" />}
+                                                    {enviando ? 'Procesando...' : 'Confirmar Registro'}
+                                                </button>
+                                                <button type="button" onClick={() => setPaso('detalle')} className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-tkd-dark transition-colors">
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </motion.div>
+                                )}
+
+                                {paso === 'exito' && (
+                                    <motion.div key="exito" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-8 py-6">
+                                        <div className="w-24 h-24 bg-green-50 rounded-[2rem] flex items-center justify-center mx-auto border border-green-100 shadow-inner">
+                                            <IconoExitoAnimado className="w-12 h-12 text-green-500" />
+                                        </div>
+                                        <div className="space-y-3">
+                                            <h3 className="text-3xl font-black uppercase tracking-tighter text-tkd-dark">¡Registro Exitoso!</h3>
+                                            <p className="text-sm font-medium text-gray-500 leading-relaxed max-w-[250px] mx-auto">
+                                                Ya tenemos tus datos. Ahora escribinos por WhatsApp para finalizar tu inscripción.
+                                            </p>
+                                        </div>
+                                        {(tenant?.pagoNequi || tenant?.pagoDaviplata) && (
+                                            <a href={generarEnlaceWhatsApp()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-4 w-full py-5 rounded-full font-black uppercase text-xs tracking-widest text-white bg-[#25D366] hover:bg-[#1DA851] shadow-xl hover:scale-105 active:scale-95 transition-all mt-4">
+                                                <IconoWhatsApp className="w-6 h-6" />
+                                                Contactar al Club
+                                            </a>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        )}
+                    </div>
+                </div>
+            </section>
         </div>
     );
 };

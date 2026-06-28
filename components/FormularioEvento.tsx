@@ -179,43 +179,43 @@ const FormularioEvento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, event
           {hasDraft && <AutosavePrompt onRestore={restoreDraft} onDiscard={clearDraft} />}
           <div>
             <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nombre del Evento</label>
-            <input type="text" {...register('nombre')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.nombre ? 'border-red-500' : 'border-gray-300'}`} />
+            <input id="nombre" type="text" {...register('nombre')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.nombre ? 'border-red-500' : 'border-gray-300'}`} />
             <FormInputError mensaje={errors.nombre?.message} />
           </div>
           <div>
             <label htmlFor="lugar" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Lugar</label>
-            <input type="text" {...register('lugar')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.lugar ? 'border-red-500' : 'border-gray-300'}`} />
+            <input id="lugar" type="text" {...register('lugar')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.lugar ? 'border-red-500' : 'border-gray-300'}`} />
             <FormInputError mensaje={errors.lugar?.message} />
           </div>
           <div>
             <label htmlFor="descripcion" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
-            <textarea {...register('descripcion')} rows={3} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-tkd-blue focus:border-tkd-blue sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors"></textarea>
+            <textarea id="descripcion" {...register('descripcion')} rows={3} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-tkd-blue focus:border-tkd-blue sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors"></textarea>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label htmlFor="fechaInicioInscripcion" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Inicio Inscripción</label>
-              <input type="date" {...register('fechaInicioInscripcion')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaInicioInscripcion ? 'border-red-500' : 'border-gray-300'}`} />
+              <input id="fechaInicioInscripcion" type="date" {...register('fechaInicioInscripcion')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaInicioInscripcion ? 'border-red-500' : 'border-gray-300'}`} />
               <FormInputError mensaje={errors.fechaInicioInscripcion?.message} />
             </div>
             <div>
               <label htmlFor="fechaFinInscripcion" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fin Inscripción</label>
-              <input type="date" {...register('fechaFinInscripcion')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaFinInscripcion ? 'border-red-500' : 'border-gray-300'}`} />
+              <input id="fechaFinInscripcion" type="date" {...register('fechaFinInscripcion')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaFinInscripcion ? 'border-red-500' : 'border-gray-300'}`} />
               <FormInputError mensaje={errors.fechaFinInscripcion?.message} />
             </div>
             <div>
               <label htmlFor="fechaEvento" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha del Evento</label>
-              <input type="date" {...register('fechaEvento')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaEvento ? 'border-red-500' : 'border-gray-300'}`} />
+              <input id="fechaEvento" type="date" {...register('fechaEvento')} className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.fechaEvento ? 'border-red-500' : 'border-gray-300'}`} />
               <FormInputError mensaje={errors.fechaEvento?.message} />
             </div>
           </div>
           <div>
             <label htmlFor="valor" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Valor de Inscripción (COP)</label>
-            <input type="number" {...register('valor')} min="0" className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.valor ? 'border-red-500' : 'border-gray-300'}`} />
+            <input id="valor" type="number" {...register('valor')} min="0" className={`mt-1 block w-full border rounded-md shadow-sm sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors ${errors.valor ? 'border-red-500' : 'border-gray-300'}`} />
             <FormInputError mensaje={errors.valor?.message} />
           </div>
           <div>
             <label htmlFor="requisitos" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Requisitos</label>
-            <textarea {...register('requisitos')} rows={2} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-tkd-blue focus:border-tkd-blue sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors"></textarea>
+            <textarea id="requisitos" {...register('requisitos')} rows={2} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-tkd-blue focus:border-tkd-blue sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors"></textarea>
           </div>
           <div>
             <div className="flex items-center space-x-1 mb-2">
@@ -241,8 +241,9 @@ const FormularioEvento: React.FC<Props> = ({ abierto, onCerrar, onGuardar, event
             </div>
             {imagenPreview && (
               <div className="mt-4 flex justify-center">
-                <div className="w-40 aspect-[9/16] bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border dark:border-gray-600 shadow-md">
+                <div className="w-40 aspect-[9/16] bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden border dark:border-gray-600 shadow-md relative">
                   <img src={imagenPreview} alt="Vista previa del evento" className="w-full h-full object-cover" />
+                  <button type="button" aria-label="Descartar banner" onClick={() => setValue('imagenUrl', '', { shouldValidate: true })}>×</button>
                 </div>
               </div>
             )}

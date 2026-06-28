@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1782140349424" clover="3.2.0">
+  <project timestamp="1782140349425" name="All files">
+    <metrics statements="11" coveredstatements="11" conditionals="7" coveredconditionals="7" methods="2" coveredmethods="2" elements="20" coveredelements="20" complexity="0" loc="11" ncloc="11" packages="2" files="2" classes="2"/>
+    <package name="components">
+      <metrics statements="6" coveredstatements="6" conditionals="3" coveredconditionals="3" methods="1" coveredmethods="1"/>
+      <file name="EstadoPagoBadge.tsx" path="E:\Apps\Tudojang\components\EstadoPagoBadge.tsx">
+        <metrics statements="6" coveredstatements="6" conditionals="3" coveredconditionals="3" methods="1" coveredmethods="1"/>
+        <line num="2" count="1" type="stmt"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="12" count="1" type="stmt"/>
+        <line num="13" count="5" type="cond" truecount="3" falsecount="0"/>
+        <line num="15" count="5" type="stmt"/>
+        <line num="22" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="hooks">
+      <metrics statements="5" coveredstatements="5" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+      <file name="useEstadoPago.ts" path="E:\Apps\Tudojang\hooks\useEstadoPago.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="4" coveredconditionals="4" methods="1" coveredmethods="1"/>
+        <line num="1" count="1" type="stmt"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="35" count="1" type="stmt"/>
+        <line num="37" count="1" type="stmt"/>
+        <line num="38" count="16" type="cond" truecount="2" falsecount="0"/>
+      </file>
+    </package>
+  </project>
+</coverage>

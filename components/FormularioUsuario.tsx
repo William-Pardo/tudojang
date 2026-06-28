@@ -18,7 +18,7 @@ interface Props {
   cargando: boolean;
 }
 
-const crearEsquemaValidacion = (esEdicion: boolean) => {
+export const crearEsquemaValidacion = (esEdicion: boolean) => {
   return yup.object({
     nombreUsuario: yup.string().trim().required('El nombre es obligatorio.'),
     numeroIdentificacion: yup.string().trim().required('El documento de identidad es obligatorio para contratos.'),

@@ -15,6 +15,7 @@ import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Estudiante, SolicitudCompra, SolicitudInscripcion, MovimientoFinanciero, TransaccionPago } from '../tipos';
 import { EstadoPago, EstadoSolicitud, EstadoSolicitudCompra, TipoMovimiento, CategoriaFinanciera } from '../tipos';
 import { enviarEmailConfirmacionPago } from './emailService';
+import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
 
 // Interfaces para el manejo de pagos
 export interface DeudaPendiente {
@@ -65,6 +66,7 @@ export const obtenerDeudasEstudiante = async (estudianteId: string): Promise<Res
     const estudiante = { id: estudianteSnap.id, ...estudianteSnap.data() } as Estudiante;
     const items: DeudaPendiente[] = [];
 
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) {
         // MOCK DATA para desarrollo local
         return {
@@ -180,6 +182,7 @@ export const procesarPagoEfectivo = async (
     usuarioAdminId?: string
 ): Promise<PagoProcesado> => {
 
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) {
         return { exito: true, reciboId: `REC-MOCK-${Date.now()}`, nuevoSaldo: 0, mensaje: "Pago simulado exitoso" };
     }
@@ -230,8 +233,8 @@ export const procesarPagoEfectivo = async (
         }
 
         // 3. Actualizar Saldo Estudiante
-        const nuevoSaldo = Math.max(0, estudiante.saldoDeudor - montoTotalRecibido);
-        const nuevoEstadoPago = nuevoSaldo === 0 ? EstadoPago.AlDia : EstadoPago.Pendiente;
+        const nuevoSaldo = calcularSaldoTrasPago(estudiante.saldoDeudor, montoTotalRecibido);
+        const nuevoEstadoPago = estadoPagoPorSaldo(nuevoSaldo);
 
         batch.update(estRef, {
             saldoDeudor: nuevoSaldo,
@@ -289,6 +292,7 @@ export const anularPagoEfectivo = async (
     transaccionId: string, 
     usuarioAdminId?: string
 ): Promise<{ exito: boolean, mensaje?: string }> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) {
         return { exito: true, mensaje: "Pago anulado simulado exitosamente" };
     }
@@ -371,6 +375,7 @@ export const anularUltimoPagoEfectivo = async (
     estudianteId: string,
     usuarioAdminId?: string
 ): Promise<{ exito: boolean, mensaje?: string }> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) {
         return { exito: true, mensaje: "Pago anulado simulado exitosamente" };
     }

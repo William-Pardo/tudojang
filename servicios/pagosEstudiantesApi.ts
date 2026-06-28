@@ -6,6 +6,7 @@ import { db, isFirebaseConfigured } from '../firebase/config';
 import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
+import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
 
 const storage = getStorage();
 const reportesCollection = collection(db, 'reportes_pagos_estudiantes');
@@ -20,6 +21,7 @@ export const reportarPagoEstudiante = async (
     monto: number,
     imagenBase64: string
 ): Promise<string> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return "mock-id-reporte";
 
     // 1. Crear el documento inicial en Pendiente
@@ -50,6 +52,7 @@ export const reportarPagoEstudiante = async (
  * ADMIN: Obtener reportes pendientes de su Tenant
  */
 export const obtenerReportesPendientes = async (tenantId: string): Promise<ReportePagoEstudiante[]> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return [];
     const q = query(
         reportesCollection,
@@ -71,6 +74,7 @@ export const gestionarReportePago = async (
     adminId: string,
     observaciones?: string
 ): Promise<void> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return;
 
     const docRef = doc(reportesCollection, reporte.id);
@@ -80,8 +84,8 @@ export const gestionarReportePago = async (
         const estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
 
         // 2. Calcular nuevo saldo
-        const nuevoSaldo = Math.max(0, estudiante.saldoDeudor - reporte.montoInformado);
-        const nuevoEstadoPago = nuevoSaldo <= 0 ? EstadoPago.AlDia : estudiante.estadoPago;
+        const nuevoSaldo = calcularSaldoTrasPago(estudiante.saldoDeudor, reporte.montoInformado);
+        const nuevoEstadoPago = estadoPagoPorSaldo(nuevoSaldo);
 
         // 3. Preparar entrada de historial
         const pagoHistorial = {

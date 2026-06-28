@@ -17,12 +17,12 @@ describe('Landing Pública de Eventos', () => {
     cy.contains('Torneo Interdepartamental de Taekwondo', { timeout: 10000 }).should('be.visible');
     
     // Verificar botón de CTA
-    cy.contains('button', 'Quiero Participar').should('be.visible');
+    cy.contains('button', 'Inscribirme Ahora').should('be.visible');
   });
 
   it('debe permitir llenar el formulario de lead y mostrar la pantalla de éxito', () => {
     // Hacer clic en CTA
-    cy.contains('button', 'Quiero Participar').click();
+    cy.contains('button', 'Inscribirme Ahora').click();
 
     // Llenar el formulario
     cy.get('input[name="nombre"]').type('Cypress Test User');
@@ -31,25 +31,25 @@ describe('Landing Pública de Eventos', () => {
     cy.get('input[name="clubOrigen"]').type('Club Testing');
 
     // Enviar el formulario
-    cy.contains('button', 'Confirmar Interés').click();
+    cy.contains('button', 'Confirmar Registro').click();
 
     // Verificar pantalla de éxito
     cy.contains('¡Registro Exitoso!').should('be.visible');
-    cy.contains('Contactar por WhatsApp').should('be.visible');
+    cy.contains('Contactar al Club').should('be.visible');
   });
 
   it('debe permitir volver a los detalles desde el formulario', () => {
     // Hacer clic en CTA
-    cy.contains('button', 'Quiero Participar').click();
+    cy.contains('button', 'Inscribirme Ahora').click();
 
     // Ver el formulario
     cy.get('input[name="nombre"]').should('be.visible');
 
     // Clic en el botón para volver
-    cy.contains('button', 'Volver a los detalles').click();
+    cy.contains('button', 'Cancelar').click();
 
     // Verificar que volvió a los detalles
-    cy.contains('button', 'Quiero Participar').should('be.visible');
+    cy.contains('button', 'Inscribirme Ahora').should('be.visible');
   });
 
   it('debe mostrar mensaje de error si el registro en Firestore falla (Unhappy Path)', () => {
@@ -58,7 +58,7 @@ describe('Landing Pública de Eventos', () => {
     // pero a nivel E2E si simulamos la desconexión:
     
     // Hacemos clic en el botón para llenar el form
-    cy.contains('button', 'Quiero Participar').click();
+    cy.contains('button', 'Inscribirme Ahora').click();
 
     cy.get('input[name="nombre"]').type('Fallo Test User');
     cy.get('input[name="whatsapp"]').type('0000000000');

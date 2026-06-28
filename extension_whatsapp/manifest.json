@@ -1,41 +1,57 @@
 {
-    "manifest_version": 3,
-    "name": "Tudojang - WhatsApp Sender",
-    "version": "1.0",
-    "description": "Herramienta de envío automatizado de recibos para Tudojang.",
-    "permissions": [
-        "activeTab",
-        "scripting",
-        "storage"
-    ],
-    "host_permissions": [
+  "manifest_version": 3,
+  "name": "Tudojang Relay",
+  "version": "1.1.0",
+  "description": "Asistente de envios transaccionales por WhatsApp Web para Tudojang.",
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://tudojang.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
         "https://web.whatsapp.com/*"
-    ],
-    "background": {
-        "service_worker": "background.js"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
     },
-    "content_scripts": [
-        {
-            "matches": [
-                "https://web.whatsapp.com/*"
-            ],
-            "js": [
-                "content.js"
-            ],
-            "run_at": "document_idle"
-        }
-    ],
-    "action": {
-        "default_popup": "popup.html",
-        "default_icon": {
-            "16": "icon16.png",
-            "48": "icon48.png",
-            "128": "icon128.png"
-        }
-    },
-    "icons": {
-        "16": "icon16.png",
-        "48": "icon48.png",
-        "128": "icon128.png"
+    {
+      "matches": [
+        "https://tudojang.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "relayBridge.js"
+      ],
+      "run_at": "document_idle"
     }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
 }

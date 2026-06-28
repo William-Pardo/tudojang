@@ -3,11 +3,11 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import type { Estudiante } from '../tipos';
-import { GrupoEdad, EstadoPago, TipoNotificacion } from '../tipos';
+import { GrupoEdad, EstadoPago, GradoTKD, TipoNotificacion } from '../tipos';
 import { enviarNotificacion } from '../servicios/api';
 import { generarMensajePersonalizado } from '../servicios/geminiService';
 import { useNotificacion } from '../context/NotificacionContext';
-import { useEstudiantes, useConfiguracion } from '../context/DataContext';
+import { useEstudiantes, useConfiguracion, useSedes } from '../context/DataContext';
 import { generarUrlAbsoluta } from '../utils/formatters';
 
 const ITEMS_PER_PAGE = 10;
@@ -15,6 +15,7 @@ const ITEMS_PER_PAGE = 10;
 export const useGestionEstudiantes = () => {
     const { estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante, cargarEstudiantes } = useEstudiantes();
     const { configClub } = useConfiguracion();
+    const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
     const location = ReactRouterDOM.useLocation();
 
@@ -22,6 +23,8 @@ export const useGestionEstudiantes = () => {
     const [filtroNombre, setFiltroNombre] = useState('');
     const [filtroGrupo, setFiltroGrupo] = useState<GrupoEdad | 'todos'>('todos');
     const [filtroEstado, setFiltroEstado] = useState<EstadoPago | 'todos'>('todos');
+    const [filtroGrado, setFiltroGrado] = useState<GradoTKD | 'todos'>('todos');
+    const [filtroSede, setFiltroSede] = useState('todos');
     const [modalFormularioAbierto, setModalFormularioAbierto] = useState(false);
     const [estudianteEnEdicion, setEstudianteEnEdicion] = useState<Estudiante | null>(null);
     const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState(false);
@@ -46,13 +49,15 @@ export const useGestionEstudiantes = () => {
             const pasaFiltroNombre = filtroNombre === '' || nombreCompleto.includes(filtroNombre.toLowerCase());
             const pasaFiltroGrupo = filtroGrupo === 'todos' || e.grupo === filtroGrupo;
             const pasaFiltroEstado = filtroEstado === 'todos' || e.estadoPago === filtroEstado;
-            return pasaFiltroNombre && pasaFiltroGrupo && pasaFiltroEstado;
+            const pasaFiltroGrado = filtroGrado === 'todos' || e.grado === filtroGrado;
+            const pasaFiltroSede = filtroSede === 'todos' || e.sedeId === filtroSede;
+            return pasaFiltroNombre && pasaFiltroGrupo && pasaFiltroEstado && pasaFiltroGrado && pasaFiltroSede;
         });
-    }, [estudiantes, filtroNombre, filtroGrupo, filtroEstado, error]);
+    }, [estudiantes, filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede, error]);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [filtroNombre, filtroGrupo, filtroEstado]);
+    }, [filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede]);
 
     const totalPages = Math.ceil(estudiantesFiltrados.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -274,6 +279,11 @@ export const useGestionEstudiantes = () => {
         setFiltroGrupo,
         filtroEstado,
         setFiltroEstado,
+        filtroGrado,
+        setFiltroGrado,
+        filtroSede,
+        setFiltroSede,
+        sedesVisibles,
         estudiantesFiltrados,
         estudiantesPaginados,
         currentPage,

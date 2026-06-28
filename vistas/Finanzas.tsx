@@ -12,6 +12,8 @@ import InformeVisualEjecutivo from '../components/Finanzas/InformeVisualEjecutiv
 import { useNotificacion } from '../context/NotificacionContext';
 import { useAuth } from '../context/AuthContext';
 import Loader from '../components/Loader';
+import ModalRegistrarPago from '../components/ModalRegistrarPago';
+import { enviarNotificacion } from '../servicios/api';
 
 interface Props {
     isSubView?: boolean;
@@ -35,8 +37,25 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
     const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
     const [movimientoAEliminar, setMovimientoAEliminar] = useState<MovimientoFinanciero | null>(null);
     const [cargandoAccion, setCargandoAccion] = useState(false);
+    const [seccion, setSeccion] = useState<'resumen' | 'pagos' | 'deudores'>('resumen');
+    const [estudiantePago, setEstudiantePago] = useState<(typeof estudiantes)[number] | null>(null);
 
     const esAdmin = usuario?.rol === RolUsuario.Admin;
+    const estudiantesDeudores = estudiantes.filter(estudiante => estudiante.saldoDeudor > 0);
+
+    const notificarDeuda = async (estudiante: (typeof estudiantes)[number]) => {
+        const destinatario = estudiante.tutor?.telefono || estudiante.telefono;
+        if (!destinatario) {
+            mostrarNotificacion("El estudiante no tiene teléfono registrado", "error");
+            return;
+        }
+        try {
+            await enviarNotificacion('WhatsApp', destinatario, `Tienes un saldo pendiente de ${formatearPrecio(estudiante.saldoDeudor)}.`);
+            mostrarNotificacion("Notificación de deuda enviada", "success");
+        } catch {
+            mostrarNotificacion("No se pudo enviar la notificación", "error");
+        }
+    };
 
     useEffect(() => {
         cargarMovimientos(filtroSede);
@@ -75,6 +94,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
     };
 
     const handleConfirmarEliminacion = async () => {
+        /* istanbul ignore next -- el modal solo monta cuando existe movimientoAEliminar */
         if (!movimientoAEliminar) return;
         setCargandoAccion(true);
         try {
@@ -114,6 +134,35 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
                             <IconoDashboard className="w-4 h-4" /> Analíticas
                         </button>
                     </div>
+                </div>
+            )}
+
+            <div className="flex gap-2">
+                {(['resumen', 'pagos', 'deudores'] as const).map(item => (
+                    <button key={item} onClick={() => setSeccion(item)} className="px-4 py-2 rounded-lg bg-gray-100 capitalize">
+                        {item}
+                    </button>
+                ))}
+            </div>
+
+            {seccion === 'pagos' && (
+                <div>
+                    {estudiantes.map(estudiante => (
+                        <button key={estudiante.id} onClick={() => setEstudiantePago(estudiante)}>
+                            Registrar pago: {estudiante.nombres}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {seccion === 'deudores' && (
+                <div>
+                    {estudiantesDeudores.map(estudiante => (
+                        <div key={estudiante.id}>
+                            <span>{estudiante.nombres} - {formatearPrecio(estudiante.saldoDeudor)}</span>
+                            <button onClick={() => notificarDeuda(estudiante)}>Notificar Deuda</button>
+                        </div>
+                    ))}
                 </div>
             )}
 
@@ -195,6 +244,9 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             )}
             {modalEliminarAbierto && movimientoAEliminar && (
                 <ModalConfirmacion abierto={modalEliminarAbierto} titulo="Anular Movimiento" mensaje={`¿Confirmas anular este registro por valor de ${formatearPrecio(movimientoAEliminar.monto)}?`} onCerrar={() => setModalEliminarAbierto(false)} onConfirmar={handleConfirmarEliminacion} cargando={cargandoAccion} />
+            )}
+            {estudiantePago && (
+                <ModalRegistrarPago estudiante={estudiantePago} abierto onCerrar={() => setEstudiantePago(null)} />
             )}
         </div>
     );

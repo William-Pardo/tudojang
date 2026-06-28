@@ -46,6 +46,11 @@ export const VistaEstudiantes: React.FC = () => {
         setFiltroGrupo,
         filtroEstado,
         setFiltroEstado,
+        filtroGrado,
+        setFiltroGrado,
+        filtroSede,
+        setFiltroSede,
+        sedesVisibles,
         modalFormularioAbierto,
         estudianteEnEdicion,
         abrirFormulario,
@@ -76,6 +81,10 @@ export const VistaEstudiantes: React.FC = () => {
     const [misionActiva, setMisionActiva] = useState<MisionKicho | null>(null);
     const [countdown, setCountdown] = useState('');
     const [generandoData, setGenerandoData] = useState(false);
+    const limiteEstudiantes = PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes
+        || configClub.limiteEstudiantes
+        || 50;
+    const porcentajeCapacidad = estudiantes.length / limiteEstudiantes;
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
     const [activeTab, setActiveTab] = useState<TabId>(esTutor ? 'asistencia' : 'directorio');
@@ -113,15 +122,23 @@ export const VistaEstudiantes: React.FC = () => {
         if (tieneEstudiantes) {
             return (
                 <div className="animate-fade-in space-y-4">
-                    <FiltrosEstudiantes filtroNombre={filtroNombre} setFiltroNombre={setFiltroNombre} filtroGrupo={filtroGrupo} setFiltroGrupo={setFiltroGrupo} filtroEstado={filtroEstado} setFiltroEstado={setFiltroEstado} />
+                    <FiltrosEstudiantes
+                        filtroNombre={filtroNombre}
+                        setFiltroNombre={setFiltroNombre}
+                        filtroGrupo={filtroGrupo}
+                        setFiltroGrupo={setFiltroGrupo}
+                        filtroEstado={filtroEstado}
+                        setFiltroEstado={setFiltroEstado}
+                        filtroGrado={filtroGrado}
+                        setFiltroGrado={setFiltroGrado}
+                        filtroSede={filtroSede}
+                        setFiltroSede={setFiltroSede}
+                        sedes={sedesVisibles}
+                    />
 
                     <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
                         <div>
-                            {estudiantesFiltrados.length > 0 ? (
-                                <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
-                            ) : (
-                                <>Mostrando <span className="text-tkd-red">0</span> resultados</>
-                            )}
+                            <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
                         </div>
                     </div>
 
@@ -201,14 +218,14 @@ export const VistaEstudiantes: React.FC = () => {
                                 <span className="text-[10px] font-black text-tkd-blue/60 uppercase tracking-widest mb-1">Capacidad del Plan</span>
                                 <div className="w-32 h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
                                     <div
-                                        className={`h-full transition-all duration-1000 ${(estudiantes.length / (PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50)) > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
-                                        style={{ width: `${Math.min((estudiantes.length / (PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50)) * 100, 100)}%` }}
+                                        className={`h-full transition-all duration-1000 ${porcentajeCapacidad > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
+                                        style={{ width: `${Math.min(porcentajeCapacidad * 100, 100)}%` }}
                                     />
                                 </div>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-xs font-black text-tkd-dark dark:text-white leading-none">
-                                    {estudiantes.length} / {PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes || configClub.limiteEstudiantes || 50}
+                                    {estudiantes.length} / {limiteEstudiantes}
                                 </span>
                                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Estudiantes Activos</span>
                             </div>

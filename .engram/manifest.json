@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "chunks": [
+    {
+      "id": "0bad4f2b",
+      "created_by": "William Pardo",
+      "created_at": "2026-03-18T18:03:57Z",
+      "sessions": 1,
+      "memories": 2,
+      "prompts": 0
+    },
+    {
+      "id": "4b5bb23c",
+      "created_by": "William Pardo",
+      "created_at": "2026-06-23T01:21:19Z",
+      "sessions": 0,
+      "memories": 1,
+      "prompts": 0
+    }
+  ]
+}

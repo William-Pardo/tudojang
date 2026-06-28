@@ -1,114 +1,162 @@
+const RELAY_PREFIX = "[Tudojang Relay]";
+const SEND_LOCK_KEY = "tudojangRelaySendLock";
 
-// content.js - Se inyecta SOLAMENTE EN https://web.whatsapp.com/
-// Este script tiene acceso al DOM del chat y es el "robot" que escribe.
+log("WhatsApp bridge cargado.");
 
-function log(msg) {
-    console.log("%c[Tudojang Sender]%c " + msg, "color:#D32126;font-weight:bold", "color:black");
-}
-
-// Escucha comandos (Mensajes)
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-    if (request.action === "SEND_MESSAGE") {
-        const { telefono, mensaje, imagenBase64 } = request.params;
-
-        // 1. Simulación de abrir chat (La forma más segura y estable es por URL)
-        // Redirige o navega al chat. Nota: WhatsApp es una SPA (Single Page App).
-
-        // Si queremos hacerlo sin recargar, debemos interactuar con el DOM.
-        // ESTRATEGIA: Usar la URL `web.whatsapp.com/send?phone=...&text=...` 
-        // Es la API oficial de "Click to Chat" que funciona perfecto en Web.
-
-        // Pero si queremos enviar MASIVO, redirigir recarga la página cada vez (lento).
-        // Para masivo, lo ideal es inyectar eventos de teclado.
-
-        // DEMOSTRACIÓN CONCEPTUAL (Versión 1 - Segura): Redirección.
-        // Esto garantiza que funcione siempre, aunque WhatsApp cambie sus clases CSS.
-        log(`Preparando envío a ${telefono}...`);
-
-        // Si estamos en medio de un chat, intentaremos navegar.
-        const url = `https://web.whatsapp.com/send?phone=${telefono}&text=${encodeURIComponent(mensaje)}`;
-
-        // Cambiamos la URL y esperamos a que cargue el botón
-        window.location.href = url;
-
-        // Aquí el script moriría al cambiar de página si fuera una navegación completa.
-        // Pero en SPAs a veces se mantiene. 
-        // Si se recarga, el script se reinicia y debe saber qué hacer (Estado en Storage).
-    }
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request?.action === "RELAY_PING_WHATSAPP") {
+    sendResponse({ ok: true });
+  }
+  return false;
 });
 
-// Lógica de "Auto-Click Enviar" al cargar la página
-// Si la URL tiene ?phone=... y &text=..., significa que estamos listos para enviar.
-window.onload = async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const phone = urlParams.get('phone');
-    const text = urlParams.get('text');
+runWhenReady().catch((error) => {
+  reportResult("failed", error.message || "Error iniciando Relay en WhatsApp Web");
+});
 
-    if (phone && text) {
-        log("Detectado intento de envío automático. Esperando carga de interfaz...");
+async function runWhenReady() {
+  const params = new URLSearchParams(window.location.search);
+  const phone = params.get("phone");
+  const text = params.get("text");
+  if (!phone || !text) return;
 
-        // Esperar a que aparezca el botón de enviar (o el input de texto cargado)
-        await esperarElemento('footer[class*="_"]'); // Selector genérico de footer
+  const lockId = `${phone}:${text}`;
+  if (sessionStorage.getItem(SEND_LOCK_KEY) === lockId) return;
+  sessionStorage.setItem(SEND_LOCK_KEY, lockId);
 
-        log("Interfaz cargada. Buscando botón de envío...");
+  const { relayActiveMessage } = await chrome.storage.local.get("relayActiveMessage");
+  if (!relayActiveMessage || relayActiveMessage.phone !== phone) {
+    sessionStorage.removeItem(SEND_LOCK_KEY);
+    return;
+  }
 
-        // INTENTO 1: Buscar botón de enviar (el avioncito)
-        // Las clases de WhatsApp cambian semanalmente. Buscamos por atributos ARIA o iconos SVG.
-        const botonEnviar = await encontrarBotonEnviar();
+  log(`Preparando envio a ${phone}.`);
 
-        if (botonEnviar) {
-            log("Botón encontrado. Enviando en 3 segundos...");
-            setTimeout(() => {
-                botonEnviar.click();
-                log("¡Click realizado! Mensaje enviado.");
+  const ready = await waitForWhatsAppReady();
+  if (!ready.ok) {
+    sessionStorage.removeItem(SEND_LOCK_KEY);
+    await reportResult("failed", ready.error);
+    return;
+  }
 
-                // Notificar al background que terminamos para que mande el siguiente
-                chrome.runtime.sendMessage({ action: "MESSAGE_SENT", phone });
+  await sleep(1200);
 
-                // Opcional: Cerrar pestaña o volver al dashboard
-            }, 3000); // Retardo humano para evitar ban
-        } else {
-            log("Error: No se encontró el botón de enviar. Puede que el número no tenga WhatsApp.");
-        }
-    }
-};
+  const invalidNumber = findInvalidNumberMessage();
+  if (invalidNumber) {
+    sessionStorage.removeItem(SEND_LOCK_KEY);
+    await reportResult("failed", "Numero invalido o sin WhatsApp");
+    return;
+  }
 
-// Helper: Esperar a que un elemento exista en el DOM
-function esperarElemento(selector, timeout = 15000) {
-    return new Promise((resolve, reject) => {
-        const el = document.querySelector(selector);
-        if (el) return resolve(el);
+  const sendButton = await waitForSendButton();
+  if (!sendButton) {
+    sessionStorage.removeItem(SEND_LOCK_KEY);
+    await reportResult("failed", "No se encontro el boton de envio");
+    return;
+  }
 
-        const observer = new MutationObserver((mutations) => {
-            const el = document.querySelector(selector);
-            if (el) {
-                resolve(el);
-                observer.disconnect();
-            }
-        });
-
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        setTimeout(() => {
-            observer.disconnect();
-            // Resolvemos null para no romper flujos, pero logueamos
-            console.warn(`Timeout esperando selector: ${selector}`);
-            resolve(null);
-        }, timeout);
-    });
+  sendButton.click();
+  log("Click de envio ejecutado.");
+  await sleep(1500);
+  await reportResult("sent", "");
 }
 
-// Helper: Encontrar botón de enviar de forma robusta
-async function encontrarBotonEnviar() {
-    // Estrategia: Buscar botón que contenga el icono de envío
-    // El icono suele tener un path específico d="M1...". 
-    // O buscar `span[data-icon="send"]` (funciona en 2024-2025)
+async function waitForWhatsAppReady() {
+  const loginText = await waitForAny([
+    () => document.querySelector("canvas[aria-label*='Scan']"),
+    () => findText("Use WhatsApp on your computer"),
+    () => findText("Usa WhatsApp en tu computadora")
+  ], 2500);
 
-    let btn = document.querySelector('span[data-icon="send"]');
-    if (btn) return btn.closest('button') || btn.parentElement;
+  if (loginText) {
+    return { ok: false, error: "WhatsApp Web requiere iniciar sesion" };
+  }
 
-    return null;
+  const footer = await waitForAny([
+    () => document.querySelector("footer"),
+    () => document.querySelector("[contenteditable='true'][role='textbox']")
+  ], 30000);
+
+  if (!footer) {
+    return { ok: false, error: "WhatsApp Web no cargo el chat a tiempo" };
+  }
+
+  return { ok: true };
+}
+
+async function waitForSendButton() {
+  return waitForAny([
+    () => buttonFromIcon("send"),
+    () => document.querySelector("button[aria-label='Send']"),
+    () => document.querySelector("button[aria-label='Enviar']"),
+    () => findButtonBySvgTitle("send"),
+    () => findButtonBySvgTitle("Enviar")
+  ], 20000);
+}
+
+function buttonFromIcon(iconName) {
+  const icon = document.querySelector(`span[data-icon='${iconName}']`);
+  if (!icon) return null;
+  return icon.closest("button") || icon.parentElement?.closest("button") || icon.parentElement;
+}
+
+function findButtonBySvgTitle(text) {
+  const titles = Array.from(document.querySelectorAll("svg title"));
+  const title = titles.find((item) => (item.textContent || "").toLowerCase().includes(text.toLowerCase()));
+  return title?.closest("button") || null;
+}
+
+function findInvalidNumberMessage() {
+  const bodyText = (document.body?.innerText || "").toLowerCase();
+  const signals = [
+    "phone number shared via url is invalid",
+    "numero de telefono compartido a traves de la url no es valido",
+    "número de teléfono compartido a través de la url no es válido",
+    "el numero de telefono no esta en whatsapp",
+    "el número de teléfono no está en whatsapp"
+  ];
+  return signals.some((signal) => bodyText.includes(signal));
+}
+
+function findText(text) {
+  const bodyText = document.body?.innerText || "";
+  return bodyText.includes(text) ? document.body : null;
+}
+
+function waitForAny(finders, timeoutMs) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const tick = () => {
+      for (const finder of finders) {
+        const found = finder();
+        if (found) {
+          resolve(found);
+          return;
+        }
+      }
+
+      if (Date.now() - started >= timeoutMs) {
+        resolve(null);
+        return;
+      }
+
+      setTimeout(tick, 400);
+    };
+    tick();
+  });
+}
+
+async function reportResult(status, error) {
+  await chrome.runtime.sendMessage({
+    action: "RELAY_MESSAGE_RESULT",
+    result: { status, error }
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function log(message) {
+  console.log(`%c${RELAY_PREFIX}%c ${message}`, "color:#D32126;font-weight:bold", "color:inherit");
 }

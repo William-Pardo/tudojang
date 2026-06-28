@@ -5,6 +5,7 @@ import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import * as api from '../servicios/api';
 import { generarMensajePersonalizado } from '../servicios/geminiService';
+import { iniciarTudojangRelay } from '../servicios/tudojangRelay';
 import { EstadoPago, TipoNotificacion } from '../tipos';
 import type { NotificacionHistorial } from '../tipos';
 
@@ -121,6 +122,63 @@ export const useGestionNotificaciones = () => {
         cargarHistorial(); 
     };
 
+    const handleEnviarRecordatoriosRelay = async () => {
+        setEnviando(true);
+        setProgreso(null);
+
+        const estudiantesARecordar = estudiantes.filter(
+            e => (e.estadoPago === EstadoPago.Pendiente || e.estadoPago === EstadoPago.Vencido) && e.saldoDeudor > 0 && e.tutor?.telefono
+        );
+
+        if (estudiantesARecordar.length === 0) {
+            mostrarNotificacion('No hay recordatorios con WhatsApp disponibles para Tudojang Relay.', 'info');
+            setEnviando(false);
+            return;
+        }
+
+        try {
+            const messages = [];
+
+            for (let i = 0; i < estudiantesARecordar.length; i++) {
+                const estudiante = estudiantesARecordar[i];
+                const tutor = estudiante.tutor;
+                if (!tutor?.telefono) continue;
+
+                setProgreso(`Preparando ${i + 1} de ${estudiantesARecordar.length} para Tudojang Relay...`);
+
+                const tipo = estudiante.estadoPago === EstadoPago.Pendiente ? TipoNotificacion.RecordatorioPago : TipoNotificacion.AvisoVencimiento;
+                const mensaje = await generarMensajePersonalizado(tipo, estudiante, configClub, {
+                    monto: estudiante.saldoDeudor
+                });
+
+                messages.push({
+                    id: `${estudiante.id}-${Date.now()}`,
+                    phone: tutor.telefono,
+                    text: mensaje,
+                    studentName: `${estudiante.nombres} ${estudiante.apellidos}`,
+                    tutorName: `${tutor.nombres} ${tutor.apellidos}`,
+                    type: tipo
+                });
+            }
+
+            const response = await iniciarTudojangRelay(messages, {
+                batchSize: 10,
+                maxSessionMessages: 100
+            });
+
+            if (!response.ok) {
+                throw new Error(response.error || 'No se pudo iniciar Tudojang Relay.');
+            }
+
+            mostrarNotificacion(`${messages.length} recordatorios fueron entregados a Tudojang Relay.`, 'success');
+        } catch (error: any) {
+            mostrarNotificacion(error.message || 'No se pudo iniciar Tudojang Relay.', 'error');
+        } finally {
+            setEnviando(false);
+            setProgreso(null);
+        }
+    };
+
     return {
         historial,
         cargando: cargandoEstudiantes || cargandoHistorial,
@@ -129,6 +187,7 @@ export const useGestionNotificaciones = () => {
         progreso,
         noLeidasCount,
         handleEnviarRecordatorios,
+        handleEnviarRecordatoriosRelay,
         cargarHistorial,
         handleMarcarLeida,
         handleMarcarTodasLeidas,

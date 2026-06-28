@@ -16,6 +16,7 @@ const VistaNotificaciones: React.FC = () => {
         progreso, 
         noLeidasCount,
         handleEnviarRecordatorios, 
+        handleEnviarRecordatoriosRelay,
         cargarHistorial,
         handleMarcarLeida,
         handleMarcarTodasLeidas
@@ -45,14 +46,24 @@ const VistaNotificaciones: React.FC = () => {
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
                     Esta acción enviará un mensaje personalizado a todos los tutores de estudiantes con pagos pendientes o vencidos.
                 </p>
-                <button 
-                    onClick={handleEnviarRecordatorios} 
-                    disabled={enviando || cargando}
-                    className="bg-tkd-red text-white px-4 py-2 rounded-md font-semibold hover:bg-red-700 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 inline-flex items-center space-x-2 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
-                >
-                    <IconoEnviar className="w-5 h-5"/>
-                    <span>{enviando ? (progreso || 'Enviando...') : 'Enviar Recordatorios Masivos'}</span>
-                </button>
+                <div className="flex flex-wrap gap-3">
+                    <button 
+                        onClick={handleEnviarRecordatoriosRelay} 
+                        disabled={enviando || cargando}
+                        className="bg-tkd-blue text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-800 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 inline-flex items-center space-x-2 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                        <IconoEnviar className="w-5 h-5"/>
+                        <span>{enviando ? (progreso || 'Preparando...') : 'Enviar con Tudojang Relay'}</span>
+                    </button>
+                    <button 
+                        onClick={handleEnviarRecordatorios} 
+                        disabled={enviando || cargando}
+                        className="bg-tkd-red text-white px-4 py-2 rounded-md font-semibold hover:bg-red-700 transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 inline-flex items-center space-x-2 shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                        <IconoEnviar className="w-5 h-5"/>
+                        <span>Envio manual anterior</span>
+                    </button>
+                </div>
                 {enviando && <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 animate-pulse">{progreso}</p>}
             </div>
 

@@ -211,6 +211,12 @@ export const FilaEstudiante: React.FC<Props> = ({
                                 <p className="text-[10px] text-gray-400 uppercase font-black mb-0.5 tracking-widest">Grupo</p>
                                 <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{estudiante.grupo}</p>
                             </div>
+                            <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-black mb-0.5 tracking-widest">Grado</p>
+                                <span className="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                    {estudiante.grado}
+                                </span>
+                            </div>
                         </div>
                         <div className="w-full sm:w-auto">
                             <p className="text-[10px] text-gray-400 uppercase font-black mb-1.5 tracking-widest sm:text-right">Estado Documental</p>
@@ -230,7 +236,12 @@ export const FilaEstudiante: React.FC<Props> = ({
                         <div className="text-sm font-black text-tkd-dark dark:text-white uppercase">{estudiante.nombres} {estudiante.apellidos}</div>
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-bold uppercase">{estudiante.numeroIdentificacion}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-300">{estudiante.grupo}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-gray-700 dark:text-gray-300">{estudiante.grupo}</div>
+                        <span className="mt-1 px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                            {estudiante.grado}
+                        </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                         <EstadoPagoBadge estado={estudiante.estadoPago} />
                     </td>

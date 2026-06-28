@@ -120,7 +120,7 @@ const PlantillaComprobante: React.FC<{ datos: DatosComprobante; config: Configur
                 {/* Recibo # */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1px dashed #e5e7eb' }}>
                     <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recibo #</div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>{dados.reciboId || datos.reciboId}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#111827', fontFamily: 'monospace' }}>{datos.reciboId}</div>
                 </div>
 
                 {/* Estudiante / Tutor */}

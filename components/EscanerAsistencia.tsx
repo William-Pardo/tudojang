@@ -14,14 +14,16 @@ interface Props {
 const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
     const [cargando, setCargando] = useState(true);
     const [errorCamara, setErrorCamara] = useState<string | null>(null);
-    const [stream, setStream] = useState<MediaStream | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const scannerTimerRef = useRef<number | null>(null);
+    const procesandoRef = useRef(false);
     const { mostrarNotificacion } = useNotificacion();
 
     // Clave para persistencia en el dispositivo (Actúa como cookie de dispositivo)
     const DEVICE_AUTH_KEY = 'tkd_device_camera_authorized';
 
     useEffect(() => {
+        let activeStream: MediaStream | null = null;
         const activarCamara = async () => {
             try {
                 // Solicitar acceso real a la cámara solo cuando el componente se monta
@@ -29,7 +31,7 @@ const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
                     video: { facingMode: 'environment' } 
                 });
                 
-                setStream(mediaStream);
+                activeStream = mediaStream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = mediaStream;
                 }
@@ -40,6 +42,22 @@ const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
                 document.cookie = `${DEVICE_AUTH_KEY}=true; max-age=31536000; path=/`;
                 
                 setCargando(false);
+                const Detector = (window as any).BarcodeDetector;
+                if (Detector) {
+                    const detector = new Detector({ formats: ['qr_code'] });
+                    scannerTimerRef.current = window.setInterval(async () => {
+                        if (!videoRef.current || procesandoRef.current) return;
+                        try {
+                            const codes = await detector.detect(videoRef.current);
+                            if (codes[0]?.rawValue) {
+                                procesandoRef.current = true;
+                                await procesarCodigoQR(codes[0].rawValue);
+                            }
+                        } catch {
+                            setErrorCamara("Error del hardware de la cámara.");
+                        }
+                    }, 500);
+                }
             } catch (err) {
                 console.error("Error acceso cámara:", err);
                 setErrorCamara("No se pudo acceder a la cámara. Verifique los permisos del navegador.");
@@ -51,8 +69,9 @@ const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
 
         // Limpieza estricta: Apagar la cámara al cerrar el componente
         return () => {
-            if (stream) {
-                stream.getTracks().forEach(track => {
+            if (scannerTimerRef.current !== null) window.clearInterval(scannerTimerRef.current);
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => {
                     track.stop();
                     console.log("Cámara desactivada por protocolo de seguridad.");
                 });
@@ -60,16 +79,24 @@ const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
         };
     }, []);
 
-    const handleScanSimulated = async (idEstudiante: string) => {
+    const procesarCodigoQR = async (valor: string) => {
         setCargando(true);
         try {
+            let idEstudiante = valor;
+            if (valor.trim().startsWith('{')) {
+                const parsed = JSON.parse(valor);
+                if (typeof parsed.id !== 'string' || !parsed.id) throw new Error("Código QR inválido");
+                idEstudiante = parsed.id;
+            }
             const estudiante = await api.obtenerEstudiantePorId(idEstudiante);
             await api.registrarEntrada(idEstudiante, sedeId);
             mostrarNotificacion(`Asistencia registrada: ${estudiante.nombres}`, "success");
             onClose();
         } catch (error) {
-            mostrarNotificacion("Error al procesar el registro", "error");
+            const invalido = error instanceof SyntaxError || (error as Error)?.message === "Código QR inválido";
+            mostrarNotificacion(invalido ? "Código QR inválido" : "Error al procesar el registro", "error");
             setCargando(false);
+            procesandoRef.current = false;
         }
     };
 
@@ -132,7 +159,7 @@ const EscanerAsistencia: React.FC<Props> = ({ sedeId, onClose }) => {
                     <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] text-center animate-slide-in-right">
                         <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-4">Alinee el código QR del carnet</p>
                         <button 
-                            onClick={() => handleScanSimulated('1')} // Simula escaneo de Juan Pérez
+                            onClick={() => procesarCodigoQR('1')}
                             className="bg-tkd-blue text-white px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
                         >
                             <IconoAprobar className="w-4 h-4" /> Simular Captura

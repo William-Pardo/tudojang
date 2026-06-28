@@ -37,57 +37,57 @@ describe('pagosApi - Sistema Financiero (con Triangulación)', () => {
     describe('procesarPagoEfectivo (Triangulación de Saldos)', () => {
         const mockEstudianteRef = { id: 'est-1' };
         
-        it('Caso 1: Pago exacto de la deuda (Saldo resultante = 0)', async () => {
+        it('Caso 1: Mensualidad $100, pagado $100 -> saldo $0', async () => {
             (doc as jest.Mock).mockReturnValue(mockEstudianteRef);
             (getDoc as jest.Mock).mockResolvedValue({
                 exists: () => true,
                 id: 'est-1',
-                data: () => ({ saldoDeudor: 1000, tenantId: 't-1' })
+                data: () => ({ saldoDeudor: 100, tenantId: 't-1' })
             });
 
-            const res = await procesarPagoEfectivo('est-1', [], 1000, 'Pago Total');
+            const res = await procesarPagoEfectivo('est-1', [], 100, 'Pago Total');
             
             expect(res.exito).toBe(true);
             expect(res.nuevoSaldo).toBe(0);
             expect(mockBatch.update).toHaveBeenCalledWith(mockEstudianteRef, expect.objectContaining({
                 saldoDeudor: 0,
-                estadoPago: 'Al Día'
+                estadoPago: 'Al día'
             }));
         });
 
-        it('Caso 2: Pago parcial de la deuda (Saldo resultante > 0)', async () => {
+        it('Caso 2: Mensualidad $100, pagado $40 -> saldo $60', async () => {
             (doc as jest.Mock).mockReturnValue(mockEstudianteRef);
             (getDoc as jest.Mock).mockResolvedValue({
                 exists: () => true,
                 id: 'est-1',
-                data: () => ({ saldoDeudor: 1000, tenantId: 't-1' })
+                data: () => ({ saldoDeudor: 100, tenantId: 't-1' })
             });
 
-            const res = await procesarPagoEfectivo('est-1', [], 500, 'Pago Parcial');
+            const res = await procesarPagoEfectivo('est-1', [], 40, 'Pago Parcial');
             
             expect(res.exito).toBe(true);
-            expect(res.nuevoSaldo).toBe(500);
+            expect(res.nuevoSaldo).toBe(60);
             expect(mockBatch.update).toHaveBeenCalledWith(mockEstudianteRef, expect.objectContaining({
-                saldoDeudor: 500,
+                saldoDeudor: 60,
                 estadoPago: 'Pendiente'
             }));
         });
 
-        it('Caso 3: Pago mayor a la deuda (El sistema asume tope en 0 para evitar negativos sueltos)', async () => {
+        it('Caso 3: Mensualidad $100, pagado $120 -> saldo a favor -$20', async () => {
             (doc as jest.Mock).mockReturnValue(mockEstudianteRef);
             (getDoc as jest.Mock).mockResolvedValue({
                 exists: () => true,
                 id: 'est-1',
-                data: () => ({ saldoDeudor: 1000, tenantId: 't-1' })
+                data: () => ({ saldoDeudor: 100, tenantId: 't-1' })
             });
 
-            const res = await procesarPagoEfectivo('est-1', [], 1500, 'Pago Excesivo');
+            const res = await procesarPagoEfectivo('est-1', [], 120, 'Pago Excesivo');
             
             expect(res.exito).toBe(true);
-            expect(res.nuevoSaldo).toBe(0);
+            expect(res.nuevoSaldo).toBe(-20);
             expect(mockBatch.update).toHaveBeenCalledWith(mockEstudianteRef, expect.objectContaining({
-                saldoDeudor: 0,
-                estadoPago: 'Al Día'
+                saldoDeudor: -20,
+                estadoPago: 'Al día'
             }));
         });
 

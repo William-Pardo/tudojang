@@ -12,7 +12,7 @@ import { EstadoPago, GrupoEdad, EstadoSolicitudCompra } from '../tipos';
 // Mockear el hook y sus dependencias
 jest.mock('../hooks/useDashboard');
 jest.mock('../context/DataContext', () => ({
-  useSedes: () => ({ sedes: [] }),
+  useSedes: () => ({ sedes: [], sedesVisibles: [] }),
   useConfiguracion: () => ({ configClub: { diasSuspension: 15 } }),
   useProgramas: () => ({ programas: [] }),
 }));

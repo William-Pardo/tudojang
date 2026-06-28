@@ -249,7 +249,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     <EstudiantesContext.Provider value={{
                         estudiantes, cargando, error, cargarEstudiantes: cargarTodo,
                         agregarEstudiante: async (datos) => {
-                            if (!tenant || tenant.tenantId === 'platform-default' || tenant.tenantId === 'escuela-gajog-001') throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
+                            if (!tenant || tenant.tenantId === 'platform-default') throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
                             const res = await api.agregarEstudiante({ ...datos, tenantId: tenant.tenantId, carnetGenerado: false });
                             setEstudiantes(prev => [...prev, res]);
                             return res;

@@ -1,12 +1,14 @@
 
 // servicios/asistenciaApi.ts
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, getDoc, updateDoc, doc, Timestamp, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { type Asistencia, EstadoEntrega } from '../tipos';
+import { type Asistencia, EstadoEntrega, EstadoPago } from '../tipos';
 
 const asistenciaCollection = collection(db, 'asistencia');
 
-export const registrarEntrada = async (estudianteId: string, sedeId: string): Promise<Asistencia> => {
+export type ResultadoRegistroAsistencia = Asistencia & { advertenciaPago?: string };
+
+export const registrarEntrada = async (estudianteId: string, sedeId: string): Promise<ResultadoRegistroAsistencia> => {
     const nuevaAsistencia: Omit<Asistencia, 'id'> = {
         estudianteId,
         sedeId,
@@ -15,15 +17,21 @@ export const registrarEntrada = async (estudianteId: string, sedeId: string): Pr
         estadoEntrega: EstadoEntrega.EnClase
     };
 
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         return { id: `mock-ast-${Date.now()}`, ...nuevaAsistencia };
     }
 
+    const estudianteSnap = await getDoc(doc(db, 'estudiantes', estudianteId));
+    if (!estudianteSnap.exists()) throw new Error("Estudiante no encontrado");
+    const estadoPago = estudianteSnap.data().estadoPago as EstadoPago;
+    const advertenciaPago = estadoPago === EstadoPago.AlDia ? undefined : "Estudiante con pago pendiente";
     const docRef = await addDoc(asistenciaCollection, nuevaAsistencia);
-    return { id: docRef.id, ...nuevaAsistencia };
+    return { id: docRef.id, ...nuevaAsistencia, advertenciaPago };
 };
 
 export const actualizarEstadoEntrega = async (asistenciaId: string, nuevoEstado: EstadoEntrega, recogidoPor?: string): Promise<void> => {
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) return;
     const docRef = doc(db, 'asistencia', asistenciaId);
     const updateData: any = { estadoEntrega: nuevoEstado };
@@ -36,6 +44,7 @@ export const actualizarEstadoEntrega = async (asistenciaId: string, nuevoEstado:
 export const escucharAsistenciasActivasSede = (sedeId: string, callback: (asistencias: any[]) => void) => {
     const hoy = new Date().toISOString().split('T')[0];
     
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         callback([]);
         return () => {};
@@ -58,6 +67,7 @@ export const escucharAsistenciasActivasSede = (sedeId: string, callback: (asiste
 export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Promise<{ asistencia: Asistencia, nombres: string } | null> => {
     const hoy = new Date().toISOString().split('T')[0];
     
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         if (identificacion === '123') {
             return {
@@ -66,6 +76,16 @@ export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Pr
             };
         }
         return null;
+    }
+
+    if (identificacion.trim().startsWith('{')) {
+        try {
+            const qr = JSON.parse(identificacion);
+            if (typeof qr.numeroIdentificacion !== 'string' || !qr.numeroIdentificacion.trim()) throw new Error();
+            identificacion = qr.numeroIdentificacion;
+        } catch {
+            throw new Error("Código QR inválido");
+        }
     }
 
     const qEst = query(collection(db, 'estudiantes'), where("numeroIdentificacion", "==", identificacion.trim()));
@@ -97,6 +117,7 @@ export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Pr
 
 export const obtenerAsistenciasActivasSede = async (sedeId: string): Promise<any[]> => {
     const hoy = new Date().toISOString().split('T')[0];
+    /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) return [];
 
     const q = query(

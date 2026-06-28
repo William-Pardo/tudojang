@@ -1,0 +1,3 @@
+{"total": {"lines":{"total":16,"covered":13,"skipped":0,"pct":81.25},"statements":{"total":19,"covered":15,"skipped":0,"pct":78.94},"functions":{"total":7,"covered":4,"skipped":0,"pct":57.14},"branches":{"total":8,"covered":6,"skipped":0,"pct":75},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":"Unknown"}}
+,"E:\\Apps\\Tudojang\\components\\ModalVerFirma.tsx": {"lines":{"total":16,"covered":13,"skipped":0,"pct":81.25},"functions":{"total":7,"covered":4,"skipped":0,"pct":57.14},"statements":{"total":19,"covered":15,"skipped":0,"pct":78.94},"branches":{"total":8,"covered":6,"skipped":0,"pct":75}}
+}

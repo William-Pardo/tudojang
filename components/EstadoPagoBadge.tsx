@@ -1,18 +1,22 @@
 // components/EstadoPagoBadge.tsx
 import React from 'react';
-import { EstadoPago } from '../tipos';
+import { useEstadoPago } from '../hooks/useEstadoPago';
+import type { EstadoPago } from '../tipos';
 
 interface Props {
-  estado: EstadoPago;
+  status?: string;
+  /** @deprecated Usar `status`. Se conserva para consumidores existentes. */
+  estado?: EstadoPago;
 }
 
-const EstadoPagoBadge: React.FC<Props> = ({ estado }) => {
-    const colorClasses = {
-        [EstadoPago.AlDia]: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-        [EstadoPago.Pendiente]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-        [EstadoPago.Vencido]: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-    };
-    return <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${colorClasses[estado]}`}>{estado}</span>;
-}
+const EstadoPagoBadge: React.FC<Props> = ({ status, estado }) => {
+  const { label, color } = useEstadoPago(status ?? estado ?? '');
 
-export default EstadoPagoBadge;
+  return (
+    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${color}`}>
+      {label}
+    </span>
+  );
+};
+
+export default React.memo(EstadoPagoBadge);

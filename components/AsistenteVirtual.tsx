@@ -17,6 +17,7 @@ const AsistenteVirtual: React.FC = () => {
     const [mostrarBtnEscalar, setMostrarBtnEscalar] = useState(false);
     const [miTicket, setMiTicket] = useState<TicketSoporte | null>(null);
     const [restantes, setRestantes] = useState(getRemainingQueries());
+    const [error, setError] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -47,7 +48,9 @@ const AsistenteVirtual: React.FC = () => {
         setHistorial(prev => [...prev, { texto: miPregunta, soyYo: true }]);
         setCargando(true);
         setMostrarBtnEscalar(false);
+        setError(null);
 
+        try {
         const contextoPrevio = historial.slice(-3).map(h => h.texto).join(' | ');
         const respuestaRaw = await consultarSabonimVirtual(miPregunta, contextoPrevio);
         
@@ -58,8 +61,13 @@ const AsistenteVirtual: React.FC = () => {
         }
 
         setHistorial(prev => [...prev, { texto: respuestaLimpia || "Entendido. ¿Deseas escalar a soporte humano?", soyYo: false }]);
-        setCargando(false);
         setRestantes(getRemainingQueries());
+        } catch (consultaError) {
+            console.error('[AsistenteVirtual] Error al consultar soporte:', consultaError);
+            setError('Error al cargar la respuesta');
+        } finally {
+            setCargando(false);
+        }
     };
 
     const solicitarEscalado = async () => {
@@ -149,7 +157,7 @@ const AsistenteVirtual: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                            <button onClick={() => setAbierto(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                            <button aria-label="Cerrar asistente" onClick={() => setAbierto(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                                 <IconoCerrar className="w-5 h-5" />
                             </button>
                         </div>
@@ -191,6 +199,7 @@ const AsistenteVirtual: React.FC = () => {
 
                         {/* Input */}
                         <div className="p-4 border-t dark:border-gray-800 bg-white dark:bg-gray-900">
+                            {error && <div role="alert" className="mb-3 text-center text-[10px] font-bold text-tkd-red">{error}</div>}
                             <div className="relative">
                                 <input 
                                     value={mensaje}
@@ -201,6 +210,7 @@ const AsistenteVirtual: React.FC = () => {
                                     className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 pl-5 pr-14 text-[11px] font-bold dark:text-white outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner"
                                 />
                                 <button 
+                                    aria-label="Enviar mensaje"
                                     onClick={manejarEnviar}
                                     disabled={!mensaje.trim() || cargando || restantes <= 0}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 text-tkd-blue hover:scale-110 transition-transform disabled:opacity-30"
@@ -214,6 +224,7 @@ const AsistenteVirtual: React.FC = () => {
             </AnimatePresence>
 
             <motion.button 
+                aria-label={abierto ? "Cerrar chat" : "Abrir chat"}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setAbierto(!abierto)}
