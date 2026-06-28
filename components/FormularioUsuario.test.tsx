@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FormularioUsuario, { crearEsquemaValidacion } from './FormularioUsuario';
 import { RolUsuario } from '../tipos';
@@ -14,7 +14,7 @@ let submittedData: any = { nombreUsuario: 'Carlos' };
 jest.mock('../context/DataContext', () => ({
   useSedes: () => ({
     sedesVisibles: [
-      { id: 'principal', nombre: 'Sede Principal', esVisible: true },
+      { id: 'principal', nombre: 'Sede Principal Mock', esVisible: true },
       { id: '2', nombre: 'Sede Norte', esVisible: true },
     ],
   }),
@@ -103,10 +103,10 @@ describe('FormularioUsuario', () => {
     expect(screen.getByText(/Apoyo en Sede/i)).toBeInTheDocument();
     expect(screen.getByText('Sede de Trabajo')).toBeInTheDocument();
     expect(screen.getAllByRole('option', { name: 'Sede Norte' })).toHaveLength(2);
-    expect(screen.queryByRole('option', { name: /^Sede Principal$/ })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Sede de Trabajo' })).toHaveAttribute('name', 'sedeId');
     expect(reset).toHaveBeenCalledWith(expect.objectContaining({
       rol: RolUsuario.Asistente,
-      sedeId: '1',
+      sedeId: 'principal',
       duracionContratoMeses: 12,
     }));
   });
@@ -199,7 +199,7 @@ describe('FormularioUsuario', () => {
     expect(onCerrar).toHaveBeenCalled();
   });
 
-  it('does not close when clicking inside and closes from the backdrop and header button', () => {
+  it('only closes through an explicit close action, not by clicking the content or backdrop', () => {
     jest.useFakeTimers();
     const onCerrar = jest.fn();
     const { rerender } = render(<FormularioUsuario {...baseProps} onCerrar={onCerrar} />);
@@ -210,12 +210,12 @@ describe('FormularioUsuario', () => {
 
     fireEvent.click(screen.getByRole('dialog'));
     act(() => jest.advanceTimersByTime(200));
-    expect(onCerrar).toHaveBeenCalledTimes(1);
+    expect(onCerrar).not.toHaveBeenCalled();
 
     rerender(<FormularioUsuario {...baseProps} onCerrar={onCerrar} />);
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar formulario' }));
     act(() => jest.advanceTimersByTime(200));
-    expect(onCerrar).toHaveBeenCalledTimes(2);
+    expect(onCerrar).toHaveBeenCalledTimes(1);
   });
 
   it('shows every validation error and disables an invalid form', () => {

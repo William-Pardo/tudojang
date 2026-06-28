@@ -198,13 +198,28 @@ npx jest components/ModalAgendarClase.test.tsx components/ModalBusquedaGlobal.te
 
 ### Instrucciones
 
-1. `ModalImportacionMasiva` tiene lógica pesada para leer CSV o Excel. Mockea librerías como `papaparse` o el File API.
+1. `ModalImportacionMasiva` tiene lógica pesada para leer **Excel (.xlsx/.xls)** vía `xlsx` y `FileReader`. Mockea `xlsx` (`read`, `writeFile`, `utils.*`) y el File API (`readAsArrayBuffer`). **No uses papaparse** — el componente no importa CSV.
 2. `ModalGestionarSolicitudes` aprueba/rechaza pedidos de tienda. Verifica los botones correspondientes.
 3. `ModalRecuperarContrasena` valida un input de email y dispara un Firebase Auth call mockeado.
 4. **Ejecuta y pega**:
 ```bash
 npx jest components/ModalGestionarSolicitudes.test.tsx components/ModalImportacionMasiva.test.tsx components/ModalRecuperarContrasena.test.tsx components/ModalSeleccionarEstudiante.test.tsx --coverage --coverageReporters=text --collectCoverageFrom="components/ModalGestionarSolicitudes.tsx" --collectCoverageFrom="components/ModalImportacionMasiva.tsx" --collectCoverageFrom="components/ModalRecuperarContrasena.tsx" --collectCoverageFrom="components/ModalSeleccionarEstudiante.tsx"
 ```
+
+### ✅ Completado — `ModalImportacionMasiva` (task-976)
+
+| Campo | Valor |
+|-------|-------|
+| Test | `components/ModalImportacionMasiva.test.tsx` |
+| Casos | 21 |
+| Cobertura | 100% Stmts · 100% Branch · 100% Funcs · 100% Lines |
+| Fecha | 2026-06-22 |
+
+**Props reales del componente:** `abierto`, `onCerrar`, `onExito` (no `isOpen`/`onCancel`/`files`).
+
+**Escenarios cubiertos:** pasos `inicio`/`previa`/`procesando`; descarga plantilla; carga Excel (vacío, estructura inválida, error lectura); auditoría por fila (tutor, grado, correo, ID, fecha); cancelar preview; importación exitosa/parcial; defaults de sede/grado/campos médicos; `Date` en celda Excel; desmontaje.
+
+**Referencia de implementación:** ver `ModalImportacionMasiva.test.tsx` (helper `simularCargaExcel`, mocks de contexto y `xlsx`).
 
 ---
 

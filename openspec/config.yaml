@@ -1,23 +1,76 @@
 schema: spec-driven
+strict_tdd: true
 
 context: |
-  Tech stack: React 18 + TypeScript, Firebase/Firestore, react-hook-form, framer-motion
-  Testing: Jest 29, ts-jest, @testing-library/react, @testing-library/user-event
-  State: Context API (DataContext, NotificacionContext)
-  Commits: Conventional commits (feat, fix, test, refactor, chore)
-  Domain: Tudojang — plataforma SaaS multi-tenant para gestión de dojangs de Taekwondo
-  Patterns: Container-Presentational, mocks completos de Firebase en tests
-  TDD tracker: .agent/tdd-tracker/ contiene estado y prompts del proceso de cobertura
+  Tech stack: React 19, TypeScript 5.7, Vite 6, Firebase/Firestore and Cloud Functions (Node 20)
+  Architecture: HashRouter SPA with Context providers, service modules, hooks, components and views
+  Domain: Multi-tenant SaaS for Taekwondo dojang management
+  Testing: Jest 29 + ts-jest + Testing Library; Cypress 13 for E2E
+  Quality: strict TypeScript and Vite production build; no linter or formatter configured
+  Delivery: GitHub Actions builds and deploys Firebase Hosting, Functions and rules
+  Conventions: Conventional commits, Firebase mocks and the existing .agent/tdd-tracker workflow
+
+testing:
+  detected: "2026-06-23"
+  strict_tdd: true
+  runner:
+    framework: Jest 29 with ts-jest and jsdom
+    command: npm test -- --runInBand
+  layers:
+    unit:
+      available: true
+      tool: Jest
+    integration:
+      available: true
+      tool: Testing Library, jsdom and Firebase service mocks
+    e2e:
+      available: true
+      tool: Cypress 13
+      command: npx cypress run
+  coverage:
+    available: true
+    command: npm run test:coverage
+  quality:
+    linter:
+      available: false
+      command: ""
+    type_checker:
+      available: true
+      command: npx tsc --noEmit
+    formatter:
+      available: false
+      command: ""
+    build:
+      available: true
+      command: npm run build
 
 rules:
   proposal:
-    - Incluir siempre una sección de "Impact" con archivos de test afectados
-    - Mencionar el coverage actual y el target de cobertura esperado
+    - Include an Impact section listing affected tests
+    - State current coverage evidence and the expected coverage target
+    - Include a rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
   design:
-    - Documentar la estrategia de mocking para los tests
-    - Incluir decisiones sobre qué herramientas/patrones de testing usar
+    - Document the mocking strategy and chosen testing patterns
+    - Include sequence diagrams for complex flows
+    - Record architecture decisions with rationale
   tasks:
-    - Cada tarea debe incluir un sub-item de "Escribir/actualizar tests"
-    - Incluir el comando de verificación de coverage como último sub-item
-    - "Ejecutar npx jest <archivo> --coverage --coverageReporters=text y pegar el resultado en el chat"
-    - Break tasks into chunks of max 2 hours
+    - Group work by phase with hierarchical numbering
+    - Keep tasks completable in one session and under two hours
+    - Every implementation task must include writing or updating tests
+    - End relevant tasks with a focused coverage verification command
+  apply:
+    instructions:
+      - Follow existing code patterns and preserve unrelated worktree changes
+    tdd: true
+    test_command: npm test -- --runInBand
+  verify:
+    test_command: npm test -- --runInBand
+    build_command: npm run build
+    coverage_command: npm run test:coverage
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - Preserve archived changes as an immutable audit trail

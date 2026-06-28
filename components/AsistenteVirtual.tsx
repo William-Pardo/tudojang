@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconoLogoOficial, IconoCerrar, IconoEnviar, IconoAprobar, IconoInformacion, IconoWhatsApp } from './Iconos';
-import { consultarSabonimVirtual, getRemainingQueries } from '../servicios/soporteService';
+import { consultarSoporte, type ResultadoConsultaSoporte } from '../servicios/soporte/cliente';
 import { crearTicketSoporte, escucharMiTicketActivo } from '../servicios/soporteApi';
 import { useAuth } from '../context/AuthContext';
 import { TicketSoporte, EtapaSoporte } from '../tipos';
@@ -12,24 +12,24 @@ const AsistenteVirtual: React.FC = () => {
     const { usuario } = useAuth();
     const [abierto, setAbierto] = useState(false);
     const [mensaje, setMensaje] = useState('');
-    const [historial, setHistorial] = useState<{ texto: string; soyYo: boolean }[]>([]);
+    const [historial, setHistorial] = useState<{ texto: string; soyYo: boolean; fuente?: ResultadoConsultaSoporte['source'] }[]>([]);
     const [cargando, setCargando] = useState(false);
     const [mostrarBtnEscalar, setMostrarBtnEscalar] = useState(false);
     const [miTicket, setMiTicket] = useState<TicketSoporte | null>(null);
-    const [restantes, setRestantes] = useState(getRemainingQueries());
+    const [restantes, setRestantes] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (abierto && historial.length === 0) {
             setHistorial([{ texto: "Kyeong-rye Sabonim. ¿En qué módulo técnico puedo orientarte hoy?", soyYo: false }]);
         }
-        setRestantes(getRemainingQueries());
     }, [abierto]);
 
     useEffect(() => {
         if (usuario) {
-            const desSuscribir = escucharMiTicketActivo(usuario.id, setMiTicket);
+            const desSuscribir = escucharMiTicketActivo(usuario.id, usuario.tenantId, setMiTicket);
             return () => desSuscribir();
         }
     }, [usuario]);
@@ -55,16 +55,29 @@ const AsistenteVirtual: React.FC = () => {
             role: h.soyYo ? 'user' as const : 'assistant' as const,
             text: h.texto,
         }));
-        const respuestaRaw = await consultarSabonimVirtual(miPregunta, contextoPrevio, usuario?.rol);
+        const resultadoRaw: unknown = await consultarSoporte({
+            question: miPregunta,
+            context: contextoPrevio,
+            role: (usuario?.rol ?? 'Publico') as any,
+        });
+        const resultado: ResultadoConsultaSoporte = typeof resultadoRaw === 'string'
+            ? {
+                state: 'answer',
+                source: 'local',
+                answer: resultadoRaw.replace('[ESCALAR_SOPORTE_MASTER]', '').trim(),
+                canEscalate: resultadoRaw.includes('[ESCALAR_SOPORTE_MASTER]'),
+            }
+            : resultadoRaw as ResultadoConsultaSoporte;
         
-        let respuestaLimpia = respuestaRaw;
-        if (respuestaRaw.includes('[ESCALAR_SOPORTE_MASTER]')) {
-            respuestaLimpia = respuestaRaw.replace('[ESCALAR_SOPORTE_MASTER]', '').trim();
-            setMostrarBtnEscalar(true);
-        }
+        const respuestaLimpia = resultado.answer;
+        setMostrarBtnEscalar(resultado.canEscalate === true);
 
-        setHistorial(prev => [...prev, { texto: respuestaLimpia || "Entendido. ¿Deseas escalar a soporte humano?", soyYo: false }]);
-        setRestantes(getRemainingQueries());
+        setHistorial(prev => [...prev, {
+            texto: respuestaLimpia || "Entendido. ¿Deseas escalar a soporte humano?",
+            soyYo: false,
+            fuente: resultado.source,
+        }]);
+        setRestantes(resultado.remaining?.user ?? null);
         } catch (consultaError) {
             console.error('[AsistenteVirtual] Error al consultar soporte:', consultaError);
             setError('Error al cargar la respuesta');
@@ -73,18 +86,19 @@ const AsistenteVirtual: React.FC = () => {
         }
     };
 
-    const solicitarEscalado = async () => {
+    const solicitarEscalado = async (usarWhatsapp = false) => {
         if (!usuario) return;
         setCargando(true);
         try {
-            await crearTicketSoporte({
+            const ticket = await crearTicketSoporte({
                 tenantId: usuario.tenantId,
                 userId: usuario.id,
                 userNombre: usuario.nombreUsuario,
                 userEmail: usuario.email,
                 asunto: "Escalado desde Asistente Virtual",
                 resumenIA: historial.map(h => h.texto).join('\n')
-            });
+            }, { whatsappConsent: usarWhatsapp });
+            setWhatsappUrl(ticket.whatsappUrl ?? null);
             setHistorial(prev => [...prev, { texto: "Su solicitud ha sido elevada al Soporte Master. He abierto un canal de seguimiento prioritario para usted.", soyYo: false }]);
             setMostrarBtnEscalar(false);
         } catch (e) {
@@ -156,7 +170,7 @@ const AsistenteVirtual: React.FC = () => {
                                     {miTicket ? (
                                         <p className="text-[8px] font-bold text-green-400 uppercase mt-1">Caso: #{miTicket.id.slice(-4)}</p>
                                     ) : (
-                                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">IA disponible: {restantes}/15 · Manual ilimitado</p>
+                                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">IA disponible: {restantes ?? 'según plan'} · Manual ilimitado</p>
                                     )}
                                 </div>
                             </div>
@@ -174,18 +188,34 @@ const AsistenteVirtual: React.FC = () => {
                                 <div key={i} className={`flex ${h.soyYo ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[85%] p-3.5 rounded-2xl text-[11px] font-medium leading-relaxed ${h.soyYo ? 'bg-tkd-blue text-white rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-tl-none shadow-sm'}`}>
                                         {h.texto}
+                                        {!h.soyYo && h.fuente && (
+                                            <span className="block mt-2 text-[8px] font-black uppercase tracking-wider text-tkd-blue">
+                                                {h.fuente === 'local' ? 'Manual verificado' : h.fuente === 'ai' ? 'Respuesta con IA' : 'Soporte humano'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                             {mostrarBtnEscalar && (
                                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="pt-2">
                                     <button 
-                                        onClick={solicitarEscalado}
+                                        onClick={() => solicitarEscalado(false)}
                                         className="w-full bg-tkd-dark text-white p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/20 hover:bg-blue-900 transition-all shadow-xl flex items-center justify-center gap-2"
                                     >
                                         <IconoInformacion className="w-4 h-4 text-tkd-red" /> Solicitar Asesor Master
                                     </button>
+                                    <button
+                                        onClick={() => solicitarEscalado(true)}
+                                        className="mt-2 w-full bg-green-600 text-white p-3 rounded-2xl text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        <IconoWhatsApp className="w-4 h-4 inline mr-2" /> Continuar por WhatsApp
+                                    </button>
                                 </motion.div>
+                            )}
+                            {whatsappUrl && (
+                                <a href={whatsappUrl} target="_blank" rel="noreferrer" className="block text-center bg-green-600 text-white p-3 rounded-2xl text-[10px] font-black uppercase">
+                                    Abrir WhatsApp
+                                </a>
                             )}
                             {cargando && (
                                 <div className="flex justify-start">
@@ -208,7 +238,7 @@ const AsistenteVirtual: React.FC = () => {
                                     value={mensaje}
                                     onChange={(e) => setMensaje(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && manejarEnviar()}
-                                    placeholder={restantes > 0 ? "Describa su inquietud..." : "Consulta el manual o solicita ayuda"}
+                                    placeholder="Describa su inquietud..."
                                     disabled={cargando}
                                     className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 pl-5 pr-14 text-[11px] font-bold dark:text-white outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner"
                                 />
@@ -241,7 +271,7 @@ const AsistenteVirtual: React.FC = () => {
                 )}
                 {!miTicket && !abierto && (
                     <div className="absolute -top-1 -right-1 w-6 h-6 bg-tkd-red text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
-                        {restantes}
+                        {restantes ?? '∞'}
                     </div>
                 )}
             </motion.button>

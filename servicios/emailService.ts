@@ -8,24 +8,6 @@ interface EnviarBienvenidaParams {
     slug: string;
 }
 
-interface EnviarConfirmacionPagoParams {
-    email: string;
-    nombreClub: string;
-    montoPagado: number; // En centavos
-    referenciaPago?: string;
-}
-
-interface EnviarRecuperacionPasswordParams {
-    email: string;
-    nombreClub?: string;
-    resetLink: string;
-}
-
-interface NotificarCambioPasswordParams {
-    email: string;
-    nombreClub?: string;
-}
-
 /**
  * Helper para llamar a las funciones directamente (Evita problemas de Hosting/CORS)
  */
@@ -98,31 +80,3 @@ export const enviarEmailBienvenida = async (params: EnviarBienvenidaParams): Pro
     }
 };
 
-/**
- * Envía un email de confirmación de pago exitoso
- */
-export const enviarEmailConfirmacionPago = async (params: EnviarConfirmacionPagoParams): Promise<void> => {
-    try {
-        await callApi('enviarConfirmacionPago', params);
-    } catch (error) {
-        console.error('Error al enviar confirmación de pago:', error);
-    }
-};
-
-/**
- * Envía un email de recuperación de contraseña con enlace de reset
- */
-export const enviarEmailRecuperacionPassword = async (params: EnviarRecuperacionPasswordParams): Promise<void> => {
-    return callApi('enviarRecuperacionPassword', params);
-};
-
-/**
- * Notifica al usuario que su contraseña fue cambiada exitosamente
- */
-export const notificarCambioPassword = async (params: NotificarCambioPasswordParams): Promise<void> => {
-    try {
-        await callApi('notificarCambioPassword', params);
-    } catch (error) {
-        console.error('Error al notificar cambio de password:', error);
-    }
-};

@@ -21,21 +21,22 @@ const schema = yup.object({
     direccion: yup.string().trim().required('La dirección es obligatoria.'),
     ciudad: yup.string().trim().required('La ciudad es obligatoria.'),
     telefono: yup.string().trim().required('El teléfono es obligatorio.'),
-    valorMensualidad: yup.number().typeError('Debe ser un número').min(0, 'No puede ser negativo').optional().default(0),
+    valorMensualidad: yup.number().transform((value, originalValue) => originalValue === '' ? 0 : value).typeError('Debe ser un número').min(0, 'No puede ser negativo').optional().default(0),
 }).required();
 
 const FormularioSede: React.FC<Props> = ({ abierto, onCerrar, onGuardar, sedeActual, cargando }) => {
     const { register, handleSubmit, formState: { errors }, reset } = useForm<Omit<Sede, 'id'>>({
         resolver: yupResolver(schema) as any,
-        defaultValues: (sedeActual as any) || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 }
+        defaultValues: sedeActual ? { ...(sedeActual as any), valorMensualidad: sedeActual.valorMensualidad || '' } : { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: '' as any }
     });
 
     useEffect(() => {
-        if (abierto) reset(sedeActual || { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: 0 });
+        if (abierto) reset(sedeActual ? { ...(sedeActual as any), valorMensualidad: sedeActual.valorMensualidad || '' } : { nombre: '', direccion: '', ciudad: '', telefono: '', valorMensualidad: '' as any });
     }, [abierto, sedeActual, reset]);
 
     const onSubmit = (data: Omit<Sede, 'id'>) => {
-        onGuardar(sedeActual ? { ...sedeActual, ...data } : data);
+        const esEdicion = Boolean(sedeActual?.id);
+        onGuardar(esEdicion ? { ...sedeActual, ...data } as Sede : data);
     };
 
     if (!abierto) return null;
@@ -44,7 +45,7 @@ const FormularioSede: React.FC<Props> = ({ abierto, onCerrar, onGuardar, sedeAct
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 animate-fade-in backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden transform transition-all">
                 <header className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50">
-                    <h2 className="text-xl font-bold dark:text-white uppercase tracking-tight">{sedeActual ? 'Editar Sede' : 'Nueva Sede'}</h2>
+                    <h2 className="text-xl font-bold dark:text-white uppercase tracking-tight">{sedeActual?.id ? 'Editar Sede' : 'Nueva Sede'}</h2>
                     <button onClick={onCerrar} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"><IconoCerrar className="w-6 h-6" /></button>
                 </header>
                 <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
@@ -73,7 +74,7 @@ const FormularioSede: React.FC<Props> = ({ abierto, onCerrar, onGuardar, sedeAct
 
                     <div className="pt-4 border-t dark:border-gray-700">
                         <label className="block text-[10px] font-black uppercase text-tkd-blue mb-1 ml-1">Valor Mensualidad Específico (COP)</label>
-                        <input type="number" {...register('valorMensualidad')} className="w-full bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 rounded-xl p-3 text-sm font-bold dark:text-white focus:ring-tkd-blue" />
+                        <input type="number" min="0" placeholder="0" {...register('valorMensualidad')} className="w-full bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 rounded-xl p-3 text-sm font-bold dark:text-white focus:ring-tkd-blue" />
                         <div className="flex items-center gap-2 mt-2 px-1">
                             <IconoInformacion className="w-3.5 h-3.5 text-gray-400" />
                             <p className="text-[9px] text-gray-400 font-bold uppercase">Dejar en $0 para usar el valor base del club.</p>

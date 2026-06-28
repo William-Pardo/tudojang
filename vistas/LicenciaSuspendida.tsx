@@ -4,6 +4,7 @@ import { useEstadoLicencia } from '../hooks/useEstadoLicencia';
 import { IconoLogoOficial, IconoGuardar, IconoInformacion, IconoWhatsApp } from '../components/Iconos';
 import { formatearPrecio } from '../utils/formatters';
 import { PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
+import { firmarCheckoutWompi } from '../servicios/wompiApi';
 
 const LicenciaSuspendida: React.FC = () => {
     const { diasRestantes, fechaVencimiento, plan, diasGracia, configClub } = useEstadoLicencia();
@@ -24,13 +25,11 @@ const LicenciaSuspendida: React.FC = () => {
             // IMPORTANTE: Referencia con prefijo SUSC_ para el Webhook
             const referencia = `SUSC_${configClub?.tenantId || 'TEST'}_${planActual.id}_${Date.now()}`;
 
-            // Generar firma de integridad
-            const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
-
-            const encondedText = new TextEncoder().encode(cadenaFirma);
-            const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            const signature = await firmarCheckoutWompi({
+                reference: referencia,
+                amountInCents: precioEnCentavos,
+                currency: moneda,
+            });
 
             const urlRetorno = `${window.location.origin}/#/`;
             let urlWompi = `https://checkout.wompi.co/p/?` +

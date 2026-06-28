@@ -33,7 +33,7 @@ Capa de abstracción que intercomunica el frontend con Firestore.
 - **Públicas y Pasarelas**: `PublicLanding.tsx`, `VistaTiendaPublica.tsx`, `PasarelaPagos.tsx`, `PasarelaInscripcion.tsx`.
 
 ### 3.3. Componentes Reutilizables y UI (`/components`)
-- **Elementos Dinámicos y Formularios**: `FormularioEstudiante.tsx`, `FormularioUsuario.tsx`, `ModalRegistrarPago.tsx` (Caja POS en efectivo), `ModalImportacionMasiva.tsx` (importación de CSV).
+- **Elementos Dinámicos y Formularios**: `FormularioEstudiante.tsx`, `FormularioUsuario.tsx`, `ModalRegistrarPago.tsx` (Caja POS en efectivo), `ModalImportacionMasiva.tsx` (importación masiva Excel `.xlsx` con auditoría de filas; tests en `ModalImportacionMasiva.test.tsx`, task-976).
 - **Elementos de Marca**: `Iconos.tsx` (con escalabilidad SVG), `LogoDinamico.tsx`, `BrandingProvider.tsx` (gestiona la paleta de colores del inquilino dinámicamente).
 - **Elementos de Lista**: `FilaEstudiante.tsx`, `TarjetaEventoAdmin.tsx`.
 

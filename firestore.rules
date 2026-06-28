@@ -1,0 +1,201 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // Funciones auxiliares
+    // =========================================================================
+
+    function authenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return authenticated() && request.auth.token.rol == 'SuperAdmin';
+    }
+
+    function ownsTicket() {
+      return authenticated()
+        && resource.data.userId == request.auth.uid
+        && resource.data.tenantId == request.auth.token.tenantId;
+    }
+
+    // Verifica que el documento pertenece al mismo tenant que el usuario
+    function sameTenant() {
+      return authenticated()
+        && resource.data.tenantId == request.auth.token.tenantId;
+    }
+
+    // Verifica que los datos que se están escribiendo usan el tenantId del usuario
+    function writingOwnTenant() {
+      return authenticated()
+        && request.resource.data.tenantId == request.auth.token.tenantId;
+    }
+
+    // Roles con acceso admin dentro del tenant
+    function isAdmin() {
+      return authenticated()
+        && request.auth.token.tenantId != null
+        && request.auth.token.rol in ['Admin', 'SuperAdmin'];
+    }
+
+    // Rol Instructor/Editor con acceso operativo
+    function isInstructor() {
+      return authenticated()
+        && request.auth.token.rol in ['Admin', 'Editor', 'Asistente', 'SuperAdmin'];
+    }
+
+    // Rol Estudiante académico
+    function isEstudiante() {
+      return authenticated() && request.auth.token.rol == 'Estudiante';
+    }
+
+    // Rol Tutor (padre/acudiente) — solo lectura sobre recursos relacionados
+    function isTutor() {
+      return authenticated() && request.auth.token.rol == 'Tutor';
+    }
+
+    function tutorLinkedToStudent(tenantId, uid) {
+      return isTutor()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/tenants/$(tenantId)/vinculos/$(request.auth.token.email + "_" + uid));
+    }
+
+    function canReadProgress(tenantId, uid) {
+      return authenticated()
+        && request.auth.token.tenantId == tenantId
+        && (request.auth.uid == uid || isAdmin() || tutorLinkedToStudent(tenantId, uid));
+    }
+
+    function canWriteOwnStudentProgress(tenantId, uid) {
+      return authenticated()
+        && request.auth.token.tenantId == tenantId
+        && request.auth.uid == uid
+        && isEstudiante();
+    }
+
+    // =========================================================================
+    // Colecciones existentes
+    // =========================================================================
+
+    match /tickets_soporte/{ticketId} {
+      allow read: if isSuperAdmin() || ownsTicket();
+      allow create, update, delete: if false;
+    }
+
+    match /asistente_cuotas/{quotaId} {
+      allow read, write: if false;
+    }
+
+    match /asistente_telemetria/{eventId} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Módulo académico — colecciones por tenant
+    // =========================================================================
+
+    // Conexiones de Google Drive (solo admin del tenant)
+    match /tenants/{tenantId}/driveConnections/{connId} {
+      allow read, write: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Invitaciones de usuarios académicos (Estudiante / Tutor)
+    match /tenants/{tenantId}/invitaciones/{invId} {
+      allow read: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+      allow create, update: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+      allow delete: if false;
+    }
+
+    // Vínculos Tutor ↔ Estudiante (N:M)
+    match /tenants/{tenantId}/vinculos/{vinculoId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId
+        && (isAdmin() || isTutor());
+      allow write: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Espacios físicos de sede
+    match /tenants/{tenantId}/espacios/{espacioId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId;
+      allow write: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Programas académicos
+    match /tenants/{tenantId}/programasAcademicos/{programaId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId;
+      allow write: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Ejecuciones de programa por grupo
+    match /tenants/{tenantId}/ejecucionesPrograma/{ejecucionId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId
+        && !isTutor();
+      allow write: if isInstructor()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Jornadas de instrucción
+    match /tenants/{tenantId}/jornadas/{jornadaId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId;
+      allow create: if isInstructor()
+        && request.auth.token.tenantId == tenantId;
+      // Las transiciones de estado se hacen vía Cloud Function (no directamente)
+      allow update: if isInstructor()
+        && request.auth.token.tenantId == tenantId;
+      allow delete: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Biblioteca: recursos académicos
+    match /tenants/{tenantId}/recursos/{recursoId} {
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId;
+      allow create, update: if isInstructor()
+        && request.auth.token.tenantId == tenantId;
+      allow delete: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Asignaciones académicas
+    match /tenants/{tenantId}/asignaciones/{asignacionId} {
+      // Estudiante puede leer sus propias asignaciones
+      allow read: if authenticated()
+        && request.auth.token.tenantId == tenantId;
+      // Solo instructores pueden crear/modificar asignaciones
+      allow create, update: if isInstructor()
+        && request.auth.token.tenantId == tenantId;
+      allow delete: if isAdmin()
+        && request.auth.token.tenantId == tenantId;
+    }
+
+    // Progreso del estudiante
+    match /tenants/{tenantId}/progreso/{uid}/{asignacionId} {
+      allow read: if canReadProgress(tenantId, uid);
+      allow write: if canWriteOwnStudentProgress(tenantId, uid);
+    }
+
+    // Ruta real usada por Cloud Functions/repositorios: progreso/{uid}/asignaciones/{asignacionId}
+    match /tenants/{tenantId}/progreso/{uid}/asignaciones/{asignacionId} {
+      allow read: if canReadProgress(tenantId, uid);
+      allow write: if canWriteOwnStudentProgress(tenantId, uid);
+    }
+
+    // =========================================================================
+    // Catch-all: denegar todo lo no declarado
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -29,6 +29,22 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     const [mensajeError, setMensajeError] = useState('');
 
     const cargarTenant = async () => {
+        const fixtureCypress = typeof window !== 'undefined' && (window as any).Cypress
+            ? (window as any).__TUDOJANG_E2E_TENANT__
+            : null;
+
+        if (fixtureCypress) {
+            const config = {
+                ...(CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub),
+                ...fixtureCypress,
+                onboardingStep: fixtureCypress.onboardingStep ?? 5,
+            } as ConfiguracionClub;
+            aplicarEstilos(config);
+            setTenant(config);
+            setEstado('ok');
+            return;
+        }
+
         // PRIORIDAD SAAS: Si hay un usuario autenticado, usamos SU configuración
         if (usuario?.tenantId) {
             try {

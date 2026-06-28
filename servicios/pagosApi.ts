@@ -14,7 +14,6 @@ import {
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Estudiante, SolicitudCompra, SolicitudInscripcion, MovimientoFinanciero, TransaccionPago } from '../tipos';
 import { EstadoPago, EstadoSolicitud, EstadoSolicitudCompra, TipoMovimiento, CategoriaFinanciera } from '../tipos';
-import { enviarEmailConfirmacionPago } from './emailService';
 import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
 
 // Interfaces para el manejo de pagos

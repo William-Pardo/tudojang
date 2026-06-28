@@ -25,6 +25,8 @@ import VistaMisionKicho from './MisionKicho';
 import MasterAccess from './vistas/MasterAccess';
 import VistaNotificaciones from './vistas/Notificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
+import VistaCentroEstudios from './vistas/CentroEstudios';
+import VistaJornadas from './vistas/admin/JornadasView';
 import Vista404 from './vistas/404';
 import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
@@ -47,7 +49,7 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoCampana, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
 } from './components/Iconos';
@@ -59,6 +61,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     const todosLosEnlaces = [
         { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
+        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
@@ -308,6 +311,8 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
                     <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
+                    <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
+                    <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
                     <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
                     <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />

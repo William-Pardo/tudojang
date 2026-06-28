@@ -4,10 +4,290 @@ const admin = require("firebase-admin");
 const { Resend } = require("resend");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
+const { manejarRequest } = require("./http");
+const { enviarCorreo } = require("./email");
+const { verificarFirmaEventoWompi } = require("./wompi");
+const { crearServicioFirmaCheckoutWompi } = require("./wompiIntegrity");
+const {
+  validarTenantParaProvision,
+  validarEvidenciaPagoParaActivacion,
+} = require("./onboardingSecurity");
+const catalogoSoporte = require("./generated/soporte/catalogo.v1.json");
+const {
+  crearServicioAsistente,
+  crearHandlerCallable,
+} = require("./asistente/callable");
+const { crearProveedorGemini } = require("./asistente/proveedor");
+const {
+  crearAlmacenCuotasFirestore,
+  reservarCuota,
+  reconciliarCuota,
+} = require("./asistente/cuotas");
+const {
+  calcularCostoMicros,
+  estimarReservaMicros,
+} = require("./asistente/costos");
+const {
+  estaIaHabilitada,
+  obtenerPeriodoMensual,
+} = require("./asistente/runtime");
+const {
+  crearServicioTickets,
+  crearServicioTransicionTicket,
+} = require("./asistente/escalamiento");
+const { crearEventoTelemetria } = require("./asistente/telemetria");
+const {
+  crearServicioInviteUser,
+  crearServicioAcceptInvitation,
+} = require("./academico/invitaciones");
+const {
+  crearServicioConnectDrive,
+  crearServicioDriveOAuthCallback,
+  crearServicioSyncDriveMetadata,
+} = require("./academico/drive");
+const {
+  crearServicioPublishAsignacion,
+} = require("./academico/asignaciones");
+const {
+  crearServicioVencerAsignaciones,
+  crearListadoAsignacionesFirestore,
+} = require("./academico/asignacionesScheduler");
+const {
+  crearServicioConsolidateProgress,
+  crearAdaptadorConsolidateProgressFirestore,
+} = require("./academico/progreso");
 
 admin.initializeApp();
 
-const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
+const emailFunctions = functionsV1.runWith({ secrets: ["RESEND_API_KEY"] });
+const paymentFunctions = functionsV1.runWith({
+  secrets: ["RESEND_API_KEY", "WOMPI_EVENTS_SECRET", "WOMPI_INTEGRITY_SECRET"],
+});
+const assistantFunctions = functionsV1.runWith({
+  secrets: ["GEMINI_API_KEY"],
+  enforceAppCheck: true,
+});
+const geminiFunctions = functionsV1.runWith({
+  secrets: ["GEMINI_API_KEY"],
+});
+const getResend = () => new Resend(process.env.RESEND_API_KEY);
+
+const PRECIOS_IA = {
+  inputUsdPerMillion: 0.1,
+  outputUsdPerMillion: 0.4,
+};
+const LIMITES_IA = {
+  user: 50_000,
+  tenant: 200_000,
+  global: 8_000_000,
+};
+const RESERVA_IA_MICROS = estimarReservaMicros(
+  { maxInputTokens: 1_200, maxOutputTokens: 300 },
+  PRECIOS_IA,
+  4
+);
+const almacenCuotasIa = crearAlmacenCuotasFirestore(admin.firestore());
+const registrarTelemetriaAsistente = async (event) => {
+  try {
+    await admin
+      .firestore()
+      .collection("asistente_telemetria")
+      .add(crearEventoTelemetria(event));
+  } catch (error) {
+    console.error("No fue posible registrar telemetria del asistente:", error);
+  }
+};
+
+const servicioAsistenteIa = crearServicioAsistente({
+  enabled: estaIaHabilitada(),
+  catalog: catalogoSoporte,
+  provider: async (request) => {
+    const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    return crearProveedorGemini({ model })(request);
+  },
+  reserveQuota: async ({ uid, tenantId }) => {
+    const reservation = await reservarCuota(almacenCuotasIa, {
+      uid,
+      tenantId,
+      period: obtenerPeriodoMensual(),
+      estimatedMicros: RESERVA_IA_MICROS,
+      limits: LIMITES_IA,
+    });
+    return { reservation, remaining: reservation.remaining };
+  },
+  reconcileQuota: (reservation, actualMicros) =>
+    reconciliarCuota(almacenCuotasIa, reservation, actualMicros),
+  calculateActualCost: (usage) => calcularCostoMicros(usage, PRECIOS_IA),
+  recordTelemetry: registrarTelemetriaAsistente,
+});
+
+exports.consultarAsistenteIa = assistantFunctions.https.onCall(
+  crearHandlerCallable(servicioAsistenteIa)
+);
+
+const registrarTelemetriaEscalamiento = async ({
+  uid,
+  tenantId,
+  escalationReason,
+}) =>
+  admin.firestore().collection("asistente_telemetria").add(
+    crearEventoTelemetria({
+      uid,
+      tenantId,
+      source: "human",
+      latencyMs: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      costMicros: 0,
+      quotaOutcome: "not_applicable",
+      escalationReason,
+    })
+  );
+
+const servicioCrearTicket = crearServicioTickets({
+  createDocument: async (ticket) => {
+    const document = await admin
+      .firestore()
+      .collection("tickets_soporte")
+      .add(ticket);
+    await registrarTelemetriaEscalamiento({
+      uid: ticket.userId,
+      tenantId: ticket.tenantId,
+      escalationReason: "ticket_created",
+    });
+    return document.id;
+  },
+  whatsappPhone: process.env.SUPPORT_WHATSAPP_PHONE || "",
+});
+
+const servicioActualizarTicket = crearServicioTransicionTicket({
+  getDocument: async (ticketId) => {
+    const snapshot = await admin
+      .firestore()
+      .collection("tickets_soporte")
+      .doc(ticketId)
+      .get();
+    return snapshot.exists ? snapshot.data() : null;
+  },
+  updateDocument: async (ticketId, changes) => {
+    await admin
+      .firestore()
+      .collection("tickets_soporte")
+      .doc(ticketId)
+      .update(changes);
+    await registrarTelemetriaEscalamiento({
+      uid: changes.lastTransition.actorId,
+      tenantId: "master",
+      escalationReason: `ticket_${changes.status}`,
+    });
+  },
+});
+
+exports.crearTicketSoporteSeguro = functionsV1
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(
+  crearHandlerCallable(servicioCrearTicket)
+);
+exports.actualizarTicketSoporteSeguro = functionsV1
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(
+  crearHandlerCallable(servicioActualizarTicket)
+);
+
+// Servicios Académicos
+const servicioInviteUser = crearServicioInviteUser({
+  auth: admin.auth(),
+  firestore: admin.firestore(),
+  enviarCorreo,
+  resend: getResend,
+  appUrl: process.env.APP_URL || "https://app.tudojang.com"
+});
+
+const servicioAcceptInvitation = crearServicioAcceptInvitation({
+  auth: admin.auth(),
+  firestore: admin.firestore()
+});
+
+const googleDriveConfig = {
+  clientId: process.env.GOOGLE_CLIENT_ID || "",
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  redirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+};
+
+const servicioConnectDrive = crearServicioConnectDrive({
+  googleDriveConfig
+});
+
+const servicioDriveOAuthCallback = crearServicioDriveOAuthCallback({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioSyncDriveMetadata = crearServicioSyncDriveMetadata({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioPublishAsignacion = crearServicioPublishAsignacion({
+  firestore: admin.firestore()
+});
+
+const servicioVencerAsignaciones = crearServicioVencerAsignaciones({
+  listarAsignacionesPublicadas: crearListadoAsignacionesFirestore(admin.firestore())
+});
+
+const servicioConsolidateProgress = crearServicioConsolidateProgress(
+  crearAdaptadorConsolidateProgressFirestore(admin.firestore())
+);
+
+exports.inviteUser = emailFunctions.https.onCall(
+  crearHandlerCallable(servicioInviteUser)
+);
+
+exports.acceptInvitation = functionsV1.https.onCall(
+  crearHandlerCallable(servicioAcceptInvitation)
+);
+
+exports.connectDrive = functionsV1.https.onCall(
+  crearHandlerCallable(servicioConnectDrive)
+);
+
+exports.driveOAuthCallback = functionsV1.https.onCall(
+  crearHandlerCallable(servicioDriveOAuthCallback)
+);
+
+exports.syncDriveMetadata = functionsV1.https.onRequest(async (req, res) => {
+  return cors(req, res, async () => {
+    try {
+      await servicioSyncDriveMetadata(req, res);
+    } catch (err) {
+      console.error("Error in syncDriveMetadata:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+exports.publishAsignacion = functionsV1.https.onCall(
+  crearHandlerCallable(servicioPublishAsignacion)
+);
+
+exports.vencerAsignacionesAcademicas = functionsV1.pubsub
+  .schedule("every day 02:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioVencerAsignaciones(new Date()));
+
+exports.consolidateProgress = functionsV1.https.onCall(
+  crearHandlerCallable(servicioConsolidateProgress)
+);
+
+exports.firmarCheckoutWompi = paymentFunctions.https.onCall(
+  crearHandlerCallable(
+    crearServicioFirmaCheckoutWompi({
+      integritySecret: () => process.env.WOMPI_INTEGRITY_SECRET,
+    })
+  )
+);
 
 const cors = require("cors")({ origin: true });
 
@@ -59,10 +339,13 @@ const FOOTER_HTML = `
   </div>
 `;
 
-exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) => {
+exports.provisionarUsuarioOnboarding = emailFunctions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { tenantId, email, password, nombreClub } = data;
     if (!email || !password || !tenantId) throw new Error('Faltan parámetros');
+
+    const tenantSnap = await admin.firestore().collection('tenants').doc(tenantId).get();
+    validarTenantParaProvision({ tenant: tenantSnap, tenantId, email });
 
     console.log(`Provisionando usuario: ${email}`);
     let user;
@@ -91,7 +374,7 @@ exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) =>
     });
 
     // Notificar a Master sobre nuevo Tenant
-    await resend.emails.send({
+    await enviarCorreo(getResend(), {
       from: "Tudojang System <sistema@tudojang.com>",
       to: [MASTER_EMAIL],
       subject: `🚨 NUEVO TENANT: ${nombreClub}`,
@@ -116,10 +399,18 @@ exports.provisionarUsuarioOnboarding = functionsV1.https.onRequest((req, res) =>
 
 exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
-    const { tenantId, email } = data;
+    const { tenantId, email, transactionId } = data;
     console.log(`Activación manual para: ${tenantId}`);
 
     const tenantRef = admin.firestore().collection('tenants').doc(tenantId);
+    const tenantSnap = await tenantRef.get();
+    validarEvidenciaPagoParaActivacion({
+      tenant: tenantSnap,
+      tenantId,
+      email,
+      transactionId,
+    });
+
     await tenantRef.update({
       estadoSuscripcion: 'activo',
       fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
@@ -134,7 +425,7 @@ exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
+exports.enviarBienvenidaTudojang = emailFunctions.https.onRequest((req, res) => {
   manejarRequest(req, res, async (data) => {
     const { email, nombreClub, passwordTemporal } = data;
 
@@ -142,7 +433,7 @@ exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
       throw new Error(`Acceso restringido: El destinatario ${email} no es un usuario o estudiante registrado.`);
     }
 
-    await resend.emails.send({
+    await enviarCorreo(getResend(), {
       from: "Tudojang Academia <info@tudojang.com>",
       to: [email],
       subject: `🥋 ¡Bienvenido a la Élite, ${nombreClub}!`,
@@ -170,130 +461,13 @@ exports.enviarBienvenidaTudojang = functionsV1.https.onRequest((req, res) => {
   });
 });
 
-exports.enviarConfirmacionPago = functionsV1.https.onRequest((req, res) => {
-  manejarRequest(req, res, async (data) => {
-    const { email, nombreClub, montoPagado, referenciaPago } = data;
-
-    if (!(await verificarDestinatario(email))) {
-      throw new Error(`Acceso restringido: Destinatario ${email} no válido.`);
-    }
-
-    const montoFormateado = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(montoPagado / 100);
-
-    await resend.emails.send({
-      from: "Tudojang Pagos <info@tudojang.com>",
-      to: [email],
-      subject: `✅ Confirmación de Pago: ${nombreClub}`,
-      html: `
-        <div style="${ESTILOS_EMAIL}">
-          ${HEADER_HTML('Recibo de Pago')}
-          <div style="padding: 40px 30px;">
-            <p>Confirmamos la recepción exitosa de tu pago para <b>${nombreClub}</b>.</p>
-            <div style="border: 2px dashed #e2e8f0; padding: 25px; border-radius: 16px; margin: 30px 0; position: relative; background: #fff;">
-              <div style="margin-bottom: 20px;">
-                <p style="margin: 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Detalle de Transacción</p>
-                <p style="margin: 5px 0 0 0; font-size: 24px; font-weight: 900; color: #0047A0;">${montoFormateado}</p>
-              </div>
-              <div>
-                <p style="margin: 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Referencia</p>
-                <p style="margin: 5px 0 0 0; font-size: 14px; font-family: monospace; color: #1e293b;">${referenciaPago || 'PAGO-AUTO-' + Date.now()}</p>
-              </div>
-            </div>
-            <p style="font-size: 13px; color: #64748b;">Tu estado de cuenta ha sido actualizado automáticamente en la plataforma.</p>
-          </div>
-          ${FOOTER_HTML}
-        </div>
-      `
-    });
-    return { success: true };
-  });
-});
-
-exports.enviarRecuperacionPassword = functionsV1.https.onRequest((req, res) => {
-  manejarRequest(req, res, async (data) => {
-    const { email, resetLink, nombreClub } = data;
-
-    if (!(await verificarDestinatario(email))) {
-      throw new Error(`Acceso restringido: Destinatario ${email} no válido.`);
-    }
-
-    await resend.emails.send({
-      from: "Tudojang Seguridad <info@tudojang.com>",
-      to: [email],
-      subject: `🔐 Recuperación de Contraseña - Tudojang`,
-      html: `
-        <div style="${ESTILOS_EMAIL}">
-          ${HEADER_HTML('Seguridad de Cuenta')}
-          <div style="padding: 40px 30px;">
-            <p>Has solicitado restablecer la contraseña de tu cuenta en <b>Tudojang</b> para la academia <b>${nombreClub || 'Tu Dojang'}</b>.</p>
-            <p>Haz clic en el siguiente botón para crear una nueva contraseña. Este enlace es válido por 1 hora.</p>
-            <div style="text-align: center; margin: 40px 0;">
-              <a href="${resetLink}" style="background: #CD2E3A; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; display: inline-block;">Restablecer Clave</a>
-            </div>
-            <p style="font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; pt: 20px;">Si no solicitaste este cambio, puedes ignorar este correo con total seguridad.</p>
-          </div>
-          ${FOOTER_HTML}
-        </div>
-      `
-    });
-    return { success: true };
-  });
-});
-
-exports.notificarCambioPassword = functionsV1.https.onRequest((req, res) => {
-  manejarRequest(req, res, async (data) => {
-    const { email, nombreClub } = data;
-
-    if (!(await verificarDestinatario(email))) return { success: false, message: 'Ignorado' };
-
-    await resend.emails.send({
-      from: "Tudojang Seguridad <info@tudojang.com>",
-      to: [email],
-      subject: `⚠️ Cambio de Contraseña Confirmado`,
-      html: `
-        <div style="${ESTILOS_EMAIL}">
-          ${HEADER_HTML('Alerta de Seguridad')}
-          <div style="padding: 40px 30px;">
-            <p>Te notificamos que la contraseña de tu perfil en <b>${nombreClub || 'Tudojang'}</b> ha sido cambiada exitosamente.</p>
-            <div style="background: #fff4f4; border-left: 4px solid #CD2E3A; padding: 15px; margin: 25px 0;">
-              <p style="margin: 0; font-size: 14px; color: #7f1d1d;">Si fuiste tú quien realizó el cambio, no es necesario hacer nada más.</p>
-            </div>
-            <p style="font-weight: 700; color: #1e293b;">¿No fuiste tú?</p>
-            <p>Contacta inmediatamente con tu administrador o soporte técnico para proteger tu cuenta.</p>
-          </div>
-          ${FOOTER_HTML}
-        </div>
-      `
-    });
-    return { success: true };
-  });
-});
-
-exports.testEmailResend = functionsV1.https.onRequest((req, res) => {
-  manejarRequest(req, res, async (data) => {
-    await resend.emails.send({
-      from: "Tudojang Academia <info@tudojang.com>",
-      to: [data.toEmail || "gengepardo@gmail.com"],
-      subject: "🚀 Prueba de Sistema Premium",
-      html: `
-        <div style="${ESTILOS_EMAIL}">
-          ${HEADER_HTML('Test de Sistema')}
-          <div style="padding: 40px 30px; text-align: center;">
-            <span style="font-size: 48px;">🚀</span>
-            <h2 style="color: #0047A0; margin-top: 20px;">¡Motor de Correos Online!</h2>
-            <p>Este es un correo de prueba generado desde el núcleo de Tudojang.</p>
-          </div>
-          ${FOOTER_HTML}
-        </div>
-      `
-    });
-    return { success: true };
-  });
-});
-
-exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
+exports.webhookWompi = paymentFunctions.https.onRequest(async (req, res) => {
   const { event, data } = req.body;
   console.log("Webhook recibido:", event);
+
+  if (!verificarFirmaEventoWompi(req.body, process.env.WOMPI_EVENTS_SECRET)) {
+    return res.status(401).json({ error: "Firma de evento inválida" });
+  }
 
   if (event === 'transaction.updated' && data.transaction.status === 'APPROVED') {
     const ref = data.transaction.reference;
@@ -301,7 +475,7 @@ exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
     const montoFormateado = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(monto / 100);
 
     // Notificar a Master sobre pago recibido
-    await resend.emails.send({
+    await enviarCorreo(getResend(), {
       from: "Tudojang Finanzas <pagos@tudojang.com>",
       to: [MASTER_EMAIL],
       subject: `💰 PAGO RECIBIDO (${montoFormateado}): ${ref}`,
@@ -328,7 +502,14 @@ exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
           // 1. Activar Suscripción
           await admin.firestore().collection('tenants').doc(tId).update({
             estadoSuscripcion: 'activo',
-            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
+            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000)),
+            ultimoPagoWompi: {
+              transactionId: data.transaction.id,
+              status: data.transaction.status,
+              reference: ref,
+              amountInCents: monto,
+              verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+            }
           });
 
           // 2. Activar Usuario Admin
@@ -341,7 +522,7 @@ exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
           if (tenantData.emailClub && tenantData.passwordTemporal) {
             console.log(`Enviando email de bienvenida desde Webhook a: ${tenantData.emailClub}`);
             try {
-              await resend.emails.send({
+              await enviarCorreo(getResend(), {
                 from: "Tudojang Academia <info@tudojang.com>",
                 to: [tenantData.emailClub],
                 subject: `🥋 ¡Acceso Activado: ${tenantData.nombreClub}!`,
@@ -380,7 +561,7 @@ exports.webhookWompi = functionsV1.https.onRequest(async (req, res) => {
  * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)
  * Se activa cuando un estudiante sube un reporte de pago.
  */
-exports.analizarComprobanteEstudiante = functionsV1.firestore
+exports.analizarComprobanteEstudiante = geminiFunctions.firestore
   .document('reportes_pagos_estudiantes/{reporteId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
@@ -396,7 +577,7 @@ exports.analizarComprobanteEstudiante = functionsV1.firestore
       await snap.ref.update({ estado: 'Analizando' });
 
       // 2. Configurar Gemini (Carga desde Secretos de Firebase)
-      const apiKey = functions.config().gemini?.api_key;
+      const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         throw new Error("No se encontró la API Key de Gemini en los secrets de Firebase. Ejecuta: firebase functions:secrets:set gemini_api_key");
       }
@@ -463,14 +644,14 @@ exports.analizarComprobanteEstudiante = functionsV1.firestore
 /**
  * TRIGGER: Notificar a Master sobre legalización de Misión Kicho
  */
-exports.notificarMasterMisionKicho = functionsV1.firestore
+exports.notificarMasterMisionKicho = emailFunctions.firestore
   .document('misiones_kicho/{misionId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data();
     const after = change.after.data();
 
     if (before.estadoLote !== 'legalizado' && after.estadoLote === 'legalizado') {
-      await resend.emails.send({
+      await enviarCorreo(getResend(), {
         from: "Tudojang Kicho <kicho@tudojang.com>",
         to: [MASTER_EMAIL],
         subject: `🧧 MISIÓN KICHO LEGALIZADA: ${after.tenantId}`,
@@ -493,11 +674,11 @@ exports.notificarMasterMisionKicho = functionsV1.firestore
 /**
  * TRIGGER: Notificar a Master sobre solicitud de Carnets
  */
-exports.notificarMasterSolicitudCarnets = functionsV1.firestore
+exports.notificarMasterSolicitudCarnets = emailFunctions.firestore
   .document('solicitudes_carnets/{solicitudId}')
   .onCreate(async (snap, context) => {
     const data = snap.data();
-    await resend.emails.send({
+    await enviarCorreo(getResend(), {
       from: "Tudojang Producción <carnets@tudojang.com>",
       to: [MASTER_EMAIL],
       subject: `🪪 SOLICITUD DE CARNETS: ${data.nombreClub}`,

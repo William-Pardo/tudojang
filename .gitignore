@@ -12,6 +12,27 @@ dist
 dist-ssr
 *.local
 
+# Cobertura Jest
+coverage/
+
+# Reportes JSON generados (cobertura, reportes TDD, etc.)
+*.json
+!package.json
+!package-lock.json
+!**/package.json
+!**/package-lock.json
+!tsconfig.json
+!tsconfig.*.json
+!**/tsconfig.json
+!firebase.json
+!metadata.json
+!users.json
+!**/manifest.json
+
+# Firebase Hosting cache
+.firebase/hosting.cache/
+.firebase/*.cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +43,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Local Pi runtime state
+.atl/

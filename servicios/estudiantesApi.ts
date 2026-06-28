@@ -18,7 +18,6 @@ import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD } from '../tipos';
 
 const estudiantesCollection = collection(db, 'estudiantes');
-const storage = getStorage();
 
 const uploadFirma = async (
     tenantId: string,
@@ -30,7 +29,7 @@ const uploadFirma = async (
       console.warn("MODO SIMULADO: Saltando subida de firma a Firebase Storage.");
       return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
-    const storageRef = ref(storage, `tenants/${tenantId}/firmas/${idEstudiante}/${tipo}_${Date.now()}.png`);
+    const storageRef = ref(getStorage(), `tenants/${tenantId}/firmas/${idEstudiante}/${tipo}_${Date.now()}.png`);
     const finalBase64 = firmaBase64.startsWith('data:') ? firmaBase64 : `data:image/png;base64,${firmaBase64}`;
     const snapshot = await uploadString(storageRef, finalBase64, 'data_url');
     const downloadURL = await getDownloadURL(snapshot.ref);

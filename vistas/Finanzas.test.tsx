@@ -36,8 +36,8 @@ jest.mock('../components/ModalConfirmacion', () => (props: any) => (
   <div data-testid="confirmacion">{props.mensaje}<button onClick={props.onConfirmar}>Confirmar eliminar</button><button onClick={props.onCerrar}>Cerrar eliminar</button></div>
 ));
 
-const ingreso = { id: 'm1', fecha: '2026-01-10', descripcion: 'Mensualidad', categoria: 'Mensualidad', tipo: TipoMovimiento.Ingreso, monto: 100 };
-const egreso = { id: 'm2', fecha: '2026-02-10', descripcion: 'Arriendo', categoria: 'Operación', tipo: TipoMovimiento.Egreso, monto: 50 };
+const ingreso = { id: 'm1', fecha: '2026-01-10', descripcion: 'Mensualidad', categoria: 'Mensualidad', tipo: TipoMovimiento.Ingreso, monto: 100, sedeId: 's1' };
+const egreso = { id: 'm2', fecha: '2026-02-10', descripcion: 'Arriendo', categoria: 'Operación', tipo: TipoMovimiento.Egreso, monto: 50, sedeId: 's2' };
 const deudor = { id: 'e1', nombres: 'Ana', apellidos: 'P', saldoDeudor: 100, telefono: '300', tutor: { telefono: '301' } };
 
 describe('VistaFinanzas', () => {
@@ -56,6 +56,8 @@ describe('VistaFinanzas', () => {
     expect(screen.getByText('Arriendo')).toBeInTheDocument();
     await user.selectOptions(screen.getByRole('combobox'), 's1');
     expect(cargarMovimientos).toHaveBeenLastCalledWith('s1');
+    expect(screen.getAllByText('Mensualidad')).toHaveLength(2);
+    expect(screen.queryByText('Arriendo')).not.toBeInTheDocument();
   });
 
   it('alterna Diario/Analíticas y sincroniza initialView', async () => {

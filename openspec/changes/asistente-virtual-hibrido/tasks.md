@@ -34,20 +34,26 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: AI Backend and Quotas — PR 2
 
-- [ ] 2.1 RED: Add tests under `functions/asistente/*.test.js` for redaction, prompt injection, token/cost calculation, typed responses and provider failures.
-- [ ] 2.2 RED: Add Emulator tests in `functions/test/asistente.integration.test.js` for Auth/App Check, trusted tenant/role, concurrent quota reservations, reconciliation and exhausted-budget degradation.
-- [ ] 2.3 GREEN: Implement `functions/asistente/{callable,modelo,cuotas,costos,redaccion}.js`, wire `functions/index.js` and indexes/config; make 2.1–2.2 pass, keeping quotas disabled pending metric approval.
-- [ ] 2.4 REFACTOR: Remove `GEMINI_API_KEY` injection from `vite.config.ts`, use Secret Manager, and verify browser bundles expose no secrets/quotas; run Functions tests and `npm run build`.
+- [x] 2.1 RED: Add tests under `functions/asistente/*.test.js` for redaction, prompt injection, token/cost calculation, typed responses and provider failures.
+- [x] 2.2 RED: Add Emulator tests in `functions/test/asistente.integration.test.js` for Auth/App Check, trusted tenant/role, concurrent quota reservations, reconciliation and exhausted-budget degradation.
+- [x] 2.3 GREEN: Implement `functions/asistente/{callable,modelo,cuotas,costos,redaccion}.js`, wire `functions/index.js` and indexes/config; make 2.1–2.2 pass, keeping quotas disabled pending metric approval.
+- [x] 2.4 REFACTOR: Remove `GEMINI_API_KEY` injection from `vite.config.ts`, use Secret Manager, and verify browser bundles expose no secrets/quotas; run Functions tests and `npm run build`.
 
 ## Phase 3: Escalation, WhatsApp and Telemetry — PR 3
 
-- [ ] 3.1 RED: Add Emulator security tests for minimal tickets, tenant isolation, Master transitions, denied client quota writes, consent and sensitive-data WhatsApp cancellation.
-- [ ] 3.2 GREEN: Implement `functions/asistente/{tickets,whatsapp,telemetria}.js`, `firestore.rules`, `firestore.indexes.json` and `firebase.json`; make 3.1 pass and limit `wa.me` to ticket ID/category.
-- [ ] 3.3 REFACTOR: Replace direct writes in `servicios/soporteApi.ts`; test retention, hashed identifiers, 50/75/90/100% cost alerts and absence of prompts/transcripts; run focused coverage.
+- [x] 3.1 RED: Add Emulator security tests for minimal tickets, tenant isolation, Master transitions, denied client quota writes, consent and sensitive-data WhatsApp cancellation.
+- [x] 3.2 GREEN: Implement `functions/asistente/{tickets,whatsapp,telemetria}.js`, `firestore.rules`, `firestore.indexes.json` and `firebase.json`; make 3.1 pass and limit `wa.me` to ticket ID/category.
+- [x] 3.3 REFACTOR: Replace direct writes in `servicios/soporteApi.ts`; test retention, hashed identifiers, 50/75/90/100% cost alerts and absence of prompts/transcripts; run focused coverage.
 
 ## Phase 4: Integration and Rollout — PR 4
 
-- [ ] 4.1 RED/GREEN: Update `servicios/soporte/cliente.ts` and `components/AsistenteVirtual.tsx` tests/UI for local, clarify, AI, quota, ticket and WhatsApp states.
-- [ ] 4.2 Add `cypress/e2e/asistente-virtual.cy.ts` covering six journeys, cross-tenant denial and rollback flags; run `npx cypress run`, `npx tsc --noEmit`, Jest and build.
+- [x] 4.1 RED/GREEN: Update `servicios/soporte/cliente.ts` and `components/AsistenteVirtual.tsx` tests/UI for local, clarify, AI, quota, ticket and WhatsApp states.
+- [x] 4.2 Add `cypress/e2e/asistente-virtual.cy.ts` covering six journeys, cross-tenant denial and rollback flags; run `npx cypress run`, `npx tsc --noEmit`, Jest and build.
 - [ ] 4.3 Rotate/revoke exposed credentials, verify Secret Manager/App Check, then document evidence and emergency disablement in `docs/asistente/seguridad-rollout.md`.
+  - [x] Resend: revoke the previous API key, retain `tudojang-production-v3`, destroy Secret Manager versions 1–5 and verify version 6.
+  - [x] Resend: remove the hardcoded credential and unauthenticated production test endpoint; verify synthetic delivery.
+  - [x] Resend: remove three unused public email endpoints and retain payment confirmation only in the trusted Wompi webhook flow.
+  - [x] Wompi: implement and test dynamic SHA-256 event-signature verification; prepare Secret Manager binding.
+  - [x] Wompi: rotate exposed credentials, create `WOMPI_EVENTS_SECRET`, move checkout integrity signing to backend and deploy safely.
+  - [ ] Gemini/App Check: complete provider secret and console enforcement evidence.
 - [ ] 4.4 Enable `assistantCatalogV1`, shadow telemetry, internal/Master, 10% tenants and plan waves; record 30-day fallback, token, cost and catalog-gap review before approving quotas.

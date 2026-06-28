@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getMessaging } from 'firebase/messaging';
+import { inicializarAppCheck } from './appCheck';
 
 const firebaseConfigString = process.env.FIREBASE_CONFIG;
 
@@ -53,9 +54,10 @@ if (!isFirebaseConfigured) {
 // Inicializar Firebase
 // Se utiliza una comprobación para evitar la reinicialización en entornos de hot-reload.
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const appCheck = isFirebaseConfigured ? inicializarAppCheck(app) : null;
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 const messaging = isFirebaseConfigured ? getMessaging(app) : null;
 
-export { app, db, auth, storage, messaging };
+export { app, appCheck, db, auth, storage, messaging };

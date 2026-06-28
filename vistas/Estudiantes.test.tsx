@@ -141,20 +141,20 @@ describe('VistaEstudiantes', () => {
   });
 
   it('inyecta cinco estudiantes y filtra por búsqueda, grupo, estado y sede', async () => {
-    const user = userEvent.setup();
     render(<VistaEstudiantes />);
+    await waitFor(() => expect(misionMock).toHaveBeenCalledWith('tenant-1'));
     await waitFor(() => expect(screen.getAllByTestId(/est-/)).toHaveLength(5));
 
-    await user.type(screen.getByLabelText('buscar'), 'Carla');
+    fireEvent.change(screen.getByLabelText('buscar'), { target: { value: 'Carla' } });
     expect(screen.getByTestId('tabla')).toHaveTextContent('Carla');
     expect(screen.queryByText('Ana')).not.toBeInTheDocument();
-    await user.clear(screen.getByLabelText('buscar'));
-    await user.selectOptions(screen.getByLabelText('grado'), GradoTKD.Rojo);
+    fireEvent.change(screen.getByLabelText('buscar'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('grado'), { target: { value: GradoTKD.Rojo } });
     expect(screen.getAllByTestId(/est-/)).toHaveLength(1);
-    await user.selectOptions(screen.getByLabelText('grado'), 'todos');
-    await user.selectOptions(screen.getByLabelText('grupo'), GrupoEdad.Cadetes);
+    fireEvent.change(screen.getByLabelText('grado'), { target: { value: 'todos' } });
+    fireEvent.change(screen.getByLabelText('grupo'), { target: { value: GrupoEdad.Cadetes } });
     expect(screen.getAllByTestId(/est-/)).toHaveLength(2);
-    await user.selectOptions(screen.getByLabelText('estado'), EstadoPago.Pendiente);
+    fireEvent.change(screen.getByLabelText('estado'), { target: { value: EstadoPago.Pendiente } });
     expect(screen.getAllByTestId(/est-/)).toHaveLength(1);
   });
 

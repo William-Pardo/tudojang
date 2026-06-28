@@ -48,7 +48,7 @@ describe('FormularioMovimiento', () => {
     const movimiento: MovimientoFinanciero = {
       id: 'mov-1',
       tipo: TipoMovimiento.Egreso,
-      categoria: CategoriaFinanciera.ServiciosPublicos,
+      categoria: CategoriaFinanciera.Servicios,
       monto: 150000,
       descripcion: 'Pago de luz',
       fecha: '2026-06-20',
@@ -58,7 +58,7 @@ describe('FormularioMovimiento', () => {
     const { container } = render(<FormularioMovimiento {...defaultProps} movimientoActual={movimiento} />);
     expect(screen.getByText('Editar Movimiento')).toBeInTheDocument();
     expect(container.querySelector('select[name="tipo"]')).toHaveValue(TipoMovimiento.Egreso);
-    expect(container.querySelector('select[name="categoria"]')).toHaveValue(CategoriaFinanciera.ServiciosPublicos);
+    expect(container.querySelector('select[name="categoria"]')).toHaveValue(CategoriaFinanciera.Servicios);
     expect(container.querySelector('input[name="monto"]')).toHaveValue(150000);
     expect(container.querySelector('input[name="descripcion"]')).toHaveValue('Pago de luz');
     expect(container.querySelector('select[name="sedeId"]')).toHaveValue('sede-2');
@@ -156,7 +156,7 @@ describe('FormularioMovimiento', () => {
     const movimiento: MovimientoFinanciero = {
       id: 'mov-3',
       tipo: TipoMovimiento.Ingreso,
-      categoria: CategoriaFinanciera.Matricula,
+      categoria: CategoriaFinanciera.Inscripcion,
       monto: 80000,
       descripcion: 'Inscripción Inicial',
       fecha: '2026-06-21',
@@ -174,7 +174,7 @@ describe('FormularioMovimiento', () => {
       expect(onGuardarMock).toHaveBeenCalledWith({
         id: 'mov-3',
         tipo: TipoMovimiento.Ingreso,
-        categoria: CategoriaFinanciera.Matricula,
+        categoria: CategoriaFinanciera.Inscripcion,
         monto: 80000,
         descripcion: 'Inscripción Corregida',
         fecha: '2026-06-21',

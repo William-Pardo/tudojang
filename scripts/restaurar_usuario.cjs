@@ -6,14 +6,14 @@ const { initializeApp } = require('firebase/app');
 const { getFirestore, doc, updateDoc, getDoc, deleteField } = require('firebase/firestore');
 
 // Configuración de Firebase (tomada de firebase/config.ts)
-const firebaseConfig = {
-    apiKey: "AIzaSyDqWGXzD5h1LqXbqrQRhO2WtWHztQqY-1I",
-    authDomain: "tudojang.firebaseapp.com",
-    projectId: "tudojang",
-    storageBucket: "tudojang.appspot.com",
-    messagingSenderId: "1071788485460",
-    appId: "1:1071788485460:web:9e6e6e6e6e6e6e6e6e6e6e"
-};
+const firebaseConfig = process.env.FIREBASE_WEB_CONFIG_JSON
+    ? JSON.parse(process.env.FIREBASE_WEB_CONFIG_JSON)
+    : null;
+
+if (!firebaseConfig?.apiKey || !firebaseConfig?.projectId || !firebaseConfig?.appId) {
+    console.error('[restaurar_usuario] ERROR: Define FIREBASE_WEB_CONFIG_JSON con la configuracion web de Firebase.');
+    process.exit(1);
+}
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);

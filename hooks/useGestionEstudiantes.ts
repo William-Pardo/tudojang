@@ -96,6 +96,8 @@ export const useGestionEstudiantes = () => {
                 await actualizarEstudiante(datosEstudiante);
                 mostrarNotificacion("Estudiante actualizado correctamente.", "success");
             } else {
+                // Los campos metodoPago y cobrarMesSiguiente vienen del formulario y
+                // se persisten en Firestore junto con el resto del documento del estudiante.
                 const nuevoEstudiante = await agregarEstudiante(datosEstudiante);
                 mostrarNotificacion("Estudiante creado correctamente.", "success");
 
@@ -103,15 +105,28 @@ export const useGestionEstudiantes = () => {
                 const destinatario = nuevoEstudiante.tutor?.telefono;
 
                 if (destinatario && nuevoEstudiante.tutor) {
-                    const links = [];
+                    const links: { nombre: string; url: string }[] = [];
+
+                    // Si el admin eligió "Link de Cobro", va primero en el mensaje
+                    if ((datosEstudiante as any).metodoPago === 'link') {
+                        links.push({
+                            nombre: 'Link de Pago — Matrícula / Mensualidad',
+                            url: generarUrlAbsoluta(`/pagar-matricula/${nuevoEstudiante.id}`)
+                        });
+                    }
+
                     if (!nuevoEstudiante.consentimientoInformado) links.push({ nombre: 'Consentimiento de Riesgos', url: generarUrlAbsoluta(`/firma/${nuevoEstudiante.id}`) });
                     if (!nuevoEstudiante.contratoServiciosFirmado) links.push({ nombre: 'Contrato de Servicios', url: generarUrlAbsoluta(`/contrato/${nuevoEstudiante.id}`) });
-                    if (!nuevoEstudiante.consentimientoImagenFirmado) links.push({ nombre: 'Autorización de Manejo de Imagen', url: generarUrlAbsoluta(`/imagen/${nuevoEstudiante.id}`) });
+                    if (!nuevoEstudiante.consentimientoImagenFirmado) links.push({ nombre: 'Autorización de Manejo de Imagen', url: generarUrlAbsoluta(`/firma-imagen/${nuevoEstudiante.id}`) });
 
                     if (links.length > 0) {
                         const mensaje = await generarMensajePersonalizado(TipoNotificacion.Bienvenida, nuevoEstudiante, configClub, { links });
                         await enviarNotificacion('WhatsApp', destinatario, mensaje);
-                        mostrarNotificacion(`Solicitud de firmas enviada a WhatsApp: ${destinatario}.`, "info");
+
+                        const tipoEnvio = (datosEstudiante as any).metodoPago === 'link'
+                            ? `Link de cobro y solicitud de firmas enviados a WhatsApp: ${destinatario}.`
+                            : `Solicitud de firmas enviada a WhatsApp: ${destinatario}.`;
+                        mostrarNotificacion(tipoEnvio, "info");
                     }
                 }
             }
@@ -149,7 +164,8 @@ export const useGestionEstudiantes = () => {
     };
 
     const handleShareLink = async (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => {
-        const url = generarUrlAbsoluta(`/${tipo}/${idEstudiante}`);
+        const ruta = tipo === 'imagen' ? 'firma-imagen' : tipo;
+        const url = generarUrlAbsoluta(`/${ruta}/${idEstudiante}`);
         const estudiante = estudiantes.find(e => e.id === idEstudiante);
         const nombreEstudiante = estudiante ? `${estudiante.nombres}` : 'el estudiante';
 

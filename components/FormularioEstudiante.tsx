@@ -5,10 +5,11 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import type { Estudiante } from '../tipos';
-import { GrupoEdad, EstadoPago, GradoTKD } from '../tipos';
+import { GrupoEdad, EstadoPago, GradoTKD, RolUsuario } from '../tipos';
 import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar } from './Iconos';
 import FormInputError from './FormInputError';
 import { useSedes, useProgramas, useConfiguracion } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { formatearPrecio } from '../utils/formatters';
 import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes } from '../utils/calculations';
 
@@ -62,7 +63,9 @@ const schema = yup.object({
     barrio: yup.string().optional(),
     programasInscritos: yup.array().optional().default([]),
     tutor: yup.object().optional().nullable(),
-    cobrarInscripcion: yup.boolean().default(true)
+    cobrarInscripcion: yup.boolean().default(true),
+    metodoPago: yup.string().oneOf(['efectivo', 'link']).default('efectivo'),
+    cobrarMesSiguiente: yup.boolean().default(false)
 }).required();
 
 const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando }) => {
@@ -84,13 +87,20 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
             eps: '',
             rh: '',
             direccion: '',
-            barrio: ''
+            barrio: '',
+            metodoPago: 'efectivo',
+            cobrarMesSiguiente: false
         }
     });
 
     const watchedSedeId = watch('sedeId');
     const watchedProgramas = watch('programasInscritos') || [];
     const watchedFechaNacimiento = watch('fechaNacimiento');
+    const watchedMetodoPago = watch('metodoPago') || 'efectivo';
+
+    const { usuario } = useAuth();
+    const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Editor;
+    const esFinDeMes = new Date().getDate() >= 26;
 
     useEffect(() => {
         setValue('grupo', calcularEdadYGrupo(watchedFechaNacimiento).grupo, { shouldValidate: true });
@@ -125,7 +135,9 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
             eps: '',
             rh: '',
             direccion: '',
-            barrio: ''
+            barrio: '',
+            metodoPago: 'efectivo',
+            cobrarMesSiguiente: false
         });
     }, [abierto, estudianteActual, reset]);
 
@@ -311,6 +323,37 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                         </div>
 
                         <div className="p-8 bg-gray-50 dark:bg-gray-800/50 rounded-[2.5rem] space-y-6">
+                            {/* Selector de Método de Pago */}
+                            {!estudianteActual && (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block ml-1">Método de Pago Inicial</label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div 
+                                            onClick={() => setValue('metodoPago', 'efectivo', { shouldValidate: true })} 
+                                            className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
+                                                watchedMetodoPago === 'efectivo' 
+                                                    ? 'bg-tkd-blue/5 border-tkd-blue shadow-lg shadow-tkd-blue/5' 
+                                                    : 'bg-white dark:bg-gray-700/30 border-gray-100 dark:border-gray-600 hover:border-gray-200 dark:hover:border-gray-500'
+                                            }`}
+                                        >
+                                            <span className="text-2xl">💵</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider dark:text-white">Pago en Efectivo</span>
+                                        </div>
+                                        <div 
+                                            onClick={() => setValue('metodoPago', 'link', { shouldValidate: true })} 
+                                            className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
+                                                watchedMetodoPago === 'link' 
+                                                    ? 'bg-tkd-blue/5 border-tkd-blue shadow-lg shadow-tkd-blue/5' 
+                                                    : 'bg-white dark:bg-gray-700/30 border-gray-100 dark:border-gray-600 hover:border-gray-200 dark:hover:border-gray-500'
+                                            }`}
+                                        >
+                                            <span className="text-2xl">🔗</span>
+                                            <span className="text-[10px] font-black uppercase tracking-wider dark:text-white">Link de Cobro</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Toggle Cobro Matrícula */}
                             {!estudianteActual && (
                                 <div className="flex items-center justify-between bg-white dark:bg-gray-700/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-600 shadow-sm relative overflow-hidden">
@@ -327,6 +370,32 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                         <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-100 dark:peer-focus:ring-blue-900 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-500 peer-checked:bg-tkd-blue"></div>
                                     </label>
                                     <div className="absolute right-0 top-0 w-20 h-full bg-gradient-to-l from-white/80 dark:from-black/20 to-transparent pointer-events-none"></div>
+                                </div>
+                            )}
+
+                            {/* Regla de Fin de Mes (a partir del día 26) */}
+                            {!estudianteActual && esFinDeMes && esAdmin && (
+                                <div className="space-y-4 p-6 bg-amber-50 dark:bg-amber-900/10 rounded-3xl border border-amber-100 dark:border-amber-900/30">
+                                    <div className="flex gap-3">
+                                        <span className="text-2xl">⚠️</span>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-400 tracking-wider">Gestión de Fin de Mes (Día 26+)</p>
+                                            <p className="text-xs text-amber-700 dark:text-amber-300 font-bold mt-1 leading-relaxed">
+                                                Los días restantes del mes actual deben gestionarse de manera interna en el club.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="h-px bg-amber-200/50 dark:bg-amber-900/50 my-1"></div>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-gray-900 dark:text-white">Abonar a mes siguiente</p>
+                                            <p className="text-[9px] font-bold text-gray-400 mt-0.5">Diferir cobro de la primera mensualidad al próximo mes.</p>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" {...register('cobrarMesSiguiente')} className="sr-only peer" />
+                                            <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-100 dark:peer-focus:ring-amber-900 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-500 peer-checked:bg-amber-500"></div>
+                                        </label>
+                                    </div>
                                 </div>
                             )}
 

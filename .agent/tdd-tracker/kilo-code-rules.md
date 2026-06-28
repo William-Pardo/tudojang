@@ -39,6 +39,8 @@ Coverage: Stmts X% | Branch Y% | Funcs Z% | Lines W%
 Después de completar exitosamente, actualizá `.agent/tdd-tracker/tdd-state.md`:
 - Cambiá `⬜` a `✅` para el item completado
 - Anotá la cobertura obtenida en la columna correspondiente
+- Registrá el ID de task (ej. `task-976`) en la columna Coverage o en **Historial reciente**
+- Actualizá el resumen de progreso al final del archivo
 
 ### 7. Si Algo No Está Claro
 NUNCA asumas. Preguntá al usuario antes de continuar.
