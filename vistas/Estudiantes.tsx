@@ -116,9 +116,6 @@ export const VistaEstudiantes: React.FC = () => {
         const tieneEstudiantes = estudiantes.length > 0;
         const filtrosSinResultados = tieneEstudiantes && estudiantesFiltrados.length === 0;
 
-        if (filtrosSinResultados) {
-            return <EmptyState Icono={IconoEstudiantes} titulo="Sin resultados" mensaje="Ningún estudiante coincide con los filtros actuales. Prueba a cambiarlos o limpiarlos." />;
-        }
         if (tieneEstudiantes) {
             return (
                 <div className="animate-fade-in space-y-4">
@@ -136,14 +133,19 @@ export const VistaEstudiantes: React.FC = () => {
                         sedes={sedesVisibles}
                     />
 
-                    <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
-                        <div>
-                            <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
-                        </div>
-                    </div>
-
-                    <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} />
-                    {renderPaginacion()}
+                    {filtrosSinResultados ? (
+                        <EmptyState Icono={IconoEstudiantes} titulo="Sin resultados" mensaje="Ningún estudiante coincide con los filtros actuales. Prueba a cambiarlos o limpiarlos." />
+                    ) : (
+                        <>
+                            <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
+                                <div>
+                                    <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
+                                </div>
+                            </div>
+                            <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} />
+                            {renderPaginacion()}
+                        </>
+                    )}
                 </div>
             );
         }
