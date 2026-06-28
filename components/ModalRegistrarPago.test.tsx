@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ModalRegistrarPago from './ModalRegistrarPago';
 import { obtenerDeudasEstudiante, procesarPagoEfectivo } from '../servicios/pagosApi';
 import { obtenerConfiguracionClub } from '../servicios/configuracionApi';
 
@@ -9,6 +8,8 @@ const generarImagen = jest.fn(), descargarComprobante = jest.fn(), compartirPorW
 jest.mock('./ComprobantesPago', () => ({ useGeneradorComprobante: () => ({ generarImagen, descargarComprobante, compartirPorWhatsApp }) }));
 jest.mock('../servicios/pagosApi', () => ({ obtenerDeudasEstudiante: jest.fn(), procesarPagoEfectivo: jest.fn() }));
 jest.mock('../servicios/configuracionApi', () => ({ obtenerConfiguracionClub: jest.fn() }));
+
+import ModalRegistrarPago from './ModalRegistrarPago';
 
 const estudiante: any = {
   id: 'e1', tenantId: 't1', nombres: 'Ana', apellidos: 'Pérez', telefono: '300 111',

@@ -243,7 +243,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         setSedes(p => [...p, res]);
                         return res;
                     },
-                    actualizarSede: api.actualizarSede,
+                    actualizarSede: async (s) => {
+                        const res = await api.actualizarSede(s);
+                        setSedes(prev => prev.map(item => item.id === res.id ? res : item));
+                        return res;
+                    },
                     eliminarSede: async (id) => { await api.eliminarSede(id); setSedes(prev => prev.filter(s => s.id !== id)); }
                 }}>
                     <EstudiantesContext.Provider value={{
@@ -255,7 +259,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             return res;
                         },
                         actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; },
-                        eliminarEstudiante: api.eliminarEstudiante
+                        eliminarEstudiante: async (id) => { await api.eliminarEstudiante(id); setEstudiantes(prev => prev.filter(e => e.id !== id)); }
                     }}>
                         <EventosContext.Provider value={{
                             eventos, cargando, error, cargarEventos: cargarTodo,
@@ -266,7 +270,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 return res;
                             },
                             actualizarEvento: api.actualizarEvento,
-                            eliminarEvento: api.eliminarEvento
+                            eliminarEvento: async (id) => { await api.eliminarEvento(id); setEventos(prev => prev.filter(e => e.id !== id)); }
                         }}>
                             <TiendaContext.Provider value={{
                                 implementos, solicitudesCompra, cargando, error,
@@ -278,7 +282,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                 eliminarImplemento: async (id) => { await api.eliminarImplemento(id); setImplementos(p => p.filter(item => item.id !== id)); }
                             }}>
                                 <FinanzasContext.Provider value={{
-                                    movimientos, cargando, error, cargarMovimientos: cargarTodo,
+                                    movimientos, cargando, error, cargarMovimientos: useCallback(async (sedeId?: string) => {
+                                        setCargando(true);
+                                        try {
+                                            const m = await api.obtenerMovimientos(sedeId);
+                                            setMovimientos(m);
+                                        } catch (err) {
+                                            console.error("Error al cargar movimientos:", err);
+                                            setError("Error al cargar movimientos.");
+                                        } finally {
+                                            setCargando(false);
+                                        }
+                                    }, []),
                                     agregarMovimiento: async (m) => {
                                         if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
                                         const res = await api.agregarMovimiento({ ...m, tenantId: tenant.tenantId });
@@ -286,7 +301,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                         return res;
                                     },
                                     actualizarMovimiento: api.actualizarMovimiento,
-                                    eliminarMovimiento: api.eliminarMovimiento
+                                    eliminarMovimiento: async (id) => { await api.eliminarMovimiento(id); setMovimientos(prev => prev.filter(m => m.id !== id)); }
                                 }}>
                                     {children}
                                 </FinanzasContext.Provider>

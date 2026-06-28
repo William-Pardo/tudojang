@@ -250,20 +250,20 @@ const EventoPublico: React.FC = () => {
                                     <motion.div key="form" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
                                         <form onSubmit={handleSubmit} className="space-y-5">
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Nombre Completo</label>
-                                                <input required name="nombre" value={formData.nombre} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Ej. Juan Pérez" />
+                                                <label htmlFor="evento-publico-nombre" className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Nombre Completo</label>
+                                                <input id="evento-publico-nombre" required name="nombre" value={formData.nombre} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Ej. Juan Pérez" />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Celular / WhatsApp</label>
-                                                <input required name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Tu número principal" />
+                                                <label htmlFor="evento-publico-whatsapp" className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Celular / WhatsApp</label>
+                                                <input id="evento-publico-whatsapp" required name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Tu número principal" />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Email (Opcional)</label>
-                                                <input name="email" type="email" value={formData.email} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="correo@ejemplo.com" />
+                                                <label htmlFor="evento-publico-email" className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Email (Opcional)</label>
+                                                <input id="evento-publico-email" name="email" type="email" value={formData.email} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="correo@ejemplo.com" />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Academia (Opcional)</label>
-                                                <input name="clubOrigen" value={formData.clubOrigen} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Club de origen" />
+                                                <label htmlFor="evento-publico-club" className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-2">Academia (Opcional)</label>
+                                                <input id="evento-publico-club" name="clubOrigen" value={formData.clubOrigen} onChange={handleInputChange} className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-tkd-dark focus:outline-none focus:border-tkd-blue focus:ring-2 focus:ring-tkd-blue/20 transition-all font-bold text-sm" placeholder="Club de origen" />
                                             </div>
                                             
                                             <div className="pt-6 space-y-4">

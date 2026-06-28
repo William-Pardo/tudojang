@@ -75,6 +75,8 @@ export const VistaEstudiantes: React.FC = () => {
         goToPreviousPage,
         exportarCSV,
         configClub,
+        limpiarFiltros,
+        filtrosActivos,
     } = useGestionEstudiantes();
 
     const [modalImportMasivaAbierto, setModalImportMasivaAbierto] = useState(false);
@@ -131,10 +133,19 @@ export const VistaEstudiantes: React.FC = () => {
                         filtroSede={filtroSede}
                         setFiltroSede={setFiltroSede}
                         sedes={sedesVisibles}
+                        onLimpiar={limpiarFiltros}
+                        filtrosActivos={filtrosActivos}
                     />
 
                     {filtrosSinResultados ? (
-                        <EmptyState Icono={IconoEstudiantes} titulo="Sin resultados" mensaje="Ningún estudiante coincide con los filtros actuales. Prueba a cambiarlos o limpiarlos." />
+                        <EmptyState Icono={IconoEstudiantes} titulo="Sin resultados" mensaje="Ningún estudiante coincide con los filtros actuales. Prueba a cambiarlos o limpiarlos.">
+                            <button
+                                onClick={limpiarFiltros}
+                                className="bg-tkd-blue text-white px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2 mx-auto"
+                            >
+                                Limpiar Filtros
+                            </button>
+                        </EmptyState>
                     ) : (
                         <>
                             <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">

@@ -16,6 +16,7 @@ import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
 import { actualizarCapacidadClub, actualizarPlanClub } from '../servicios/configuracionApi';
 import { COSTOS_ADICIONALES, PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
+import { firmarCheckoutWompi } from '../servicios/wompiApi';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
@@ -23,6 +24,7 @@ import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
+import { obtenerLimiteEquipoTecnico, obtenerLimiteOperativo } from '../utils/limitesSaas';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -33,7 +35,7 @@ const ModalFormPrograma: React.FC<{
 }> = ({ programa, onCerrar, onGuardar }) => {
     const [nombre, setNombre] = useState(programa?.nombre || '');
     const [tipo, setTipo] = useState(programa?.tipoCobro || TipoCobroPrograma.Recurrente);
-    const [valor, setValor] = useState(programa?.valor || 0);
+    const [valor, setValor] = useState<number | ''>(programa?.valor || '');
     const [horario, setHorario] = useState(programa?.horario || '');
 
     const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl p-4 text-sm font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all placeholder:text-gray-300";
@@ -63,7 +65,7 @@ const ModalFormPrograma: React.FC<{
                         </div>
                         <div>
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-2 block tracking-widest">Inversión (COP)</label>
-                            <input type="number" value={valor} onChange={e => setValor(Number(e.target.value))} className={inputStyle} />
+                            <input type="number" min="0" value={valor} onChange={e => setValor(e.target.value === '' ? '' : Number(e.target.value))} className={inputStyle} placeholder="0" />
                         </div>
                     </div>
 
@@ -75,7 +77,7 @@ const ModalFormPrograma: React.FC<{
 
                 <div className="space-y-3 pt-4">
                     <button
-                        onClick={() => onGuardar({ ...programa, nombre, tipoCobro: tipo, valor, horario })}
+                        onClick={() => onGuardar({ ...programa, nombre, tipoCobro: tipo, valor: Number(valor) || 0, horario })}
                         className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95"
                     >
                         <IconoGuardar className="w-6 h-6" /> Actualizar Catálogo
@@ -116,12 +118,11 @@ const ModalPagoCheckout: React.FC<{
                 const moneda = 'COP';
                 // Usamos el formato SUSC_ para que el webhook lo reconozca
                 const referencia = `SUSC_${tenantId}_${item.id}_${Date.now()}`;
-                const cadenaFirma = `${referencia}${precioEnCentavos}${moneda}${CONFIGURACION_WOMPI.integrityKey}`;
-
-                const encondedText = new TextEncoder().encode(cadenaFirma);
-                const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                const signature = await firmarCheckoutWompi({
+                    reference: referencia,
+                    amountInCents: precioEnCentavos,
+                    currency: moneda,
+                });
 
                 const urlRetorno = `${window.location.origin}/#/`;
                 let urlWompi = `https://checkout.wompi.co/p/?` +
@@ -169,7 +170,7 @@ const ModalPagoCheckout: React.FC<{
 
                     <div className="space-y-3">
                         <button onClick={handleProcederAlPago} className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95">
-                            <IconoAprobar className="w-6 h-6" /> Abrir Pasarela Segura
+                            <IconoAprobar className="w-6 h-6" /> Ir a pago seguro
                         </button>
                         <button onClick={onCerrar} className="w-full text-gray-400 font-black uppercase text-[10px] tracking-widest py-2">Cancelar</button>
                     </div>
@@ -182,6 +183,7 @@ const ModalPagoCheckout: React.FC<{
 // --- VISTA PRINCIPAL ---
 
 const VistaConfiguracion: React.FC = () => {
+    const MAX_PROGRAMAS_EXTRA = 10;
     const {
         usuarios, localConfigClub, localConfigNotificaciones, cargando, error,
         cargandoAccion, handleConfigChange, guardarConfiguracionesHandler,
@@ -204,11 +206,20 @@ const VistaConfiguracion: React.FC = () => {
     const [planSeleccionado, setPlanSeleccionado] = useState<string>(localConfigClub?.plan || 'starter');
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
 
+    const cerrarModalSede = () => {
+        setModalSedeAbierto(false);
+        setSedeEdit(null);
+    };
+
     const handleGuardarSede = async (datos: any) => {
         try {
-            if (datos.id) await actualizarSede(datos);
-            else await agregarSede(datos);
-            setModalSedeAbierto(false);
+            if (sedeEdit?.id) {
+                await actualizarSede({ ...sedeEdit, ...datos, id: sedeEdit.id } as Sede);
+            } else {
+                const { id, ...datosNuevaSede } = datos;
+                await agregarSede(datosNuevaSede);
+            }
+            cerrarModalSede();
             mostrarNotificacion("Sede guardada correctamente.", "success");
         } catch (e) {
             mostrarNotificacion("Error al guardar la sede.", "error");
@@ -217,8 +228,15 @@ const VistaConfiguracion: React.FC = () => {
 
     const handleGuardarPrograma = async (datos: any) => {
         try {
-            if (datos.id) await actualizarPrograma(datos);
-            else await agregarPrograma(datos);
+            if (datos.id) {
+                await actualizarPrograma(datos);
+            } else {
+                if (programas.length >= MAX_PROGRAMAS_EXTRA) {
+                    mostrarNotificacion(`Límite de programas extra alcanzado (${MAX_PROGRAMAS_EXTRA}).`, "warning");
+                    return;
+                }
+                await agregarPrograma(datos);
+            }
             setModalProgramaAbierto(false);
             mostrarNotificacion("Programa actualizado en el catálogo.", "success");
         } catch (e) {
@@ -315,6 +333,8 @@ const VistaConfiguracion: React.FC = () => {
     if (cargando || esTenantTemporal) return <Loader texto="Sincronizando Consola..." />;
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all";
+    const limiteEquipoTecnico = obtenerLimiteEquipoTecnico(localConfigClub);
+    const equipoTecnicoCompleto = limiteEquipoTecnico > 0 && usuarios.length >= limiteEquipoTecnico;
 
     return (
         <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
@@ -433,11 +453,11 @@ const VistaConfiguracion: React.FC = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                     <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800">
                                         <label className="text-[9px] font-black uppercase text-tkd-blue block mb-2 ml-1 tracking-widest">Valor Mensualidad Base</label>
-                                        <input type="number" name="valorMensualidad" value={localConfigClub.valorMensualidad} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="number" min="0" name="valorMensualidad" value={localConfigClub.valorMensualidad || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="0" />
                                     </div>
                                     <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-2xl border border-red-100 dark:border-red-800">
                                         <label className="text-[9px] font-black uppercase text-tkd-red block mb-2 ml-1 tracking-widest">Mora Mensual (%)</label>
-                                        <input type="number" name="moraPorcentaje" value={localConfigClub.moraPorcentaje} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        <input type="number" min="0" name="moraPorcentaje" value={localConfigClub.moraPorcentaje || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="0" />
                                     </div>
                                 </div>
                                 <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-800/20 space-y-4">
@@ -448,7 +468,7 @@ const VistaConfiguracion: React.FC = () => {
                                             <input type="checkbox" name="activarMatriculaAnual" checked={localConfigClub.activarMatriculaAnual} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className="w-5 h-5 accent-tkd-blue" />
                                         </div>
                                     </div>
-                                    <input type="number" name="valorMatricula" value={localConfigClub.valorMatricula} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="$40.000 sugerido" />
+                                    <input type="number" min="0" name="valorMatricula" value={localConfigClub.valorMatricula || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="$40.000 sugerido" />
                                     <p className="text-[9px] text-gray-400 uppercase font-bold italic">Este valor se sugerirá en el registro de cada alumno nuevo.</p>
                                 </div>
 
@@ -602,22 +622,14 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
                             <button onClick={() => {
                                 const sedesAdicionalesActuales = totalSedesActivas - 1;
-                                const currentPlanLimit = (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || 1;
-                                const effectiveLimit = Math.max(localConfigClub.limiteSedes || 0, currentPlanLimit);
+                                const effectiveLimit = obtenerLimiteOperativo(localConfigClub, 'limiteSedes');
                                 const limiteSedesAdicionales = effectiveLimit - 1;
 
                                 if (sedesAdicionalesActuales >= limiteSedesAdicionales) {
                                     mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu plan para agregar más sucursales.`, "warning");
                                     return;
                                 }
-                                setSedeEdit({
-                                    nombre: 'Nueva Sede',
-                                    direccion: '',
-                                    ciudad: '',
-                                    telefono: '',
-                                    id: '', tenantId: localConfigClub.tenantId,
-                                    valorMensualidad: localConfigClub.valorMensualidad || 0
-                                });
+                                setSedeEdit(null);
                                 setModalSedeAbierto(true);
                             }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
                                 <IconoAgregar className="w-4 h-4" /> Agregar Sede Adicional
@@ -702,7 +714,12 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">4. Nómina Inicial</h3>
-                            <button onClick={() => abrirFormularioUsuario()} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+                            <button
+                                onClick={() => abrirFormularioUsuario()}
+                                disabled={equipoTecnicoCompleto}
+                                title={equipoTecnicoCompleto ? `Límite alcanzado: ${usuarios.length} de ${limiteEquipoTecnico}` : undefined}
+                                className="bg-tkd-blue disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
+                            >
                                 <IconoAgregar className="w-4 h-4" /> Vincular Instructor
                             </button>
                         </div>
@@ -728,7 +745,14 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Catálogo de Programas Extra</h3>
-                            <button onClick={() => { setProgramaEdit(null); setModalProgramaAbierto(true); }} className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+                            <button onClick={() => {
+                                if (programas.length >= MAX_PROGRAMAS_EXTRA) {
+                                    mostrarNotificacion(`Límite de programas extra alcanzado (${MAX_PROGRAMAS_EXTRA}).`, "warning");
+                                    return;
+                                }
+                                setProgramaEdit(null);
+                                setModalProgramaAbierto(true);
+                            }} disabled={programas.length >= MAX_PROGRAMAS_EXTRA} className="bg-tkd-blue disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
                                 <IconoAgregar className="w-4 h-4" /> Crear Modalidad
                             </button>
                         </div>
@@ -801,21 +825,21 @@ const VistaConfiguracion: React.FC = () => {
                                 {
                                     label: 'Estudiantes',
                                     used: estudiantes.length,
-                                    limit: Math.max(localConfigClub.limiteEstudiantes || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteEstudiantes || 0),
+                                    limit: obtenerLimiteOperativo(localConfigClub, 'limiteEstudiantes'),
                                     icon: IconoEstudiantes,
                                     color: 'text-tkd-blue'
                                 },
                                 {
                                     label: 'Docentes / Staff',
                                     used: usuarios.length,
-                                    limit: Math.max(localConfigClub.limiteUsuarios || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteUsuarios || 0),
+                                    limit: obtenerLimiteEquipoTecnico(localConfigClub),
                                     icon: IconoUsuario,
                                     color: 'text-green-500'
                                 },
                                 {
                                     label: 'Sedes (Principal + Adicionales)',
                                     used: totalSedesActivas,
-                                    limit: Math.max(localConfigClub.limiteSedes || 0, (PLANES_SAAS as any)[localConfigClub.plan]?.limiteSedes || 0),
+                                    limit: obtenerLimiteOperativo(localConfigClub, 'limiteSedes'),
                                     icon: IconoCasa,
                                     color: 'text-tkd-red'
                                 }
@@ -943,7 +967,7 @@ const VistaConfiguracion: React.FC = () => {
             {modalUsuarioAbierto && <FormularioUsuario abierto={modalUsuarioAbierto} onCerrar={cerrarFormularioUsuario} onGuardar={guardarUsuarioHandler} usuarioActual={usuarioEnEdicion} cargando={cargandoAccion} />}
             {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva de ${usuarioAEliminar.nombreUsuario}?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
-            {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={() => setModalSedeAbierto(false)} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
+            {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={cerrarModalSede} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
             {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}
         </div>
     );

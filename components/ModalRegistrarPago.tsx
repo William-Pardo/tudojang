@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import type { Estudiante } from '../tipos';
-import { obtenerDeudasEstudiante, procesarPagoEfectivo } from '../servicios/pagosApi';
+import type { Estudiante, TransaccionPago } from '../tipos';
+import { RolUsuario } from '../tipos';
+import { useAuth } from '../context/AuthContext';
+import { obtenerDeudasEstudiante, procesarPagoEfectivo, obtenerUltimoPagoEfectivo, anularUltimoPagoEfectivo } from '../servicios/pagosApi';
 import type { DeudaPendiente, PagoProcesado, ItemAPagar } from '../servicios/pagosApi';
 import { useGeneradorComprobante } from './ComprobantesPago';
 import type { DatosComprobante } from './ComprobantesPago';
 import { obtenerConfiguracionClub } from '../servicios/configuracionApi';
 import type { ConfiguracionClub } from '../tipos';
+import { useNotificacion } from '../context/NotificacionContext';
+import ModalConfirmacion from './ModalConfirmacion';
 import {
     IconoCerrar,
     IconoTienda,
@@ -14,7 +18,8 @@ import {
     IconoExitoAnimado,
     IconoAlertaTriangulo,
     IconoExportar,
-    IconoWhatsApp
+    IconoWhatsApp,
+    IconoDeshacer
 } from './Iconos';
 
 interface Props {
@@ -24,8 +29,18 @@ interface Props {
     onPagoExitoso?: () => void;
 }
 
+type TabVista = 'cobrar' | 'ultimo_pago';
+
 const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, onPagoExitoso }) => {
+    const { usuario } = useAuth();
+    const { mostrarNotificacion } = useNotificacion();
+    const esAdmin = usuario?.rol === RolUsuario.Admin;
+
+    const [tabActiva, setTabActiva] = useState<TabVista>('cobrar');
     const [deudas, setDeudas] = useState<DeudaPendiente[]>([]);
+    const [ultimoPago, setUltimoPago] = useState<TransaccionPago | null>(null);
+    const [cargandoUltimoPago, setCargandoUltimoPago] = useState(false);
+    
     const [loading, setLoading] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [generandoImg, setGenerandoImg] = useState(false);
@@ -35,12 +50,16 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
     const [configClub, setConfigClub] = useState<ConfiguracionClub | null>(null);
     const [imagenComprobante, setImagenComprobante] = useState<string | null>(null);
 
+    const [modalAnularAbierto, setModalAnularAbierto] = useState(false);
+    const [cargandoAnulacion, setCargandoAnulacion] = useState(false);
+
     const { generarImagen, descargarComprobante, compartirPorWhatsApp } = useGeneradorComprobante();
 
     // Efecto para cargar deudas y config al abrir el modal
     useEffect(() => {
         if (abierto && estudiante) {
-            cargarDeudas();
+            setTabActiva('cobrar');
+            cargarDatosFinancieros();
             cargarConfig();
             setResultado(null);
             setError(null);
@@ -49,8 +68,14 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
         }
     }, [abierto, estudiante]);
 
+    const cargarDatosFinancieros = async () => {
+        await cargarDeudas();
+        if (esAdmin) {
+            await cargarUltimoPago();
+        }
+    };
+
     const cargarDeudas = async () => {
-        /* istanbul ignore next -- solo se invoca desde el efecto que exige estudiante */
         if (!estudiante) return;
         setLoading(true);
         try {
@@ -60,6 +85,19 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
             setError("No se pudieron cargar las deudas pendientes.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const cargarUltimoPago = async () => {
+        if (!estudiante) return;
+        setCargandoUltimoPago(true);
+        try {
+            const transaccion = await obtenerUltimoPagoEfectivo(estudiante.id);
+            setUltimoPago(transaccion);
+        } catch (err) {
+            console.error("Error cargando último pago", err);
+        } finally {
+            setCargandoUltimoPago(false);
         }
     };
 
@@ -86,7 +124,6 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
     const construirDatosComprobante = (res: PagoProcesado): DatosComprobante => {
         const itemsSeleccionados = deudas.filter(d => seleccionados.has(d.id));
         return {
-            /* istanbul ignore next -- backend productivo siempre retorna reciboId */
             reciboId: res.reciboId || `REC-${Date.now()}`,
             fechaHora: new Date().toISOString(),
             nombreEstudiante: `${estudiante?.nombres} ${estudiante?.apellidos}`,
@@ -104,7 +141,6 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
     };
 
     const handleProcesarPago = async () => {
-        /* istanbul ignore next -- el modal no renderiza sin estudiante */
         if (!estudiante) return;
 
         const itemsAPagar: ItemAPagar[] = deudas
@@ -127,6 +163,11 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
             if (res.exito) {
                 setResultado(res);
                 if (onPagoExitoso) onPagoExitoso();
+                
+                // Actualizamos último pago visible si es admin
+                if (esAdmin) {
+                    cargarUltimoPago();
+                }
 
                 // Generar comprobante automáticamente
                 const datosCom = construirDatosComprobante(res);
@@ -147,14 +188,12 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
     };
 
     const handleDescargar = async () => {
-        /* istanbul ignore next -- botón disponible únicamente en estado exitoso con configuración */
         if (!resultado || !configClub) return;
         const datos = construirDatosComprobante(resultado);
         await descargarComprobante(datos, configClub);
     };
 
     const handleWhatsApp = async () => {
-        /* istanbul ignore next -- botón disponible únicamente en estado exitoso con configuración */
         if (!resultado || !configClub) return;
         const telefono = estudiante?.tutor?.telefono || estudiante?.telefono || '';
         const telefonoLimpio = telefono.replace(/[^0-9]/g, '');
@@ -164,6 +203,28 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
         }
         const datos = construirDatosComprobante(resultado);
         await compartirPorWhatsApp(datos, configClub, telefonoLimpio);
+    };
+
+    const handleAnularUltimoPago = async () => {
+        if (!estudiante) return;
+        setCargandoAnulacion(true);
+        try {
+            const res = await anularUltimoPagoEfectivo(estudiante.id, usuario?.id);
+            if (res.exito) {
+                mostrarNotificacion('Pago anulado correctamente', 'success');
+                setModalAnularAbierto(false);
+                setTabActiva('cobrar');
+                // Recargar deudas y estado
+                cargarDatosFinancieros();
+                if (onPagoExitoso) onPagoExitoso(); // Para refrescar al estudiante en la lista
+            } else {
+                mostrarNotificacion(res.mensaje || 'Error al anular pago', 'error');
+            }
+        } catch (error: any) {
+            mostrarNotificacion(error.message, 'error');
+        } finally {
+            setCargandoAnulacion(false);
+        }
     };
 
     const getIconoPorTipo = (tipo: string) => {
@@ -182,22 +243,62 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            {modalAnularAbierto && (
+                <ModalConfirmacion
+                    abierto={modalAnularAbierto}
+                    titulo="Deshacer Último Pago"
+                    mensaje={`¿Estás seguro de que deseas anular el recibo ${ultimoPago?.reciboId}? Esto restaurará la deuda de ${formatMoneda(ultimoPago?.montoTotal || 0)} y quedará registrado como un egreso contable en auditoría.`}
+                    cargando={cargandoAnulacion}
+                    onConfirmar={handleAnularUltimoPago}
+                    onCerrar={() => setModalAnularAbierto(false)}
+                />
+            )}
+
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="p-6 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-                    <div>
-                        <h2 className="text-xl font-black text-tkd-dark dark:text-white uppercase tracking-tight flex items-center gap-2">
-                            <IconoBillete className="w-6 h-6 text-green-600" />
-                            Registrar Pago
-                        </h2>
-                        <p className="text-sm text-gray-500 font-medium">
-                            Estudiante: <span className="text-tkd-blue font-bold">{estudiante.nombres} {estudiante.apellidos}</span>
-                        </p>
+                <div className="p-6 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 className="text-xl font-black text-tkd-dark dark:text-white uppercase tracking-tight flex items-center gap-2">
+                                <IconoBillete className="w-6 h-6 text-tkd-blue" />
+                                Gestión Financiera
+                            </h2>
+                            <p className="text-sm text-gray-500 font-medium">
+                                Estudiante: <span className="text-tkd-blue font-bold">{estudiante.nombres} {estudiante.apellidos}</span>
+                            </p>
+                        </div>
+                        <button onClick={onCerrar} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500">
+                            <IconoCerrar className="w-6 h-6" />
+                        </button>
                     </div>
-                    <button onClick={onCerrar} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500">
-                        <IconoCerrar className="w-6 h-6" />
-                    </button>
+
+                    {/* Tabs */}
+                    {!resultado && esAdmin && (
+                        <div className="flex gap-4 border-b dark:border-gray-700">
+                            <button
+                                onClick={() => setTabActiva('cobrar')}
+                                className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${
+                                    tabActiva === 'cobrar' 
+                                        ? 'border-tkd-blue text-tkd-blue' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                            >
+                                Cobrar
+                            </button>
+                            <button
+                                onClick={() => setTabActiva('ultimo_pago')}
+                                className={`pb-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5 ${
+                                    tabActiva === 'ultimo_pago' 
+                                        ? 'border-tkd-blue text-tkd-blue' 
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                            >
+                                Último Recibo
+                                {ultimoPago && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Content */}
@@ -217,7 +318,6 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
                             </div>
 
                             {/* Preview del comprobante generado */}
-                            {/* istanbul ignore next -- estado transitorio entre promesas, cubierto por flujo de generación */}
                             {generandoImg ? (
                                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-tkd-blue"></div>
@@ -259,7 +359,7 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
                                 Cerrar y Continuar →
                             </button>
                         </div>
-                    ) : (
+                    ) : tabActiva === 'cobrar' ? (
                         <>
                             {loading ? (
                                 <div className="flex justify-center py-12">
@@ -326,11 +426,77 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
                                 </div>
                             )}
                         </>
+                    ) : (
+                        /* --- PESTAÑA: ÚLTIMO RECIBO --- */
+                        <>
+                            {cargandoUltimoPago ? (
+                                <div className="flex justify-center py-12">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-tkd-blue"></div>
+                                </div>
+                            ) : ultimoPago ? (
+                                <div className="space-y-6 animate-fade-in">
+                                    <div className="bg-gray-50 dark:bg-gray-800/80 rounded-2xl p-6 border border-gray-200 dark:border-gray-700">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-1">Recibo Completado</p>
+                                                <p className="text-xl font-mono font-bold text-gray-800 dark:text-white">{ultimoPago.reciboId}</p>
+                                                <p className="text-sm text-gray-500 mt-1">{new Date(ultimoPago.fecha).toLocaleString()}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-1">Monto Total</p>
+                                                <p className="text-2xl font-black text-green-600 dark:text-green-400">{formatMoneda(ultimoPago.montoTotal)}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <p className="text-xs font-black uppercase tracking-wider text-gray-600 dark:text-gray-400 border-b dark:border-gray-700 pb-2">Conceptos Pagados</p>
+                                            {ultimoPago.itemsPagados.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                    <div className="flex items-center gap-3">
+                                                        {getIconoPorTipo(item.tipo)}
+                                                        <span className="font-bold text-sm text-gray-700 dark:text-gray-300">{item.tipo}</span>
+                                                    </div>
+                                                    <span className="font-bold text-gray-800 dark:text-white">{formatMoneda(item.monto)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-6">
+                                        <div className="flex items-start gap-4">
+                                            <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-full text-red-600 dark:text-red-400 shrink-0">
+                                                <IconoDeshacer className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-red-800 dark:text-red-400 font-black uppercase tracking-tight mb-1">Deshacer Pago</h4>
+                                                <p className="text-sm text-red-600 dark:text-red-300 leading-relaxed mb-4">
+                                                    Si el pago se registró por error, podés anularlo. El saldo volverá a la cuenta del estudiante y el pago quedará marcado como 'Anulado' en la contabilidad.
+                                                </p>
+                                                <button
+                                                    onClick={() => setModalAnularAbierto(true)}
+                                                    className="px-6 py-2.5 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 hover:bg-red-700 hover:shadow-red-600/40 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <IconoDeshacer className="w-5 h-5" />
+                                                    Anular Este Recibo
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                    <div className="bg-gray-100 dark:bg-gray-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <IconoBillete className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p>No se encontraron pagos recientes que se puedan anular.</p>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
-                {/* Footer Actions (solo en modo selección) */}
-                {!resultado && deudas.length > 0 && (
+                {/* Footer Actions (solo en modo selección de Cobrar) */}
+                {!resultado && tabActiva === 'cobrar' && deudas.length > 0 && (
                     <div className="p-6 bg-gray-50 dark:bg-gray-800/50 border-t dark:border-gray-700 flex flex-col sm:flex-row gap-4 justify-between items-center">
                         <div className="text-center sm:text-left">
                             <p className="text-xs text-gray-500 uppercase font-black tracking-wider mb-1">Total a Pagar</p>

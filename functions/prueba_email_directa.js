@@ -1,13 +1,22 @@
 const { Resend } = require("resend");
 
-const resend = new Resend("re_ZACtuoS1_FBeD6e6ZCu84HK8zfZHQV4MW");
+const apiKey = process.env.RESEND_API_KEY;
+const destinatario = process.env.RESEND_TEST_TO;
+
+if (!apiKey || !destinatario) {
+  throw new Error(
+    "Configura RESEND_API_KEY y RESEND_TEST_TO en el entorno antes de ejecutar esta prueba."
+  );
+}
+
+const resend = new Resend(apiKey);
 
 async function sendTest() {
   console.log("Iniciando envío de prueba REAL a gengepardo@gmail.com...");
   try {
     const { data, error } = await resend.emails.send({
       from: "Tudojang Academia <info@tudojang.com>",
-      to: ["gengepardo@gmail.com"],
+      to: [destinatario],
       subject: "✅ ¡SÍ FUNCIONA! - Sistema de Correos Tudojang",
       html: `
         <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #0047A0; border-radius: 16px; overflow: hidden;">

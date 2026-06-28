@@ -7,7 +7,6 @@ jest.mock('firebase/firestore', () => ({
   addDoc: jest.fn(), updateDoc: jest.fn(), Timestamp: {},
 }));
 jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
-jest.mock('./emailService', () => ({ enviarEmailConfirmacionPago: jest.fn() }));
 
 const batch = { set: jest.fn(), update: jest.fn(), commit: jest.fn() };
 

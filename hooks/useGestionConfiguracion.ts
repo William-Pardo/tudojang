@@ -5,6 +5,7 @@ import type { Usuario, ConfiguracionNotificaciones, ConfiguracionClub } from '..
 import { useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
+import { obtenerLimiteEquipoTecnico } from '../utils/limitesSaas';
 
 export const useGestionConfiguracion = () => {
     const {
@@ -90,10 +91,18 @@ export const useGestionConfiguracion = () => {
         );
     }, [usuarios, filtroUsuario]);
 
+    const limiteUsuariosPermitido = useMemo(() => {
+        return obtenerLimiteEquipoTecnico(configClub);
+    }, [configClub]);
+
+    const notificarLimiteUsuarios = () => {
+        mostrarNotificacion(`Límite de equipo técnico alcanzado (${limiteUsuariosPermitido}). Mejora tu plan o compra cupos adicionales para agregar más perfiles.`, "warning");
+    };
+
     const abrirFormularioUsuario = (usuario: Usuario | null = null) => {
         // VALIDACIÓN SAAS: Límite de usuarios (instructores/asistentes)
-        if (!usuario && usuarios.length >= configClub.limiteUsuarios) {
-            mostrarNotificacion(`Límite de Personal alcanzado (${configClub.limiteUsuarios}). Por favor, mejore su plan para habilitar más perfiles de instructor.`, "warning");
+        if (!usuario && limiteUsuariosPermitido > 0 && usuarios.length >= limiteUsuariosPermitido) {
+            notificarLimiteUsuarios();
             return;
         }
         setUsuarioEnEdicion(usuario);
@@ -106,6 +115,12 @@ export const useGestionConfiguracion = () => {
     };
 
     const guardarUsuarioHandler = async (datos: any, id?: string) => {
+        if (!id && limiteUsuariosPermitido > 0 && usuarios.length >= limiteUsuariosPermitido) {
+            notificarLimiteUsuarios();
+            cerrarFormularioUsuario();
+            return;
+        }
+
         setCargandoAccion(true);
         try {
             if (id) {
@@ -147,8 +162,13 @@ export const useGestionConfiguracion = () => {
     };
 
     const handleConfigChange = (e: React.ChangeEvent<HTMLInputElement>, setConfig: React.Dispatch<React.SetStateAction<any>>) => {
-        const { name, value, type } = e.target;
-        setConfig((prev: any) => ({ ...prev, [name]: type === 'number' ? parseInt(value, 10) || 0 : value }));
+        const { name, value, type, checked } = e.target;
+        const nextValue = type === 'checkbox'
+            ? checked
+            : type === 'number'
+                ? (value === '' ? '' : Number(value))
+                : value;
+        setConfig((prev: any) => ({ ...prev, [name]: nextValue }));
     };
 
     const guardarConfiguracionesHandler = async (e?: React.FormEvent | React.MouseEvent) => {
@@ -159,7 +179,14 @@ export const useGestionConfiguracion = () => {
         }
         setCargandoAccion(true);
         try {
-            await guardarConfiguraciones(localConfigNotificaciones, localConfigClub);
+            const configNormalizada = {
+                ...localConfigClub,
+                valorMensualidad: Number(localConfigClub.valorMensualidad) || 0,
+                moraPorcentaje: Number(localConfigClub.moraPorcentaje) || 0,
+                valorMatricula: Number(localConfigClub.valorMatricula) || 0,
+            };
+            await guardarConfiguraciones(localConfigNotificaciones, configNormalizada);
+            setLocalConfigClub(configNormalizada);
             mostrarNotificacion("Configuraciones guardadas exitosamente.", "success");
         } catch (error) {
             mostrarNotificacion("No se pudieron guardar las configuraciones.", "error");

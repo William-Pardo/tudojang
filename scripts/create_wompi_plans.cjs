@@ -1,6 +1,7 @@
 const https = require('https');
 
-const PRIVATE_KEY = "prv_prod_hruawVEOZ8tsoL7NIEgqULsyzCx3QYBB";
+const PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY;
+if (!PRIVATE_KEY) throw new Error("Configura WOMPI_PRIVATE_KEY en el entorno.");
 const HOST = "production.wompi.co";
 
 const planes = [

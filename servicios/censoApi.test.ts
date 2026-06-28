@@ -1,4 +1,5 @@
 import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import {
   crearMisionKicho,
   obtenerMisiones,
@@ -13,13 +14,13 @@ import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
 
 jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((...args) => ({ args })), addDoc: jest.fn(),
+  collection: jest.fn((db, name) => ({ args: [db, name] })), addDoc: jest.fn(),
   query: jest.fn((...args) => ({ args })), where: jest.fn(),
   getDocs: jest.fn(), getDoc: jest.fn(), updateDoc: jest.fn(),
   deleteDoc: jest.fn(), setDoc: jest.fn(),
-  doc: jest.fn((...args) => ({ args })), Timestamp: {},
+  doc: jest.fn((db, name, id) => ({ args: [db, name, id] })), Timestamp: {},
   orderBy: jest.fn(), limit: jest.fn(), onSnapshot: jest.fn(),
-  increment: jest.fn(val => val), // Mock increment
+  increment: jest.fn(value => ({ _methodName: 'FieldValue.increment', operand: value })),
   writeBatch: jest.fn(() => ({
     set: jest.fn(),
     update: jest.fn(),
@@ -31,7 +32,7 @@ jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
 describe('censoApi', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(true);
+        (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = true;
   });
 
   describe('crearMisionKicho', () => {
@@ -45,7 +46,7 @@ describe('censoApi', () => {
       await crearMisionKicho(mockMisionData);
 
       expect(addDoc).toHaveBeenCalledWith(
-        collection(null, 'misiones_kicho'),
+        collection(db, 'misiones_kicho'),
         expect.objectContaining({
           ...mockMisionData,
           activa: true,
@@ -56,7 +57,7 @@ describe('censoApi', () => {
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await crearMisionKicho({
         tenantId: 'tenant123',
         nombreMision: 'Mision de Prueba',
@@ -77,12 +78,12 @@ describe('censoApi', () => {
       });
 
       const misiones = await obtenerMisiones();
-      expect(getDocs).toHaveBeenCalledWith(collection(null, 'misiones_kicho'));
+      expect(getDocs).toHaveBeenCalledWith(collection(db, 'misiones_kicho'));
       expect(misiones).toEqual(mockMisiones);
     });
 
     it('debería retornar un array vacío si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       const misiones = await obtenerMisiones();
       expect(misiones).toEqual([]);
     });
@@ -113,7 +114,7 @@ describe('censoApi', () => {
     });
 
     it('debería usar el modo mock si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       const mision = await obtenerMisionActivaTenant('mockTenant');
       expect(mision).toEqual(expect.objectContaining({ id: 'm-mock-1', tenantId: 'mockTenant' }));
     });
@@ -128,7 +129,7 @@ describe('censoApi', () => {
       await registrarAspirantePublico('mision123', 'tenant123', mockDatosAspirante);
 
       expect(addDoc).toHaveBeenCalledWith(
-        collection(null, 'registros_temporales'),
+        collection(db, 'registros_temporales'),
         expect.objectContaining({
           misionId: 'mision123',
           tenantId: 'tenant123',
@@ -137,13 +138,13 @@ describe('censoApi', () => {
         })
       );
       expect(updateDoc).toHaveBeenCalledWith(
-        doc(null, 'misiones_kicho', 'mision123'),
+        doc(db, 'misiones_kicho', 'mision123'),
         { registrosRecibidos: increment(1) }
       );
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await registrarAspirantePublico('mision123', 'tenant123', {});
       expect(addDoc).not.toHaveBeenCalled();
       expect(updateDoc).not.toHaveBeenCalled();
@@ -154,13 +155,13 @@ describe('censoApi', () => {
     it('debería actualizar el estado de un registro temporal', async () => {
       await validarRegistroTemporal('reg123', 'verificado');
       expect(updateDoc).toHaveBeenCalledWith(
-        doc(null, 'registros_temporales', 'reg123'),
+        doc(db, 'registros_temporales', 'reg123'),
         { estado: 'verificado' }
       );
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await validarRegistroTemporal('reg123', 'verificado');
       expect(updateDoc).not.toHaveBeenCalled();
     });
@@ -170,7 +171,7 @@ describe('censoApi', () => {
     it('debería legalizar un lote Kicho', async () => {
       await legalizarLoteKicho('mision123', 'firmaBase64');
       expect(updateDoc).toHaveBeenCalledWith(
-        doc(null, 'misiones_kicho', 'mision123'),
+        doc(db, 'misiones_kicho', 'mision123'),
         expect.objectContaining({
           estadoLote: 'legalizado',
           activa: false,
@@ -181,7 +182,7 @@ describe('censoApi', () => {
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await legalizarLoteKicho('mision123', 'firmaBase64');
       expect(updateDoc).not.toHaveBeenCalled();
     });
@@ -221,13 +222,13 @@ describe('censoApi', () => {
           numeroIdentificacion: '123',
         })
       );
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(null, 'registros_temporales', 'reg1'), { estado: 'procesado' });
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(null, 'registros_temporales', 'reg2'), { estado: 'procesado' });
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(null, 'misiones_kicho', 'm1'), { estadoLote: 'procesado' });
+      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg1'), { estado: 'procesado' });
+      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg2'), { estado: 'procesado' });
+      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'misiones_kicho', 'm1'), { estadoLote: 'procesado' });
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await inyectarEstudiantesKicho('m1', []);
       expect(writeBatch).not.toHaveBeenCalled();
     });
@@ -249,7 +250,7 @@ describe('censoApi', () => {
     });
 
     it('debería retornar un array vacío si isFirebaseConfigured es falso', async () => {
-      (jest.mocked(require('../firebase/config').isFirebaseConfigured as jest.Mock) as jest.Mock).mockReturnValue(false);
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       const registros = await obtenerRegistrosMision('m1');
       expect(registros).toEqual([]);
     });

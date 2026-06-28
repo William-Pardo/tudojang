@@ -68,11 +68,12 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
 
     const movimientosFiltrados = useMemo(() => {
         return movimientos.filter(m => {
+            const sedeValida = filtroSede === 'todas' || m.sedeId === filtroSede;
             const fechaValida = (!filtroFechaInicio || m.fecha >= filtroFechaInicio) &&
                                 (!filtroFechaFin || m.fecha <= filtroFechaFin);
-            return fechaValida;
+            return sedeValida && fechaValida;
         });
-    }, [movimientos, filtroFechaInicio, filtroFechaFin]);
+    }, [movimientos, filtroSede, filtroFechaInicio, filtroFechaFin]);
 
     const handleGuardarMovimiento = async (data: Omit<MovimientoFinanciero, 'id'> | MovimientoFinanciero) => {
         setCargandoAccion(true);

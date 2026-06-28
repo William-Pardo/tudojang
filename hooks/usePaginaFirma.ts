@@ -6,12 +6,54 @@ import * as api from '../servicios/api';
 import { useNotificacion } from '../context/NotificacionContext';
 import * as plantillas from '../servicios/plantillas';
 
-type TipoFirma = 'consentimiento' | 'contrato' | 'imagen';
+export type TipoFirma = 'consentimiento' | 'contrato' | 'imagen';
 
 interface UsePaginaFirmaProps {
     idEstudiante: string | undefined;
     tipo: TipoFirma;
 }
+
+export const generarTextoDocumentoFirma = (
+    tipo: TipoFirma,
+    estudiante: Estudiante,
+    configClub: ConfiguracionClub,
+    sede?: Sede,
+): string => {
+    switch (tipo) {
+        case 'consentimiento':
+            return plantillas.generarTextoConsentimientoRiesgos(estudiante, configClub);
+        case 'contrato':
+            return plantillas.generarTextoContrato(estudiante, configClub, sede);
+        case 'imagen':
+            return plantillas.generarTextoConsentimientoImagen(estudiante, configClub);
+    }
+};
+
+export const guardarFirmaDocumento = async (
+    tipo: TipoFirma,
+    estudiante: Estudiante,
+    firmaBase64: string,
+    autorizacionFotos?: boolean,
+): Promise<void> => {
+    switch (tipo) {
+        case 'consentimiento':
+            await api.guardarFirmaConsentimiento(estudiante.id, estudiante.tenantId, firmaBase64);
+            return;
+        case 'contrato':
+            await api.guardarFirmaContrato(estudiante.id, estudiante.tenantId, firmaBase64);
+            return;
+        case 'imagen':
+            if (autorizacionFotos === undefined) {
+                throw new Error("Se requiere una elección de autorización.");
+            }
+            await api.guardarFirmaImagen(
+                estudiante.id,
+                estudiante.tenantId,
+                firmaBase64,
+                autorizacionFotos,
+            );
+    }
+};
 
 export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
     const [estudiante, setEstudiante] = useState<Estudiante | null>(null);
@@ -161,12 +203,7 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
     
     const textoDocumento = useMemo(() => {
         if (!estudiante || !configClub) return "Cargando documento...";
-        switch(tipo) {
-            case 'consentimiento': return plantillas.generarTextoConsentimientoImagen(estudiante, configClub);
-            case 'contrato': return plantillas.generarTextoContrato(estudiante, configClub, sede || undefined);
-            case 'imagen': return plantillas.generarTextoConsentimientoImagen(estudiante, configClub);
-            default: return "";
-        }
+        return generarTextoDocumentoFirma(tipo, estudiante, configClub, sede || undefined);
     }, [estudiante, configClub, tipo, sede]);
 
     const isCanvasEmpty = (): boolean => {
@@ -190,21 +227,12 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
             const firmaBase64 = canvasRef.current.toDataURL('image/png');
             let notificacionMsg = "";
 
-            switch(tipo) {
-                case 'consentimiento':
-                    await api.guardarFirmaConsentimiento(idEstudiante, estudiante!.tenantId, firmaBase64);
-                    notificacionMsg = "Consentimiento enviado con éxito.";
-                    break;
-                case 'contrato':
-                    await api.guardarFirmaContrato(idEstudiante, estudiante!.tenantId, firmaBase64);
-                    notificacionMsg = "Contrato firmado y enviado exitosamente.";
-                    break;
-                case 'imagen':
-                    if (autorizacionFotos === undefined) throw new Error("Se requiere una elección de autorización.");
-                    await api.guardarFirmaImagen(idEstudiante, estudiante!.tenantId, firmaBase64, autorizacionFotos);
-                    notificacionMsg = "Autorización de imagen guardada exitosamente.";
-                    break;
-            }
+            await guardarFirmaDocumento(tipo, estudiante!, firmaBase64, autorizacionFotos);
+            notificacionMsg = {
+                consentimiento: "Consentimiento enviado con éxito.",
+                contrato: "Contrato firmado y enviado exitosamente.",
+                imagen: "Autorización de imagen guardada exitosamente.",
+            }[tipo];
             
             setEnviadoConExito(true);
             mostrarNotificacion(notificacionMsg, "success");

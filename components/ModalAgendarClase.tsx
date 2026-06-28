@@ -1,7 +1,8 @@
 
 // components/ModalAgendarClase.tsx
 import React, { useState, useEffect } from 'react';
-import { BloqueHorario, Programa, Sede, Usuario, GrupoEdad, RolUsuario } from '../tipos';
+import { BloqueHorario, Programa, Sede, Usuario, GrupoEdad } from '../tipos';
+import { obtenerInstructoresAgenda } from '../utils/instructoresAgenda';
 import { IconoCerrar, IconoGuardar, IconoInformacion, IconoCasa, IconoUsuario, IconoLogoOficial } from './Iconos';
 
 interface Props {
@@ -32,11 +33,7 @@ const ModalAgendarClase: React.FC<Props> = ({ abierto, onCerrar, onGuardar, bloq
         }
     }, [abierto, bloqueActual]);
 
-    const profesores = usuarios.filter(u =>
-        u.rol === RolUsuario.Admin ||
-        u.rol === RolUsuario.Editor ||
-        u.rol === RolUsuario.Asistente
-    );
+    const profesores = obtenerInstructoresAgenda(usuarios);
 
     // Si no hay programas configurados, creamos uno virtual para que la UI no se bloquee
     const listaProgramas = programas.length > 0 ? programas : [{ id: 'programa-base', nombre: '🥋 Clase Regular (Base)', bloquesHorarios: [] }];

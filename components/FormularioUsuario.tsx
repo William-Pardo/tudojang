@@ -90,13 +90,15 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           whatsapp: usuarioActual.whatsapp || '',
           email: usuarioActual.email,
           rol: usuarioActual.rol,
-          sedeId: usuarioActual.sedeId || '',
+          sedeId: usuarioActual.sedeId === '1' ? 'principal' : (usuarioActual.sedeId || ''),
           contrasena: '',
           sueldoBase: usuarioActual.contrato?.sueldoBase || 0,
           duracionContratoMeses: usuarioActual.contrato?.duracionMeses || 12,
           tipoVinculacion: usuarioActual.contrato?.tipoVinculacion || '',
           fechaInicio: usuarioActual.contrato?.fechaInicio || new Date().toISOString().split('T')[0],
-          lugarEjecucion: usuarioActual.contrato?.lugarEjecucion || ''
+          lugarEjecucion: ['1', 'Sede Principal', 'Sede Principal (Institucional)'].includes(usuarioActual.contrato?.lugarEjecucion || '')
+            ? (sedesVisibles.find(s => s.id === 'principal')?.nombre || '')
+            : (usuarioActual.contrato?.lugarEjecucion || '')
         });
       } else {
         reset({
@@ -105,7 +107,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           whatsapp: '',
           email: '',
           rol: RolUsuario.Asistente,
-          sedeId: '1',
+          sedeId: 'principal',
           contrasena: '',
           sueldoBase: 0,
           duracionContratoMeses: 12,
@@ -129,13 +131,18 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
     focus:ring-2 focus:ring-tkd-blue focus:border-tkd-blue`;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black transition-opacity duration-200 ease-out ${visible ? 'bg-opacity-70' : 'bg-opacity-0'}`} aria-modal="true" role="dialog" onClick={handleClose}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black transition-opacity duration-200 ease-out ${visible ? 'bg-opacity-70' : 'bg-opacity-0'}`} aria-modal="true" role="dialog">
       <div className={`bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md mx-4 max-h-[95vh] flex flex-col transform transition-all duration-200 ease-out ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} onClick={e => e.stopPropagation()}>
         <header className="flex items-center justify-between p-6 border-b dark:border-gray-800">
           <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
             {usuarioActual ? 'Editar Perfil' : 'Nuevo Miembro de Equipo'}
           </h2>
-          <button onClick={handleClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Cerrar formulario"
+            className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+          >
             <IconoCerrar className="w-6 h-6" />
           </button>
         </header>
@@ -220,12 +227,18 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           {/* SEDE ASIGNADA */}
           {(rolSeleccionado === RolUsuario.Tutor || rolSeleccionado === RolUsuario.Asistente) && (
             <div className="animate-slide-in-right p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
-              <label className="block text-[10px] font-black uppercase text-tkd-red mb-2 ml-1 tracking-widest">Sede de Trabajo</label>
+              <label
+                htmlFor="usuario-sede-trabajo"
+                className="block text-[10px] font-black uppercase text-tkd-red mb-2 ml-1 tracking-widest"
+              >
+                Sede de Trabajo
+              </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                   <IconoCasa className="w-5 h-5 text-tkd-red" />
                 </div>
                 <select
+                  id="usuario-sede-trabajo"
                   {...register('sedeId')}
                   className={`block w-full pl-10 pr-10 py-3 border rounded-xl shadow-sm transition-all outline-none font-black text-base appearance-none cursor-pointer
                             bg-white text-gray-900 border-tkd-red/30 
@@ -233,8 +246,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                             focus:ring-2 focus:ring-tkd-red ${errors.sedeId ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                 >
                   <option value="">Seleccione Sede...</option>
-                  <option value="1">Sede Principal (Institucional)</option>
-                  {sedesVisibles.filter(s => s.id !== 'principal').map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  {sedesVisibles.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                 </select>
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-tkd-red/50">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -328,10 +340,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                   <div className="relative">
                     <select {...register('lugarEjecucion')} className={`${inputClasses} appearance-none cursor-pointer`}>
                       <option value="">Seleccionar Sede...</option>
-                      <option value="1">Sede Principal</option>
-                      {sedesVisibles.filter(s => s.id !== 'principal').map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
-                      <option value="Sede Administrativa">Sede Administrativa</option>
-                      <option value="Campo / Eventos">Campo / Eventos</option>
+                      {sedesVisibles.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>

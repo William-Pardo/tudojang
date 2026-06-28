@@ -2,8 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AsistenteVirtual from './AsistenteVirtual';
-import { consultarSabonimVirtual, getRemainingQueries } from '../servicios/soporteService';
+import { consultarSoporte } from '../servicios/soporte/cliente';
 import { crearTicketSoporte, escucharMiTicketActivo } from '../servicios/soporteApi';
+import { RolUsuario } from '../tipos';
 
 jest.mock('framer-motion', () => ({
   motion: {
@@ -32,9 +33,8 @@ jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({ usuario: mockUsuario }),
 }));
 
-jest.mock('../servicios/soporteService', () => ({
-  consultarSabonimVirtual: jest.fn(),
-  getRemainingQueries: jest.fn(() => 15),
+jest.mock('../servicios/soporte/cliente', () => ({
+  consultarSoporte: jest.fn(),
 }));
 
 jest.mock('../servicios/soporteApi', () => ({
@@ -43,11 +43,63 @@ jest.mock('../servicios/soporteApi', () => ({
 }));
 
 describe('AsistenteVirtual', () => {
+  const consultarSabonimVirtual = consultarSoporte as jest.Mock;
+  const getRemainingQueries = jest.fn(() => 15);
   beforeEach(() => {
     jest.clearAllMocks();
     mockUsuario = null;
-    (getRemainingQueries as jest.Mock).mockReturnValue(15);
     (escucharMiTicketActivo as jest.Mock).mockReturnValue(jest.fn());
+  });
+
+  it('identifica visualmente una respuesta local', async () => {
+    const user = userEvent.setup();
+    (consultarSoporte as jest.Mock).mockResolvedValue({
+      state: 'answer', source: 'local', answer: 'Respuesta del catálogo.', remaining: null,
+    });
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+    await user.type(screen.getByPlaceholderText(/Describa su inquietud/i), 'Pregunta');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    expect(await screen.findByText('Manual verificado')).toBeInTheDocument();
+  });
+
+  it('muestra cuota agotada y ofrece soporte humano', async () => {
+    const user = userEvent.setup();
+    (consultarSoporte as jest.Mock).mockResolvedValue({
+      state: 'quota_exhausted',
+      source: 'human',
+      answer: 'La cuota de IA está agotada. El manual continúa disponible.',
+      canEscalate: true,
+    });
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+    await user.type(screen.getByPlaceholderText(/Describa su inquietud/i), 'Pregunta desconocida');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    expect(await screen.findByText(/cuota de IA está agotada/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Solicitar Asesor Master/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Continuar por WhatsApp/i })).toBeInTheDocument();
+  });
+
+  it('abre WhatsApp solo después del consentimiento explícito', async () => {
+    const user = userEvent.setup();
+    mockUsuario = { id: 'u1', tenantId: 't1', nombreUsuario: 'Ana', email: 'ana@test.com' };
+    (consultarSoporte as jest.Mock).mockResolvedValue({
+      state: 'unavailable', source: 'human', answer: 'Puedo escalar tu solicitud.', canEscalate: true,
+    });
+    (crearTicketSoporte as jest.Mock).mockResolvedValue({
+      whatsappUrl: 'https://wa.me/573001234567?text=ticket',
+    });
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+    await user.type(screen.getByPlaceholderText(/Describa su inquietud/i), 'Necesito ayuda');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    await user.click(await screen.findByRole('button', { name: /Continuar por WhatsApp/i }));
+
+    expect(crearTicketSoporte).toHaveBeenCalledWith(expect.any(Object), { whatsappConsent: true });
+    expect(await screen.findByRole('link', { name: /Abrir WhatsApp/i })).toHaveAttribute(
+      'href',
+      'https://wa.me/573001234567?text=ticket',
+    );
   });
 
   it('muestra un error amigable y detiene la carga si falla la consulta', async () => {
@@ -120,19 +172,23 @@ describe('AsistenteVirtual', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
     await user.click(await screen.findByRole('button', { name: /Solicitar Asesor Master/i }));
     expect(await screen.findByText(/canal de seguimiento prioritario/i)).toBeInTheDocument();
-    expect(crearTicketSoporte).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: 't1',
-      userId: 'u1',
-    }));
+    expect(crearTicketSoporte).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: 't1', userId: 'u1' }),
+      { whatsappConsent: false },
+    );
   });
 
-  it('deshabilita el input cuando no quedan consultas', async () => {
+  it('mantiene disponible el manual cuando no quedan consultas de IA', async () => {
     const user = userEvent.setup();
     (getRemainingQueries as jest.Mock).mockReturnValue(0);
+    (consultarSabonimVirtual as jest.Mock).mockResolvedValue('Respuesta desde el manual local.');
     render(<AsistenteVirtual />);
     await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
-    expect(screen.getByPlaceholderText(/L.*mite IA excedido/i)).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Enviar mensaje' })).toBeDisabled();
+    const input = screen.getByPlaceholderText(/Describa su inquietud/i);
+    expect(input).not.toBeDisabled();
+    await user.type(input, 'Como registro asistencia');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    expect(await screen.findByText('Respuesta desde el manual local.')).toBeInTheDocument();
   });
 
   it('envía el mensaje al presionar Enter', async () => {
@@ -146,7 +202,7 @@ describe('AsistenteVirtual', () => {
 
   it('muestra badge verde cuando hay un ticket activo y el chat está cerrado', async () => {
     mockUsuario = { id: 'u1' };
-    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, callback) => {
+    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, _tenantId, callback) => {
       callback({ id: 'ticket-1234', etapa: 2, salaVideoUrl: null });
       return jest.fn();
     });
@@ -157,7 +213,7 @@ describe('AsistenteVirtual', () => {
   it('muestra el panel de etapas y el identificador del ticket', async () => {
     const user = userEvent.setup();
     mockUsuario = { id: 'u1' };
-    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, callback) => {
+    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, _tenantId, callback) => {
       callback({ id: 'ticket-abcd', etapa: 3, salaVideoUrl: null });
       return jest.fn();
     });
@@ -175,7 +231,7 @@ describe('AsistenteVirtual', () => {
   it('muestra el enlace de sala de video del ticket', async () => {
     const user = userEvent.setup();
     mockUsuario = { id: 'u1' };
-    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, callback) => {
+    (escucharMiTicketActivo as jest.Mock).mockImplementation((_userId, _tenantId, callback) => {
       callback({
         id: 'ticket-xyz9',
         etapa: 4,
@@ -255,5 +311,39 @@ describe('AsistenteVirtual', () => {
 
     resolveFirst('Respuesta');
     expect(await screen.findByText('Respuesta')).toBeInTheDocument();
+  });
+
+  it('envía al motor local el rol autenticado y hasta cuatro turnos previos', async () => {
+    const user = userEvent.setup();
+    mockUsuario = {
+      id: 'u1',
+      tenantId: 't1',
+      nombreUsuario: 'Ana',
+      email: 'ana@test.com',
+      rol: RolUsuario.Admin,
+    };
+    (consultarSabonimVirtual as jest.Mock)
+      .mockResolvedValueOnce('Primera respuesta')
+      .mockResolvedValueOnce('Segunda respuesta');
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+
+    const input = screen.getByPlaceholderText(/Describa su inquietud/i);
+    await user.type(input, 'Primera pregunta');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    await screen.findByText('Primera respuesta');
+    await user.type(input, 'Segunda pregunta');
+    await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
+    await screen.findByText('Segunda respuesta');
+
+    expect(consultarSabonimVirtual).toHaveBeenLastCalledWith({
+      question: 'Segunda pregunta',
+      context: [
+        expect.objectContaining({ role: 'assistant', text: expect.stringMatching(/Kyeong-rye/i) }),
+        { role: 'user', text: 'Primera pregunta' },
+        { role: 'assistant', text: 'Primera respuesta' },
+      ],
+      role: RolUsuario.Admin,
+    });
   });
 });

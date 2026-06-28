@@ -1,0 +1,29 @@
+1. 🎨 Cómo cambiar iconos con tus SVGs
+Tu proyecto ya tiene la estructura para esto. Los iconos de sidebar viven en public/Iconos/ y los de acciones están inline en 
+Iconos.tsx
+.
+
+Para los iconos de acciones (Editar, Eliminar, etc.) hay dos caminos:
+
+Opción A — Reemplazarlo en public/Iconos/ (más simple)
+Guardá tu SVG en:
+
+e:\Apps\Tudojang\public\Iconos\NombreIcono_.svg
+Mismo patrón de nombre que los existentes, por ejemplo: EliminarIcono_.svg, EditarIcono_.svg.
+
+Opción B — Importarlo en Iconos.tsx como componente React (más potente, permite heredar className y colores CSS)
+Guardá tu SVG en:
+
+e:\Apps\Tudojang\public\Iconos\eliminar.svg
+Luego en 
+Iconos.tsx
+, en vez del path SVG inline, hacés:
+
+tsx
+
+
+import MiIcono from '/Iconos/eliminar.svg';
+// y lo usás como <img src={MiIcono} ... />
+IMPORTANT
+
+Si tu SVG necesita heredar color / stroke del CSS (para dark mode, hover, etc.), la Opción B con <img> no funciona — los SVG como imágenes no reciben estilos CSS. En ese caso hay que usar un plugin de Vite para SVG como React component (vite-plugin-svgr), o simplemente pegar el contenido SVG inline dentro del componente en Iconos.tsx, que es exactamente lo que hace el proyecto ahora.

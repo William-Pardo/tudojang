@@ -105,6 +105,37 @@ jest.mock('framer-motion', () => ({
 }));
 ```
 
+### Patrón de Mock para xlsx + FileReader (importación Excel)
+Usado en `components/ModalImportacionMasiva.test.tsx` (task-976):
+```typescript
+const mockRead = jest.fn();
+const mockSheetToJson = jest.fn();
+jest.mock('xlsx', () => ({
+  utils: {
+    book_new: jest.fn(() => ({})),
+    aoa_to_sheet: jest.fn((data) => ({ data })),
+    book_append_sheet: jest.fn(),
+    sheet_to_json: (...args: unknown[]) => mockSheetToJson(...args),
+  },
+  writeFile: jest.fn(),
+  read: (...args: unknown[]) => mockRead(...args),
+}));
+
+const mockFileReaderInstance = {
+  result: null as ArrayBuffer | null,
+  onload: null as ((event: { target: { result: ArrayBuffer | null } }) => void) | null,
+  readAsArrayBuffer: jest.fn(function (this: typeof mockFileReaderInstance) {
+    if (this.onload && this.result) {
+      this.onload({ target: { result: this.result } });
+    }
+  }),
+};
+
+beforeEach(() => {
+  jest.spyOn(window, 'FileReader').mockImplementation(() => mockFileReaderInstance as unknown as FileReader);
+});
+```
+
 ### Comando de Coverage
 ```bash
 npx jest <ruta-al-test> --coverage --coverageReporters=text --collectCoverageFrom="<ruta-al-source>"

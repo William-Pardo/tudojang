@@ -9,6 +9,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
 import { CONFIGURACION_WOMPI } from '../constantes';
 import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
+import { firmarCheckoutWompi } from '../servicios/wompiApi';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -75,7 +76,8 @@ const RegistroEscuela: React.FC = () => {
                         // DOBLE SEGURIDAD: Activamos manualmente al volver
                         await activarSuscripcionManual({
                             tenantId: datos.tenantId,
-                            email: datos.email
+                            email: datos.email,
+                            transactionId: wompiId
                         });
 
                         // Enviamos email de bienvenida
@@ -98,21 +100,6 @@ const RegistroEscuela: React.FC = () => {
             }
         }
     }, [window.location.search, window.location.hash]);
-
-    // Función para generar SHA-256 en el navegador
-    const generarFirmaIntegridad = async (cadena: string) => {
-        // Fallback para entornos donde crypto o crypto.subtle no esté disponible (ej. contextos no seguros)
-        if (!window.crypto || !window.crypto.subtle) {
-            console.warn("Advertencia: crypto.subtle no disponible. Usando firma simulada.");
-            return "firma_simulada_" + Math.random().toString(36).slice(2);
-        }
-
-        const encondedText = new TextEncoder().encode(cadena);
-        const hashBuffer = await window.crypto.subtle.digest('SHA-256', encondedText);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        return hashHex;
-    };
 
     const onSubmit = async (data: any) => {
         const log = (msg: string) => {
@@ -186,10 +173,11 @@ const RegistroEscuela: React.FC = () => {
 
             log("Generando firma...");
             const precioWompi = parseInt(precioParam) * 100;
-            const cadenaFirma = `${nuevoTenantId}${precioWompi}COP${CONFIGURACION_WOMPI.integrityKey}`;
-
-            console.log("Cadena firma:", cadenaFirma);
-            const firmaIntegridad = await generarFirmaIntegridad(cadenaFirma);
+            const firmaIntegridad = await firmarCheckoutWompi({
+                reference: nuevoTenantId,
+                amountInCents: precioWompi,
+                currency: 'COP',
+            });
             log("Firma generada. Preparando URL...");
 
             const urlRetorno = `${window.location.origin}/#/registro-escuela`;

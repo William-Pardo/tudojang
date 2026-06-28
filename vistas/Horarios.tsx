@@ -8,6 +8,7 @@ import { IconoCasa, IconoUsuario, IconoAgregar, IconoInformacion, IconoEditar, I
 import LogoDinamico from '../components/LogoDinamico';
 import ModalAgendarClase from '../components/ModalAgendarClase';
 import { BloqueHorario, RolUsuario } from '../tipos';
+import { obtenerInstructoresAgenda } from '../utils/instructoresAgenda';
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -25,6 +26,7 @@ const VistaHorarios: React.FC = () => {
 
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin;
     const esInstructor = usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente;
+    const instructoresAgenda = useMemo(() => obtenerInstructoresAgenda(usuarios), [usuarios]);
 
     // Si es instructor, por defecto filtrar por él mismo
     useState(() => {
@@ -126,7 +128,7 @@ const VistaHorarios: React.FC = () => {
                                 className="bg-white dark:bg-gray-800 border-none rounded-xl pl-10 pr-6 py-3 text-[10px] font-black uppercase tracking-widest shadow-sm focus:ring-2 focus:ring-tkd-red outline-none appearance-none cursor-pointer"
                             >
                                 <option value="todos">Todos los Instructores</option>
-                                {usuarios.filter(u => u.rol !== RolUsuario.Tutor).map(u => (
+                                {instructoresAgenda.map(u => (
                                     <option key={u.id} value={u.id}>{u.nombreUsuario}</option>
                                 ))}
                             </select>
@@ -206,7 +208,7 @@ const VistaHorarios: React.FC = () => {
                     </div>
                     <div className="text-center">
                         <p className="text-3xl font-black text-gray-900 dark:text-white">
-                            {new Set(agendaFiltrada.map(b => b.instructorId)).size}
+                            {instructoresAgenda.length}
                         </p>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Instructores Activos</p>
                     </div>

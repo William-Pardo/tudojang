@@ -26,6 +26,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    const e2eUser = typeof window !== 'undefined' && (window as any).Cypress
+      ? (window as any).__TUDOJANG_E2E_USER__
+      : null;
+
+    if (e2eUser) {
+      setUsuario(e2eUser as Usuario);
+      setCargandoSesion(false);
+      return;
+    }
+
     // Si no hay configuración de Firebase, no hacer nada con onAuthStateChanged
     if (!isFirebaseConfigured) {
       setCargandoSesion(false);

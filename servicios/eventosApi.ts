@@ -21,7 +21,6 @@ import { obtenerEstudiantePorId, obtenerEstudiantePorNumIdentificacion } from '.
 
 const eventosCollection = collection(db, 'eventos');
 const solicitudesCollection = collection(db, 'solicitudesInscripcion');
-const storage = getStorage();
 
 const validarFechasEvento = (evento: Pick<Evento, 'fechaInicioInscripcion' | 'fechaFinInscripcion'>) => {
     if (evento.fechaFinInscripcion < evento.fechaInicioInscripcion) {
@@ -36,7 +35,7 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
         return imagenUrl || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
     }
     if (imagenUrl && imagenUrl.startsWith('data:image')) {
-        const storageRef = ref(storage, `tenants/${tenantId}/eventos/${eventoId}/imagen_${Date.now()}`);
+        const storageRef = ref(getStorage(), `tenants/${tenantId}/eventos/${eventoId}/imagen_${Date.now()}`);
         const snapshot = await uploadString(storageRef, imagenUrl, 'data_url');
         return await getDownloadURL(snapshot.ref);
     }

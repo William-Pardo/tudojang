@@ -138,6 +138,9 @@ export interface ConfiguracionClub {
     passwordTemporal?: string;
     onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
     activarFormularioInscripcion?: boolean; // Nuevo: Toggle para el formulario público
+    features?: {
+        centroEstudios?: boolean; // Módulo de estudio académico — activación por tenant
+    };
 }
 
 export interface Estudiante {
@@ -180,6 +183,8 @@ export interface Estudiante {
         firmaContratoDigital?: string;
         firmaImagenDigital?: string;
     };
+    metodoPago?: 'efectivo' | 'link';
+    cobrarMesSiguiente?: boolean;
 }
 
 export interface InscripcionPrograma {
