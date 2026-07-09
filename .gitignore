@@ -45,3 +45,6 @@ coverage/
 *.sw?
 # Local Pi runtime state
 .atl/
+
+# Assets pesados de demo/video (no versionar binarios grandes)
+Video Demo/
