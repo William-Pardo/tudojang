@@ -2,6 +2,46 @@
 
 Objetivo: llevar el Modulo de Estudios / Centro de Estudios desde piloto funcional validado hasta produccion controlada, segura y trazable.
 
+## Coordinacion con otras IA
+
+Este archivo es la fuente de verdad tecnica (TDD, cierres, incidentes) del
+modulo Centro de Estudios. La coordinacion de QUIEN hace QUE y EN QUE RAMA la
+gobiernan estos otros dos documentos, que deben leerse junto con este antes de
+tocar el modulo:
+
+1. `COORDINACION MULTI-IA.md` — paralelismo real entre Codex y Claude
+   (worktrees/ramas separadas, trabajo transversal a toda la app).
+2. `COORDINACION CODEX ANTIGRAVITY - CENTRO ESTUDIOS.md` — turnos y fases
+   especificas de Codex/Antigravity dentro de este modulo puntual.
+
+Regla de sincronizacion: ninguna IA cierra una tarea de Centro de Estudios sin
+dejar registro en ESTE archivo. Si la tarea ademas afecta coordinacion entre
+IAs (fase, bloqueo, checkpoint, merge a main), el registro tambien debe
+reflejarse en el documento de coordinacion que corresponda (arriba). Si un
+documento contradice a otro, manda el orden definido en `COORDINACION MULTI-IA.md`.
+
+## Protocolo Engram obligatorio
+
+Antes de trabajo significativo sobre este modulo:
+
+```powershell
+cd E:\Apps\ENGRAM-BANK
+.\scripts\Ensure-Engram.ps1
+git pull
+.\scripts\Sync-EngramBank.ps1 -Import
+```
+
+Despues de trabajo significativo sobre este modulo:
+
+```powershell
+cd E:\Apps\ENGRAM-BANK
+.\scripts\Sync-EngramBank.ps1 -All -Push
+```
+
+Ninguna IA debe cerrar una tarea de este archivo sin sincronizar Engram. Si
+Engram no sincroniza, se reporta como bloqueo operativo, no se continua en
+silencio.
+
 ## Protocolo obligatorio de ejecucion
 
 Cada tarea debe ejecutarse con TDD real usando ciclo:

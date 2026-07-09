@@ -11,7 +11,36 @@ puntual). Si hay conflicto entre documentos, manda este orden:
 
 1. instrucciones del usuario;
 2. este documento (para trabajo transversal / paralelo real);
-3. `COORDINACION CODEX ANTIGRAVITY - CENTRO ESTUDIOS.md` (para el modulo Centro de Estudios especificamente).
+3. `CIERRE CENTRO DE ESTUDIOS.md` (fuente de verdad tecnica del modulo Centro de Estudios: TDD, cierres, incidentes);
+4. `COORDINACION CODEX ANTIGRAVITY - CENTRO ESTUDIOS.md` (turnos y fases especificas de Codex/Antigravity dentro de ese modulo).
+
+Sincronizacion obligatoria: si una tarea toca el modulo Centro de Estudios,
+el registro de avance de abajo NO reemplaza el registro en
+`CIERRE CENTRO DE ESTUDIOS.md` — van los dos. Este documento registra la
+rama/worktree y el merge; `CIERRE CENTRO DE ESTUDIOS.md` registra el ciclo
+TDD (RED/GREEN/REFACTOR/VERIFY/TRACE) de la tarea puntual.
+
+## Protocolo Engram obligatorio
+
+Antes de trabajo significativo:
+
+```powershell
+cd E:\Apps\ENGRAM-BANK
+.\scripts\Ensure-Engram.ps1
+git pull
+.\scripts\Sync-EngramBank.ps1 -Import
+```
+
+Despues de trabajo significativo:
+
+```powershell
+cd E:\Apps\ENGRAM-BANK
+.\scripts\Sync-EngramBank.ps1 -All -Push
+```
+
+Ninguna IA (Codex, Claude o Antigravity) debe cerrar una tarea ni mergear una
+rama sin sincronizar Engram. Si Engram no sincroniza, se reporta como
+bloqueo operativo en el registro de avance, no se continua en silencio.
 
 ---
 
@@ -44,6 +73,9 @@ Reglas minimas:
 4. Si al mergear aparece conflicto de texto, se resuelve una sola vez en ese
    momento (no requiere haber coordinado antes).
 5. El usuario decide cuando y quien mergea si hay dudas de orden.
+6. Si la tarea toca el modulo Centro de Estudios, el cierre TDD va tambien en
+   `CIERRE CENTRO DE ESTUDIOS.md` (formato RED/GREEN/REFACTOR/VERIFY/TRACE de
+   ese archivo), ademas del registro de abajo.
 
 ---
 
