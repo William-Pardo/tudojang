@@ -6,7 +6,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD, RolUsuario } from '../tipos';
-import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar } from './Iconos';
+import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar, IconoUsuario } from './Iconos';
 import FormInputError from './FormInputError';
 import { useSedes, useProgramas, useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -37,7 +37,7 @@ export const calcularEdadYGrupo = (fechaNacimiento: string): { edad: number, gru
     return { edad, grupo: GrupoEdad.NoAsignado };
 };
 
-const schema = yup.object({
+export const schemaEstudiante = yup.object({
     nombres: yup.string().trim().required('Los nombres son obligatorios.'),
     apellidos: yup.string().trim().required('Los apellidos son obligatorios.'),
     numeroIdentificacion: yup.string().trim().required('La identificación es obligatoria.'),
@@ -62,10 +62,24 @@ const schema = yup.object({
     direccion: yup.string().optional(),
     barrio: yup.string().optional(),
     programasInscritos: yup.array().optional().default([]),
-    tutor: yup.object().optional().nullable(),
+    tutor: yup.object().when('fechaNacimiento', {
+        is: (fechaNacimiento: string) => {
+            const { edad } = calcularEdadYGrupo(fechaNacimiento);
+            return edad > 0 && edad < 18;
+        },
+        then: () => yup.object({
+            nombres: yup.string().required('El nombre del tutor es obligatorio para menores.'),
+            numeroIdentificacion: yup.string().required('La identificación del tutor es obligatoria.'),
+            correo: yup.string().email('Correo inválido.').required('El correo del tutor es obligatorio.'),
+            telefono: yup.string().required('El teléfono del tutor es obligatorio.')
+        }),
+        otherwise: () => yup.object().optional().nullable()
+    }),
     cobrarInscripcion: yup.boolean().default(true),
     metodoPago: yup.string().oneOf(['efectivo', 'link']).default('efectivo'),
-    cobrarMesSiguiente: yup.boolean().default(false)
+    cobrarMesSiguiente: yup.boolean().default(false),
+    enviarInvitacionLoginEstudiante: yup.boolean().default(false),
+    enviarInvitacionLoginTutor: yup.boolean().default(false)
 }).required();
 
 const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando }) => {
@@ -73,34 +87,45 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     const { programas } = useProgramas();
     const { configClub } = useConfiguracion();
 
+    const crearDefaultsEstudiante = () => ({
+        grado: GradoTKD.Blanco,
+        grupo: GrupoEdad.NoAsignado,
+        estadoPago: EstadoPago.AlDia,
+        programasInscritos: [],
+        fechaIngreso: new Date().toISOString().split('T')[0],
+        horasAcumuladasGrado: 0,
+        cobrarInscripcion: true,
+        eps: '',
+        rh: '',
+        direccion: '',
+        barrio: '',
+        metodoPago: 'efectivo',
+        cobrarMesSiguiente: false,
+        enviarInvitacionLoginEstudiante: !!configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear,
+        enviarInvitacionLoginTutor: !!configClub.configuracionCuentasExternas?.invitarTutorAlCrear
+    });
+
     const { register, handleSubmit, formState: { errors, isValid }, watch, setValue, reset } = useForm<any>({
-        resolver: yupResolver(schema),
+        resolver: yupResolver(schemaEstudiante),
         mode: 'onChange',
-        defaultValues: estudianteActual || {
-            grado: GradoTKD.Blanco,
-            grupo: GrupoEdad.NoAsignado,
-            estadoPago: EstadoPago.AlDia,
-            programasInscritos: [],
-            fechaIngreso: new Date().toISOString().split('T')[0],
-            horasAcumuladasGrado: 0,
-            cobrarInscripcion: true,
-            eps: '',
-            rh: '',
-            direccion: '',
-            barrio: '',
-            metodoPago: 'efectivo',
-            cobrarMesSiguiente: false
-        }
+        defaultValues: estudianteActual ? {
+            ...estudianteActual,
+            enviarInvitacionLoginEstudiante: false,
+            enviarInvitacionLoginTutor: false
+        } : crearDefaultsEstudiante()
     });
 
     const watchedSedeId = watch('sedeId');
     const watchedProgramas = watch('programasInscritos') || [];
     const watchedFechaNacimiento = watch('fechaNacimiento');
     const watchedMetodoPago = watch('metodoPago') || 'efectivo';
+    const watchedCorreo = watch('correo') || '';
 
     const { usuario } = useAuth();
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Editor;
     const esFinDeMes = new Date().getDate() >= 26;
+    const edadCalculada = calcularEdadYGrupo(watchedFechaNacimiento).edad;
+    const esMenor = edadCalculada > 0 && edadCalculada < 18;
 
     useEffect(() => {
         setValue('grupo', calcularEdadYGrupo(watchedFechaNacimiento).grupo, { shouldValidate: true });
@@ -124,22 +149,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     };
 
     useEffect(() => {
-        if (abierto) reset(estudianteActual || {
-            grado: GradoTKD.Blanco,
-            grupo: GrupoEdad.NoAsignado,
-            estadoPago: EstadoPago.AlDia,
-            programasInscritos: [],
-            fechaIngreso: new Date().toISOString().split('T')[0],
-            horasAcumuladasGrado: 0,
-            cobrarInscripcion: true,
-            eps: '',
-            rh: '',
-            direccion: '',
-            barrio: '',
-            metodoPago: 'efectivo',
-            cobrarMesSiguiente: false
-        });
-    }, [abierto, estudianteActual, reset]);
+        if (abierto) reset(estudianteActual ? {
+            ...estudianteActual,
+            enviarInvitacionLoginEstudiante: false,
+            enviarInvitacionLoginTutor: false
+        } : crearDefaultsEstudiante());
+    }, [abierto, estudianteActual, reset, configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear, configClub.configuracionCuentasExternas?.invitarTutorAlCrear]);
 
     const onSubmit = async (data: any) => { await onGuardar(data); onCerrar(); };
 
@@ -277,6 +292,69 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             <input id="correo" {...register('correo')} placeholder="EMAIL" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
                             <FormInputError mensaje={errors.correo?.message as string} />
                         </div>
+
+                        {esMenor && (
+                            <div className="pt-8 border-t dark:border-gray-800 animate-slide-in-right space-y-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-tkd-red/10 rounded-2xl flex items-center justify-center">
+                                        <IconoUsuario className="w-5 h-5 text-tkd-red" />
+                                    </div>
+                                    <h3 className="text-sm font-black uppercase text-tkd-dark dark:text-white tracking-widest">Acudiente Responsable</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombres Completos Tutor</label>
+                                        <input {...register('tutor.nombres')} placeholder="NOMBRE DEL TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                        <FormInputError mensaje={errors.tutor?.nombres?.message as string} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cédula Tutor</label>
+                                        <input {...register('tutor.numeroIdentificacion')} placeholder="CÉDULA" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                        <FormInputError mensaje={errors.tutor?.numeroIdentificacion?.message as string} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Correo Tutor</label>
+                                        <input type="email" {...register('tutor.correo')} placeholder="EMAIL TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                        <FormInputError mensaje={errors.tutor?.correo?.message as string} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono / WhatsApp</label>
+                                        <input {...register('tutor.telefono')} placeholder="TELÉFONO TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                        <FormInputError mensaje={errors.tutor?.telefono?.message as string} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+
+                        {configClub.configuracionCuentasExternas?.loginEstudiantesActivo && (
+                            <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30 space-y-4">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.25em]">Acceso digital</p>
+                                    <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white mt-1">Login externo del alumno</h4>
+                                    <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-2 leading-relaxed uppercase">
+                                        Envía una invitación oficial para que el alumno cree contraseña y acceda al Centro de Estudios.
+                                    </p>
+                                </div>
+
+                                <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all ${watchedCorreo ? 'bg-white dark:bg-gray-800 border-blue-100 dark:border-blue-900/40 cursor-pointer' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-100 dark:border-white/5 opacity-60 cursor-not-allowed'}`}>
+                                    <input
+                                        type="checkbox"
+                                        {...register('enviarInvitacionLoginEstudiante')}
+                                        disabled={!watchedCorreo}
+                                        className="w-5 h-5 accent-tkd-blue mt-0.5"
+                                    />
+                                    <span>
+                                        <span className="block text-xs font-black uppercase text-gray-900 dark:text-white">Enviar invitación de login al guardar</span>
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                                            {watchedCorreo ? `Destino: ${watchedCorreo}` : 'Primero registra el correo del estudiante.'}
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <label className="text-[10px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Programas Extra (Recurrentes)</label>

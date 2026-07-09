@@ -27,12 +27,14 @@ import VistaNotificaciones from './vistas/Notificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
 import VistaCentroEstudios from './vistas/CentroEstudios';
 import VistaJornadas from './vistas/admin/JornadasView';
+import { ClaseEnVivoView } from './vistas/ClaseEnVivoView';
 import Vista404 from './vistas/404';
 import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
 import LicenciaSuspendida from './vistas/LicenciaSuspendida';
 import { useEstadoLicencia } from './hooks/useEstadoLicencia';
+import { useVentanaClaseEnVivo } from './hooks/useVentanaClaseEnVivo';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
@@ -58,17 +60,32 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     const location = ReactRouterDOM.useLocation();
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
+    // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): ventana horaria dinamica real,
+    // reemplaza el placeholder `showClaseEnVivo=true` (siempre visible). El link solo se activa
+    // si hay al menos una jornada real del usuario (segun rol/asignacion, ver
+    // `hooks/useVentanaClaseEnVivo.ts`) dentro de `[horaInicio-15min, horaFin+15min]` ahora mismo.
+    // Recalculado cada 60s (mismo intervalo que tenia el placeholder).
+    const { jornadaActiva } = useVentanaClaseEnVivo();
+
     const todosLosEnlaces = [
         { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
         { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        { ruta: jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : "/clase-en-vivo", texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
-    const enlacesVisibles = todosLosEnlaces.filter(enlace => enlace.roles.includes(usuario.rol));
+    const enlacesVisibles = todosLosEnlaces.filter(enlace => {
+        if (enlace.texto === 'Clase en Vivo') {
+            // Fuera de la ventana horaria, el link queda oculto (Módulo Clase en Vivo.txt §3:
+            // "Fuera de esa ventana, el acceso debe estar bloqueado, oculto o deshabilitado").
+            return enlace.roles.includes(usuario.rol) && !!jornadaActiva;
+        }
+        return enlace.roles.includes(usuario.rol);
+    });
     const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
 
     const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
@@ -313,6 +330,8 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
+                    <ReactRouterDOM.Route path="/clase-en-vivo/:jornadaId" element={<ClaseEnVivoView />} />
+                    <ReactRouterDOM.Route path="/clase-en-vivo" element={<ClaseEnVivoView />} />
                     <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
                     <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
                     <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />

@@ -1,5 +1,6 @@
 import React from 'react';
 import { type ProgresoLocalSync, type ProgresoSyncPayload, useProgressSync } from '../../hooks/academico/useProgressSync';
+import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
 interface PdfViewerProps {
   tenantId: string;
@@ -9,6 +10,10 @@ interface PdfViewerProps {
   permanenciaMinimaMs?: number;
   sincronizar: (payload: ProgresoSyncPayload) => void | Promise<void>;
   cargarProgreso?: () => ProgresoLocalSync | null | Promise<ProgresoLocalSync | null>;
+  /** Props opcionales para el registro de métricas académicas */
+  estudianteId?: string;
+  estudianteNombre?: string;
+  recursoId?: string;
 }
 
 const PdfViewer: React.FC<PdfViewerProps> = ({
@@ -19,6 +24,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   permanenciaMinimaMs = 5000,
   sincronizar,
   cargarProgreso,
+  estudianteId,
+  estudianteNombre,
+  recursoId,
 }) => {
   const { flush, progreso, registrarPaginaPdf } = useProgressSync({
     tenantId,
@@ -38,13 +46,40 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     }
   }, []);
 
+  // Hook de métricas — solo activo si se proveen los datos del estudiante
+  const { registrarProgresoPdf } = useRegistrarActividad({
+    tenantId,
+    estudianteId: estudianteId ?? '',
+    estudianteNombre,
+    asignacionId,
+    recursoId: recursoId ?? asignacionId,
+    tituloRecurso: titulo,
+  });
+
+  const registrarPaginaConMetrica = React.useCallback(
+    (pagina: number, paginasAcumuladas: number[]) => {
+      registrarPaginaPdf(pagina);
+
+      if (estudianteId && totalPaginas > 0) {
+        const paginasUnicas = Array.from(new Set([...paginasAcumuladas, pagina]));
+        const porcentajePaginas = Math.round((paginasUnicas.length / totalPaginas) * 100);
+        registrarProgresoPdf({
+          paginasVistas: paginasUnicas.sort((a, b) => a - b),
+          totalPaginas,
+          porcentajePaginas,
+        });
+      }
+    },
+    [estudianteId, registrarPaginaPdf, registrarProgresoPdf, totalPaginas]
+  );
+
   const abrirPagina = (pagina: number) => {
     setPaginaAbierta(pagina);
     if (temporizadorPermanenciaRef.current) {
       window.clearTimeout(temporizadorPermanenciaRef.current);
     }
     temporizadorPermanenciaRef.current = window.setTimeout(() => {
-      registrarPaginaPdf(pagina);
+      registrarPaginaConMetrica(pagina, progreso.paginasVistas);
     }, permanenciaMinimaMs);
   };
 
@@ -82,6 +117,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-black text-tkd-dark dark:text-white">
                 Pagina {pagina} de {totalPaginas}
+                {progreso.paginasVistas.includes(pagina) && (
+                  <span className="ml-2 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
+                )}
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -93,7 +131,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => registrarPaginaPdf(pagina)}
+                  onClick={() => registrarPaginaConMetrica(pagina, progreso.paginasVistas)}
                   className="rounded-xl bg-tkd-blue text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest"
                 >
                   Marcar pagina {pagina} como vista
@@ -113,3 +151,4 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 };
 
 export default PdfViewer;
+

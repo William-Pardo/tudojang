@@ -114,7 +114,7 @@ describe('FormularioUsuario', () => {
   it.each([
     [RolUsuario.Admin, /Acceso total/i],
     [RolUsuario.Editor, /Gesti.*n de alumnos/i],
-    [RolUsuario.Tutor, /Sabonim/i],
+    [RolUsuario.Tutor, /Maestro/i],
   ])('renders the description for role %s', (role, description) => {
     selectedRole = role;
     render(<FormularioUsuario {...baseProps} />);
@@ -229,7 +229,7 @@ describe('FormularioUsuario', () => {
 
     expect(screen.getAllByTestId('input-error')).toHaveLength(11);
     expect(screen.getByText('Guardar Cambios').closest('button')).toBeDisabled();
-    expect(screen.getByPlaceholderText('Ej: Sabonim Carlos Ruiz')).toHaveClass('border-red-500');
+    expect(screen.getByPlaceholderText('Ej: Maestro Carlos Ruiz')).toHaveClass('border-red-500');
   });
 
   it('shows processing state and disables submit while loading', () => {

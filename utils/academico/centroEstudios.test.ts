@@ -2,7 +2,7 @@ import {
   calcularMetricasCentroEstudios,
   calcularUrgenciaAsignacion,
   ordenarAsignacionesPorUrgencia,
-} from './centroEstudios';
+} from './centroEstudios.ts';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 
 const base: AsignacionCentroEstudios = {

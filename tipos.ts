@@ -5,6 +5,7 @@ export enum RolUsuario {
     Admin = 'Admin',
     Editor = 'Editor',
     Asistente = 'Asistente',
+    Estudiante = 'Estudiante',
     Tutor = 'Tutor',
     SuperAdmin = 'SuperAdmin'
 }
@@ -138,6 +139,11 @@ export interface ConfiguracionClub {
     passwordTemporal?: string;
     onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
     activarFormularioInscripcion?: boolean; // Nuevo: Toggle para el formulario público
+    configuracionCuentasExternas?: {
+        loginEstudiantesActivo?: boolean;
+        invitarEstudianteAlCrear?: boolean;
+        invitarTutorAlCrear?: boolean;
+    };
     features?: {
         centroEstudios?: boolean; // Módulo de estudio académico — activación por tenant
     };
@@ -497,4 +503,137 @@ export interface ReportePagoEstudiante {
     observaciones?: string;
     validadoPor?: string; // ID del usuario que aprobó
     fechaValidacion?: string;
+}
+
+// ============================================================================
+// ETAPA 1: AGENDA, PROGRAMA ACADÉMICO Y CLASE EN VIVO
+// Contratos Base (Ref: PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md)
+// ============================================================================
+
+/**
+ * Define el contenido reutilizable. No debe representar por sí solo una clase específica.
+ */
+export interface ProgramaAcademico {
+    id: string;
+    tenantId: string;
+    nombre: string;
+    descripcion?: string;
+    grupoObjetivo: 'Infantil' | 'Precadetes' | 'Cadetes' | 'Adultos' | 'Todos';
+    gradosIncluidos: string[];
+    fechaInicio: string;
+    fechaFin: string;
+    estado: 'borrador' | 'activo' | 'pausado' | 'cerrado';
+    objetivos: string[];
+    tags: string[];
+    creadoPorUid: string;
+    creadoEn: string;
+    actualizadoEn: string;
+}
+
+export interface HorarioRecurrente {
+    diaSemana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+    horaInicio: string;
+    horaFin: string;
+}
+
+/**
+ * Nueva variable central. Representa la ejecución real de un programa en una sede, horario y maestro.
+ */
+export interface CohorteAcademica {
+    id: string;
+    tenantId: string;
+    programaId: string;
+    nombre: string;
+    sedeId: string;
+    espacioId?: string;
+    maestroTitularId: string;
+    grupoOperativo: string;
+    gradosIncluidos: string[];
+    horario: HorarioRecurrente[];
+    fechaInicio: string;
+    fechaFin: string;
+    estado: 'sin_agenda' | 'agenda_generada' | 'en_curso' | 'finalizada' | 'pausada';
+    estudiantesIds?: string[];
+    creadoPorUid: string;
+    creadoEn: string;
+    actualizadoEn: string;
+}
+
+/**
+ * Clase específica generada por una cohorte o creada manualmente desde Agenda.
+ */
+export interface JornadaAcademica {
+    id: string;
+    tenantId: string;
+    programaId?: string;
+    cohorteId?: string;
+    sedeId: string;
+    espacioId?: string;
+    maestroTitularId: string;
+    maestroEjecutorId: string;
+    grupoOperativo: string;
+    gradosIncluidos: string[];
+    fecha: string;
+    horaInicio: string;
+    horaFin: string;
+    estado: 'programada' | 'confirmada' | 'iniciada' | 'cerrada' | 'cancelada' | 'reprogramada';
+    origen: 'programa' | 'agenda_manual' | 'excepcion';
+    motivoExcepcion?: string;
+    creadoPorUid: string;
+    creadoEn: string;
+    actualizadoEn: string;
+}
+
+/**
+ * No debe ser un módulo aislado; debe ser el estado operativo de una jornada.
+ * Los estados 'en_curso' y 'finalizada' son usados por claseEnVivoApi.
+ */
+export interface ClaseEnVivo {
+    id: string;
+    tenantId: string;
+    jornadaId: string;
+    programaId?: string;
+    cohorteId?: string;
+    sedeId?: string;
+    maestroEjecutorId?: string;
+    estado: 'en_curso' | 'finalizada' | 'cancelada';
+    inicioRealAt: string;
+    cierreRealAt?: string;
+    observaciones?: string;
+    estadisticasActuales?: { totalAsistencias: number; totalAusencias: number };
+    creadoEn?: string;
+    actualizadoEn?: string;
+}
+
+/**
+ * Guardar eventos permite auditar errores y recalcular resúmenes.
+ * Los campos registradoPorUid y metodo son usados por asistenciaQrApi.
+ */
+export interface EventoAsistenciaQr {
+    id: string;
+    tenantId: string;
+    jornadaId?: string;
+    claseEnVivoId: string;
+    estudianteId: string;
+    tipo: 'entrada' | 'salida';
+    timestamp: string;
+    registradoPorUid: string;
+    metodo: 'qr_scanner' | 'manual';
+    creadoEn: string;
+}
+
+/**
+ * Registro consolidado de asistencia por alumno por jornada.
+ * primeraEntradaAt/ultimaSalidaAt son usados por asistenciaQrApi para calcular minutos.
+ */
+export interface AsistenciaJornada {
+    id: string;
+    tenantId: string;
+    jornadaId: string;
+    estudianteId: string;
+    primeraEntradaAt?: string;
+    ultimaSalidaAt?: string;
+    minutosAsistidos: number;
+    estado: 'presente' | 'tarde' | 'parcial' | 'ausente' | 'justificado';
+    actualizadoEn: string;
 }

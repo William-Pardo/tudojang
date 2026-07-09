@@ -19,6 +19,7 @@ export interface InvitacionUsuario {
   creadoEn: string;
   expiraEn: string;
   actionLink?: string;
+  activationLink?: string;
   aceptadaEn?: string;
   uid?: string;
 }
@@ -43,9 +44,10 @@ export const createInvitation = async (
     const ahora = new Date();
     const expira = new Date();
     expira.setDate(expira.getDate() + 7);
+    const id = `inv-${Date.now()}`;
     
     const newMock: InvitacionUsuario = {
-      id: `inv-${Date.now()}`,
+      id,
       email: emailLimpio,
       rol,
       tenantId,
@@ -53,7 +55,7 @@ export const createInvitation = async (
       creadoPor: 'mock-admin-uid',
       creadoEn: ahora.toISOString(),
       expiraEn: expira.toISOString(),
-      actionLink: `https://mock.tudojang.com/#/activar-cuenta?invitationId=inv-${Date.now()}`
+      activationLink: `http://localhost:5173/#/activar-cuenta?tenantId=${encodeURIComponent(tenantId)}&invitacionId=${encodeURIComponent(id)}&token=mock-token`
     };
     mockInvitations.push(newMock);
     return newMock;
@@ -114,4 +116,38 @@ export const resendInvitation = async (tenantId: string, invitationId: string): 
   await inviteUserCF({ email: invData.email, rol: invData.rol, tenantId });
   
   await updateDoc(docRef, { estado: 'revocada' });
+};
+
+export const acceptInvitation = async (
+  tenantId: string,
+  invitacionId: string,
+  token: string,
+  password: string
+): Promise<{ ok: boolean; uid: string }> => {
+  if (!tenantId || !invitacionId || !token || !password) {
+    throw new Error('El enlace de activación está incompleto.');
+  }
+
+  if (password.length < 8) {
+    throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  }
+
+  if (!isFirebaseConfigured) {
+    const inv = mockInvitations.find(
+      item => item.tenantId === tenantId && item.id === invitacionId && item.estado === 'pendiente'
+    );
+    if (!inv) throw new Error('Invitación no encontrada o ya utilizada.');
+    inv.estado = 'aceptada';
+    inv.aceptadaEn = new Date().toISOString();
+    inv.uid = `mock-${invitacionId}`;
+    return { ok: true, uid: inv.uid };
+  }
+
+  const acceptInvitationCF = httpsCallable<
+    { tenantId: string; invitacionId: string; token: string; password: string },
+    { ok: boolean; uid: string }
+  >(getFunctions(), 'acceptInvitation');
+
+  const response = await acceptInvitationCF({ tenantId, invitacionId, token, password });
+  return response.data;
 };

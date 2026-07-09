@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
-import { progresoRepository } from '../../servicios/academico/progresoRepository';
+import { progresoRepository, type FirestoreProgressRepository, type ProgresoRepository } from '../../servicios/academico/progresoRepository';
+import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
 export interface PreguntaQuiz {
   id: string;
@@ -56,6 +57,11 @@ interface QuizViewProps {
   preguntas?: PreguntaQuiz[];
   maxIntentos?: number;
   onResultado?: (resultado: ResultadoQuiz) => void;
+  repository?: ProgresoRepository | FirestoreProgressRepository;
+  /** Props opcionales para el registro de métricas académicas */
+  estudianteId?: string;
+  estudianteNombre?: string;
+  recursoId?: string;
 }
 
 const QuizView: React.FC<QuizViewProps> = ({
@@ -63,42 +69,67 @@ const QuizView: React.FC<QuizViewProps> = ({
   preguntas = preguntasDemoQuiz,
   maxIntentos = 2,
   onResultado,
+  repository = progresoRepository,
+  estudianteId,
+  estudianteNombre,
+  recursoId,
 }) => {
+  const inicioQuizRef = React.useRef<number>(Date.now());
+
+  const { registrarResultadoQuiz } = useRegistrarActividad({
+    tenantId: asignacion.tenantId,
+    estudianteId: estudianteId ?? '',
+    estudianteNombre,
+    asignacionId: asignacion.id,
+    recursoId: recursoId ?? asignacion.recursoId,
+    tituloRecurso: asignacion.titulo,
+  });
   const [respuestas, setRespuestas] = React.useState<Record<string, string>>({});
   const [resultado, setResultado] = React.useState<ResultadoQuiz | null>(null);
   const [intentosUsados, setIntentosUsados] = React.useState(0);
 
   React.useEffect(() => {
-    const progresoGuardado = progresoRepository.leerQuiz(asignacion.tenantId, asignacion.id);
-    if (!progresoGuardado) return;
+    let cancelado = false;
 
-    const resultadoRestaurado: ResultadoQuiz = {
-      puntaje: progresoGuardado.puntaje,
-      aprobado: progresoGuardado.aprobado,
-      respuestasCorrectas: 0,
-      totalPreguntas: preguntas.length,
-      intentosUsados: progresoGuardado.intentosUsados,
-      estadoPostQuiz: progresoGuardado.estadoPostQuiz,
+    async function cargarProgresoQuiz() {
+      const progresoGuardado = await repository.leerQuiz(asignacion.tenantId, asignacion.id);
+      if (cancelado || !progresoGuardado) return;
+
+      const resultadoRestaurado: ResultadoQuiz = {
+        puntaje: progresoGuardado.puntaje,
+        aprobado: progresoGuardado.aprobado,
+        respuestasCorrectas: 0,
+        totalPreguntas: preguntas.length,
+        intentosUsados: progresoGuardado.intentosUsados,
+        estadoPostQuiz: progresoGuardado.estadoPostQuiz,
+      };
+
+      setIntentosUsados(progresoGuardado.intentosUsados);
+      setResultado(resultadoRestaurado);
+      onResultado?.(resultadoRestaurado);
+    }
+
+    cargarProgresoQuiz();
+
+    return () => {
+      cancelado = true;
     };
-
-    setIntentosUsados(progresoGuardado.intentosUsados);
-    setResultado(resultadoRestaurado);
-    onResultado?.(resultadoRestaurado);
-  }, [asignacion.id, asignacion.tenantId, onResultado, preguntas.length]);
+  }, [asignacion.id, asignacion.tenantId, onResultado, preguntas.length, repository]);
 
   const puedeEnviar = preguntas.every((pregunta) => Boolean(respuestas[pregunta.id]));
   const intentosRestantes = Math.max(maxIntentos - intentosUsados, 0);
   const bloqueado = intentosRestantes <= 0 || resultado?.aprobado === true;
 
-  const enviar = () => {
+  const enviar = async () => {
     if (!puedeEnviar || bloqueado) return;
 
     const siguienteIntento = intentosUsados + 1;
     const nuevoResultado = evaluarQuiz(preguntas, respuestas, 70, siguienteIntento);
+    const tiempoSegundos = Math.round((Date.now() - inicioQuizRef.current) / 1000);
 
     setIntentosUsados(siguienteIntento);
     setResultado(nuevoResultado);
-    progresoRepository.guardarQuiz({
+    await repository.guardarQuiz({
       tenantId: asignacion.tenantId,
       asignacionId: asignacion.id,
       puntaje: nuevoResultado.puntaje,
@@ -107,10 +138,28 @@ const QuizView: React.FC<QuizViewProps> = ({
       estadoPostQuiz: nuevoResultado.estadoPostQuiz,
       actualizadoEn: new Date().toISOString(),
     });
+
+    // Registrar métrica de evaluación si tenemos datos del estudiante
+    if (estudianteId) {
+      await registrarResultadoQuiz({
+        totalPreguntas: nuevoResultado.totalPreguntas,
+        correctas: nuevoResultado.respuestasCorrectas,
+        incorrectas: nuevoResultado.totalPreguntas - nuevoResultado.respuestasCorrectas,
+        score: nuevoResultado.puntaje,
+        tiempoSegundos,
+        respuestas: preguntas.map((p) => ({
+          preguntaId: p.id,
+          seleccionada: respuestas[p.id] ?? '',
+          correcta: respuestas[p.id] === p.respuestaCorrecta,
+        })),
+      });
+    }
+
     onResultado?.(nuevoResultado);
 
     if (!nuevoResultado.aprobado && siguienteIntento < maxIntentos) {
       setRespuestas({});
+      inicioQuizRef.current = Date.now(); // Reset timer for next attempt
     }
   };
 

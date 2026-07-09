@@ -13,6 +13,10 @@ describe('Flujo de Registro y Onboarding', () => {
         cy.get('input[name="email"]').type(testEmail);
         cy.get('input[name="telefono"]').type('3195653135');
 
+        cy.get('button[type="submit"]').should('be.disabled');
+        cy.get('#aceptaPrivacidad').check();
+        cy.get('#aceptaTerminos').check();
+        cy.get('button[type="submit"]').should('not.be.disabled');
         cy.get('button[type="submit"]').click();
 
         // 3. Validar progreso mediante el log de depuración

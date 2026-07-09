@@ -6,6 +6,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { useConfiguracion, useSedes } from '../context/DataContext';
 import { RolUsuario } from '../tipos';
 import { formatearPrecio, formatearFecha } from '../utils/formatters';
+import { obtenerEtiquetaRol } from '../utils/roles';
 import { generarReciboPagoPdf } from '../utils/receiptGenerator';
 import {
     IconoUsuario, IconoWhatsApp, IconoEmail,
@@ -54,6 +55,7 @@ const VistaMiPerfil: React.FC = () => {
     };
 
     const sedeUsuario = sedesVisibles.find(s => s.id === usuario?.sedeId);
+    const etiquetaRolUsuario = obtenerEtiquetaRol(usuario?.rol, 'equipoTecnico');
 
     return (
         <div className="p-4 sm:p-8 space-y-10 animate-fade-in pb-20">
@@ -81,7 +83,7 @@ const VistaMiPerfil: React.FC = () => {
                             </div>
                             <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{usuario?.nombreUsuario}</h2>
                             <span className="inline-block px-4 py-1 mt-2 rounded-full bg-tkd-red text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
-                                {usuario?.rol}
+                                {etiquetaRolUsuario}
                             </span>
                         </div>
                         <div className="p-8 space-y-6">

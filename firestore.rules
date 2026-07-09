@@ -11,48 +11,56 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return authenticated() && request.auth.token.rol == 'SuperAdmin';
+      return authenticated() && currentRole() == 'SuperAdmin';
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function hasCurrentUser() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function currentTenantId() {
+      return request.auth.token.tenantId != null
+        ? request.auth.token.tenantId
+        : (hasCurrentUser() ? currentUser().tenantId : null);
+    }
+
+    function currentRole() {
+      return request.auth.token.rol != null
+        ? request.auth.token.rol
+        : (hasCurrentUser() ? currentUser().rol : null);
     }
 
     function ownsTicket() {
       return authenticated()
         && resource.data.userId == request.auth.uid
-        && resource.data.tenantId == request.auth.token.tenantId;
-    }
-
-    // Verifica que el documento pertenece al mismo tenant que el usuario
-    function sameTenant() {
-      return authenticated()
-        && resource.data.tenantId == request.auth.token.tenantId;
-    }
-
-    // Verifica que los datos que se están escribiendo usan el tenantId del usuario
-    function writingOwnTenant() {
-      return authenticated()
-        && request.resource.data.tenantId == request.auth.token.tenantId;
+        && resource.data.tenantId == currentTenantId();
     }
 
     // Roles con acceso admin dentro del tenant
     function isAdmin() {
       return authenticated()
-        && request.auth.token.tenantId != null
-        && request.auth.token.rol in ['Admin', 'SuperAdmin'];
+        && currentTenantId() != null
+        && currentRole() in ['Admin', 'SuperAdmin'];
     }
 
     // Rol Instructor/Editor con acceso operativo
     function isInstructor() {
       return authenticated()
-        && request.auth.token.rol in ['Admin', 'Editor', 'Asistente', 'SuperAdmin'];
+        && currentRole() in ['Admin', 'Editor', 'Asistente', 'SuperAdmin'];
     }
 
-    // Rol Estudiante académico
+    // Rol Estudiante acadÃ©mico
     function isEstudiante() {
-      return authenticated() && request.auth.token.rol == 'Estudiante';
+      return authenticated() && currentRole() == 'Estudiante';
     }
 
-    // Rol Tutor (padre/acudiente) — solo lectura sobre recursos relacionados
+    // Rol Tutor (padre/acudiente) â€” solo lectura sobre recursos relacionados
     function isTutor() {
-      return authenticated() && request.auth.token.rol == 'Tutor';
+      return authenticated() && currentRole() == 'Tutor';
     }
 
     function tutorLinkedToStudent(tenantId, uid) {
@@ -63,13 +71,13 @@ service cloud.firestore {
 
     function canReadProgress(tenantId, uid) {
       return authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && (request.auth.uid == uid || isAdmin() || tutorLinkedToStudent(tenantId, uid));
     }
 
     function canWriteOwnStudentProgress(tenantId, uid) {
       return authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && request.auth.uid == uid
         && isEstudiante();
     }
@@ -91,92 +99,226 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Perfil de usuario autenticado usado durante login.
+    match /usuarios/{uid} {
+      allow get: if authenticated()
+        && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /tenants/{tenantId} {
+      allow get: if authenticated()
+        && (currentTenantId() == tenantId || isSuperAdmin());
+      allow list: if authenticated();
+      allow create, update: if isAdmin()
+        && currentTenantId() == tenantId;
+      allow delete: if false;
+    }
+
+    match /notificaciones_config/{tenantId} {
+      allow read, write: if isAdmin()
+        && currentTenantId() == tenantId;
+    }
+
+    match /sedes/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /programas/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /estudiantes/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isInstructor();
+    }
+
+    match /eventos/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isInstructor();
+    }
+
+    match /implementos/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /solicitudesCompra/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isInstructor();
+      allow delete: if isAdmin();
+    }
+
+    match /solicitudesInscripcion/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isInstructor();
+      allow delete: if isAdmin();
+    }
+
+    match /transaccionesPago/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /finanzas/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
     // =========================================================================
-    // Módulo académico — colecciones por tenant
+    // Clases en vivo y Asistencia (Raíz)
+    // =========================================================================
+
+    match /clases_en_vivo/{docId} {
+      allow read: if authenticated() && currentTenantId() == resource.data.tenantId;
+      allow create, update: if authenticated() 
+        && currentTenantId() == request.resource.data.tenantId 
+        && (isAdmin() || request.auth.uid == request.resource.data.maestroEjecutorId || request.auth.uid == request.resource.data.maestroTitularId);
+      allow delete: if isAdmin() && currentTenantId() == resource.data.tenantId;
+    }
+
+    match /asistencias_jornada/{docId} {
+      allow read: if authenticated() && currentTenantId() == resource.data.tenantId;
+      // Los estudiantes no pueden escribir asistencia (solo_lectura)
+      allow create, update: if authenticated()
+        && !isEstudiante() && !isTutor()
+        && currentTenantId() == request.resource.data.tenantId;
+      allow delete: if isAdmin() && currentTenantId() == resource.data.tenantId;
+    }
+
+    // =========================================================================
+    // MÃ³dulo acadÃ©mico â€” colecciones por tenant
     // =========================================================================
 
     // Conexiones de Google Drive (solo admin del tenant)
     match /tenants/{tenantId}/driveConnections/{connId} {
       allow read, write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Invitaciones de usuarios académicos (Estudiante / Tutor)
+    // Invitaciones de usuarios acadÃ©micos (Estudiante / Tutor)
     match /tenants/{tenantId}/invitaciones/{invId} {
       allow read: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow create, update: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow delete: if false;
     }
 
-    // Vínculos Tutor ↔ Estudiante (N:M)
+    // VÃ­nculos Tutor â†” Estudiante (N:M)
     match /tenants/{tenantId}/vinculos/{vinculoId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && (isAdmin() || isTutor());
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Espacios físicos de sede
+    // Espacios fÃ­sicos de sede
     match /tenants/{tenantId}/espacios/{espacioId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Programas académicos
+    // Programas acadÃ©micos
     match /tenants/{tenantId}/programasAcademicos/{programaId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
     // Ejecuciones de programa por grupo
     match /tenants/{tenantId}/ejecucionesPrograma/{ejecucionId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && !isTutor();
       allow write: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Jornadas de instrucción
+    // Roster explícito de estudiantes matriculados en una ejecución de programa.
+    // Baja frecuencia (acción administrativa) → escritura directa gateada por rol,
+    // a diferencia de `asistencias` (Decisión 3) que sí exige Admin SDK por ser
+    // alta frecuencia y requerir cruce de pertenencia.
+    match /tenants/{tenantId}/ejecucionesPrograma/{ejecucionId}/inscripciones/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && !isTutor();
+      allow create: if isInstructor()
+        && currentTenantId() == tenantId
+        && request.resource.data.estudianteId == estudianteId
+        && request.resource.data.tenantId == tenantId;
+      // No hay `request.resource` en `delete` (Firestore Security Rules: el
+      // documento entrante no existe en un borrado) — validar solo rol+tenant,
+      // igual que el patrón ya usado para `asignaciones` en este mismo archivo.
+      allow delete: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow update: if false; // re-matricular = delete + create; sin estados intermedios ambiguos
+    }
+
+    // Jornadas de instrucciÃ³n
     match /tenants/{tenantId}/jornadas/{jornadaId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow create: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
-      // Las transiciones de estado se hacen vía Cloud Function (no directamente)
+        && currentTenantId() == tenantId;
+      // Las transiciones de estado se hacen vÃ­a Cloud Function (no directamente).
+      // Subtarea 12.2: el "maestro asignado" (resource.data.instructorId == uid)
+      // puede editar solo SU jornada; Admin/SuperAdmin pueden editar cualquiera del
+      // tenant. Editor/Asistente NO asignado queda rechazado en backend.
       allow update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId
+        && (isAdmin() || resource.data.instructorId == request.auth.uid);
       allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Biblioteca: recursos académicos
+    match /tenants/{tenantId}/jornadas/{jornadaId}/auditoria/{auditId} {
+      allow read: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow create: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow update, delete: if false;
+    }
+
+    // Asistencia (check-in/check-out) por estudiante sobre una jornada.
+    // Escritura exclusiva del callable `registrarAsistenciaJornada` (Admin SDK,
+    // bypassa reglas) porque valida pertenencia contra el roster de inscripciones
+    // (design.md, Decision 3) — alta frecuencia de escaneo, no vale la pena
+    // duplicar esa lógica de cruce en reglas. El cliente NUNCA escribe directo.
+    match /tenants/{tenantId}/jornadas/{jornadaId}/asistencias/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId;
+      allow write: if false;
+    }
+
+    // Biblioteca: recursos acadÃ©micos
     match /tenants/{tenantId}/recursos/{recursoId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow create, update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Asignaciones académicas
+    // Asignaciones acadÃ©micas
     match /tenants/{tenantId}/asignaciones/{asignacionId} {
       // Estudiante puede leer sus propias asignaciones
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
-      // Solo instructores pueden crear/modificar asignaciones
+        && currentTenantId() == tenantId;
+      // Solo instructores pueden crear/modificar/eliminar asignaciones
       allow create, update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
-      allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
+      allow delete: if isInstructor()
+        && currentTenantId() == tenantId;
     }
 
     // Progreso del estudiante
@@ -191,6 +333,27 @@ service cloud.firestore {
       allow write: if canWriteOwnStudentProgress(tenantId, uid);
     }
 
+    // Logs de actividad académica
+    match /tenants/{tenantId}/actividadLogs/{logId} {
+      allow create: if authenticated()
+        && currentTenantId() == tenantId
+        && request.resource.data.estudianteId == request.auth.uid;
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == resource.data.estudianteId || isInstructor());
+    }
+
+    // Métricas agregadas de progreso del estudiante
+    match /tenants/{tenantId}/metricasEstudiante/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == estudianteId || isInstructor());
+      // El frontend escribe estas métricas agregadas al registrar actividad
+      allow write: if authenticated()
+        && currentTenantId() == tenantId
+        && request.auth.uid == estudianteId;
+    }
+
     // =========================================================================
     // Catch-all: denegar todo lo no declarado
     // =========================================================================
@@ -199,3 +362,4 @@ service cloud.firestore {
     }
   }
 }
+

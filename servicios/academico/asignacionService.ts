@@ -3,6 +3,9 @@
 // Versión inicial controlada: todavía NO conecta con Firestore.
 // Usa datos demo para permitir construir la vista sin romper la app.
 
+import { collection, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { db, isFirebaseConfigured } from '../../firebase/config';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { RecursoAcademico } from '../../models/academico/recurso';
 import type {
@@ -15,8 +18,12 @@ import type {
   ObtenerAsignacionesResponse,
   PublicarAsignacionRequest,
   PublicarAsignacionResponse,
+  PublicarAsignacionesBatchRequest,
+  PublicarAsignacionesBatchResponse,
 } from '../../models/academico/asignacionService.types';
-import { calcularUrgenciaAsignacion, ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios';
+import { calcularUrgenciaAsignacion, ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios.ts';
+
+export type { PublicarAsignacionResponse } from '../../models/academico/asignacionService.types';
 
 interface EstudianteAsignacion {
   id: string;
@@ -132,6 +139,13 @@ export async function obtenerAsignacionesPorEstudiante(
   return { asignaciones: ordenarAsignacionesPorUrgencia(asignaciones) };
 }
 
+export async function listarAsignacionesPorTenant(tenantId: string): Promise<AsignacionAcademica[]> {
+  if (!tenantId || !isFirebaseConfigured) return [];
+
+  const snap = await getDocs(collection(db, 'tenants', tenantId, 'asignaciones'));
+  return snap.docs.map((item) => ({ id: item.id, ...(item.data() as object) } as AsignacionAcademica));
+}
+
 export function aplicaAlEstudiante(asignacion: AsignacionAcademica, estudiante: EstudianteAsignacion): boolean {
   const { destinatario } = asignacion;
 
@@ -245,6 +259,7 @@ export function publishAsignacion({
   return {
     ...asignacion,
     recursoId: recurso.id,
+    externalFileId: recurso.externalFileId,
     estado: 'publicada',
     creadoPorUid: publicadoPorUid,
     actualizadoEn: new Date().toISOString(),
@@ -254,24 +269,88 @@ export function publishAsignacion({
 export async function publicarAsignacion(
   request: PublicarAsignacionRequest
 ): Promise<PublicarAsignacionResponse> {
+  if (isFirebaseConfigured) {
+    const callable = httpsCallable<PublicarAsignacionRequest, { ok: boolean; asignacionId: string }>(
+      getFunctions(),
+      'publishAsignacion'
+    );
+    const response = await callable(request);
+    return {
+      ok: response.data.ok,
+      id: response.data.asignacionId,
+    };
+  }
+
   return {
     ok: true,
     id: request.asignacion.id,
   };
 }
 
+export async function publicarAsignacionesBatch(
+  request: PublicarAsignacionesBatchRequest
+): Promise<PublicarAsignacionesBatchResponse> {
+  if (isFirebaseConfigured) {
+    const callable = httpsCallable<PublicarAsignacionesBatchRequest, PublicarAsignacionesBatchResponse>(
+      getFunctions(),
+      'publishAsignacionesBatch'
+    );
+    const response = await callable(request);
+    return response.data;
+  }
+
+  return {
+    ok: true,
+    created: request.recursoIds.flatMap((recursoId) =>
+      request.jornadaIds.map((jornadaId) => `asignacion-${recursoId}-${jornadaId}`)
+    ),
+    skipped: [],
+  };
+}
+
 export async function actualizarAsignacion(
   request: ActualizarAsignacionRequest
 ): Promise<ActualizarAsignacionResponse> {
-  return {
-    ok: Boolean(request.asignacion.id),
-  };
+  const { asignacion } = request;
+  const tenantId = asignacion?.tenantId;
+  const jornadaId = asignacion?.jornadaId;
+
+  if (!asignacion?.id || !tenantId || !jornadaId) {
+    return { ok: false };
+  }
+
+  const respuesta = await publicarAsignacion({ tenantId, jornadaId, asignacion });
+
+  return { ok: respuesta.ok };
 }
 
 export async function eliminarAsignacion(
   request: EliminarAsignacionRequest
 ): Promise<EliminarAsignacionResponse> {
-  return {
-    ok: Boolean(request.tenantId && request.asignacionId),
-  };
+  const tenantId = request.tenantId?.trim();
+  const asignacionId = request.asignacionId?.trim();
+
+  if (!tenantId || !asignacionId) {
+    return { ok: false };
+  }
+
+  // 1. Eliminar la asignación principal
+  await deleteDoc(doc(db, 'tenants', tenantId, 'asignaciones', asignacionId));
+
+  // 2. Eliminar el progreso de todos los estudiantes para esta asignación
+  if (isFirebaseConfigured) {
+    try {
+      const progresoRef = collection(db, 'tenants', tenantId, 'progreso');
+      const progresoSnap = await getDocs(progresoRef);
+      const promesas = progresoSnap.docs.map(async (estudianteDoc) => {
+        const progressDocRef = doc(db, 'tenants', tenantId, 'progreso', estudianteDoc.id, 'asignaciones', asignacionId);
+        await deleteDoc(progressDocRef);
+      });
+      await Promise.all(promesas);
+    } catch (err) {
+      console.warn('[eliminarAsignacion] No se pudo limpiar el progreso de los estudiantes:', err);
+    }
+  }
+
+  return { ok: true };
 }

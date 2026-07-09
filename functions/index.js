@@ -43,11 +43,20 @@ const {
 const {
   crearServicioConnectDrive,
   crearServicioDriveOAuthCallback,
+  crearServicioListDriveFolder,
+  crearServicioDisconnectDrive,
+  crearServicioGetDriveConnection,
+  crearServicioSetDriveFolder,
+  crearServicioGetTemporaryFileUrl,
   crearServicioSyncDriveMetadata,
 } = require("./academico/drive");
 const {
   crearServicioPublishAsignacion,
+  crearServicioPublishAsignacionesBatch,
 } = require("./academico/asignaciones");
+const {
+  crearServicioRegistrarAsistencia,
+} = require("./academico/asistencia");
 const {
   crearServicioVencerAsignaciones,
   crearListadoAsignacionesFirestore,
@@ -69,6 +78,9 @@ const assistantFunctions = functionsV1.runWith({
 });
 const geminiFunctions = functionsV1.runWith({
   secrets: ["GEMINI_API_KEY"],
+});
+const driveFunctions = functionsV1.runWith({
+  secrets: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"],
 });
 const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
@@ -224,12 +236,43 @@ const servicioDriveOAuthCallback = crearServicioDriveOAuthCallback({
   firestore: admin.firestore()
 });
 
+const servicioListDriveFolder = crearServicioListDriveFolder({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioDisconnectDrive = crearServicioDisconnectDrive({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioGetDriveConnection = crearServicioGetDriveConnection({
+  firestore: admin.firestore()
+});
+
+const servicioSetDriveFolder = crearServicioSetDriveFolder({
+  firestore: admin.firestore()
+});
+
+const servicioGetTemporaryFileUrl = crearServicioGetTemporaryFileUrl({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
 const servicioSyncDriveMetadata = crearServicioSyncDriveMetadata({
   googleDriveConfig,
   firestore: admin.firestore()
 });
 
 const servicioPublishAsignacion = crearServicioPublishAsignacion({
+  firestore: admin.firestore()
+});
+
+const servicioPublishAsignacionesBatch = crearServicioPublishAsignacionesBatch({
+  firestore: admin.firestore()
+});
+
+const servicioRegistrarAsistencia = crearServicioRegistrarAsistencia({
   firestore: admin.firestore()
 });
 
@@ -249,15 +292,35 @@ exports.acceptInvitation = functionsV1.https.onCall(
   crearHandlerCallable(servicioAcceptInvitation)
 );
 
-exports.connectDrive = functionsV1.https.onCall(
+exports.connectDrive = driveFunctions.https.onCall(
   crearHandlerCallable(servicioConnectDrive)
 );
 
-exports.driveOAuthCallback = functionsV1.https.onCall(
+exports.driveOAuthCallback = driveFunctions.https.onCall(
   crearHandlerCallable(servicioDriveOAuthCallback)
 );
 
-exports.syncDriveMetadata = functionsV1.https.onRequest(async (req, res) => {
+exports.listDriveFolder = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioListDriveFolder)
+);
+
+exports.disconnectDrive = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioDisconnectDrive)
+);
+
+exports.getDriveConnection = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioGetDriveConnection)
+);
+
+exports.setDriveFolder = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioSetDriveFolder)
+);
+
+exports.getTemporaryFileUrl = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioGetTemporaryFileUrl)
+);
+
+exports.syncDriveMetadata = driveFunctions.https.onRequest(async (req, res) => {
   return cors(req, res, async () => {
     try {
       await servicioSyncDriveMetadata(req, res);
@@ -270,6 +333,14 @@ exports.syncDriveMetadata = functionsV1.https.onRequest(async (req, res) => {
 
 exports.publishAsignacion = functionsV1.https.onCall(
   crearHandlerCallable(servicioPublishAsignacion)
+);
+
+exports.publishAsignacionesBatch = functionsV1.https.onCall(
+  crearHandlerCallable(servicioPublishAsignacionesBatch)
+);
+
+exports.registrarAsistenciaJornada = functionsV1.https.onCall(
+  crearHandlerCallable(servicioRegistrarAsistencia)
 );
 
 exports.vencerAsignacionesAcademicas = functionsV1.pubsub

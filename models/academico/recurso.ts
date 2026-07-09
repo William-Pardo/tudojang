@@ -52,6 +52,12 @@ export interface FichaAcademica {
 
   /** Notas internas del admin (no visibles para estudiantes). */
   notasInternas?: string;
+
+  /**
+   * Etiquetas reutilizables para busqueda futura en biblioteca.
+   * Se agregan al preparar asignaciones sin duplicar el recurso original.
+   */
+  tags?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +95,15 @@ export interface RecursoAcademico {
   /** Nombre actual del archivo (sincronizado desde Drive). */
   nombre: string;
 
+  /**
+   * Título curado visible para estudiantes, capturado al clasificar el recurso.
+   * Distinto del nombre del archivo en Drive; cuando falta, la UI muestra `nombre` como respaldo.
+   */
+  tituloVisible?: string;
+
+  /** Nombre normalizado para detectar duplicados de biblioteca. */
+  nombreNormalizado?: string;
+
   /** Tipo MIME del archivo (ej. 'application/pdf', 'video/mp4'). */
   mimeType: string;
 
@@ -103,6 +118,18 @@ export interface RecursoAcademico {
 
   /** Fecha de última modificación en Drive (ISO 8601). */
   fechaModificacionDrive?: string;
+
+  /**
+   * Estado operativo de la fuente Drive.
+   * No controla el ciclo de vida del recurso; solo informa si el archivo fuente puede verificarse.
+   */
+  fuenteDriveEstado?: 'verificada' | 'no_verificada' | 'fuera_carpeta_activa' | 'requiere_reconexion' | 'archivo_no_encontrado';
+
+  /** Carpeta Drive desde la que fue indexado originalmente, cuando se conoce. */
+  carpetaOrigenDriveId?: string;
+
+  /** Fecha de la ultima verificacion positiva de acceso a Drive. */
+  ultimaVerificacionDrive?: string;
 
   // ---- Ficha académica (clasificación pedagógica) ----
 

@@ -14,6 +14,7 @@ const PasarelaInscripcion: React.FC = () => {
     const { tenant, estaCargado } = useTenant();
     const [paso, setPaso] = useState<'pago' | 'verificando' | 'formulario' | 'finalizado'>('pago');
     const [cargando, setCargando] = useState(false);
+    const [edad, setEdad] = useState<number | null>(null);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -24,9 +25,19 @@ const PasarelaInscripcion: React.FC = () => {
 
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
-        fechaNacimiento: '', tutorNombre: '', tutorEmail: '',
+        fechaNacimiento: '', tutorNombre: '', tutorApellidos: '', tutorCedula: '', tutorEmail: '',
         tutorTelefono: '', parentesco: 'Padre'
     });
+
+    const calcularEdad = (fecha: string) => {
+        if (!fecha) return null;
+        const hoy = new Date();
+        const cumpleanos = new Date(fecha);
+        let edadCalculada = hoy.getFullYear() - cumpleanos.getFullYear();
+        const m = hoy.getMonth() - cumpleanos.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < cumpleanos.getDate())) edadCalculada--;
+        return edadCalculada;
+    };
 
     const valorTotal = (tenant?.valorInscripcion || 0) + (tenant?.valorMensualidad || 0);
 
@@ -37,6 +48,7 @@ const PasarelaInscripcion: React.FC = () => {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+        if (name === 'fechaNacimiento') setEdad(calcularEdad(value));
     };
 
     const handleSubmitRegistro = async (e: React.FormEvent) => {
@@ -169,6 +181,48 @@ const PasarelaInscripcion: React.FC = () => {
                                         <label className="text-[9px] font-black uppercase text-tkd-blue mb-2 block tracking-widest">Fecha de Nacimiento Alumno</label>
                                         <input name="fechaNacimiento" type="date" required className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 text-sm font-black dark:text-white" onChange={handleInputChange} />
                                     </div>
+
+                                    {edad !== null && edad < 18 && (
+                                        <div className="pt-8 border-t dark:border-gray-800 animate-slide-in-right space-y-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-tkd-red/10 rounded-2xl flex items-center justify-center">
+                                                    <IconoUsuario className="w-5 h-5 text-tkd-red" />
+                                                </div>
+                                                <h3 className="text-sm font-black uppercase text-tkd-dark dark:text-white tracking-widest">Acudiente Responsable</h3>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Nombres Tutor</label>
+                                                    <input name="tutorNombre" type="text" required className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Apellidos Tutor</label>
+                                                    <input name="tutorApellidos" type="text" required className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Cédula Tutor</label>
+                                                    <input name="tutorCedula" type="text" required className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Correo Tutor</label>
+                                                    <input name="tutorEmail" type="email" required className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp Tutor</label>
+                                                    <input name="tutorTelefono" type="tel" required className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Parentesco</label>
+                                                    <select name="parentesco" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl py-4 px-5 text-sm font-black dark:text-white focus:ring-2 focus:ring-tkd-blue" onChange={handleInputChange}>
+                                                        <option value="Padre">Padre</option>
+                                                        <option value="Madre">Madre</option>
+                                                        <option value="Otro">Otro</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <button type="submit" disabled={cargando} className="w-full py-6 bg-tkd-blue text-white rounded-2xl font-black uppercase text-sm tracking-[0.3em] shadow-2xl hover:bg-blue-800 transition-all flex items-center justify-center gap-4">
                                         {cargando ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-6 h-6" />}

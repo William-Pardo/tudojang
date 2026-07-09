@@ -43,8 +43,21 @@ export interface AsignacionAcademica {
    */
   recursoId: string;
 
+  /**
+   * ID externo del archivo en Google Drive asociado al recurso.
+   * Se usa para solicitar URLs temporales sin exponer enlaces permanentes.
+   */
+  externalFileId?: string;
+
+  /**
+   * Jornada (clase) real a la que se asignó el material.
+   * Ausente en asignaciones publicadas antes de este campo o sin jornada asociada.
+   */
+  jornadaId?: string;
+
   titulo: string;
   descripcion?: string;
+  tags?: string[];
 
   destinatario: DestinatarioAsignacion;
 
@@ -57,6 +70,10 @@ export interface AsignacionAcademica {
   fechaCierre?: string;
 
   estado: EstadoAsignacionAcademica;
+
+  /** Metadatos del recurso copiados a la asignación */
+  totalPaginas?: number;
+  duracionSegundos?: number;
 
   creadoPorUid: string;
   creadoEn: string;

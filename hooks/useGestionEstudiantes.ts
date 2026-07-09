@@ -6,11 +6,18 @@ import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD, TipoNotificacion } from '../tipos';
 import { enviarNotificacion } from '../servicios/api';
 import { generarMensajePersonalizado } from '../servicios/geminiService';
+import { createInvitation } from '../servicios/academico/invitacionService';
+import { RolAcademico } from '../models/academico';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion, useSedes } from '../context/DataContext';
 import { generarUrlAbsoluta } from '../utils/formatters';
 
 const ITEMS_PER_PAGE = 10;
+
+type DatosEstudianteFormulario = Estudiante & {
+    enviarInvitacionLoginEstudiante?: boolean;
+    enviarInvitacionLoginTutor?: boolean;
+};
 
 export const useGestionEstudiantes = () => {
     const { estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante, cargarEstudiantes } = useEstudiantes();
@@ -89,17 +96,48 @@ export const useGestionEstudiantes = () => {
         setEstudianteEnEdicion(null);
     };
 
-    const guardarEstudiante = async (datosEstudiante: Estudiante) => {
+    const guardarEstudiante = async (datosEstudiante: DatosEstudianteFormulario) => {
         setCargandoAccion(true);
         try {
-            if (datosEstudiante.id) {
-                await actualizarEstudiante(datosEstudiante);
+            const {
+                enviarInvitacionLoginEstudiante,
+                enviarInvitacionLoginTutor,
+                ...datosPersistibles
+            } = datosEstudiante;
+
+            const enviarInvitacionAcademica = async (estudiante: Estudiante, rol: RolAcademico) => {
+                const tenantId = estudiante.tenantId || configClub.tenantId;
+                const correoDestino = rol === 'Estudiante' ? estudiante.correo : estudiante.tutor?.correo;
+
+                if (!correoDestino) return;
+
+                if (!tenantId || tenantId === 'PLATFORM_INIT_PENDING') {
+                    mostrarNotificacion('Estudiante guardado, pero no se pudo enviar la invitación: tenant no identificado.', 'warning');
+                    return;
+                }
+
+                try {
+                    await createInvitation(tenantId, correoDestino, rol);
+                    mostrarNotificacion(`Invitación de login enviada a ${correoDestino}.`, 'success');
+                } catch (error: any) {
+                    mostrarNotificacion(`Estudiante guardado, pero no se pudo enviar la invitación a ${correoDestino}: ${error.message}`, 'warning');
+                }
+            };
+
+            if (datosPersistibles.id) {
+                await actualizarEstudiante(datosPersistibles);
                 mostrarNotificacion("Estudiante actualizado correctamente.", "success");
+
+                if (enviarInvitacionLoginEstudiante) await enviarInvitacionAcademica(datosPersistibles, 'Estudiante');
+                if (enviarInvitacionLoginTutor) await enviarInvitacionAcademica(datosPersistibles, 'Tutor');
             } else {
                 // Los campos metodoPago y cobrarMesSiguiente vienen del formulario y
                 // se persisten en Firestore junto con el resto del documento del estudiante.
-                const nuevoEstudiante = await agregarEstudiante(datosEstudiante);
+                const nuevoEstudiante = await agregarEstudiante(datosPersistibles);
                 mostrarNotificacion("Estudiante creado correctamente.", "success");
+
+                if (enviarInvitacionLoginEstudiante) await enviarInvitacionAcademica(nuevoEstudiante, 'Estudiante');
+                if (enviarInvitacionLoginTutor) await enviarInvitacionAcademica(nuevoEstudiante, 'Tutor');
 
                 // Comunicación exclusiva por WhatsApp para estudiantes/tutores
                 const destinatario = nuevoEstudiante.tutor?.telefono;

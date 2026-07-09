@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { Usuario } from '../tipos';
 import { IconoEditar, IconoEliminar, IconoContrato, IconoAprobar } from './Iconos';
+import { obtenerEtiquetaRol } from '../utils/roles';
 
 interface Props {
   usuario: Usuario;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export const FilaUsuario: React.FC<Props> = ({ usuario, onEditar, onEliminar, onGestionarContrato, isCard }) => {
+  const etiquetaRol = obtenerEtiquetaRol(usuario.rol, 'equipoTecnico');
 
   const renderBadgeContrato = () => {
       const estado = usuario.contrato?.firmado ? 'Firmado' : (usuario.contrato ? 'Pendiente' : 'Sin configurar');
@@ -64,7 +66,7 @@ export const FilaUsuario: React.FC<Props> = ({ usuario, onEditar, onEliminar, on
         <div className="border-t dark:border-gray-700 pt-3 space-y-2 text-sm">
              <div className="flex justify-between">
                 <strong className="text-[10px] font-black uppercase text-gray-400">Rol:</strong>
-                <span className="text-[10px] font-black uppercase text-tkd-red">{usuario.rol}</span>
+                <span className="text-[10px] font-black uppercase text-tkd-red">{etiquetaRol}</span>
             </div>
         </div>
       </motion.div>
@@ -83,7 +85,7 @@ export const FilaUsuario: React.FC<Props> = ({ usuario, onEditar, onEliminar, on
             <div className="font-black text-tkd-dark dark:text-white uppercase text-sm leading-none">{usuario.nombreUsuario}</div>
             <div className="text-[10px] text-gray-400 font-bold uppercase mt-1">{usuario.email}</div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-[10px] font-black uppercase text-tkd-red">{usuario.rol}</td>
+        <td className="px-6 py-4 whitespace-nowrap text-[10px] font-black uppercase text-tkd-red">{etiquetaRol}</td>
         <td className="px-6 py-4 whitespace-nowrap">{renderBadgeContrato()}</td>
         <td className="px-6 py-4 whitespace-nowrap text-right">
            {contenidoAcciones}

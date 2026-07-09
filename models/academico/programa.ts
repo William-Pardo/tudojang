@@ -1,6 +1,8 @@
 export type EstadoProgramaAcademico = 'borrador' | 'publicado' | 'archivado';
 export type EstadoEjecucionPrograma = 'activo' | 'pausado' | 'cancelado' | 'completado';
 
+import type { BloqueRecurrente } from './jornada';
+
 export interface ObjetivoFormativo {
   id: string;
   descripcion: string;
@@ -24,6 +26,13 @@ export interface ProgramaAcademico {
   unidades: UnidadTematica[];
   creadoEn: string;
   actualizadoEn: string;
+
+  /**
+   * Etiquetas del programa usadas para priorizar material relacionado al armar
+   * publicaciones. Ausente en programas creados antes de este campo; se trata
+   * como "sin tags", sin backfill.
+   */
+  tags?: string[];
 }
 
 export interface EjecucionPrograma {
@@ -39,4 +48,16 @@ export interface EjecucionPrograma {
   objetivosCompletados: string[];
   creadoEn: string;
   actualizadoEn: string;
+
+  /**
+   * Horario recurrente de la ejecución (uno por día de la semana).
+   * Ausente en ejecuciones creadas antes de este campo.
+   */
+  bloques?: BloqueRecurrente[];
+
+  /**
+   * Fecha de fin del ciclo, usada para generar las jornadas del período.
+   * Ausente en ejecuciones creadas antes de este campo.
+   */
+  fechaFin?: string;
 }

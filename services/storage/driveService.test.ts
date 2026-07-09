@@ -8,6 +8,9 @@ import {
   DriveOAuthCallbackResult,
   DriveListFolderResult,
   TemporaryFileUrlResult,
+  DriveDisconnectResult,
+  DriveConnectionInfo,
+  DriveSetFolderResult,
 } from './driveService';
 
 // ---------------------------------------------------------------------------
@@ -30,7 +33,7 @@ const makeMockCallFn = (responses: Record<string, unknown>) => {
 // ---------------------------------------------------------------------------
 describe('driveService.iniciarConexionOAuth', () => {
   it('llama a la Cloud Function connectDrive y devuelve la URL de OAuth', async () => {
-    const expectedUrl = 'https://accounts.google.com/o/oauth2/v2/auth?scope=drive.readonly';
+    const expectedUrl = 'https://accounts.google.com/o/oauth2/v2/auth?scope=drive.file';
     const callFn = makeMockCallFn({
       connectDrive: { url: expectedUrl } as DriveConnectionResult,
     });
@@ -176,6 +179,93 @@ describe('driveService.listarCarpetaDrive', () => {
     const service = crearDriveService({ callFn });
     const files = await service.listarCarpetaDrive('tenant-abc', 'empty-folder');
     expect(files).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: desconectarDrive
+// ---------------------------------------------------------------------------
+describe('driveService.desconectarDrive', () => {
+  it('llama a disconnectDrive con tenantId y devuelve el resultado', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: { ok: true, disconnectedCount: 1 } as DriveDisconnectResult,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.desconectarDrive('tenant-abc');
+
+    expect(callFn).toHaveBeenCalledWith('disconnectDrive');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc' });
+    expect(result).toEqual({ ok: true, disconnectedCount: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: obtenerConexionDrive / guardarCarpetaActiva
+// ---------------------------------------------------------------------------
+describe('driveService.obtenerConexionDrive', () => {
+  it('llama a getDriveConnection con tenantId y devuelve carpeta activa', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: {
+            connected: true,
+            connectionId: 'conn-123',
+            activeFolderId: 'folder-abc',
+            status: 'active',
+          } as DriveConnectionInfo,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.obtenerConexionDrive('tenant-abc');
+
+    expect(callFn).toHaveBeenCalledWith('getDriveConnection');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc' });
+    expect(result).toEqual({
+      connected: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-abc',
+      status: 'active',
+    });
+  });
+});
+
+describe('driveService.guardarCarpetaActiva', () => {
+  it('llama a setDriveFolder con tenantId y folderId', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: {
+            ok: true,
+            connectionId: 'conn-123',
+            activeFolderId: 'folder-abc',
+          } as DriveSetFolderResult,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.guardarCarpetaActiva('tenant-abc', 'folder-abc');
+
+    expect(callFn).toHaveBeenCalledWith('setDriveFolder');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc', folderId: 'folder-abc' });
+    expect(result).toEqual({
+      ok: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-abc',
+    });
   });
 });
 

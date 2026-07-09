@@ -3,32 +3,167 @@ import type { AsignacionCentroEstudios } from '../../models/academico/asignacion
 import { IconoCerrar } from '../Iconos';
 import QuizView, { type ResultadoQuiz } from './QuizView';
 import PdfViewer from './PdfViewer';
+import VideoPlayer from './VideoPlayer';
 import type { ProgresoSyncPayload } from '../../hooks/academico/useProgressSync';
-import { progresoRepository } from '../../servicios/academico/progresoRepository';
+import { progresoRepository, type FirestoreProgressRepository, type ProgresoRepository } from '../../servicios/academico/progresoRepository';
+import { driveService as defaultDriveService, type TemporaryFileUrlResult } from '../../services/storage/driveService';
+import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
 interface MaterialPreviewModalProps {
   asignacion: AsignacionCentroEstudios | null;
   onCerrar: () => void;
+  repository?: ProgresoRepository | FirestoreProgressRepository;
+  driveService?: Pick<typeof defaultDriveService, 'obtenerUrlTemporal'>;
+  /** Datos del estudiante para registrar actividad académica en métricas */
+  estudianteId?: string;
+  estudianteNombre?: string;
 }
 
 function obtenerTipoMaterial(asignacion: AsignacionCentroEstudios): string {
-  if (asignacion.uso === 'evaluacion') return 'Quiz';
+  if (asignacion.uso === 'evaluacion') return 'Quiz / Evaluación';
   if (asignacion.uso === 'refuerzo') return 'Refuerzo guiado';
   return 'Material de estudio';
 }
 
-const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({ asignacion, onCerrar }) => {
+type TipoMaterialDetectado = 'video' | 'pdf' | 'quiz' | 'generico';
+
+function detectarTipoMaterial(asignacion: AsignacionCentroEstudios): TipoMaterialDetectado {
+  if (asignacion.uso === 'evaluacion') return 'quiz';
+  const titulo = (asignacion.titulo || '').toLowerCase();
+  if (
+    titulo.endsWith('.mp4') ||
+    titulo.endsWith('.mov') ||
+    titulo.endsWith('.avi') ||
+    titulo.endsWith('.mkv') ||
+    asignacion.duracionSegundos !== undefined
+  ) {
+    return 'video';
+  }
+
+  // Extensiones genéricas explícitas
+  const ext = titulo.split('.').pop() || '';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'md', 'ppt', 'pptx', 'key'].includes(ext)) {
+    return 'generico';
+  }
+
+  // Fallback por defecto a pdf para compatibilidad
+  return 'pdf';
+}
+
+const obtenerMensajeAccesoDrive = (err: unknown): string => {
+  const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
+  const message = err instanceof Error ? err.message : '';
+  const normalizado = `${code} ${message}`.toLowerCase();
+
+  if (normalizado.includes('not-found') || normalizado.includes('archivo') || normalizado.includes('eliminado')) {
+    return 'Archivo de Drive no disponible. La asignacion debe revisarse antes de continuar.';
+  }
+
+  if (normalizado.includes('unauthenticated') || normalizado.includes('invalid_grant') || normalizado.includes('revoked')) {
+    return 'Conexion de Drive expirada. Solicita al administrador reconectar Google Drive.';
+  }
+
+  if (normalizado.includes('permission-denied') || normalizado.includes('403') || normalizado.includes('forbidden')) {
+    return 'Permisos insuficientes para abrir este recurso de Drive.';
+  }
+
+  return message || 'No se pudo obtener acceso temporal al recurso.';
+};
+
+const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
+  asignacion,
+  onCerrar,
+  repository = progresoRepository,
+  driveService = defaultDriveService,
+  estudianteId,
+  estudianteNombre,
+}) => {
   const [resultadoQuiz, setResultadoQuiz] = React.useState<ResultadoQuiz | null>(null);
+  const [accesoTemporal, setAccesoTemporal] = React.useState<TemporaryFileUrlResult | null>(null);
+  const [errorAcceso, setErrorAcceso] = React.useState('');
+  const [textoContenido, setTextoContenido] = React.useState<string | null>(null);
+
+  const tipoMaterial = React.useMemo(
+    () => (asignacion ? detectarTipoMaterial(asignacion) : 'generico'),
+    [asignacion]
+  );
+
+  // Hook de registro de actividad
+  const { registrarApertura } = useRegistrarActividad({
+    tenantId: asignacion?.tenantId ?? '',
+    estudianteId: estudianteId ?? '',
+    estudianteNombre,
+    asignacionId: asignacion?.id ?? '',
+    recursoId: asignacion?.recursoId ?? '',
+    tituloRecurso: asignacion?.titulo ?? '',
+  });
+
+  // Auto-registrar aperturas de archivos genéricos (imágenes, textos, etc.)
+  React.useEffect(() => {
+    if (!asignacion || !estudianteId || tipoMaterial !== 'generico') return;
+
+    const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
+    let tipoAct: 'imagen' | 'texto' | 'presentacion' | 'apertura' = 'apertura';
+
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+      tipoAct = 'imagen';
+    } else if (['txt', 'md'].includes(ext)) {
+      tipoAct = 'texto';
+    } else if (['ppt', 'pptx', 'key'].includes(ext)) {
+      tipoAct = 'presentacion';
+    }
+
+    registrarApertura(tipoAct);
+  }, [asignacion?.id, tipoMaterial, estudianteId, registrarApertura, asignacion?.titulo]);
 
   React.useEffect(() => {
     setResultadoQuiz(null);
   }, [asignacion?.id]);
 
+  React.useEffect(() => {
+    setAccesoTemporal(null);
+    setErrorAcceso('');
+
+    if (!asignacion || asignacion.uso === 'evaluacion' || !asignacion.externalFileId) return;
+
+    let activo = true;
+    driveService.obtenerUrlTemporal(asignacion.tenantId, asignacion.id, asignacion.externalFileId)
+      .then((resultado) => {
+        if (!activo) return;
+        setAccesoTemporal(resultado);
+
+        // Si es texto, intentar leer el contenido
+        const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
+        if (['txt', 'md'].includes(ext) && resultado.url) {
+          fetch(resultado.url)
+            .then(res => res.text())
+            .then(text => {
+              if (activo) setTextoContenido(text);
+            })
+            .catch(err => {
+              console.warn('[MaterialPreviewModal] Falló fetch de texto', err);
+            });
+        }
+      })
+      .catch((err) => {
+        if (activo) setErrorAcceso(obtenerMensajeAccesoDrive(err));
+      });
+
+    return () => {
+      activo = false;
+    };
+  }, [asignacion, driveService]);
+
   if (!asignacion) return null;
 
   const estadoVisible = resultadoQuiz?.estadoPostQuiz || asignacion.estadoProgreso;
   const progresoVisible = resultadoQuiz?.aprobado ? 100 : asignacion.porcentajeProgreso;
-  const sincronizarProgreso = (payload: ProgresoSyncPayload) => {
+  const sincronizarProgreso = async (payload: ProgresoSyncPayload) => {
+    await repository.guardarSync(payload.tenantId, payload.asignacionId, {
+      paginasVistas: payload.paginasVistas,
+      segundosUnicos: payload.segundosUnicos,
+    });
+
     const win = typeof window !== 'undefined' ? (window as any) : undefined;
     if (win?.Cypress) {
       win.__CENTRO_ESTUDIOS_SYNC_PAYLOADS__ = [
@@ -58,17 +193,86 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({ asignacion,
         </header>
 
         <main className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-          {asignacion.uso === 'evaluacion' ? (
-            <QuizView asignacion={asignacion} onResultado={setResultadoQuiz} />
-          ) : (
+          {accesoTemporal && (
+            <div className="rounded-2xl bg-green-50 text-green-800 p-4 text-sm font-bold">
+              Acceso seguro listo. URL temporal vence en {new Date(accesoTemporal.expiresAt).toLocaleTimeString()}.
+            </div>
+          )}
+
+          {errorAcceso && (
+            <div className="rounded-2xl bg-red-50 text-red-700 p-4 text-sm font-bold">
+              {errorAcceso}
+            </div>
+          )}
+
+          {tipoMaterial === 'quiz' ? (
+            <QuizView
+              asignacion={asignacion}
+              onResultado={setResultadoQuiz}
+              repository={repository}
+              estudianteId={estudianteId}
+              estudianteNombre={estudianteNombre}
+              recursoId={asignacion.recursoId}
+            />
+          ) : tipoMaterial === 'video' ? (
+            <VideoPlayer
+              tenantId={asignacion.tenantId}
+              asignacionId={asignacion.id}
+              titulo={asignacion.titulo}
+              url={accesoTemporal?.url ?? asignacion.driveFileUrl ?? ''}
+              totalSegundos={asignacion.duracionSegundos ?? 120}
+              sincronizar={sincronizarProgreso}
+              cargarProgreso={() => repository.leerSync(asignacion.tenantId, asignacion.id)}
+              estudianteId={estudianteId}
+              estudianteNombre={estudianteNombre}
+              recursoId={asignacion.recursoId}
+            />
+          ) : tipoMaterial === 'pdf' ? (
             <PdfViewer
               tenantId={asignacion.tenantId}
               asignacionId={asignacion.id}
               titulo={asignacion.titulo}
-              totalPaginas={3}
+              totalPaginas={asignacion.totalPaginas ?? 3}
               sincronizar={sincronizarProgreso}
-              cargarProgreso={() => progresoRepository.leerSync(asignacion.tenantId, asignacion.id)}
+              cargarProgreso={() => repository.leerSync(asignacion.tenantId, asignacion.id)}
+              estudianteId={estudianteId}
+              estudianteNombre={estudianteNombre}
+              recursoId={asignacion.recursoId}
             />
+          ) : (
+            /* Tipo material: Generico (Imagen, texto, presentación) */
+            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
+                {asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') ? '🖼' : '📝'}
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Apertura registrada y validada para métricas</p>
+              </div>
+
+              {/* Render de imágenes */}
+              {accesoTemporal?.url && (asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') || asignacion.titulo.endsWith('.gif')) && (
+                <img
+                  src={accesoTemporal.url}
+                  alt={asignacion.titulo}
+                  className="max-h-[40vh] object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3"
+                />
+              )}
+
+              {/* Render de texto */}
+              {textoContenido !== null && (
+                <pre className="w-full max-h-[30vh] overflow-auto text-left text-xs bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/10 font-mono text-gray-600 dark:text-gray-300">
+                  {textoContenido}
+                </pre>
+              )}
+
+              {/* Si no se puede previsualizar */}
+              {!accesoTemporal?.url && !errorAcceso && (
+                <div className="text-sm text-gray-500 font-bold mt-2">
+                  Cargando recurso seguro desde Google Drive...
+                </div>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-black uppercase tracking-widest">

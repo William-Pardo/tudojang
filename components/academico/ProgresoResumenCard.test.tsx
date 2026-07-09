@@ -36,8 +36,8 @@ describe('ProgresoResumenCard', () => {
       />
     );
 
-    expect(screen.getByText('Asignaciones')).toBeInTheDocument();
+    expect(screen.getByText('Material publicado')).toBeInTheDocument();
     expect(screen.getByText('33%')).toBeInTheDocument();
-    expect(screen.getByText(/1 completadas/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 completado/i)).toBeInTheDocument();
   });
 });

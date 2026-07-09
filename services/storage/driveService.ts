@@ -43,6 +43,27 @@ export interface DriveListFolderResult {
   files: DriveFile[];
 }
 
+export interface DriveDisconnectResult {
+  ok: boolean;
+  disconnectedCount: number;
+}
+
+export interface DriveConnectionInfo {
+  connected: boolean;
+  connectionId?: string;
+  activeFolderId?: string;
+  activeFolderName?: string;
+  googleAccountEmail?: string;
+  status?: string;
+}
+
+export interface DriveSetFolderResult {
+  ok: boolean;
+  connectionId: string;
+  activeFolderId: string;
+  activeFolderName?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Fábrica del servicio con inyección de dependencias
 // ---------------------------------------------------------------------------
@@ -135,6 +156,54 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
   };
 
   /**
+   * Desconecta Google Drive para un tenant.
+   * La Cloud Function marca las conexiones activas como desconectadas y revoca el token cuando es posible.
+   */
+  const desconectarDrive = async (
+    tenantId: string
+  ): Promise<DriveDisconnectResult> => {
+    const callDisconnect = call<
+      { tenantId: string },
+      DriveDisconnectResult
+    >('disconnectDrive');
+
+    const result = await callDisconnect({ tenantId });
+    return result.data;
+  };
+
+  /**
+   * Obtiene la conexion activa de Drive del tenant, incluyendo carpeta activa persistida en Firestore.
+   */
+  const obtenerConexionDrive = async (
+    tenantId: string
+  ): Promise<DriveConnectionInfo> => {
+    const callGetConnection = call<
+      { tenantId: string },
+      DriveConnectionInfo
+    >('getDriveConnection');
+
+    const result = await callGetConnection({ tenantId });
+    return result.data;
+  };
+
+  /**
+   * Persiste la carpeta institucional activa para todos los admins del tenant.
+   */
+  const guardarCarpetaActiva = async (
+    tenantId: string,
+    folderId: string,
+    folderName?: string
+  ): Promise<DriveSetFolderResult> => {
+    const callSetFolder = call<
+      { tenantId: string; folderId: string; folderName?: string },
+      DriveSetFolderResult
+    >('setDriveFolder');
+
+    const result = await callSetFolder({ tenantId, folderId, folderName });
+    return result.data;
+  };
+
+  /**
    * Obtiene una URL temporal (15 min) para acceder a un archivo de Drive.
    * Valida que exista una asignación activa antes de generar la URL.
    * Si el archivo fue eliminado, la Cloud Function marca la asignación como bloqueada.
@@ -164,6 +233,9 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     procesarCallbackOAuth,
     listarCarpetaDrive,
     obtenerUrlTemporal,
+    desconectarDrive,
+    obtenerConexionDrive,
+    guardarCarpetaActiva,
   };
 };
 

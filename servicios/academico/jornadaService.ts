@@ -32,6 +32,17 @@ interface GenerarJornadasFromBloqueInput {
 
 const crearId = (prefijo: string) => `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+function minutosDesdeHora(hora: string): number {
+  const [hh, mm] = hora.split(':').map(Number);
+  return hh * 60 + mm;
+}
+
+function validarHorario(horaInicio: string, horaFin: string): void {
+  if (minutosDesdeHora(horaFin) <= minutosDesdeHora(horaInicio)) {
+    throw new Error('horaFin debe ser posterior a horaInicio.');
+  }
+}
+
 const transicionesPermitidas: Record<EstadoJornada, EstadoJornada[]> = {
   borrador: ['confirmada', 'cancelada'],
   pendiente_confirmacion: ['confirmada', 'cancelada', 'pendiente_sustitucion'],
@@ -40,7 +51,7 @@ const transicionesPermitidas: Record<EstadoJornada, EstadoJornada[]> = {
   pendiente_cierre: ['cerrada', 'parcial'],
   cerrada: [],
   cancelada: [],
-  reprogramada: ['pendiente_confirmacion', 'cancelada'],
+  reprogramada: ['confirmada', 'pendiente_confirmacion', 'cancelada'],
   parcial: ['cerrada'],
   pendiente_sustitucion: ['confirmada', 'cancelada'],
 };
@@ -59,9 +70,10 @@ function transicionar(jornada: JornadaInstruccion, estado: EstadoJornada): Jorna
 }
 
 export function createJornada(input: CrearJornadaInput): JornadaInstruccion {
+  validarHorario(input.horaInicio, input.horaFin);
   const ahora = new Date().toISOString();
 
-  return {
+  const jornada: JornadaInstruccion = {
     id: crearId('jornada'),
     tenantId: input.tenantId,
     programaId: input.programaId,
@@ -70,7 +82,6 @@ export function createJornada(input: CrearJornadaInput): JornadaInstruccion {
     sedeId: input.sedeId,
     espacioId: input.espacioId,
     instructorId: input.instructorId,
-    bloqueRecurrenteId: input.bloqueRecurrenteId,
     fecha: input.fecha,
     horaInicio: input.horaInicio,
     horaFin: input.horaFin,
@@ -81,6 +92,12 @@ export function createJornada(input: CrearJornadaInput): JornadaInstruccion {
     creadoEn: ahora,
     actualizadoEn: ahora,
   };
+
+  if (input.bloqueRecurrenteId) {
+    jornada.bloqueRecurrenteId = input.bloqueRecurrenteId;
+  }
+
+  return jornada;
 }
 
 export function confirmarJornada(jornada: JornadaInstruccion): JornadaInstruccion {
@@ -119,6 +136,15 @@ export function cancelarJornada(jornada: JornadaInstruccion, motivoCancelacion: 
     ...transicionar(jornada, 'cancelada'),
     motivoCancelacion,
   };
+}
+
+export function reprogramarJornada(
+  jornada: JornadaInstruccion,
+  cambios: { fecha: string; horaInicio: string; horaFin: string }
+): JornadaInstruccion {
+  validarHorario(cambios.horaInicio, cambios.horaFin);
+  const conNuevoHorario = { ...jornada, ...cambios };
+  return transicionar(transicionar(conNuevoHorario, 'reprogramada'), 'confirmada');
 }
 
 export function rechazarTransicionInvalida(

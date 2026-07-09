@@ -8,6 +8,73 @@ const admin = require('firebase-admin');
 const { google } = require('googleapis');
 const { cifrarToken, descifrarToken } = require('./kms');
 
+const DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const GOOGLE_USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
+
+const parseConnectionTimestamp = (data = {}) => {
+  const candidates = [
+    data.connectedAt,
+    data.lastRefreshedAt,
+    data.folderUpdatedAt,
+    data.disconnectedAt
+  ];
+
+  for (const value of candidates) {
+    const timestamp = Date.parse(value);
+    if (Number.isFinite(timestamp)) return timestamp;
+  }
+
+  return 0;
+};
+
+const ordenarDocsPorConexionReciente = (docs = []) => {
+  return [...docs].sort((a, b) => {
+    const diff = parseConnectionTimestamp(b.data()) - parseConnectionTimestamp(a.data());
+    if (diff !== 0) return diff;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+};
+
+const seleccionarDocMasReciente = (docs = []) => ordenarDocsPorConexionReciente(docs)[0] || null;
+
+const obtenerConexionActivaMasReciente = async (firestore, tenantId) => {
+  const connectionsSnap = await firestore
+    .collection('tenants')
+    .doc(tenantId)
+    .collection('driveConnections')
+    .where('status', '==', 'active')
+    .get();
+
+  if (connectionsSnap.empty) return null;
+
+  const doc = seleccionarDocMasReciente(connectionsSnap.docs);
+  return {
+    doc,
+    data: doc.data(),
+    activeCount: connectionsSnap.docs.length
+  };
+};
+
+const scopeIncluye = (scope = '', requiredScope) => {
+  return String(scope).split(/\s+/).includes(requiredScope);
+};
+
+const assertScopeDriveReadonly = (scope = '') => {
+  if (scope && !scopeIncluye(scope, DRIVE_READONLY_SCOPE)) {
+    const error = new Error(
+      'Google no autorizo el alcance drive.readonly requerido para listar carpetas. Desconecta y vuelve a conectar Google Drive aceptando el permiso de lectura.'
+    );
+    error.code = 'permission-denied';
+    throw error;
+  }
+};
+
+const resumirDriveId = (value = '') => {
+  const text = String(value || '');
+  if (text.length <= 12) return text;
+  return `${text.slice(0, 6)}...${text.slice(-4)}`;
+};
+
 /**
  * Crea el servicio para generar la URL de autorización OAuth2 de Google Drive.
  *
@@ -54,9 +121,12 @@ const crearServicioConnectDrive = ({ googleDriveConfig }) => {
       resolvedRedirectUri
     );
 
-    // 5. Generar URL de consentimiento de Google Drive (Read-only + Offline access)
+    // 5. Generar URL de consentimiento de Google Drive.
+    // drive.readonly permite listar el contenido de una carpeta institucional seleccionada.
+    // drive.file no permite recorrer de forma confiable los hijos de una carpeta elegida con Picker.
     const scopes = [
-      'https://www.googleapis.com/auth/drive.readonly'
+      DRIVE_READONLY_SCOPE,
+      GOOGLE_USERINFO_EMAIL_SCOPE
     ];
 
     const url = oauth2Client.generateAuthUrl({
@@ -133,6 +203,8 @@ const crearServicioDriveOAuthCallback = ({ googleDriveConfig, firestore }) => {
       throw new Error('No se recibió access_token de Google');
     }
 
+    assertScopeDriveReadonly(scope);
+
     // 5. Cifrar el refresh_token si viene en la respuesta
     let encryptedRefreshToken = null;
     if (refresh_token) {
@@ -143,14 +215,35 @@ const crearServicioDriveOAuthCallback = ({ googleDriveConfig, firestore }) => {
     const connectionsCol = firestore.collection('tenants').doc(tenantId).collection('driveConnections');
     
     // Buscar si ya existe una conexión para reutilizar su ID y no duplicar registros
-    const snapshot = await connectionsCol.limit(1).get();
+    const snapshot = await connectionsCol.get();
+    const docsExistentes = snapshot.empty ? [] : snapshot.docs;
+    const activeDocs = docsExistentes.filter((doc) => doc.data()?.status === 'active');
+    const docActivoMasReciente = seleccionarDocMasReciente(activeDocs);
+    const docMasReciente = seleccionarDocMasReciente(docsExistentes);
     let connRef;
     let oldData = {};
-    if (!snapshot.empty) {
-      connRef = snapshot.docs[0].ref;
-      oldData = snapshot.docs[0].data();
+    if (docActivoMasReciente) {
+      connRef = docActivoMasReciente.ref;
+      oldData = docActivoMasReciente.data();
+    } else if (docMasReciente) {
+      connRef = docMasReciente.ref;
+      oldData = docMasReciente.data();
     } else {
       connRef = connectionsCol.doc();
+    }
+
+    let googleAccountEmail = '';
+    try {
+      const fetchFn = googleDriveConfig._fetchFn || fetch;
+      const tokenInfoResponse = await fetchFn(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(access_token)}`
+      );
+      if (tokenInfoResponse.ok) {
+        const tokenInfo = await tokenInfoResponse.json();
+        googleAccountEmail = typeof tokenInfo.email === 'string' ? tokenInfo.email : '';
+      }
+    } catch (_) {
+      googleAccountEmail = '';
     }
 
     const connectionData = {
@@ -158,21 +251,45 @@ const crearServicioDriveOAuthCallback = ({ googleDriveConfig, firestore }) => {
       tenantId,
       connectedAt: new Date().toISOString(),
       connectedBy: context.auth.uid,
-      scope: scope || 'https://www.googleapis.com/auth/drive.readonly',
+      scope: scope || DRIVE_READONLY_SCOPE,
       expiryDate: expiry_date || (Date.now() + 3600 * 1000),
       status: 'active'
     };
 
+    if (googleAccountEmail) {
+      connectionData.googleAccountEmail = googleAccountEmail;
+    }
+
     // Si recibimos un nuevo refresh_token, lo actualizamos. Si no, mantenemos el anterior
     if (encryptedRefreshToken) {
       connectionData.refreshToken = encryptedRefreshToken;
-    } else if (oldData.refreshToken) {
+    } else if (
+      oldData.refreshToken &&
+      oldData.status === 'active' &&
+      scopeIncluye(oldData.scope, DRIVE_READONLY_SCOPE)
+    ) {
       connectionData.refreshToken = oldData.refreshToken;
     } else {
-      throw new Error('No se recibió refresh_token y no existe una conexión previa con refresh_token guardado. Intente reconectar forzando el consentimiento.');
+      throw new Error('No se recibio refresh_token reutilizable con permiso drive.readonly. Desconecta y vuelve a conectar Google Drive para renovar el consentimiento.');
     }
 
     await connRef.set(connectionData, { merge: true });
+
+    if (encryptedRefreshToken && activeDocs.length > 1) {
+      const ahora = new Date().toISOString();
+      const connRefId = connRef.id || connRef.path;
+      const duplicadas = activeDocs.filter((doc) => {
+        const docRefId = doc.ref?.id || doc.ref?.path;
+        return doc.ref !== connRef && doc.id !== connRefId && docRefId !== connRefId;
+      });
+
+      await Promise.all(duplicadas.map((doc) => doc.ref.set({
+        status: 'disconnected',
+        disconnectedAt: ahora,
+        disconnectedBy: context.auth.uid,
+        disconnectedReason: 'replaced_by_new_drive_connection'
+      }, { merge: true })));
+    }
 
     return { ok: true, connectionId: connRef.id };
   };
@@ -294,6 +411,353 @@ const crearServicioRefreshDriveToken = ({ googleDriveConfig, firestore }) => {
 };
 
 /**
+ * Crea el servicio para listar archivos y subcarpetas de Google Drive.
+ * Usa la conexion activa del tenant y devuelve solo metadatos seguros para la UI.
+ *
+ * @param {object} deps
+ * @param {object} deps.googleDriveConfig
+ * @param {object} deps.firestore
+ */
+const crearServicioListDriveFolder = ({ googleDriveConfig, firestore }) => {
+  return async (data, context) => {
+    if (!context.auth) {
+      throw new Error('No autenticado');
+    }
+
+    const { tenantId, folderId = 'root' } = data || {};
+    if (!tenantId) {
+      throw new Error('El parámetro tenantId es obligatorio');
+    }
+
+    const rolesPermitidos = ['Admin', 'SuperAdmin', 'Maestro', 'Editor'];
+    if (!rolesPermitidos.includes(context.auth.token.rol)) {
+      const error = new Error('No autorizado para explorar Google Drive');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    if (context.auth.token.rol !== 'SuperAdmin' && context.auth.token.tenantId !== tenantId) {
+      const error = new Error('No autorizado para este tenant');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    const conexionActiva = await obtenerConexionActivaMasReciente(firestore, tenantId);
+
+    if (!conexionActiva) {
+      throw new Error('El tenant no tiene una conexión de Google Drive activa');
+    }
+
+    const connData = conexionActiva.data;
+    if (!connData.refreshToken) {
+      throw new Error('La conexión de Drive no tiene refresh_token almacenado');
+    }
+
+    const clientId = googleDriveConfig.clientId || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = googleDriveConfig.clientSecret || process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = googleDriveConfig.redirectUri || process.env.GOOGLE_REDIRECT_URI;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      throw new Error('Configuración de Google Drive incompleta');
+    }
+
+    const plaintextRefreshToken = await descifrarToken(connData.refreshToken);
+    const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+    oauth2Client.setCredentials({ refresh_token: plaintextRefreshToken });
+
+    let accessToken;
+    try {
+      const tokenResponse = await oauth2Client.getAccessToken();
+      accessToken = tokenResponse.token;
+    } catch (err) {
+      throw new Error('Error al obtener access_token de Drive: ' + err.message);
+    }
+
+    const safeFolderId = String(folderId || 'root').replace(/'/g, "\\'");
+    const query = `'${safeFolderId}' in parents and trashed = false`;
+    const fields = 'files(id,name,mimeType,webViewLink,parents,modifiedTime,size)';
+    const params = new URLSearchParams({
+      q: query,
+      fields,
+      orderBy: 'folder,name',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+      pageSize: '100'
+    });
+    const url = `https://www.googleapis.com/drive/v3/files?${params.toString()}`;
+
+    const fetchFn = googleDriveConfig._fetchFn || fetch;
+    const response = await fetchFn(url, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      let detail = '';
+      try {
+        const rawBody = await response.text();
+        if (rawBody) {
+          const parsed = JSON.parse(rawBody);
+          const googleStatus = parsed?.error?.status;
+          const googleMessage = parsed?.error?.message;
+          detail = [googleStatus, googleMessage].filter(Boolean).join(': ');
+        }
+      } catch (_) {
+        detail = '';
+      }
+
+      console.warn('[drive:listDriveFolder:permission-denied]', {
+        tenantId,
+        folderId: resumirDriveId(safeFolderId),
+        connectionId: conexionActiva.doc.id,
+        activeConnections: conexionActiva.activeCount,
+        scope: connData.scope || '',
+        googleAccountEmail: connData.googleAccountEmail || '',
+        googleError: detail || `HTTP ${response.status}`
+      });
+
+      const error = new Error(
+        detail
+          ? `Permisos insuficientes en Drive o token expirado: ${detail}`
+          : 'Permisos insuficientes en Drive o token expirado'
+      );
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    if (response.status === 404) {
+      const error = new Error('Carpeta inaccesible o eliminada en Drive');
+      error.code = 'not-found';
+      throw error;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Error al listar carpeta Drive: HTTP ${response.status}`);
+    }
+
+    const body = await response.json();
+    const files = Array.isArray(body.files) ? body.files : [];
+
+    return {
+      files: files.map((file) => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        webViewLink: file.webViewLink,
+        parents: file.parents,
+        modifiedTime: file.modifiedTime,
+        size: file.size === undefined ? undefined : Number(file.size)
+      }))
+    };
+  };
+};
+
+/**
+ * Crea el servicio para desconectar Google Drive de un tenant.
+ * Marca las conexiones activas como desconectadas y revoca el refresh_token cuando Google lo permite.
+ *
+ * @param {object} deps
+ * @param {object} deps.googleDriveConfig
+ * @param {object} deps.firestore
+ */
+const crearServicioDisconnectDrive = ({ googleDriveConfig, firestore }) => {
+  return async (data, context) => {
+    if (!context.auth) {
+      throw new Error('No autenticado');
+    }
+
+    const { tenantId } = data || {};
+    if (!tenantId) {
+      throw new Error('El parÃ¡metro tenantId es obligatorio');
+    }
+
+    if (
+      context.auth.token.rol !== 'Admin' &&
+      context.auth.token.rol !== 'SuperAdmin'
+    ) {
+      const error = new Error('Solo el Admin del tenant puede desconectar Google Drive');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    if (context.auth.token.rol !== 'SuperAdmin' && context.auth.token.tenantId !== tenantId) {
+      const error = new Error('No autorizado para este tenant');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    const connectionsSnap = await firestore
+      .collection('tenants')
+      .doc(tenantId)
+      .collection('driveConnections')
+      .where('status', '==', 'active')
+      .get();
+
+    if (connectionsSnap.empty) {
+      return { ok: true, disconnectedCount: 0 };
+    }
+
+    const clientId = googleDriveConfig.clientId || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = googleDriveConfig.clientSecret || process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = googleDriveConfig.redirectUri || process.env.GOOGLE_REDIRECT_URI;
+    const ahora = new Date().toISOString();
+
+    let disconnectedCount = 0;
+    for (const doc of connectionsSnap.docs) {
+      const connData = doc.data();
+      let revokeError = null;
+
+      if (connData.refreshToken && clientId && clientSecret && redirectUri) {
+        try {
+          const plaintextRefreshToken = await descifrarToken(connData.refreshToken);
+          const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+          await oauth2Client.revokeToken(plaintextRefreshToken);
+        } catch (err) {
+          revokeError = err.message || 'No se pudo revocar el token en Google';
+        }
+      }
+
+      const updateData = {
+        status: 'disconnected',
+        disconnectedAt: ahora,
+        disconnectedBy: context.auth.uid,
+        folderId: admin.firestore.FieldValue.delete(),
+        activeFolderId: admin.firestore.FieldValue.delete()
+      };
+
+      if (revokeError) {
+        updateData.revokeError = revokeError;
+      } else {
+        updateData.revokeError = admin.firestore.FieldValue.delete();
+      }
+
+      await doc.ref.set(updateData, { merge: true });
+      disconnectedCount += 1;
+    }
+
+    return { ok: true, disconnectedCount };
+  };
+};
+
+/**
+ * Devuelve la conexion activa de Drive para un tenant, incluyendo carpeta activa.
+ *
+ * @param {object} deps
+ * @param {object} deps.firestore
+ */
+const crearServicioGetDriveConnection = ({ firestore }) => {
+  return async (data, context) => {
+    if (!context.auth) {
+      throw new Error('No autenticado');
+    }
+
+    const { tenantId } = data || {};
+    if (!tenantId) {
+      throw new Error('El parámetro tenantId es obligatorio');
+    }
+
+    const rolesPermitidos = ['Admin', 'SuperAdmin', 'Maestro', 'Editor'];
+    if (!rolesPermitidos.includes(context.auth.token.rol)) {
+      const error = new Error('No autorizado para consultar Google Drive');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    if (context.auth.token.rol !== 'SuperAdmin' && context.auth.token.tenantId !== tenantId) {
+      const error = new Error('No autorizado para este tenant');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    const conexionActiva = await obtenerConexionActivaMasReciente(firestore, tenantId);
+
+    if (!conexionActiva) {
+      return { connected: false };
+    }
+
+    const doc = conexionActiva.doc;
+    const connData = conexionActiva.data;
+    const activeFolderId = connData.activeFolderId || connData.folderId || '';
+
+      return {
+        connected: true,
+        connectionId: doc.id,
+        activeFolderId,
+        activeFolderName: connData.activeFolderName || connData.folderName || '',
+        googleAccountEmail: connData.googleAccountEmail || '',
+        status: connData.status || 'active'
+      };
+  };
+};
+
+/**
+ * Persiste la carpeta activa de Drive en la conexion activa del tenant.
+ *
+ * @param {object} deps
+ * @param {object} deps.firestore
+ */
+const crearServicioSetDriveFolder = ({ firestore }) => {
+  return async (data, context) => {
+    if (!context.auth) {
+      throw new Error('No autenticado');
+    }
+
+    const { tenantId, folderId, folderName } = data || {};
+    if (!tenantId || !folderId) {
+      throw new Error('Los parámetros tenantId y folderId son obligatorios');
+    }
+
+    if (
+      context.auth.token.rol !== 'Admin' &&
+      context.auth.token.rol !== 'SuperAdmin'
+    ) {
+      const error = new Error('Solo el Admin del tenant puede definir la carpeta activa de Drive');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    if (context.auth.token.rol !== 'SuperAdmin' && context.auth.token.tenantId !== tenantId) {
+      const error = new Error('No autorizado para este tenant');
+      error.code = 'permission-denied';
+      throw error;
+    }
+
+    const conexionActiva = await obtenerConexionActivaMasReciente(firestore, tenantId);
+
+    if (!conexionActiva) {
+      throw new Error('El tenant no tiene una conexión de Google Drive activa');
+    }
+
+    const doc = conexionActiva.doc;
+    const activeFolderId = String(folderId).trim();
+    if (!activeFolderId) {
+      throw new Error('El parámetro folderId no puede estar vacío');
+    }
+    const activeFolderName = String(folderName || '').trim();
+
+    const updateData = {
+      activeFolderId,
+      folderId: activeFolderId,
+      folderUpdatedAt: new Date().toISOString(),
+      folderUpdatedBy: context.auth.uid
+    };
+
+    if (activeFolderName) {
+      updateData.activeFolderName = activeFolderName;
+      updateData.folderName = activeFolderName;
+    }
+
+    await doc.ref.set(updateData, { merge: true });
+
+    return {
+      ok: true,
+      connectionId: doc.id,
+      activeFolderId,
+      activeFolderName
+    };
+  };
+};
+
+/**
  * Crea el servicio para generar URLs temporales de acceso a archivos de Drive.
  * Valida rol del solicitante, tenantId, existencia de asignación activa y genera
  * un enlace de descarga temporal (15 minutos) usando el access_token del tenant.
@@ -394,19 +858,13 @@ const crearServicioGetTemporaryFileUrl = ({ googleDriveConfig, firestore }) => {
     }
 
     // 6. Obtener la conexión de Drive activa del tenant
-    const connectionsSnap = await firestore
-      .collection('tenants')
-      .doc(tenantId)
-      .collection('driveConnections')
-      .where('status', '==', 'active')
-      .limit(1)
-      .get();
+    const conexionActiva = await obtenerConexionActivaMasReciente(firestore, tenantId);
 
-    if (connectionsSnap.empty) {
+    if (!conexionActiva) {
       throw new Error('El tenant no tiene una conexión de Google Drive activa');
     }
 
-    const connData = connectionsSnap.docs[0].data();
+    const connData = conexionActiva.data;
     if (!connData.refreshToken) {
       throw new Error('La conexión de Drive no tiene refresh_token almacenado');
     }
@@ -609,20 +1067,14 @@ const crearServicioSyncDriveMetadata = ({ googleDriveConfig, firestore }) => {
       const fetchFn = googleDriveConfig._fetchFn || fetch;
 
       for (const tId of Object.keys(resourcesByTenant)) {
-        const connectionsSnap = await firestore
-          .collection('tenants')
-          .doc(tId)
-          .collection('driveConnections')
-          .where('status', '==', 'active')
-          .limit(1)
-          .get();
+        const conexionActiva = await obtenerConexionActivaMasReciente(firestore, tId);
 
-        if (connectionsSnap.empty) {
+        if (!conexionActiva) {
           results.push({ tenantId: tId, status: 'no_active_connection', count: resourcesByTenant[tId].length });
           continue;
         }
 
-        const connData = connectionsSnap.docs[0].data();
+        const connData = conexionActiva.data;
         if (!connData.refreshToken) {
           results.push({ tenantId: tId, status: 'missing_refresh_token', count: resourcesByTenant[tId].length });
           continue;
@@ -783,6 +1235,10 @@ module.exports = {
   crearServicioConnectDrive,
   crearServicioDriveOAuthCallback,
   crearServicioRefreshDriveToken,
+  crearServicioListDriveFolder,
+  crearServicioDisconnectDrive,
+  crearServicioGetDriveConnection,
+  crearServicioSetDriveFolder,
   crearServicioGetTemporaryFileUrl,
   crearServicioSyncDriveMetadata
 };

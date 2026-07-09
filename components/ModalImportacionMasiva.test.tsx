@@ -73,6 +73,7 @@ const filaBase = {
   Grado_Actual: GradoTKD.Blanco,
   Tutor_Nombre_Completo: '',
   Tutor_Identificacion: '',
+  Tutor_Correo: '',
   Tutor_Telefono: '',
   Alergias: 'Ninguna',
   Lesiones: 'Ninguna',

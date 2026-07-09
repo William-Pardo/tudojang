@@ -58,6 +58,16 @@ let usuariosMock: UsuarioContrasena[] = [
     numeroIdentificacion: '1020304052', whatsapp: '3201234567', rol: RolUsuario.Asistente,
     tenantId: 'escuela-gajog-001', sedeId: '1', contrasena: 'asistente123',
   },
+  {
+    id: 'estudiante-001', email: 'juan@test.com', nombreUsuario: 'Juan Pérez (Estudiante)',
+    numeroIdentificacion: '10101', whatsapp: '3001234568', rol: RolUsuario.Estudiante,
+    tenantId: 'escuela-gajog-001', contrasena: 'juan123',
+  },
+  {
+    id: 'estudiante-002', email: 'maria@test.com', nombreUsuario: 'Maria Lopez (Estudiante)',
+    numeroIdentificacion: '20202', whatsapp: '3001234569', rol: RolUsuario.Estudiante,
+    tenantId: 'escuela-gajog-001', contrasena: 'maria123',
+  }
 ];
 
 export const esperar = (milliseconds: number): Promise<void> =>

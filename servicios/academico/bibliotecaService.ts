@@ -6,8 +6,11 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
   Firestore
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../../firebase/config';
@@ -46,6 +49,9 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     creadoPorUid: string
   ): Promise<RecursoAcademico> => {
     if (!checkConfigured()) {
+      const existente = buscarRecursoIndexadoEnMock_(tenantId, fileId, nombre);
+      if (existente) return existente;
+
       const id = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const recurso: RecursoAcademico = {
         id,
@@ -53,7 +59,10 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
         proveedor: 'google_drive',
         externalFileId: fileId,
         nombre,
+        nombreNormalizado: normalizarNombreRecurso_(nombre),
         mimeType,
+        fuenteDriveEstado: 'verificada',
+        ultimaVerificacionDrive: new Date().toISOString(),
         ficha: null,
         estado: 'borrador',
         creadoPorUid,
@@ -64,6 +73,9 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       return recurso;
     }
 
+    const existente = await findRecursoIndexado(tenantId, fileId, nombre);
+    if (existente) return existente;
+
     const docRef = doc(collection(getDatabase(), 'tenants', tenantId, 'recursos'));
     const recurso: RecursoAcademico = {
       id: docRef.id,
@@ -71,7 +83,10 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       proveedor: 'google_drive',
       externalFileId: fileId,
       nombre,
+      nombreNormalizado: normalizarNombreRecurso_(nombre),
       mimeType,
+      fuenteDriveEstado: 'verificada',
+      ultimaVerificacionDrive: new Date().toISOString(),
       ficha: null,
       estado: 'borrador',
       creadoPorUid,
@@ -82,24 +97,63 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     return recurso;
   };
 
+  const findRecursoIndexado = async (
+    tenantId: string,
+    fileId: string,
+    nombre?: string
+  ): Promise<RecursoAcademico | null> => {
+    if (!checkConfigured()) {
+      return buscarRecursoIndexadoEnMock_(tenantId, fileId, nombre);
+    }
+
+    const recursosRef = collection(getDatabase(), 'tenants', tenantId, 'recursos');
+    const consultaPorArchivo = query(recursosRef, where('externalFileId', '==', fileId));
+    const snapPorArchivo = await getDocs(consultaPorArchivo);
+    if (snapPorArchivo && !snapPorArchivo.empty && snapPorArchivo.docs[0]) {
+      const item = snapPorArchivo.docs[0];
+      return { id: item.id, ...item.data() } as RecursoAcademico;
+    }
+
+    if (!nombre) return null;
+
+    const consultaPorNombre = query(recursosRef, where('nombreNormalizado', '==', normalizarNombreRecurso_(nombre)));
+    const snapPorNombre = await getDocs(consultaPorNombre);
+    if (snapPorNombre && !snapPorNombre.empty && snapPorNombre.docs[0]) {
+      const item = snapPorNombre.docs[0];
+      return { id: item.id, ...item.data() } as RecursoAcademico;
+    }
+
+    return null;
+  };
+
   /**
    * Actualiza la ficha académica de un recurso y cambia su estado a 'pendiente'.
+   * `tituloVisible` se persiste solo cuando llega no vacío, para no pisar el valor
+   * existente en re-guardados que no lo editan.
    */
   const updateFicha = async (
     tenantId: string,
     recursoId: string,
-    ficha: FichaAcademica
+    ficha: FichaAcademica,
+    tituloVisible?: string
   ): Promise<void> => {
+    const tituloVisibleLimpio = tituloVisible?.trim() ?? '';
+
     if (!checkConfigured()) {
       const recurso = mockRecursos.find(r => r.id === recursoId && r.tenantId === tenantId);
       if (!recurso) {
         throw new Error('Recurso no encontrado');
       }
-      if (recurso.estado !== 'borrador' && recurso.estado !== 'pendiente') {
+      if (recurso.estado !== 'borrador' && recurso.estado !== 'pendiente' && recurso.estado !== 'aprobado') {
         throw new Error(`Transición inválida: no se puede actualizar la ficha en estado ${recurso.estado}`);
       }
       recurso.ficha = ficha;
-      recurso.estado = 'pendiente';
+      if (tituloVisibleLimpio) {
+        recurso.tituloVisible = tituloVisibleLimpio;
+      }
+      if (recurso.estado === 'borrador') {
+        recurso.estado = 'pendiente';
+      }
       recurso.actualizadoEn = new Date().toISOString();
       return;
     }
@@ -110,13 +164,15 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       throw new Error('Recurso no encontrado');
     }
     const recurso = snap.data() as RecursoAcademico;
-    if (recurso.estado !== 'borrador' && recurso.estado !== 'pendiente') {
+    if (recurso.estado !== 'borrador' && recurso.estado !== 'pendiente' && recurso.estado !== 'aprobado') {
       throw new Error(`Transición inválida: no se puede actualizar la ficha en estado ${recurso.estado}`);
     }
+    const nuevoEstado = recurso.estado === 'borrador' ? 'pendiente' : recurso.estado;
     await updateDoc(docRef, {
       ficha,
-      estado: 'pendiente',
-      actualizadoEn: new Date().toISOString()
+      estado: nuevoEstado,
+      actualizadoEn: new Date().toISOString(),
+      ...(tituloVisibleLimpio ? { tituloVisible: tituloVisibleLimpio } : {})
     });
   };
 
@@ -133,7 +189,13 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       if (!recurso) {
         throw new Error('Recurso no encontrado');
       }
-      if (recurso.estado !== 'pendiente') {
+      if (recurso.estado === 'aprobado') {
+        return; // Idempotente
+      }
+      if (!recurso.ficha) {
+        throw new Error('No se puede aprobar un recurso sin ficha académica clasificada.');
+      }
+      if (recurso.estado !== 'pendiente' && recurso.estado !== 'borrador') {
         throw new Error(`Transición inválida: no se puede aprobar un recurso en estado ${recurso.estado}`);
       }
       recurso.estado = 'aprobado';
@@ -149,7 +211,13 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       throw new Error('Recurso no encontrado');
     }
     const recurso = snap.data() as RecursoAcademico;
-    if (recurso.estado !== 'pendiente') {
+    if (recurso.estado === 'aprobado') {
+      return; // Idempotente
+    }
+    if (!recurso.ficha) {
+      throw new Error('No se puede aprobar un recurso sin ficha académica clasificada.');
+    }
+    if (recurso.estado !== 'pendiente' && recurso.estado !== 'borrador') {
       throw new Error(`Transición inválida: no se puede aprobar un recurso en estado ${recurso.estado}`);
     }
     await updateDoc(docRef, {
@@ -195,11 +263,31 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     });
   };
 
+  const listarRecursosAprobados = async (tenantId: string): Promise<RecursoAcademico[]> => {
+    if (!checkConfigured()) {
+      return mockRecursos.filter((recurso) => (
+        recurso.tenantId === tenantId
+        && recurso.estado === 'aprobado'
+      ));
+    }
+
+    const recursosRef = collection(getDatabase(), 'tenants', tenantId, 'recursos');
+    const consulta = query(recursosRef, where('estado', '==', 'aprobado'));
+    const snap = await getDocs(consulta);
+
+    return snap.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+    } as RecursoAcademico));
+  };
+
   return {
     importFromDrive,
+    findRecursoIndexado,
     updateFicha,
     approveRecurso,
-    archiveRecurso
+    archiveRecurso,
+    listarRecursosAprobados
   };
 };
 
@@ -208,7 +296,29 @@ export const bibliotecaService = crearBibliotecaService();
 // Exportaciones individuales para compatibilidad con importaciones destructuradas
 export const {
   importFromDrive,
+  findRecursoIndexado,
   updateFicha,
   approveRecurso,
-  archiveRecurso
+  archiveRecurso,
+  listarRecursosAprobados
 } = bibliotecaService;
+
+function buscarRecursoIndexadoEnMock_(tenantId: string, fileId: string, nombre?: string): RecursoAcademico | null {
+  const nombreNormalizado = nombre ? normalizarNombreRecurso_(nombre) : '';
+  return mockRecursos.find((recurso) => (
+    recurso.tenantId === tenantId
+    && (
+      recurso.externalFileId === fileId
+      || Boolean(nombreNormalizado && normalizarNombreRecurso_(recurso.nombre) === nombreNormalizado)
+    )
+  )) ?? null;
+}
+
+function normalizarNombreRecurso_(nombre: string): string {
+  return String(nombre || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}

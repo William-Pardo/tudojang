@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 import ProgresoResumenCard from '../../components/academico/ProgresoResumenCard';
-import { calcularMetricasCentroEstudios, ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios';
+import { calcularMetricasCentroEstudios, ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios.ts';
 
 export interface EstudianteVinculadoTutor {
   id: string;

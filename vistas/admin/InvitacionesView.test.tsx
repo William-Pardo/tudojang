@@ -26,14 +26,13 @@ describe('InvitacionesView', () => {
     jest.clearAllMocks();
   });
 
-  it('renderiza la vista de invitaciones correctamente', async () => {
+  it('renderiza la vista de accesos academicos correctamente', async () => {
     render(<InvitacionesView />);
-    expect(screen.getByText('Invitaciones Académicas')).toBeInTheDocument();
-    expect(screen.getByLabelText('Correo Electrónico')).toBeInTheDocument();
-    expect(screen.getByLabelText('Rol Académico')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Enviar Invitación/i })).toBeInTheDocument();
-    
-    // Esperar a que se complete la carga asíncrona inicial
+
+    expect(screen.getByText('Cuentas Externas')).toBeInTheDocument();
+    expect(screen.getByLabelText('Correo electrónico')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rol académico')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Enviar invitación/i })).toBeInTheDocument();
     expect(await screen.findByText('No hay invitaciones enviadas.')).toBeInTheDocument();
   });
 });

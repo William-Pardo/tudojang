@@ -310,6 +310,24 @@ const PublicLanding: React.FC = () => {
             </section>
 
             <footer className="py-12 border-t border-gray-100 text-center">
+                <div className="mb-6 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
+                    <a
+                        href="/privacy.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] hover:text-tkd-blue transition-colors"
+                    >
+                        Política de privacidad
+                    </a>
+                    <a
+                        href="/terms.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-black text-gray-400 uppercase tracking-[0.25em] hover:text-tkd-blue transition-colors"
+                    >
+                        Términos del servicio
+                    </a>
+                </div>
                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.5em]">Aliant • Tudojang SaaS Core 2026</p>
             </footer>
         </div>

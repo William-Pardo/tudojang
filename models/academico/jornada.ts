@@ -18,6 +18,7 @@ export interface JornadaInstruccion {
   objetivosImpartidos: string[];
   asistenciaRegistrada: boolean;
   motivoCancelacion?: string;
+  tema?: string;
   creadoEn: string;
   actualizadoEn: string;
 }

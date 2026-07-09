@@ -7,6 +7,7 @@ import {
   iniciarJornada,
   marcarPendienteCierre,
   rechazarTransicionInvalida,
+  reprogramarJornada,
 } from './jornadaService';
 
 describe('jornadaService', () => {
@@ -79,6 +80,35 @@ describe('jornadaService', () => {
     expect(() => rechazarTransicionInvalida(createJornadaBase(), 'cerrada')).toThrow(/transicion invalida/i);
   });
 
+  it('rechaza transicion directa borrador → reprogramada', () => {
+    expect(() => rechazarTransicionInvalida(createJornadaBase(), 'reprogramada')).toThrow(/transicion invalida/i);
+  });
+
+  it('reprograma una jornada confirmada con nueva fecha y horario en un solo paso', () => {
+    const confirmada = confirmarJornada(createJornadaBase());
+
+    const reprogramada = reprogramarJornada(confirmada, {
+      fecha: '2026-07-04',
+      horaInicio: '10:00',
+      horaFin: '11:00',
+    });
+
+    expect(reprogramada.estado).toBe('confirmada');
+    expect(reprogramada.fecha).toBe('2026-07-04');
+    expect(reprogramada.horaInicio).toBe('10:00');
+    expect(reprogramada.horaFin).toBe('11:00');
+  });
+
+  it('rechaza reprogramar una jornada que no esta confirmada', () => {
+    const jornada = createJornadaBase();
+
+    expect(() => reprogramarJornada(jornada, {
+      fecha: '2026-07-04',
+      horaInicio: '10:00',
+      horaFin: '11:00',
+    })).toThrow(/transicion invalida/i);
+  });
+
   it('genera jornadas desde bloque recurrente por rango de fechas', () => {
     const jornadas = generateJornadasFromBloque({
       bloque: {
@@ -130,6 +160,56 @@ describe('jornadaService', () => {
       fechaInicio: '2026-06-01',
       fechaFin: '2026-06-30',
     })).toEqual([]);
+  });
+
+  it('rechaza createJornada si horaFin es igual a horaInicio', () => {
+    expect(() => createJornada({
+      tenantId: 'tenant-1',
+      programaId: 'programa-1',
+      ejecucionProgramaId: 'ejecucion-1',
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      espacioId: 'tatami-1',
+      instructorId: 'maestro-1',
+      fecha: '2026-06-27',
+      horaInicio: '09:00',
+      horaFin: '09:00',
+      objetivosPlaneados: ['obj-1'],
+    })).toThrow(/horaFin debe ser posterior/i);
+  });
+
+  it('rechaza createJornada si horaFin es anterior a horaInicio', () => {
+    expect(() => createJornada({
+      tenantId: 'tenant-1',
+      programaId: 'programa-1',
+      ejecucionProgramaId: 'ejecucion-1',
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      espacioId: 'tatami-1',
+      instructorId: 'maestro-1',
+      fecha: '2026-06-27',
+      horaInicio: '10:00',
+      horaFin: '09:00',
+      objetivosPlaneados: ['obj-1'],
+    })).toThrow(/horaFin debe ser posterior/i);
+  });
+
+  it('rechaza reprogramarJornada si horaFin es igual a horaInicio', () => {
+    const confirmada = confirmarJornada(createJornadaBase());
+    expect(() => reprogramarJornada(confirmada, {
+      fecha: '2026-07-04',
+      horaInicio: '10:00',
+      horaFin: '10:00',
+    })).toThrow(/horaFin debe ser posterior/i);
+  });
+
+  it('rechaza reprogramarJornada si horaFin es anterior a horaInicio', () => {
+    const confirmada = confirmarJornada(createJornadaBase());
+    expect(() => reprogramarJornada(confirmada, {
+      fecha: '2026-07-04',
+      horaInicio: '11:00',
+      horaFin: '09:00',
+    })).toThrow(/horaFin debe ser posterior/i);
   });
 });
 

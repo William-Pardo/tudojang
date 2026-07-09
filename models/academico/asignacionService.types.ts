@@ -24,12 +24,35 @@ export interface ObtenerAsignacionesResponse {
 }
 
 export interface PublicarAsignacionRequest {
+  tenantId: string;
+  jornadaId: string;
   asignacion: AsignacionAcademica;
 }
 
 export interface PublicarAsignacionResponse {
   ok: boolean;
   id: string;
+}
+
+export type MotivoAsignacionSalteada = 'duplicado' | 'recurso_no_aprobado' | 'jornada_no_encontrada';
+
+export interface PublicarAsignacionesBatchRequest {
+  tenantId: string;
+  recursoIds: string[];
+  jornadaIds: string[];
+  asignacionBase: Omit<AsignacionAcademica, 'id' | 'recursoId' | 'jornadaId'>;
+}
+
+export interface AsignacionSalteada {
+  recursoId: string;
+  jornadaId: string;
+  reason: MotivoAsignacionSalteada;
+}
+
+export interface PublicarAsignacionesBatchResponse {
+  ok: boolean;
+  created: string[];
+  skipped: AsignacionSalteada[];
 }
 
 export interface EliminarAsignacionRequest {

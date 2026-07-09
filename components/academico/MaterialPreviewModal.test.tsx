@@ -26,6 +26,18 @@ const asignacion: AsignacionCentroEstudios = {
 };
 
 describe('MaterialPreviewModal', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const crearRepositoryMock = () => ({
+    leerQuiz: jest.fn().mockResolvedValue(null),
+    guardarQuiz: jest.fn().mockResolvedValue(undefined),
+    leerSync: jest.fn().mockResolvedValue(null),
+    guardarSync: jest.fn().mockResolvedValue(undefined),
+    aplicarAAsignaciones: jest.fn((asignaciones) => asignaciones),
+  });
+
   it('renderiza quiz cuando el recurso es evaluación', () => {
     render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} />);
 
@@ -76,5 +88,92 @@ describe('MaterialPreviewModal', () => {
     expect(screen.getByText(/quiz aprobado/i)).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('aprobado')).toBeInTheDocument();
+  });
+
+  it('guarda progreso de quiz en el repositorio inyectado', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock();
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} repository={repository} />);
+
+    await user.click(screen.getByLabelText(/saludar, escuchar instrucciones/i));
+    await user.click(screen.getByRole('button', { name: /enviar respuestas/i }));
+
+    expect(repository.guardarQuiz).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: 'tenant-1',
+      asignacionId: 'a1',
+      aprobado: true,
+      estadoPostQuiz: 'aprobado',
+    }));
+  });
+
+  it('guarda avance PDF en el repositorio inyectado al sincronizar', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock();
+    render(
+      <MaterialPreviewModal
+        asignacion={{ ...asignacion, uso: 'estudio', titulo: 'Material base' }}
+        onCerrar={jest.fn()}
+        repository={repository}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /marcar pagina 1 como vista/i }));
+    await user.click(screen.getByRole('button', { name: /sincronizar avance/i }));
+
+    expect(repository.guardarSync).toHaveBeenCalledWith('tenant-1', 'a1', expect.objectContaining({
+      paginasVistas: [1],
+      segundosUnicos: [],
+    }));
+  });
+
+  it('solicita URL temporal segura para material Drive no evaluativo', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        ok: true,
+        url: 'https://drive-temporal.test/file',
+        fileName: 'Material base.pdf',
+        mimeType: 'application/pdf',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Material base',
+          externalFileId: 'drive-file-real',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    expect(await screen.findByText(/acceso seguro listo/i)).toBeInTheDocument();
+    expect(driveService.obtenerUrlTemporal).toHaveBeenCalledWith('tenant-1', 'a1', 'drive-file-real');
+  });
+
+  it('muestra error controlado si el archivo Drive fue eliminado', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockRejectedValue(
+        Object.assign(new Error('El archivo ya no existe en Google Drive'), { code: 'not-found' }),
+      ),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Material base',
+          externalFileId: 'drive-file-eliminado',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    expect(await screen.findByText(/archivo de drive no disponible/i)).toBeInTheDocument();
   });
 });

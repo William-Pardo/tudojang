@@ -1,6 +1,6 @@
 // functions/academico/drive.test.js
-// Tests para los servicios de integración con Google Drive.
-// Usan inyección de dependencias y mocks del SDK de Google.
+// Tests para los servicios de integraciÃ³n con Google Drive.
+// Usan inyecciÃ³n de dependencias y mocks del SDK de Google.
 
 'use strict';
 
@@ -8,6 +8,7 @@ const mockGenerateAuthUrl = jest.fn().mockReturnValue('https://accounts.google.c
 const mockGetToken = jest.fn();
 const mockRefreshAccessToken = jest.fn();
 const mockSetCredentials = jest.fn();
+const mockRevokeToken = jest.fn().mockResolvedValue({});
 
 jest.mock('googleapis', () => ({
   google: {
@@ -16,14 +17,25 @@ jest.mock('googleapis', () => ({
         generateAuthUrl: mockGenerateAuthUrl,
         getToken: mockGetToken,
         refreshAccessToken: mockRefreshAccessToken,
-        setCredentials: mockSetCredentials
+        setCredentials: mockSetCredentials,
+        revokeToken: mockRevokeToken
       }))
     }
   }
 }));
 
 const { google } = require('googleapis');
-const { crearServicioConnectDrive, crearServicioDriveOAuthCallback, crearServicioRefreshDriveToken, crearServicioGetTemporaryFileUrl, crearServicioSyncDriveMetadata } = require('./drive');
+const {
+  crearServicioConnectDrive,
+  crearServicioDriveOAuthCallback,
+  crearServicioRefreshDriveToken,
+  crearServicioListDriveFolder,
+  crearServicioDisconnectDrive,
+  crearServicioGetDriveConnection,
+  crearServicioSetDriveFolder,
+  crearServicioGetTemporaryFileUrl,
+  crearServicioSyncDriveMetadata
+} = require('./drive');
 
 // Helpers de mocks
 const makeContext = (overrides = {}) => ({
@@ -46,13 +58,21 @@ describe('crearServicioConnectDrive', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    google.auth.OAuth2.mockImplementation(() => ({
+      generateAuthUrl: mockGenerateAuthUrl,
+      getToken: mockGetToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      setCredentials: mockSetCredentials,
+      getAccessToken: mockGetAccessToken
+    }));
+    mockGetAccessToken.mockResolvedValue({ token: 'access-token-sync' });
   });
 
   const buildService = (config = defaultConfig) => {
     return crearServicioConnectDrive({ googleDriveConfig: config });
   };
 
-  it('lanza error si no hay autenticación', async () => {
+  it('lanza error si no hay autenticaciÃ³n', async () => {
     const service = buildService();
     await expect(
       service({ tenantId: 'tenant-abc' }, { auth: null })
@@ -83,7 +103,7 @@ describe('crearServicioConnectDrive', () => {
     ).rejects.toThrow('No autorizado para este tenant');
   });
 
-  it('lanza error si la configuración de Google Drive está incompleta (falta clientId)', async () => {
+  it('lanza error si la configuraciÃ³n de Google Drive está incompleta (falta clientId)', async () => {
     const service = buildService({ ...defaultConfig, clientId: null });
     const ctx = makeContext();
     await expect(
@@ -91,7 +111,7 @@ describe('crearServicioConnectDrive', () => {
     ).rejects.toThrow('Configuración de Google Drive incompleta');
   });
 
-  it('lanza error si la configuración de Google Drive está incompleta (falta clientSecret)', async () => {
+  it('lanza error si la configuraciÃ³n de Google Drive está incompleta (falta clientSecret)', async () => {
     const service = buildService({ ...defaultConfig, clientSecret: null });
     const ctx = makeContext();
     await expect(
@@ -99,7 +119,7 @@ describe('crearServicioConnectDrive', () => {
     ).rejects.toThrow('Configuración de Google Drive incompleta');
   });
 
-  it('lanza error si la configuración de Google Drive está incompleta (falta redirectUri)', async () => {
+  it('lanza error si la configuraciÃ³n de Google Drive está incompleta (falta redirectUri)', async () => {
     const service = buildService({ ...defaultConfig, redirectUri: null });
     const ctx = makeContext();
     await expect(
@@ -121,7 +141,10 @@ describe('crearServicioConnectDrive', () => {
     );
     expect(mockGenerateAuthUrl).toHaveBeenCalledWith({
       access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/drive.readonly'],
+      scope: [
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/userinfo.email'
+      ],
       state: 'tenant-abc',
       prompt: 'consent'
     });
@@ -155,21 +178,25 @@ describe('crearServicioDriveOAuthCallback', () => {
 
   const makeFirestoreForDrive = (connections = [], docRef = null) => {
     const finalDocRef = docRef || makeDocRef({}, false);
-    const getMock = jest.fn().mockResolvedValue({
-      empty: connections.length === 0,
-      docs: connections.map(c => ({
-        ref: finalDocRef,
+    const docs = connections.map((c, index) => {
+      const ref = c.ref || c._ref || finalDocRef;
+      return {
+        id: c.id || ref.id || `conn-${index + 1}`,
+        ref,
         data: () => c,
-      })),
+      };
+    });
+    const getMock = jest.fn().mockResolvedValue({
+      empty: docs.length === 0,
+      docs,
     });
 
     return {
       collection: jest.fn().mockReturnValue({
         doc: jest.fn().mockReturnValue({
           collection: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({
-              get: getMock,
-            }),
+            get: getMock,
+            limit: jest.fn().mockReturnValue({ get: getMock }),
             doc: jest.fn().mockReturnValue(finalDocRef),
           }),
         }),
@@ -187,9 +214,13 @@ describe('crearServicioDriveOAuthCallback', () => {
     return crearServicioDriveOAuthCallback({ googleDriveConfig: config, firestore });
   };
 
-  it('lanza error si no hay autenticación', async () => {
+  it('lanza error si no hay autenticaciÃ³n', async () => {
     const firestore = makeFirestoreForDrive();
-    const service = buildService(firestore);
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ email: 'drive-admin@example.com' })
+    });
+    const service = buildService(firestore, { ...defaultConfig, _fetchFn: fetchFn });
     await expect(
       service({ code: 'code-123', tenantId: 'tenant-abc' }, { auth: null })
     ).rejects.toThrow('No autenticado');
@@ -246,7 +277,11 @@ describe('crearServicioDriveOAuthCallback', () => {
   it('intercambia el código por tokens, cifra el refresh_token y guarda la conexión en Firestore', async () => {
     const docRef = makeDocRef({}, false);
     const firestore = makeFirestoreForDrive([], docRef);
-    const service = buildService(firestore);
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ email: 'drive-admin@example.com' })
+    });
+    const service = buildService(firestore, { ...defaultConfig, _fetchFn: fetchFn });
     const ctx = makeContext();
 
     mockGetToken.mockResolvedValue({
@@ -254,7 +289,7 @@ describe('crearServicioDriveOAuthCallback', () => {
         access_token: 'access-token-123',
         refresh_token: 'refresh-token-456',
         expiry_date: 12345678,
-        scope: 'https://www.googleapis.com/auth/drive.readonly',
+        scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email',
       }
     });
 
@@ -268,6 +303,7 @@ describe('crearServicioDriveOAuthCallback', () => {
     const connectionData = docRef.set.mock.calls[0][0];
     expect(connectionData.tenantId).toBe('tenant-abc');
     expect(connectionData.status).toBe('active');
+    expect(connectionData.googleAccountEmail).toBe('drive-admin@example.com');
     expect(connectionData.refreshToken).toBeDefined();
     // Debe ser un string JSON conteniendo content, iv, tag (formato cifrado de kms)
     const parsedKms = JSON.parse(connectionData.refreshToken);
@@ -276,11 +312,13 @@ describe('crearServicioDriveOAuthCallback', () => {
     expect(parsedKms.tag).toBeDefined();
   });
 
-  it('usa el refresh_token anterior si la reconexión no lo devuelve y ya existía conexión', async () => {
+  it('usa el refresh_token anterior si la reconexión no lo devuelve y ya existÃ­a conexión', async () => {
     const existingConnection = {
       id: 'conn-123',
       tenantId: 'tenant-abc',
       refreshToken: JSON.stringify({ content: 'crypted-old-token', iv: 'iv', tag: 'tag' }),
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      status: 'active',
     };
 
     const docRef = makeDocRef(existingConnection, true);
@@ -304,6 +342,111 @@ describe('crearServicioDriveOAuthCallback', () => {
     expect(connectionData.refreshToken).toBe(existingConnection.refreshToken);
   });
 
+  it('no reutiliza refresh_token anterior si la conexion previa no tenia drive.readonly', async () => {
+    const existingConnection = {
+      id: 'conn-123',
+      tenantId: 'tenant-abc',
+      refreshToken: JSON.stringify({ content: 'crypted-old-token', iv: 'iv', tag: 'tag' }),
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      status: 'active',
+    };
+
+    const docRef = makeDocRef(existingConnection, true);
+    const firestore = makeFirestoreForDrive([existingConnection], docRef);
+    const service = buildService(firestore);
+    const ctx = makeContext();
+
+    mockGetToken.mockResolvedValue({
+      tokens: {
+        access_token: 'new-access-token-999',
+        expiry_date: 999999,
+        scope: 'https://www.googleapis.com/auth/drive.readonly',
+      }
+    });
+
+    await expect(
+      service({ code: 'code-reconnect', tenantId: 'tenant-abc' }, ctx)
+    ).rejects.toThrow('No se recibio refresh_token reutilizable con permiso drive.readonly');
+  });
+
+  it('rechaza el callback si Google devuelve un scope sin drive.readonly', async () => {
+    const existingConnection = {
+      id: 'conn-123',
+      tenantId: 'tenant-abc',
+      refreshToken: JSON.stringify({ content: 'crypted-old-token', iv: 'iv', tag: 'tag' }),
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      status: 'active',
+    };
+
+    const docRef = makeDocRef(existingConnection, true);
+    const firestore = makeFirestoreForDrive([existingConnection], docRef);
+    const service = buildService(firestore);
+
+    mockGetToken.mockResolvedValue({
+      tokens: {
+        access_token: 'new-access-token-999',
+        expiry_date: 999999,
+        scope: 'https://www.googleapis.com/auth/userinfo.email openid',
+      }
+    });
+
+    await expect(
+      service({ code: 'code-reconnect', tenantId: 'tenant-abc' }, makeContext())
+    ).rejects.toThrow('Google no autorizo el alcance drive.readonly requerido');
+
+    expect(docRef.set).not.toHaveBeenCalled();
+  });
+
+  it('desactiva conexiones activas duplicadas cuando una reconexion trae refresh_token nuevo', async () => {
+    const oldRef = makeDocRef({}, true);
+    oldRef.id = 'conn-old';
+    const newRef = makeDocRef({}, true);
+    newRef.id = 'conn-new';
+    const olderConnection = {
+      id: 'conn-old',
+      ref: oldRef,
+      tenantId: 'tenant-abc',
+      refreshToken: JSON.stringify({ content: 'old-token', iv: 'iv', tag: 'tag' }),
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      status: 'active',
+      connectedAt: '2026-06-01T00:00:00.000Z',
+    };
+    const newerConnection = {
+      id: 'conn-new',
+      ref: newRef,
+      tenantId: 'tenant-abc',
+      refreshToken: JSON.stringify({ content: 'newer-token', iv: 'iv', tag: 'tag' }),
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      status: 'active',
+      connectedAt: '2026-07-01T00:00:00.000Z',
+    };
+
+    const firestore = makeFirestoreForDrive([olderConnection, newerConnection], newRef);
+    const service = buildService(firestore);
+
+    mockGetToken.mockResolvedValue({
+      tokens: {
+        access_token: 'access-token-123',
+        refresh_token: 'brand-new-refresh-token',
+        expiry_date: 12345678,
+        scope: 'https://www.googleapis.com/auth/drive.readonly',
+      }
+    });
+
+    const result = await service({ code: 'code-valido', tenantId: 'tenant-abc' }, makeContext());
+
+    expect(result.connectionId).toBe('conn-new');
+    expect(newRef.set).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'active',
+      refreshToken: expect.any(String),
+    }), { merge: true });
+    expect(oldRef.set).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'disconnected',
+      disconnectedReason: 'replaced_by_new_drive_connection',
+      disconnectedBy: 'admin-uid',
+    }), { merge: true });
+  });
+
   it('lanza error si no viene refresh_token y no hay conexión previa', async () => {
     const docRef = makeDocRef({}, false);
     const firestore = makeFirestoreForDrive([], docRef);
@@ -320,7 +463,7 @@ describe('crearServicioDriveOAuthCallback', () => {
 
     await expect(
       service({ code: 'code-valido', tenantId: 'tenant-abc' }, ctx)
-    ).rejects.toThrow('No se recibió refresh_token y no existe una conexión previa');
+    ).rejects.toThrow('No se recibio refresh_token reutilizable con permiso drive.readonly');
   });
 });
 
@@ -331,7 +474,7 @@ describe('crearServicioRefreshDriveToken', () => {
     redirectUri: 'https://app.tudojang.com/oauth-callback'
   };
 
-  // Usa kms real para cifrar tokens en los tests (sin mock — verifica integración real con kms.js)
+  // Usa kms real para cifrar tokens en los tests (sin mock â€” verifica integraciÃ³n real con kms.js)
   const { cifrarToken } = require('./kms');
 
   const makeConnRef = (data = null) => ({
@@ -364,7 +507,7 @@ describe('crearServicioRefreshDriveToken', () => {
   const buildService = (firestore, config = defaultConfig) =>
     crearServicioRefreshDriveToken({ googleDriveConfig: config, firestore });
 
-  it('lanza error si no hay autenticación', async () => {
+  it('lanza error si no hay autenticaciÃ³n', async () => {
     const firestore = makeFirestoreForRefresh();
     const service = buildService(firestore);
     await expect(
@@ -438,7 +581,7 @@ describe('crearServicioRefreshDriveToken', () => {
     const connData = {
       tenantId: 'tenant-abc',
       status: 'active',
-      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      scope: 'https://www.googleapis.com/auth/drive.file',
       refreshToken: encryptedToken
     };
     const firestore = makeFirestoreForRefresh(connData);
@@ -449,7 +592,7 @@ describe('crearServicioRefreshDriveToken', () => {
       credentials: {
         access_token: 'new-access-token-xyz',
         expiry_date: 9999999,
-        scope: 'https://www.googleapis.com/auth/drive.readonly'
+        scope: 'https://www.googleapis.com/auth/drive.file'
       }
     });
 
@@ -505,7 +648,7 @@ const mockGetAccessToken = jest.fn();
 // Re-mock de googleapis para incluir getAccessToken (debe hacerse antes de los requires)
 // El mock global ya incluye setCredentials. Extendemos para getAccessToken.
 beforeAll(() => {
-  jest.resetModules(); // no necesario aquí pero lo dejamos como referencia
+  jest.resetModules(); // no necesario aquÃ­ pero lo dejamos como referencia
   mockGetAccessToken.mockResolvedValue({ token: 'access-token-temporal-xyz' });
 });
 
@@ -588,7 +731,7 @@ describe('crearServicioGetTemporaryFileUrl', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Asegurar que getAccessToken esté disponible en el mock de OAuth2
+    // Asegurar que getAccessToken estÃ© disponible en el mock de OAuth2
     google.auth.OAuth2.mockImplementation(() => ({
       generateAuthUrl: mockGenerateAuthUrl,
       getToken: mockGetToken,
@@ -602,7 +745,7 @@ describe('crearServicioGetTemporaryFileUrl', () => {
   const buildService = (firestore, config = defaultConfig) =>
     crearServicioGetTemporaryFileUrl({ googleDriveConfig: { ...config, _fetchFn: makeFetchFn() }, firestore });
 
-  it('lanza error si no hay autenticación', async () => {
+  it('lanza error si no hay autenticaciÃ³n', async () => {
     const firestore = makeFirestore();
     const service = crearServicioGetTemporaryFileUrl({ googleDriveConfig: defaultConfig, firestore });
     await expect(
@@ -692,7 +835,7 @@ describe('crearServicioGetTemporaryFileUrl', () => {
     expect(err.message).toMatch('aún no está disponible');
   });
 
-  it('rechaza si la asignación ya venció por fechaCierre', async () => {
+  it('rechaza si la asignación ya venciÃ³ por fechaCierre', async () => {
     const pasado = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
     const firestore = makeFirestore({ asignacion: makeAsignacion({ fechaCierre: pasado }) });
     const service = buildService(firestore);
@@ -713,7 +856,7 @@ describe('crearServicioGetTemporaryFileUrl', () => {
     ).rejects.toThrow('no tiene una conexión de Google Drive activa');
   });
 
-  it('genera URL temporal correctamente para acceso válido', async () => {
+  it('genera URL temporal correctamente para acceso vÃ¡lido', async () => {
     const encryptedToken = await cifrarToken('valid-refresh-token');
     const connectionData = { refreshToken: encryptedToken, status: 'active' };
     const fetchFn = makeFetchFn();
@@ -763,7 +906,7 @@ describe('crearServicioGetTemporaryFileUrl', () => {
     expect(err.message).toMatch('ya no existe en Google Drive');
     expect(err.code).toBe('not-found');
     expect(err.archivoBloqueado).toBe(true);
-    // Verifica que se bloqueó la asignación
+    // Verifica que se bloqueÃ³ la asignación
     expect(_asignacionRef.set).toHaveBeenCalledWith(
       expect.objectContaining({ estado: 'bloqueada', motivoBloqueo: 'archivo_eliminado' }),
       { merge: true }
@@ -824,6 +967,405 @@ describe('crearServicioGetTemporaryFileUrl', () => {
   });
 });
 
+describe('crearServicioListDriveFolder', () => {
+  const defaultConfig = {
+    clientId: 'google-client-id',
+    clientSecret: 'google-client-secret',
+    redirectUri: 'https://app.tudojang.com/oauth-callback'
+  };
+  const { cifrarToken } = require('./kms');
+
+  const makeFirestore = (connectionData = null) => {
+    const connections = Array.isArray(connectionData)
+      ? connectionData
+      : connectionData
+        ? [connectionData]
+        : [];
+    const connectionSnap = {
+      empty: connections.length === 0,
+      docs: connections.map((item, index) => ({
+        id: item.id || `conn-${index + 1}`,
+        data: () => item
+      }))
+    };
+
+    return {
+      collection: jest.fn().mockImplementation(() => ({
+        doc: jest.fn().mockImplementation(() => ({
+          collection: jest.fn().mockImplementation(() => ({
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            get: jest.fn().mockResolvedValue(connectionSnap)
+          }))
+        }))
+      }))
+    };
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    google.auth.OAuth2.mockImplementation(() => ({
+      generateAuthUrl: mockGenerateAuthUrl,
+      getToken: mockGetToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      setCredentials: mockSetCredentials,
+      getAccessToken: mockGetAccessToken
+    }));
+    mockGetAccessToken.mockResolvedValue({ token: 'access-token-list' });
+  });
+
+  it('rechaza usuarios no autenticados', async () => {
+    const service = crearServicioListDriveFolder({
+      googleDriveConfig: defaultConfig,
+      firestore: makeFirestore()
+    });
+
+    await expect(service({ tenantId: 'tenant-abc', folderId: 'root' }, { auth: null }))
+      .rejects.toThrow('No autenticado');
+  });
+
+  it('lista archivos y carpetas de una carpeta Drive activa', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        files: [
+          {
+            id: 'folder-1',
+            name: 'Teoria',
+            mimeType: 'application/vnd.google-apps.folder',
+            webViewLink: 'https://drive.google.com/folders/folder-1',
+            parents: ['root'],
+            modifiedTime: '2026-06-29T00:00:00Z'
+          },
+          {
+            id: 'file-1',
+            name: 'manual.pdf',
+            mimeType: 'application/pdf',
+            webViewLink: 'https://drive.google.com/file/d/file-1/view',
+            parents: ['root'],
+            modifiedTime: '2026-06-29T00:00:00Z',
+            size: '1200'
+          }
+        ]
+      })
+    });
+    const service = crearServicioListDriveFolder({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore: makeFirestore({ refreshToken: encryptedToken, status: 'active' })
+    });
+
+    const result = await service(
+      { tenantId: 'tenant-abc', folderId: 'root' },
+      { auth: { uid: 'admin-uid', token: { rol: 'Admin', tenantId: 'tenant-abc' } } }
+    );
+
+    const [url] = fetchFn.mock.calls[0];
+    const params = new URL(url).searchParams;
+    expect(params.get('q')).toBe("'root' in parents and trashed = false");
+    expect(params.get('supportsAllDrives')).toBe('true');
+    expect(params.get('includeItemsFromAllDrives')).toBe('true');
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ headers: { Authorization: 'Bearer access-token-list' } })
+    );
+    expect(result.files).toEqual([
+      expect.objectContaining({ id: 'folder-1', name: 'Teoria', mimeType: 'application/vnd.google-apps.folder' }),
+      expect.objectContaining({ id: 'file-1', name: 'manual.pdf', mimeType: 'application/pdf', size: 1200 })
+    ]);
+  });
+
+  it('usa la conexion activa mas reciente al listar una carpeta Drive', async () => {
+    const oldEncryptedToken = await cifrarToken('old-refresh-token');
+    const newEncryptedToken = await cifrarToken('new-refresh-token');
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ files: [] })
+    });
+    const service = crearServicioListDriveFolder({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore: makeFirestore([
+        {
+          id: 'conn-old',
+          refreshToken: oldEncryptedToken,
+          status: 'active',
+          connectedAt: '2026-06-01T00:00:00.000Z',
+        },
+        {
+          id: 'conn-new',
+          refreshToken: newEncryptedToken,
+          status: 'active',
+          connectedAt: '2026-07-01T00:00:00.000Z',
+        },
+      ])
+    });
+
+    await service(
+      { tenantId: 'tenant-abc', folderId: 'root' },
+      { auth: { uid: 'admin-uid', token: { rol: 'Admin', tenantId: 'tenant-abc' } } }
+    );
+
+    expect(mockSetCredentials).toHaveBeenCalledWith({ refresh_token: 'new-refresh-token' });
+  });
+
+  it('rechaza tenant diferente para usuarios que no son SuperAdmin', async () => {
+    const service = crearServicioListDriveFolder({
+      googleDriveConfig: defaultConfig,
+      firestore: makeFirestore()
+    });
+
+    const err = await service(
+      { tenantId: 'tenant-b', folderId: 'root' },
+      { auth: { uid: 'admin-uid', token: { rol: 'Admin', tenantId: 'tenant-a' } } }
+    ).catch(e => e);
+
+    expect(err.message).toContain('No autorizado para este tenant');
+    expect(err.code).toBe('permission-denied');
+  });
+
+  it('incluye el detalle seguro de Google cuando Drive devuelve 403', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const fetchFn = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: jest.fn().mockResolvedValue(JSON.stringify({
+        error: {
+          status: 'PERMISSION_DENIED',
+          message: 'The user does not have sufficient permissions for this file.'
+        }
+      }))
+    });
+    const service = crearServicioListDriveFolder({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore: makeFirestore({ refreshToken: encryptedToken, status: 'active' })
+    });
+
+    const err = await service(
+      { tenantId: 'tenant-abc', folderId: 'folder-real' },
+      { auth: { uid: 'admin-uid', token: { rol: 'Admin', tenantId: 'tenant-abc' } } }
+    ).catch(e => e);
+
+    expect(err.code).toBe('permission-denied');
+    expect(err.message).toContain('PERMISSION_DENIED');
+    expect(err.message).toContain('sufficient permissions');
+  });
+});
+
+describe('crearServicioDisconnectDrive', () => {
+  const defaultConfig = {
+    clientId: 'google-client-id',
+    clientSecret: 'google-client-secret',
+    redirectUri: 'https://app.tudojang.com/oauth-callback'
+  };
+  const { cifrarToken } = require('./kms');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRevokeToken.mockResolvedValue({});
+    google.auth.OAuth2.mockImplementation(() => ({
+      generateAuthUrl: mockGenerateAuthUrl,
+      getToken: mockGetToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      setCredentials: mockSetCredentials,
+      revokeToken: mockRevokeToken
+    }));
+  });
+
+  const makeFirestoreWithActiveConnection = (connectionData) => {
+    const connRef = {
+      set: jest.fn().mockResolvedValue()
+    };
+    const getMock = jest.fn().mockResolvedValue({
+      empty: false,
+      docs: [{
+        ref: connRef,
+        data: () => connectionData
+      }]
+    });
+
+    return {
+      collection: jest.fn().mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          collection: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              get: getMock
+            })
+          })
+        })
+      }),
+      _connRef: connRef,
+      _getMock: getMock
+    };
+  };
+
+  it('revoca el token y marca la conexion activa como desconectada', async () => {
+    const encryptedToken = await cifrarToken('refresh-token-to-revoke');
+    const firestore = makeFirestoreWithActiveConnection({
+      refreshToken: encryptedToken,
+      status: 'active'
+    });
+    const service = crearServicioDisconnectDrive({ googleDriveConfig: defaultConfig, firestore });
+
+    const result = await service({ tenantId: 'tenant-abc' }, makeContext());
+
+    expect(result).toEqual({ ok: true, disconnectedCount: 1 });
+    expect(mockRevokeToken).toHaveBeenCalledWith('refresh-token-to-revoke');
+    expect(firestore._connRef.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'disconnected',
+        disconnectedBy: 'admin-uid'
+      }),
+      { merge: true }
+    );
+  });
+
+  it('rechaza desconexion si el rol no es Admin ni SuperAdmin', async () => {
+    const firestore = makeFirestoreWithActiveConnection({ status: 'active' });
+    const service = crearServicioDisconnectDrive({ googleDriveConfig: defaultConfig, firestore });
+
+    await expect(
+      service({ tenantId: 'tenant-abc' }, makeContext({ token: { rol: 'Tutor', tenantId: 'tenant-abc' } }))
+    ).rejects.toThrow('Solo el Admin del tenant puede desconectar Google Drive');
+  });
+});
+
+describe('crearServicioGetDriveConnection y crearServicioSetDriveFolder', () => {
+  const makeFirestoreWithActiveConnection = (connectionData = null) => {
+    const connRef = {
+      set: jest.fn().mockResolvedValue()
+    };
+    const connections = Array.isArray(connectionData)
+      ? connectionData
+      : connectionData
+        ? [connectionData]
+        : [];
+    const docs = connections.map((item, index) => ({
+      id: item.id || 'conn-123',
+      ref: item.ref || connRef,
+      data: () => item
+    }));
+    const getMock = jest.fn().mockResolvedValue({
+      empty: docs.length === 0,
+      docs
+    });
+    const whereMock = jest.fn().mockReturnValue({
+      get: getMock,
+      limit: jest.fn().mockReturnValue({ get: getMock })
+    });
+
+    return {
+      collection: jest.fn().mockReturnValue({
+        doc: jest.fn().mockReturnValue({
+          collection: jest.fn().mockReturnValue({
+            where: whereMock
+          })
+        })
+      }),
+      _connRef: connRef,
+      _whereMock: whereMock
+    };
+  };
+
+  it('devuelve conexion activa con activeFolderId persistido', async () => {
+    const firestore = makeFirestoreWithActiveConnection({
+      status: 'active',
+      activeFolderId: 'folder-firestore',
+      googleAccountEmail: 'drive-admin@example.com'
+    });
+    const service = crearServicioGetDriveConnection({ firestore });
+
+    const result = await service({ tenantId: 'tenant-abc' }, makeContext());
+
+    expect(result).toEqual({
+      connected: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-firestore',
+      activeFolderName: '',
+      googleAccountEmail: 'drive-admin@example.com',
+      status: 'active'
+    });
+    expect(firestore._whereMock).toHaveBeenCalledWith('status', '==', 'active');
+  });
+
+  it('devuelve la conexion activa mas reciente cuando existen duplicadas', async () => {
+    const firestore = makeFirestoreWithActiveConnection([
+      {
+        id: 'conn-old',
+        status: 'active',
+        activeFolderId: 'folder-old',
+        connectedAt: '2026-06-01T00:00:00.000Z',
+      },
+      {
+        id: 'conn-new',
+        status: 'active',
+        activeFolderId: 'folder-new',
+        googleAccountEmail: 'drive-new@example.com',
+        connectedAt: '2026-07-01T00:00:00.000Z',
+      },
+    ]);
+    const service = crearServicioGetDriveConnection({ firestore });
+
+    const result = await service({ tenantId: 'tenant-abc' }, makeContext());
+
+    expect(result).toEqual({
+      connected: true,
+      connectionId: 'conn-new',
+      activeFolderId: 'folder-new',
+      activeFolderName: '',
+      googleAccountEmail: 'drive-new@example.com',
+      status: 'active'
+    });
+  });
+
+  it('devuelve disconnected cuando no hay conexion activa', async () => {
+    const firestore = makeFirestoreWithActiveConnection(null);
+    const service = crearServicioGetDriveConnection({ firestore });
+
+    const result = await service({ tenantId: 'tenant-abc' }, makeContext());
+
+    expect(result).toEqual({ connected: false });
+  });
+
+  it('guarda activeFolderId en la conexion activa del tenant', async () => {
+    const firestore = makeFirestoreWithActiveConnection({ status: 'active' });
+    const service = crearServicioSetDriveFolder({ firestore });
+
+    const result = await service(
+      { tenantId: 'tenant-abc', folderId: 'folder-real-123' },
+      makeContext()
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-real-123',
+      activeFolderName: ''
+    });
+    expect(firestore._connRef.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeFolderId: 'folder-real-123',
+        folderId: 'folder-real-123',
+        folderUpdatedBy: 'admin-uid'
+      }),
+      { merge: true }
+    );
+  });
+
+  it('rechaza guardar carpeta si el rol no es Admin ni SuperAdmin', async () => {
+    const firestore = makeFirestoreWithActiveConnection({ status: 'active' });
+    const service = crearServicioSetDriveFolder({ firestore });
+
+    await expect(
+      service(
+        { tenantId: 'tenant-abc', folderId: 'folder-real-123' },
+        makeContext({ token: { rol: 'Maestro', tenantId: 'tenant-abc' } })
+      )
+    ).rejects.toThrow('Solo el Admin del tenant puede definir la carpeta activa de Drive');
+  });
+});
+
 describe('crearServicioSyncDriveMetadata', () => {
   const defaultConfig = {
     clientId: 'google-client-id',
@@ -835,6 +1377,14 @@ describe('crearServicioSyncDriveMetadata', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    google.auth.OAuth2.mockImplementation(() => ({
+      generateAuthUrl: mockGenerateAuthUrl,
+      getToken: mockGetToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      setCredentials: mockSetCredentials,
+      getAccessToken: mockGetAccessToken
+    }));
+    mockGetAccessToken.mockResolvedValue({ token: 'access-token-sync' });
   });
 
   it('retorna 200 si recibe una confirmacion de canal de sincronizacion (sync)', async () => {
@@ -1267,3 +1817,4 @@ describe('crearServicioSyncDriveMetadata', () => {
     );
   });
 });
+

@@ -135,6 +135,11 @@ export interface CrearProgresoRepositoryOptions {
 }
 
 export function crearProgresoRepository(options: CrearProgresoRepositoryOptions = {}): ProgresoRepository | FirestoreProgressRepository {
+  const win = typeof window !== 'undefined' ? (window as any) : undefined;
+  if (win?.Cypress) {
+    return new ProgresoLocalRepository(options.storage);
+  }
+
   if (options.modo === 'firestore' && options.estudianteId && options.firestoreDeps) {
     return new FirestoreProgressRepository({
       ...options.firestoreDeps,

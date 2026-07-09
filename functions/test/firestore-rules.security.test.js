@@ -20,7 +20,7 @@ test("ticket reads require owner tenant or SuperAdmin", () => {
   assert.match(rules, /resource\.data\.userId == request\.auth\.uid/);
   assert.match(
     rules,
-    /resource\.data\.tenantId == request\.auth\.token\.tenantId/
+    /resource\.data\.tenantId == currentTenantId\(\)/
   );
 });
 

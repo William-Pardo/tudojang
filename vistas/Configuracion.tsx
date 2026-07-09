@@ -22,6 +22,8 @@ import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
+import InvitacionesView from './admin/InvitacionesView';
+import VinculosView from './admin/VinculosView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 import { obtenerLimiteEquipoTecnico, obtenerLimiteOperativo } from '../utils/limitesSaas';
@@ -198,7 +200,7 @@ const VistaConfiguracion: React.FC = () => {
     const { sedes, sedesVisibles, totalSedesActivas, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
+    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>('branding');
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
@@ -397,11 +399,12 @@ const VistaConfiguracion: React.FC = () => {
             )}
 
             {!isWizardMode && (
-                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
-                    <div className="flex flex-row gap-1">
+                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full overflow-visible">
+                    <div className="flex flex-row flex-wrap gap-1">
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
                             { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
+                            { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
                             { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
                             { id: 'alertas', label: 'Alertas', icon: IconoCampana },
@@ -410,10 +413,10 @@ const VistaConfiguracion: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
                                 <tab.icon className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                                <span className="hidden md:inline">{tab.label}</span>
+                                <span className="inline">{tab.label}</span>
                             </button>
                         ))}
                     </div>
@@ -800,6 +803,79 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
                             <GestionNotificacionesPush />
                         </section>
+                    </div>
+                )}
+
+                {!isWizardMode && activeTab === 'accesos' && (
+                    <div className="space-y-8 animate-fade-in">
+                        <section className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-6">
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-tkd-red mb-2">Perfiles externos</p>
+                                <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-dark dark:text-white">Configuración de login externo</h3>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2 max-w-3xl">
+                                    Controla el acceso de alumnos y tutores que no trabajan dentro del club. Las invitaciones también se pueden enviar desde el registro o edición de cada estudiante.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {[
+                                    {
+                                        key: 'loginEstudiantesActivo',
+                                        title: 'Activar cuentas externas',
+                                        description: 'Permite crear login para alumnos y tutores.'
+                                    },
+                                    {
+                                        key: 'invitarEstudianteAlCrear',
+                                        title: 'Invitar estudiante al crear',
+                                        description: 'Marca por defecto el envío al correo del alumno.'
+                                    },
+                                    {
+                                        key: 'invitarTutorAlCrear',
+                                        title: 'Invitar tutor al crear',
+                                        description: 'Marca por defecto el envío al acudiente cuando exista correo.'
+                                    }
+                                ].map((item) => {
+                                    const cuentasExternas = localConfigClub.configuracionCuentasExternas || {};
+                                    const checked = !!cuentasExternas[item.key as keyof typeof cuentasExternas];
+
+                                    return (
+                                        <label key={item.key} className={`p-5 rounded-3xl border-2 cursor-pointer transition-all ${checked ? 'border-tkd-blue bg-tkd-blue/5' : 'border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5'}`}>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">{item.title}</h4>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-2 leading-relaxed">{item.description}</p>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        setLocalConfigClub(prev => prev ? {
+                                                            ...prev,
+                                                            configuracionCuentasExternas: {
+                                                                ...(prev.configuracionCuentasExternas || {}),
+                                                                [item.key]: e.target.checked
+                                                            }
+                                                        } : prev);
+                                                    }}
+                                                    className="w-5 h-5 accent-tkd-blue shrink-0"
+                                                />
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => guardarConfiguracionesHandler()}
+                                className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                            >
+                                Guardar configuración de cuentas
+                            </button>
+                        </section>
+
+                        <InvitacionesView />
+                        <VinculosView />
                     </div>
                 )}
 

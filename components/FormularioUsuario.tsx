@@ -9,6 +9,7 @@ import { RolUsuario } from '../tipos';
 import { IconoCerrar, IconoCandado, IconoUsuario, IconoGuardar, IconoEmail, IconoInformacion, IconoCasa, IconoOjoAbierto, IconoOjoCerrado, IconoWhatsApp } from './Iconos';
 import FormInputError from './FormInputError';
 import { useSedes } from '../context/DataContext';
+import { obtenerDescripcionRolEquipoTecnico } from '../utils/roles';
 
 interface Props {
   abierto: boolean;
@@ -48,7 +49,7 @@ const DESCRIPCIONES_ROLES = {
   [RolUsuario.Admin]: "Acceso total: Finanzas, Configuración y Personal.",
   [RolUsuario.Editor]: "Secretaría: Gestión de alumnos, tienda, eventos y cobros.",
   [RolUsuario.Asistente]: "Apoyo en Sede: Registro de asistencias y consulta de alumnos.",
-  [RolUsuario.Tutor]: "Sabonim (Profesor): Acceso a su perfil, asistencias y pagos."
+  [RolUsuario.Tutor]: "Maestro: gestion tecnica, asistencia, clases y seguimiento operativo."
 };
 
 const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usuarioActual, cargando }) => {
@@ -159,7 +160,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 type="text"
                 {...register('nombreUsuario')}
                 className={`${inputClasses} pr-4 ${errors.nombreUsuario ? 'border-red-500 ring-1 ring-red-500' : ''}`}
-                placeholder="Ej: Sabonim Carlos Ruiz"
+                placeholder="Ej: Maestro Carlos Ruiz"
               />
             </div>
             <FormInputError mensaje={errors.nombreUsuario?.message as string} />
@@ -210,7 +211,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 <option value={RolUsuario.Admin}>Administrador General</option>
                 <option value={RolUsuario.Editor}>Editor / Secretaría</option>
                 <option value={RolUsuario.Asistente}>Asistente de Sede</option>
-                <option value={RolUsuario.Tutor}>Sabonim (Profesor)</option>
+                <option value={RolUsuario.Tutor}>Maestro</option>
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -219,7 +220,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
             {rolSeleccionado && (
               <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-start gap-3 border border-blue-200 dark:border-blue-800">
                 <IconoInformacion className="w-5 h-5 text-tkd-blue flex-shrink-0" />
-                <p className="text-[11px] font-bold text-blue-800 dark:text-blue-300 leading-tight uppercase">{(DESCRIPCIONES_ROLES as any)[rolSeleccionado]}</p>
+                <p className="text-[11px] font-bold text-blue-800 dark:text-blue-300 leading-tight uppercase">{obtenerDescripcionRolEquipoTecnico(rolSeleccionado)}</p>
               </div>
             )}
           </div>
