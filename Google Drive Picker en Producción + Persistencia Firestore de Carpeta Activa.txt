@@ -1,0 +1,109 @@
+Google Drive Picker en Producción + Persistencia Firestore de Carpeta Activa
+Problema
+Google Picker no abre en producción porque las variables de entorno VITE_GOOGLE_PICKER_* no están definidas en ningún archivo .env. El build desplegado inyecta "" en las tres constantes, haciendo que pickerDisponible sea siempre false. El botón "Seleccionar carpeta en Drive" queda deshabilitado con el mensaje: "Google Picker pendiente de configurar".
+
+Además, la carpeta activa se persiste solo en localStorage, lo que significa que un segundo admin del mismo tenant no ve la carpeta ya seleccionada. Esto es un problema real en escenarios multi-admin.
+
+Diagnóstico
+Picker deshabilitado
+Variable	Estado	Origen esperado
+VITE_GOOGLE_PICKER_API_KEY	❌ No definida	API key pública Firebase (AIzaSyArURNdvpmVeUC9bJRIYsbGSkURK4ZEbvY)
+VITE_GOOGLE_PICKER_CLIENT_ID	❌ No definida	OAuth Client ID web (545628702717-5sjc3h3gcj3cga70b1job8oclqv44q8h.apps.googleusercontent.com)
+VITE_GOOGLE_PICKER_APP_ID	❌ No definida (opcional)	Project number (545628702717)
+IMPORTANT
+
+La API key de Firebase (AIzaSyArURNdvpmVeUC9bJRIYsbGSkURK4ZEbvY) ya está expuesta en el build de producción para Firebase Auth/Firestore. Google Picker puede reutilizarla como developerKey siempre que la API Google Picker API esté habilitada en el proyecto GCP y la key tenga las restricciones HTTP correctas.
+
+Carpeta solo en localStorage
+La carpeta activa se guarda en localStorage["tudojang:driveFolder:<tenantId>"]. Esto funciona para un solo admin en un solo navegador, pero:
+
+Si Admin B se conecta desde otro dispositivo, no ve la carpeta seleccionada por Admin A
+Si se borra caché del navegador, se pierde la carpeta activa
+User Review Required
+IMPORTANT
+
+Variable de entorno para el build: Necesito que confirmes los valores a poner en .env.local (o en el CI/CD de deploy). Los valores que derivé del proyecto son:
+
+env
+
+VITE_GOOGLE_PICKER_API_KEY=AIzaSyArURNdvpmVeUC9bJRIYsbGSkURK4ZEbvY
+VITE_GOOGLE_PICKER_CLIENT_ID=545628702717-5sjc3h3gcj3cga70b1job8oclqv44q8h.apps.googleusercontent.com
+VITE_GOOGLE_PICKER_APP_ID=545628702717
+¿Son correctos? ¿El CI/CD debe inyectarlos o los ponemos en .env.local?
+
+IMPORTANT
+
+Google Picker API habilitada: Verificar en Google Cloud Console > APIs que la Google Picker API esté habilitada. Sin esto, Picker no abre aunque las variables estén bien.
+
+WARNING
+
+Restricciones de API key: La API key pública debe tener el origen https://tudojang.com y https://tudojang.web.app como referrers HTTP permitidos. Si la key solo tiene restricciones para Firebase APIs, el Picker será rechazado.
+
+Open Questions
+IMPORTANT
+
+¿Persistir carpeta en Firestore? El doc de cierre (punto 4 de pendientes) sugiere evaluar esto. Mi recomendación: SÍ, porque:
+
+Multi-admin por tenant necesita carpeta compartida
+El campo folderId ya encaja naturalmente en el documento driveConnections existente
+localStorage queda como caché local para evitar flicker al cargar
+Propuesta: Al seleccionar carpeta, guardar folderId en tenants/{tenantId}/driveConnections/{connId}. Al cargar BibliotecaView, leer primero de localStorage (cache rápido), luego sincronizar desde la Cloud Function. ¿Aprobás esta dirección?
+
+Proposed Changes
+1. Variables de entorno para Picker
+[MODIFY] 
+.env.local
+Agregar las tres variables VITE_GOOGLE_PICKER_* derivadas del proyecto Firebase
+2. Persistencia de carpeta activa en Firestore
+[MODIFY] 
+drive.js
+En crearServicioDriveOAuthCallback: aceptar campo opcional folderId en el callback result
+Nueva función crearServicioSetDriveFolder: callable que recibe { tenantId, folderId }, valida rol Admin/SuperAdmin, y actualiza el campo activeFolderId en la conexión Drive activa del tenant
+Nueva función crearServicioGetDriveConnection: callable que devuelve el estado de conexión del tenant incluyendo activeFolderId (para que BibliotecaView pueda cargar la carpeta activa desde Firestore)
+[MODIFY] 
+index.js
+Exportar las dos funciones nuevas: setDriveFolder, getDriveConnection
+Registrarlas con driveFunctions.https.onCall(crearHandlerCallable(...))
+[MODIFY] 
+driveService.ts
+Agregar guardarCarpetaActiva(tenantId, folderId) → llama a setDriveFolder
+Agregar obtenerConexionDrive(tenantId) → llama a getDriveConnection
+Agregar tipos DriveConnectionInfo
+[MODIFY] 
+BibliotecaView.tsx
+Al seleccionar carpeta (Picker o URL/ID), además de localStorage, llamar a driveService.guardarCarpetaActiva()
+Al montar con driveConectado, llamar a driveService.obtenerConexionDrive() para sincronizar el activeFolderId desde Firestore
+localStorage sigue como caché para carga instantánea
+3. Tests (TDD)
+[MODIFY] 
+drive.test.js
+Tests para crearServicioSetDriveFolder: rol válido, tenant match, actualiza folderId
+Tests para crearServicioGetDriveConnection: devuelve connectionId + activeFolderId
+[MODIFY] 
+driveService.test.ts
+Tests para guardarCarpetaActiva y obtenerConexionDrive
+[MODIFY] 
+BibliotecaView.test.tsx
+Test: al seleccionar carpeta, se llama guardarCarpetaActiva además de persistir en localStorage
+Test: al montar conectado, se sincroniza activeFolderId desde backend
+No reescribir tests existentes — solo agregar nuevos
+4. Documentación
+[MODIFY] 
+CIERRE_DRIVE_PICKER_DEMO_REAL.md
+Documentar las variables de entorno ya configuradas
+Documentar la persistencia Firestore de carpeta activa
+Actualizar resultado de validación
+Verification Plan
+Automated Tests
+powershell
+
+# Tests unitarios frontend
+npm run test:app -- --silent vistas/admin/BibliotecaView.test.tsx services/storage/driveService.test.ts
+# Tests unitarios backend
+npx jest --runInBand --testMatch "**/functions/academico/drive.test.js" --testPathIgnorePatterns "node_modules"
+# Build
+npm run build
+Manual Verification
+Después del deploy con las variables Picker, verificar en https://tudojang.com/#/centro-estudios que el botón "Seleccionar carpeta en Drive" esté habilitado y abra el Picker real
+Seleccionar una carpeta y verificar que se persiste y se listan archivos reales
+Abrir desde otro navegador/incógnito con el mismo admin y verificar que la carpeta activa se carga desde Firestore

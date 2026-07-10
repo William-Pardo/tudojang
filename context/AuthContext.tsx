@@ -8,8 +8,11 @@ import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuper
 import type { Usuario } from '../tipos';
 import { RolUsuario } from '../tipos';
 
-// Helper to normalize role strings to the enum values (case‑insensitive)
-const normalizeRol = (rol: string | undefined): RolUsuario | undefined => {
+// Helper to normalize role strings to the enum values (case‑insensitive).
+// Exportado para poder testearlo directo. Regla canonica de roles (CIERRE
+// CENTRO DE ESTUDIOS.md 14.9): 'maestro' es un rol propio (quien ensena y
+// asigna clases); 'tutor' es el padre/acudiente — no son alias entre si.
+export const normalizeRol = (rol: string | undefined): RolUsuario | undefined => {
   if (!rol) return undefined;
   const cleaned = rol.trim().toLowerCase();
   switch (cleaned) {
@@ -25,6 +28,8 @@ const normalizeRol = (rol: string | undefined): RolUsuario | undefined => {
       return RolUsuario.Estudiante;
     case 'tutor':
       return RolUsuario.Tutor;
+    case 'maestro':
+      return RolUsuario.Maestro;
     default:
       return undefined;
   }

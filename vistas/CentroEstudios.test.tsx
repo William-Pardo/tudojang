@@ -239,6 +239,27 @@ describe('CentroEstudios', () => {
     expect(screen.getByRole('button', { name: /^publicar todo$/i })).not.toBeDisabled();
   });
 
+  it('ubica el switcher de pestañas antes del stepper y oculta el stepper fuera de la pestaña "flujo"', async () => {
+    const user = userEvent.setup();
+    mockUseAuth.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin } });
+
+    render(<CentroEstudios />);
+
+    const tablist = screen.getByRole('tablist', { name: /secciones de gestión/i });
+    const stepperFlujo = screen.getByRole('list', { name: /flujo principal de centro de estudios/i });
+
+    // El switcher de pestañas debe preceder al stepper en el orden del DOM.
+    expect(tablist.compareDocumentPosition(stepperFlujo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(screen.getByRole('tab', { name: /progreso estudiantes/i }));
+
+    expect(screen.queryByRole('list', { name: /flujo principal de centro de estudios/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /flujo académico/i }));
+
+    expect(screen.getByRole('list', { name: /flujo principal de centro de estudios/i })).toBeInTheDocument();
+  });
+
   it('muestra exactamente 3 pasos en el flujo de Centro de Estudios, en orden', async () => {
     mockUseAuth.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin } });
 

@@ -675,6 +675,307 @@ describe('Programa academico: crear, validar y editar', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Cluster de 4 bugs reportados por el usuario tras probar manualmente la
+// integracion "Programa y publicacion" (ver CIERRE CENTRO DE ESTUDIOS.md,
+// subseccion "Fix: persistencia y seleccion de Programa academico"):
+//   1. No hay boton de eliminar programa academico.
+//   2. Cada edicion de un programa termina creando un duplicado (porque
+//      `programaSeleccionadoId` nunca vuelve a apuntar a un programa real tras
+//      un remount, y `esEdicion` compara contra el id demo hardcodeado).
+//   3. Al editar un programa, horario/sede/instructor se pierden (se hidratan
+//      en blanco/default: viven en EjecucionPrograma, no en ProgramaAcademico).
+//   4. Al editar un programa, "Mis clases" no se actualiza.
+describe('Fix 2: seleccion post-hidratacion apunta al programa real (no al placeholder demo)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('tras hidratar, editar SIN seleccionar nada manualmente reutiliza el id real (no crea un duplicado)', async () => {
+    const user = userEvent.setup();
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa ya guardado',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['grados-superiores'],
+    };
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+    });
+
+    renderVista({ repositoryPrograma });
+
+    // Simula el escenario real: el usuario ya tenia este programa guardado en una
+    // sesion anterior; al remontar (navegar a otra seccion y volver), la seleccion
+    // local vuelve al placeholder demo aunque el programa real ya se hidrato en la
+    // bandeja. NO se interactua con el <select> a proposito.
+    await screen.findByRole('option', { name: /programa ya guardado/i });
+
+    await user.click(screen.getByRole('button', { name: /editar programa/i }));
+    await completarFormularioMinimo(user);
+    await user.click(screen.getByRole('button', { name: /^aceptar$/i }));
+    const dialogConfirmar = screen.getByText('Confirmar programa').closest('[role="dialog"]') as HTMLElement;
+    await user.click(within(dialogConfirmar).getByRole('button', { name: /^confirmar$/i }));
+
+    await waitFor(() => expect(repositoryPrograma.guardarPrograma).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'programa-real-1' }),
+    ));
+  });
+});
+
+describe('Fix 3: reconstruccion de horario/sede/instructor/fechas al hidratar un programa real', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('usa la EjecucionPrograma guardada (obtenerEjecucion) para no dejar el horario/fechas en blanco tras un remount', async () => {
+    const user = userEvent.setup();
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa con horario',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['grados-superiores'],
+    };
+    const ejecucionReal = {
+      id: 'ejecucion-programa-real-1',
+      tenantId: 'tenant-real',
+      programaId: 'programa-real-1',
+      grupoId: 'precadetes',
+      sedeId: 'sede-principal',
+      estado: 'activo' as const,
+      fechaInicio: '2026-08-01',
+      fechaFin: '2026-10-31',
+      unidadActualId: null,
+      objetivoActualId: null,
+      objetivosCompletados: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      bloques: [{
+        id: 'bloque-real-1',
+        tenantId: 'tenant-real',
+        grupoId: 'precadetes',
+        sedeId: 'sede-principal',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-real',
+        diaSemana: 2, // Martes
+        horaInicio: '16:00',
+        horaFin: '17:00',
+        activo: true,
+      }],
+    };
+
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+    });
+    const repositoryJornada = crearRepoJornadaFake({
+      obtenerEjecucion: jest.fn().mockResolvedValue(ejecucionReal),
+    });
+
+    renderVista({ repositoryPrograma, repositoryJornada });
+
+    await screen.findByRole('option', { name: /programa con horario/i });
+
+    await user.click(screen.getByRole('button', { name: /editar programa/i }));
+    const dialog = screen.getByRole('dialog', { name: /editar programa/i });
+
+    expect(within(dialog).getByLabelText(/grupo objetivo/i)).toHaveValue('Precadetes');
+    expect(within(dialog).getByLabelText(/fecha inicio/i)).toHaveValue('2026-08-01');
+    expect(within(dialog).getByLabelText(/fecha fin/i)).toHaveValue('2026-10-31');
+    expect(within(dialog).getByDisplayValue('16:00')).toBeInTheDocument();
+    expect(within(dialog).getByDisplayValue('17:00')).toBeInTheDocument();
+  });
+
+  it('sin ejecucion guardada (o repositorio sin obtenerEjecucion), conserva el comportamiento previo (defaults del placeholder) sin romperse', async () => {
+    const programaReal = {
+      id: 'programa-real-2',
+      tenantId: 'tenant-real',
+      nombre: 'Programa sin ejecucion',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['x'],
+    };
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+    });
+
+    renderVista({ repositoryPrograma });
+
+    expect(await screen.findByRole('option', { name: /programa sin ejecucion/i })).toBeInTheDocument();
+  });
+});
+
+describe('Fix 4: refresco de "Mis clases" tras guardar el programa', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('tras editar y confirmar el programa (mismo id), "Mis clases" muestra las clases nuevas sin navegar afuera y volver', async () => {
+    const user = userEvent.setup();
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa ya guardado',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['grados-superiores'],
+    };
+
+    let jornadasGuardadas: any[] = [];
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn(() => Promise.resolve(jornadasGuardadas)),
+      guardarJornadasEnLote: jest.fn((jornadas: any[]) => {
+        jornadasGuardadas = [...jornadasGuardadas, ...jornadas];
+        return Promise.resolve();
+      }),
+    });
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+    });
+
+    renderVista({ repositoryJornada, repositoryPrograma });
+
+    const select = await screen.findByRole('combobox', { name: /programa/i });
+    await user.selectOptions(select, 'programa-real-1');
+
+    expect(await screen.findByText(/todavia no tiene clases generadas/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /editar programa/i }));
+    await completarFormularioMinimo(user);
+    await user.click(screen.getByRole('button', { name: /^aceptar$/i }));
+    const dialogConfirmar = screen.getByText('Confirmar programa').closest('[role="dialog"]') as HTMLElement;
+    await user.click(within(dialogConfirmar).getByRole('button', { name: /^confirmar$/i }));
+
+    await waitFor(() => expect(repositoryJornada.guardarJornadasEnLote).toHaveBeenCalled());
+
+    await waitFor(() => expect(screen.queryByText(/todavia no tiene clases generadas/i)).not.toBeInTheDocument());
+  });
+});
+
+describe('Fix 1: Eliminar programa academico', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('el boton "Eliminar programa" pide confirmacion antes de borrar', async () => {
+    const user = userEvent.setup();
+    renderVista();
+
+    await user.click(screen.getByRole('button', { name: /eliminar programa/i }));
+
+    expect(screen.getByRole('heading', { name: /eliminar programa/i })).toBeInTheDocument();
+  });
+
+  it('cancelar la confirmacion no llama a eliminarPrograma', async () => {
+    const user = userEvent.setup();
+    const repositoryPrograma = crearRepoProgramaFake({
+      eliminarPrograma: jest.fn().mockResolvedValue(undefined),
+    });
+    renderVista({ repositoryPrograma });
+
+    await user.click(screen.getByRole('button', { name: /eliminar programa/i }));
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }));
+
+    expect(repositoryPrograma.eliminarPrograma).not.toHaveBeenCalled();
+    // ModalConfirmacion cierra con una animacion de ~200ms antes de invocar onCerrar.
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /eliminar programa/i })).not.toBeInTheDocument());
+  });
+
+  it('al confirmar, llama a eliminarPrograma, limpia las jornadas no cerradas asociadas y quita el programa de la bandeja', async () => {
+    const user = userEvent.setup();
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa a borrar',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['x'],
+    };
+    const jornadaBorrador = {
+      id: 'jornada-a-borrar',
+      tenantId: 'tenant-real',
+      programaId: 'programa-real-1',
+      ejecucionProgramaId: 'ejecucion-programa-real-1',
+      grupoId: 'infantil',
+      sedeId: 'sede-principal',
+      espacioId: 'tatami-1',
+      instructorId: 'maestro-1',
+      fecha: '2026-07-06',
+      horaInicio: '08:00',
+      horaFin: '09:00',
+      estado: 'borrador' as const,
+      objetivosPlaneados: ['obj-1'],
+      objetivosImpartidos: [],
+      asistenciaRegistrada: false,
+      creadoEn: '2026-07-01T00:00:00.000Z',
+      actualizadoEn: '2026-07-01T00:00:00.000Z',
+    };
+    const jornadaCerrada = {
+      ...jornadaBorrador,
+      id: 'jornada-cerrada-se-conserva',
+      estado: 'cerrada' as const,
+      asistenciaRegistrada: true,
+    };
+
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([jornadaBorrador, jornadaCerrada]),
+      eliminarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
+    });
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+      eliminarPrograma: jest.fn().mockResolvedValue(undefined),
+    });
+
+    renderVista({ repositoryJornada, repositoryPrograma });
+
+    const select = await screen.findByRole('combobox', { name: /programa/i });
+    await user.selectOptions(select, 'programa-real-1');
+
+    await user.click(screen.getByRole('button', { name: /eliminar programa/i }));
+    await user.click(screen.getByRole('button', { name: /^eliminar$/i }));
+
+    await waitFor(() => expect(repositoryPrograma.eliminarPrograma).toHaveBeenCalledWith('tenant-real', 'programa-real-1'));
+    // Solo se borra fisicamente la jornada NO cerrada -- la cerrada se conserva por
+    // trazabilidad, mismo criterio que ya usa guardarPrograma al regenerar el horario.
+    await waitFor(() => expect(repositoryJornada.eliminarJornadasEnLote).toHaveBeenCalledWith(
+      'tenant-real',
+      ['jornada-a-borrar'],
+    ));
+    await waitFor(() => expect(screen.queryByRole('option', { name: /programa a borrar/i })).not.toBeInTheDocument());
+  });
+});
+
 describe('Matricular estudiantes (Fase 0: roster explicito de matricula)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

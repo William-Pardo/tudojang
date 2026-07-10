@@ -27,7 +27,7 @@ export const crearEsquemaValidacion = (esEdicion: boolean) => {
     email: yup.string().email('Debe ser un correo válido.').required('El correo electrónico es obligatorio.'),
     rol: yup.string().oneOf(Object.values(RolUsuario)).required('El rol es obligatorio.'),
     sedeId: yup.string().when('rol', {
-      is: (val: string) => val === RolUsuario.Tutor || val === RolUsuario.Asistente,
+      is: (val: string) => val === RolUsuario.Maestro || val === RolUsuario.Asistente,
       then: (s) => s.required('Este perfil debe tener una sede asignada para filtrar sus funciones.'),
       otherwise: (s) => s.optional(),
     }),
@@ -43,13 +43,6 @@ export const crearEsquemaValidacion = (esEdicion: boolean) => {
     fechaInicio: yup.string().required('La fecha de inicio es obligatoria.'),
     lugarEjecucion: yup.string().required('La sede de ejecución es obligatoria.'),
   }).required();
-};
-
-const DESCRIPCIONES_ROLES = {
-  [RolUsuario.Admin]: "Acceso total: Finanzas, Configuración y Personal.",
-  [RolUsuario.Editor]: "Secretaría: Gestión de alumnos, tienda, eventos y cobros.",
-  [RolUsuario.Asistente]: "Apoyo en Sede: Registro de asistencias y consulta de alumnos.",
-  [RolUsuario.Tutor]: "Maestro: gestion tecnica, asistencia, clases y seguimiento operativo."
 };
 
 const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usuarioActual, cargando }) => {
@@ -208,10 +201,15 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
                 {...register('rol')}
                 className="block w-full py-3 px-4 border rounded-xl shadow-sm transition-all outline-none font-black text-base bg-white text-gray-900 border-gray-300 dark:bg-gray-800 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-tkd-blue appearance-none cursor-pointer"
               >
+                {/* Regla canonica de roles (CIERRE CENTRO DE ESTUDIOS.md 14.9): la opcion
+                    "Maestro" guarda rol Maestro. Antes guardaba rol Tutor (padre/acudiente),
+                    root cause del bug "solo veo 1 de 3 maestros en Programa". Tutor NO se
+                    crea desde este formulario: se crea via el flujo de invitaciones
+                    academicas (functions/academico/invitaciones.js). */}
                 <option value={RolUsuario.Admin}>Administrador General</option>
                 <option value={RolUsuario.Editor}>Editor / Secretaría</option>
                 <option value={RolUsuario.Asistente}>Asistente de Sede</option>
-                <option value={RolUsuario.Tutor}>Maestro</option>
+                <option value={RolUsuario.Maestro}>Maestro</option>
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
@@ -226,7 +224,7 @@ const FormularioUsuario: React.FC<Props> = ({ abierto, onCerrar, onGuardar, usua
           </div>
 
           {/* SEDE ASIGNADA */}
-          {(rolSeleccionado === RolUsuario.Tutor || rolSeleccionado === RolUsuario.Asistente) && (
+          {(rolSeleccionado === RolUsuario.Maestro || rolSeleccionado === RolUsuario.Asistente) && (
             <div className="animate-slide-in-right p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
               <label
                 htmlFor="usuario-sede-trabajo"

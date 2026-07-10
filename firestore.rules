@@ -170,27 +170,6 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // Clases en vivo y Asistencia (Raíz)
-    // =========================================================================
-
-    match /clases_en_vivo/{docId} {
-      allow read: if authenticated() && currentTenantId() == resource.data.tenantId;
-      allow create, update: if authenticated() 
-        && currentTenantId() == request.resource.data.tenantId 
-        && (isAdmin() || request.auth.uid == request.resource.data.maestroEjecutorId || request.auth.uid == request.resource.data.maestroTitularId);
-      allow delete: if isAdmin() && currentTenantId() == resource.data.tenantId;
-    }
-
-    match /asistencias_jornada/{docId} {
-      allow read: if authenticated() && currentTenantId() == resource.data.tenantId;
-      // Los estudiantes no pueden escribir asistencia (solo_lectura)
-      allow create, update: if authenticated()
-        && !isEstudiante() && !isTutor()
-        && currentTenantId() == request.resource.data.tenantId;
-      allow delete: if isAdmin() && currentTenantId() == resource.data.tenantId;
-    }
-
-    // =========================================================================
     // MÃ³dulo acadÃ©mico â€” colecciones por tenant
     // =========================================================================
 

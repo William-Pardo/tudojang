@@ -141,6 +141,51 @@ const CentroEstudios: React.FC = () => {
             Convierte archivos de Drive en recursos aprobados y publicalos a una clase, grupo o estudiante.
           </p>
         </div>
+      </header>
+
+      {/* Tab switcher: se ubica antes del stepper para que, al entrar a "Progreso
+          estudiantes", no quede debajo un stepper de un flujo distinto (bug reportado:
+          el stepper de Flujo académico seguía visible en la pestaña de Métricas). */}
+      {puedeGestionarJornadas && (
+        <div className="flex gap-2 rounded-2xl bg-gray-100 dark:bg-white/10 p-1 w-fit" role="tablist" aria-label="Secciones de gestión">
+          <button
+            role="tab"
+            aria-selected={tabGestion === 'flujo'}
+            id="tab-flujo"
+            aria-controls="panel-flujo"
+            onClick={() => setTabGestion('flujo')}
+            className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
+              tabGestion === 'flujo'
+                ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            📚 Flujo académico
+          </button>
+          <button
+            role="tab"
+            aria-selected={tabGestion === 'metricas'}
+            id="tab-metricas"
+            aria-controls="panel-metricas"
+            onClick={() => setTabGestion('metricas')}
+            className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
+              tabGestion === 'metricas'
+                ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
+                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            📊 Progreso estudiantes
+          </button>
+        </div>
+      )}
+
+      {/* El stepper de 3 pasos (Conectar Drive / Centro de recursos / Programa y
+          publicacion) solo describe el pipeline de "Flujo académico": no tiene sentido
+          en la pestaña de Métricas, así que solo se renderiza cuando esa es la pestaña
+          activa. Para estudiantes (sin `puedeGestionarJornadas`, sin tab switcher)
+          `tabGestion` nunca cambia de 'flujo', por lo que el stepper sigue visible
+          para ellos igual que antes. */}
+      {tabGestion === 'flujo' && (
         <ol className="rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900 grid gap-3 lg:grid-cols-[16fr_47fr_37fr] lg:items-center" aria-label="Flujo principal de Centro de Estudios">
           {pasosConEstado.map((paso) => (
               <li
@@ -161,45 +206,13 @@ const CentroEstudios: React.FC = () => {
               </li>
           ))}
         </ol>
-      </header>
+      )}
 
       {metricas.total > 0 && <ProgresoResumenCard metricas={metricas} />}
 
 
       {puedeGestionarJornadas && (
         <section className="space-y-5">
-          {/* Tab switcher */}
-          <div className="flex gap-2 rounded-2xl bg-gray-100 dark:bg-white/10 p-1 w-fit" role="tablist" aria-label="Secciones de gestión">
-            <button
-              role="tab"
-              aria-selected={tabGestion === 'flujo'}
-              id="tab-flujo"
-              aria-controls="panel-flujo"
-              onClick={() => setTabGestion('flujo')}
-              className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
-                tabGestion === 'flujo'
-                  ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              📚 Flujo académico
-            </button>
-            <button
-              role="tab"
-              aria-selected={tabGestion === 'metricas'}
-              id="tab-metricas"
-              aria-controls="panel-metricas"
-              onClick={() => setTabGestion('metricas')}
-              className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
-                tabGestion === 'metricas'
-                  ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              📊 Progreso estudiantes
-            </button>
-          </div>
-
           {/* Panel: Flujo académico (Biblioteca + Asignaciones) */}
           {tabGestion === 'flujo' && (
             <div

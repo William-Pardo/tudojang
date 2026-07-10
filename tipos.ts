@@ -1,12 +1,20 @@
 
 // tipos.ts 
 
+// Regla canonica de roles (decision de producto del usuario, 2026-07-09 — ver
+// CIERRE CENTRO DE ESTUDIOS.md 14.9):
+//   - Tutor   = padre/acudiente. NUNCA un instructor ni un miembro del Equipo Tecnico.
+//   - Maestro = rol de quien ensena y asigna clases (el rol docente del Equipo Tecnico).
+//   - Editor  = Secretaria (gestion de alumnos/tienda/cobros); su capacidad docente es legacy.
+//   - Asistente solo aparece como instructor de Programa si el admin lo habilita
+//     (features.asistenteInstructorPrograma).
 export enum RolUsuario {
     Admin = 'Admin',
     Editor = 'Editor',
     Asistente = 'Asistente',
     Estudiante = 'Estudiante',
     Tutor = 'Tutor',
+    Maestro = 'Maestro',
     SuperAdmin = 'SuperAdmin'
 }
 
@@ -585,46 +593,12 @@ export interface JornadaAcademica {
 }
 
 /**
- * No debe ser un módulo aislado; debe ser el estado operativo de una jornada.
- * Los estados 'en_curso' y 'finalizada' son usados por claseEnVivoApi.
- */
-export interface ClaseEnVivo {
-    id: string;
-    tenantId: string;
-    jornadaId: string;
-    programaId?: string;
-    cohorteId?: string;
-    sedeId?: string;
-    maestroEjecutorId?: string;
-    estado: 'en_curso' | 'finalizada' | 'cancelada';
-    inicioRealAt: string;
-    cierreRealAt?: string;
-    observaciones?: string;
-    estadisticasActuales?: { totalAsistencias: number; totalAusencias: number };
-    creadoEn?: string;
-    actualizadoEn?: string;
-}
-
-/**
- * Guardar eventos permite auditar errores y recalcular resúmenes.
- * Los campos registradoPorUid y metodo son usados por asistenciaQrApi.
- */
-export interface EventoAsistenciaQr {
-    id: string;
-    tenantId: string;
-    jornadaId?: string;
-    claseEnVivoId: string;
-    estudianteId: string;
-    tipo: 'entrada' | 'salida';
-    timestamp: string;
-    registradoPorUid: string;
-    metodo: 'qr_scanner' | 'manual';
-    creadoEn: string;
-}
-
-/**
  * Registro consolidado de asistencia por alumno por jornada.
- * primeraEntradaAt/ultimaSalidaAt son usados por asistenciaQrApi para calcular minutos.
+ * (Nota Fase 5 de `clase-en-vivo-checkin-trigger-agenda`: `ClaseEnVivo`/`EventoAsistenciaQr`
+ * y sus únicos consumidores, `claseEnVivoApi.ts`/`asistenciaQrApi.ts` ["Sistema B", nunca
+ * persistió en Firestore], fueron archivados/borrados por quedar reemplazados por el flujo
+ * real sobre `JornadaInstruccion` (ver `models/academico/asistencia.ts`). Este tipo
+ * permanece porque lo sigue usando `progresoClaseApi.ts`, fuera de alcance de esa fase.)
  */
 export interface AsistenciaJornada {
     id: string;

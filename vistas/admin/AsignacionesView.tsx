@@ -8,6 +8,7 @@ import { obtenerContextoJornada, type OpcionJornada } from '../../servicios/acad
 import {
   jornadaRepository,
   MENSAJE_ADVERTENCIA_AUDITORIA,
+  esJornadaOperada,
   type JornadaRepository,
 } from '../../servicios/academico/jornadaRepository';
 import { programaRepository, type ProgramaRepository } from '../../servicios/academico/programaRepository';
@@ -516,42 +517,115 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     tags: ['infantil', 'iniciación', 'patada frontal'],
   }), [nombreInstructorActual, usuarioId]);
   const [programas, setProgramas] = React.useState<ProgramaAcademicoAsignacion[]>([programaInicial]);
+  const [programaSeleccionadoId, setProgramaSeleccionadoId] = React.useState(programaInicial.id);
+  // Opciones vigentes (sedes/instructores) accesibles desde efectos async sin sumar
+  // deps que re-disparen la hidratacion. Se actualiza en cada render.
+  const opcionesProgramaRef = React.useRef<{ instructores: OpcionJornada[]; sedes: OpcionJornada[] }>(opcionesJornadaFallback);
+  opcionesProgramaRef.current = opcionesPrograma;
 
   React.useEffect(() => {
     let activo = true;
 
-    repositoryPrograma.listarProgramasPorTenant(tenantId).then((programasReales) => {
+    repositoryPrograma.listarProgramasPorTenant(tenantId).then(async (programasReales) => {
       if (!activo || programasReales.length === 0) return;
+
+      // Fix 3 (persistencia de Programa academico): ProgramaAcademico (persistido) no
+      // guarda horario/sede/instructor — esos viven en EjecucionPrograma (id determinista
+      // `ejecucion-${programa.id}`, el mismo que usa guardarPrograma). Antes se hidrataban
+      // en blanco/default (la nota original admitia el hueco: "queda para una iteracion
+      // futura") y cada remount pisaba en silencio el horario real del programa. Ahora se
+      // lee la ejecucion persistida y se reconstruyen diasHorario/sede/grupo/fechas/
+      // instructor. Si la ejecucion no existe (programa guardado sin horario) o el
+      // repositorio inyectado no implementa obtenerEjecucion (fakes de test viejos), se
+      // degrada al comportamiento anterior sin romperse.
+      const ejecuciones = await Promise.all(programasReales.map(async (real) => {
+        try {
+          return (await repositoryJornada.obtenerEjecucion?.(tenantId, `ejecucion-${real.id}`)) ?? null;
+        } catch {
+          return null;
+        }
+      }));
+      if (!activo) return;
+
+      const opcionesVigentes = opcionesProgramaRef.current;
+      const hidratados = programasReales.map((real, indice): ProgramaAcademicoAsignacion => {
+        const ejecucion = ejecuciones[indice];
+        const bloquesActivos = (ejecucion?.bloques ?? []).filter((bloque) => bloque.activo !== false);
+        const instructorIdReal = bloquesActivos[0]?.instructorId ?? '';
+        const instructorNombre = opcionesVigentes.instructores.find((opcion) => opcion.id === instructorIdReal)?.nombre;
+        const grupoReconstruido = ejecucion
+          ? gruposObjetivo.find((grupo) => slugificar(grupo) === ejecucion.grupoId)
+          : undefined;
+        const sedeReconstruida = ejecucion
+          ? opcionesVigentes.sedes.find((opcion) => slugificar(opcion.nombre) === ejecucion.sedeId)?.nombre
+          : undefined;
+        return {
+          ...programaInicial,
+          id: real.id,
+          nombre: real.nombre,
+          observaciones: real.descripcion,
+          // Tags reales del documento persistido: sin esto, el programa
+          // recargado heredaria en silencio los tags hardcodeados del demo
+          // y la priorizacion de materiales correria contra tags ajenos.
+          tags: real.tags ?? [],
+          // Tema/objetivo reales: guardarPrograma los persiste como unidades[0]
+          // del ProgramaAcademico; antes se heredaban del demo.
+          tema: real.unidades?.[0]?.nombre ?? programaInicial.tema,
+          objetivoClase: real.unidades?.[0]?.objetivos?.[0]?.descripcion ?? programaInicial.objetivoClase,
+          ...(ejecucion ? {
+            fechaInicio: ejecucion.fechaInicio || programaInicial.fechaInicio,
+            fechaFin: ejecucion.fechaFin || programaInicial.fechaFin,
+            grupoObjetivo: grupoReconstruido ?? programaInicial.grupoObjetivo,
+            sede: sedeReconstruida ?? programaInicial.sede,
+            ...(instructorIdReal ? {
+              instructorId: instructorIdReal,
+              instructor: instructorNombre
+                ?? (instructorIdReal === usuarioId ? nombreInstructorActual : instructorIdReal),
+            } : {}),
+            diasHorario: bloquesActivos.map((bloque) => ({
+              dia: INDICE_A_DIA_SEMANA[bloque.diaSemana] ?? 'Lunes',
+              horaInicio: bloque.horaInicio,
+              horaFin: bloque.horaFin,
+            })),
+          } : {}),
+        };
+      });
+
       setProgramas((actuales) => {
-        // Nota: ProgramaAcademico (persistido) no guarda horario/sede/instructor —
-        // esos viven en EjecucionPrograma. Por ahora se listan con esos campos en
-        // blanco/por defecto; reeditar el horario completo queda para una iteracion futura.
-        const nuevos = programasReales
-          .filter((real) => !actuales.some((programa) => programa.id === real.id))
-          .map((real): ProgramaAcademicoAsignacion => ({
-            ...programaInicial,
-            id: real.id,
-            nombre: real.nombre,
-            observaciones: real.descripcion,
-            // Tags reales del documento persistido: sin esto, el programa
-            // recargado heredaria en silencio los tags hardcodeados del demo
-            // y la priorizacion de materiales correria contra tags ajenos.
-            tags: real.tags ?? [],
-          }));
+        // Solo se AGREGAN programas nuevos: una entrada ya presente en esta sesion
+        // (posiblemente con ediciones locales del usuario en curso) nunca se pisa
+        // con la copia hidratada.
+        const nuevos = hidratados.filter((real) => !actuales.some((programa) => programa.id === real.id));
         return nuevos.length ? [...actuales, ...nuevos] : actuales;
       });
+
+      // Fix 2 (duplicados al editar): tras un remount la seleccion volvia SIEMPRE al
+      // placeholder demo, aunque hubiera programas reales hidratados. Como esEdicion
+      // compara contra el id demo, cada "editar y guardar" del usuario corria como
+      // creacion nueva -> un ProgramaAcademico duplicado por ciclo. Si la seleccion
+      // sigue en el demo y hay al menos un programa real, se apunta al primero real.
+      setProgramaSeleccionadoId((actual) => (
+        actual === programaInicial.id && hidratados.length > 0 ? hidratados[0].id : actual
+      ));
     });
 
     return () => {
       activo = false;
     };
-  }, [tenantId, repositoryPrograma]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId, repositoryPrograma, repositoryJornada, programaInicial, usuarioId, nombreInstructorActual]);
 
-  const [programaSeleccionadoId, setProgramaSeleccionadoId] = React.useState(programaInicial.id);
   const programaSeleccionado = programas.find((programa) => programa.id === programaSeleccionadoId) ?? programas[0];
   const [modalProgramaAbierto, setModalProgramaAbierto] = React.useState(false);
   const [confirmacionProgramaAbierta, setConfirmacionProgramaAbierta] = React.useState(false);
   const [confirmacionCierreProgramaAbierta, setConfirmacionCierreProgramaAbierta] = React.useState(false);
+  // Fix 1: confirmacion + estado en vuelo del borrado real de un programa academico.
+  const [confirmacionEliminarProgramaAbierta, setConfirmacionEliminarProgramaAbierta] = React.useState(false);
+  const [eliminandoPrograma, setEliminandoPrograma] = React.useState(false);
+  // Fix 4: contador incrementado tras guardar/eliminar un programa para que el
+  // <MisClasesView> embebido recargue sus jornadas sin remount (mismo patron
+  // refreshTrigger que ya usa este archivo con los recursos de Biblioteca).
+  const [refrescoMisClases, setRefrescoMisClases] = React.useState(0);
   const [programaEditando, setProgramaEditando] = React.useState<ProgramaAcademicoAsignacion>(programaInicial);
   const [programaSnapshotAlAbrir, setProgramaSnapshotAlAbrir] = React.useState<ProgramaAcademicoAsignacion>(programaInicial);
   const [programaJornada, setProgramaJornada] = React.useState(programaInicial.nombre);
@@ -1082,6 +1156,9 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
           await repositoryJornada.guardarEjecucion(ejecucion);
           await repositoryJornada.guardarJornadasEnLote(jornadasGeneradas);
           idReal = programaReal.id;
+          // Fix 4: las jornadas del programa cambiaron -> recargar "Mis clases"
+          // sin exigir navegar afuera y volver.
+          setRefrescoMisClases((actual) => actual + 1);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'No se pudo generar las clases reales del programa.');
         }
@@ -1104,6 +1181,58 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
       setPasoPublicacion((actual) => (actual < 2 ? 2 : actual));
     } finally {
       setGuardandoPrograma(false);
+    }
+  };
+
+  // Fix 1: borrado real de un programa academico. Antes no existia ninguna via para
+  // eliminar un programa (ni funcion de servicio ni boton). Ademas de borrar el
+  // documento ProgramaAcademico, limpia las jornadas asociadas que aun no se operaron
+  // (mismo criterio de trazabilidad de la subtarea 12.6: una jornada cerrada/operada
+  // o con asistencia registrada NUNCA se borra fisicamente; se conserva como historial
+  // aunque su programa desaparezca). El placeholder demo local nunca se persistio, asi
+  // que para el solo se limpia el estado local.
+  const eliminarProgramaSeleccionado = async () => {
+    if (!programaSeleccionado || eliminandoPrograma) return;
+    setEliminandoPrograma(true);
+    setError('');
+    const programaId = programaSeleccionado.id;
+    try {
+      const ejecucionId = `ejecucion-${programaId}`;
+      const todasJornadas = await repositoryJornada.listarJornadasPorTenant(tenantId);
+      const jornadasEliminables = todasJornadas.filter(
+        (jornada) => jornada.ejecucionProgramaId === ejecucionId && !esJornadaOperada(jornada),
+      );
+      if (jornadasEliminables.length > 0) {
+        await repositoryJornada.eliminarJornadasEnLote(
+          tenantId,
+          jornadasEliminables.map((jornada) => jornada.id),
+        );
+      }
+
+      if (programaId !== programaInicial.id) {
+        await repositoryPrograma.eliminarPrograma(tenantId, programaId);
+      }
+
+      setProgramas((actuales) => {
+        const restantes = actuales.filter((programa) => programa.id !== programaId);
+        // La vista asume que siempre hay al menos un programa en bandeja
+        // (programaSeleccionado.id se usa sin guarda): si se borro el ultimo,
+        // se restaura el placeholder local.
+        return restantes.length ? restantes : [programaInicial];
+      });
+      setProgramaSeleccionadoId((actual) => {
+        if (actual !== programaId) return actual;
+        const restantes = programas.filter((programa) => programa.id !== programaId);
+        return restantes[0]?.id ?? programaInicial.id;
+      });
+      setJornadaLocalId('');
+      // Fix 4: las jornadas del programa borrado ya no existen -> refrescar "Mis clases".
+      setRefrescoMisClases((actual) => actual + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el programa.');
+    } finally {
+      setEliminandoPrograma(false);
+      setConfirmacionEliminarProgramaAbierta(false);
     }
   };
 
@@ -1456,7 +1585,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
             <p className="mt-2 max-w-xs text-xs font-bold text-gray-400">
               Los tags del programa deben coincidir con los tags del material.
             </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_auto] sm:items-end">
               <label className="grid gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
                 <span className="sr-only">Programa</span>
                 <select
@@ -1503,6 +1632,17 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
                   title="Matricular estudiantes"
                 >
                   <IconoEstudiantes className="h-5 w-5" />
+                </button>
+              )}
+              {programaExisteEnBandeja && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmacionEliminarProgramaAbierta(true)}
+                  className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-red-50 text-tkd-red transition hover:bg-red-100"
+                  aria-label="Eliminar programa"
+                  title="Eliminar programa"
+                >
+                  <IconoEliminar className="h-5 w-5" />
                 </button>
               )}
             </div>
@@ -1711,6 +1851,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
               esAdmin={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin}
               rol={usuario?.rol}
               repository={repositoryJornada}
+              refreshTrigger={refrescoMisClases}
             />
           </section>
         </article>
@@ -1959,6 +2100,16 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
           onConfirmar={cerrarModalPrograma}
           cargando={false}
           textoBotonConfirmar="Descartar"
+        />
+
+        <ModalConfirmacion
+          abierto={confirmacionEliminarProgramaAbierta}
+          titulo="Eliminar programa"
+          mensaje={`Se eliminará el programa "${programaSeleccionado?.nombre ?? ''}" y sus clases que aún no se dictaron. Las clases ya cerradas u operadas se conservan como historial. Esta acción no se puede deshacer.`}
+          onCerrar={() => !eliminandoPrograma && setConfirmacionEliminarProgramaAbierta(false)}
+          onConfirmar={eliminarProgramaSeleccionado}
+          cargando={eliminandoPrograma}
+          textoBotonConfirmar="Eliminar"
         />
 
         {wizardAbierto && (

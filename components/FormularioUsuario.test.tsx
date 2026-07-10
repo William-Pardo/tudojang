@@ -68,7 +68,7 @@ const existingUser: any = {
   numeroIdentificacion: '123',
   whatsapp: '3001234567',
   email: 'ana@test.com',
-  rol: RolUsuario.Tutor,
+  rol: RolUsuario.Maestro,
   sedeId: '2',
   contrato: {
     sueldoBase: 2000,
@@ -114,11 +114,33 @@ describe('FormularioUsuario', () => {
   it.each([
     [RolUsuario.Admin, /Acceso total/i],
     [RolUsuario.Editor, /Gesti.*n de alumnos/i],
-    [RolUsuario.Tutor, /Maestro/i],
+    [RolUsuario.Maestro, /Maestro/i],
   ])('renders the description for role %s', (role, description) => {
     selectedRole = role;
     render(<FormularioUsuario {...baseProps} />);
     expect(screen.getAllByText(description).length).toBeGreaterThan(0);
+  });
+
+  // Regla canonica de roles (CIERRE CENTRO DE ESTUDIOS.md 14.9): la opcion "Maestro"
+  // del Equipo Tecnico debe guardar rol Maestro (antes guardaba rol Tutor — root cause
+  // del bug "solo veo 1 de 3 maestros"). Tutor (padre/acudiente) NO se crea desde este
+  // formulario: se crea via el flujo de invitaciones academicas
+  // (functions/academico/invitaciones.js, ROLES_ACADEMICOS_VALIDOS incluye 'Tutor').
+  it('la opcion "Maestro" guarda rol Maestro y el selector ya no ofrece rol Tutor', () => {
+    render(<FormularioUsuario {...baseProps} />);
+
+    const opcionMaestro = screen.getByRole('option', { name: 'Maestro' }) as HTMLOptionElement;
+    expect(opcionMaestro.value).toBe(RolUsuario.Maestro);
+
+    const selectorRol = opcionMaestro.closest('select') as HTMLSelectElement;
+    const valores = Array.from(selectorRol.options).map((opcion) => opcion.value);
+    expect(valores).toEqual([
+      RolUsuario.Admin,
+      RolUsuario.Editor,
+      RolUsuario.Asistente,
+      RolUsuario.Maestro,
+    ]);
+    expect(valores).not.toContain(RolUsuario.Tutor);
   });
 
   it('hides role information and workplace sede when no role is selected', () => {
@@ -129,7 +151,7 @@ describe('FormularioUsuario', () => {
   });
 
   it('renders edit mode, initializes existing values, and submits with the user id', async () => {
-    selectedRole = RolUsuario.Tutor;
+    selectedRole = RolUsuario.Maestro;
     const onGuardar = jest.fn();
     render(
       <FormularioUsuario
@@ -273,10 +295,10 @@ describe('FormularioUsuario', () => {
       }));
     });
 
-    it('requires a sede for Tutor and Asistente roles', async () => {
+    it('requires a sede for Maestro and Asistente roles', async () => {
       await expect(crearEsquemaValidacion(false).validate({
         ...validData,
-        rol: RolUsuario.Tutor,
+        rol: RolUsuario.Maestro,
         sedeId: '',
       })).rejects.toThrow(/sede asignada/i);
 

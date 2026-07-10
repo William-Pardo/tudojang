@@ -356,11 +356,75 @@ test("instructor (Editor) from another tenant cannot delete an academic assignme
   );
 });
 
+// Regla canonica de roles (CIERRE CENTRO DE ESTUDIOS.md 14.9): desde 2026-07-09
+// SI existe un rol 'Maestro' separado en RolUsuario (quien ensena y asigna clases).
+// A nivel rules, Maestro entra a isInstructor() con las mismas capacidades operativas
+// que Editor (cuya capacidad docente queda como legacy). Tutor = padre/acudiente,
+// nunca instructor. Este test espeja el caso Editor de arriba con rol Maestro.
+test("instructor (Maestro) can delete an academic assignment in their own tenant", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", "tenant-1", "asignaciones", "asignacion-maestro"),
+      {
+        tenantId: "tenant-1",
+        recursoId: "recurso-1",
+        jornadaId: "jornada-1",
+        titulo: "Material tecnico",
+        destinatario: { tipo: "grupo", grupo: "Infantil" },
+        uso: "estudio",
+        momento: "preparacion",
+        obligatoria: true,
+        fechaApertura: "2026-06-27T00:00:00.000Z",
+        estado: "publicada",
+        creadoPorUid: "maestro-rol-real",
+        creadoEn: "2026-06-27T00:00:00.000Z",
+        actualizadoEn: "2026-06-27T00:00:00.000Z",
+      }
+    );
+  });
+
+  const maestroDb = client("maestro-rol-real", "tenant-1", "Maestro");
+
+  await assertSucceeds(
+    deleteDoc(doc(maestroDb, "tenants", "tenant-1", "asignaciones", "asignacion-maestro"))
+  );
+});
+
+test("instructor (Maestro) from another tenant cannot delete an academic assignment", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", "tenant-1", "asignaciones", "asignacion-maestro-2"),
+      {
+        tenantId: "tenant-1",
+        recursoId: "recurso-1",
+        jornadaId: "jornada-1",
+        titulo: "Material tecnico",
+        destinatario: { tipo: "grupo", grupo: "Infantil" },
+        uso: "estudio",
+        momento: "preparacion",
+        obligatoria: true,
+        fechaApertura: "2026-06-27T00:00:00.000Z",
+        estado: "publicada",
+        creadoPorUid: "maestro-rol-real",
+        creadoEn: "2026-06-27T00:00:00.000Z",
+        actualizadoEn: "2026-06-27T00:00:00.000Z",
+      }
+    );
+  });
+
+  const maestroOtroTenantDb = client("maestro-rol-ajeno", "tenant-2", "Maestro");
+
+  await assertFails(
+    deleteDoc(doc(maestroOtroTenantDb, "tenants", "tenant-1", "asignaciones", "asignacion-maestro-2"))
+  );
+});
+
 // =========================================================================
 // Jornadas de instrucción — permiso "maestro asignado" (subtarea 12.2)
 // El maestro asignado se identifica por resource.data.instructorId == request.auth.uid.
-// No existe un rol "Maestro" separado: Editor/Asistente solo pueden editar la
-// jornada donde estén asignados; Admin/SuperAdmin pueden editar cualquiera del tenant.
+// (Nota 14.9: cuando se escribio esta seccion no existia un rol "Maestro" separado;
+// ahora existe y entra por isInstructor(). Editor/Asistente solo pueden editar la
+// jornada donde estén asignados; Admin/SuperAdmin pueden editar cualquiera del tenant.)
 // =========================================================================
 
 const JORNADA_ASIGNADA = {

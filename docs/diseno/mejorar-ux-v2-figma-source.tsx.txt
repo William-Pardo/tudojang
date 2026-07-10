@@ -1,0 +1,580 @@
+import { useState, useMemo } from "react";
+import {
+  ChevronLeft, ChevronRight, Calendar, Clock, Plus,
+  FileImage, FileText, Film, Check, X, ChevronDown,
+  GraduationCap, Dumbbell, ArrowRight, Layers, Tag,
+  SlidersHorizontal, Search,
+} from "lucide-react";
+
+// ── Tag taxonomy ──────────────────────────────────────────────────────────────
+
+type TagCat = "etapa" | "nivel" | "tecnica" | "capacidad" | "uso" | "formato" | "momento";
+
+const TAG_CATS: Record<TagCat, { label: string; color: string; bg: string; border: string }> = {
+  etapa:     { label: "Etapa",     color: "text-violet-700", bg: "bg-violet-50",  border: "border-violet-200" },
+  nivel:     { label: "Nivel",     color: "text-blue-700",   bg: "bg-blue-50",    border: "border-blue-200"   },
+  tecnica:   { label: "Técnica",   color: "text-red-700",    bg: "bg-red-50",     border: "border-red-200"    },
+  capacidad: { label: "Capacidad", color: "text-orange-700", bg: "bg-orange-50",  border: "border-orange-200" },
+  uso:       { label: "Uso",       color: "text-emerald-700",bg: "bg-emerald-50", border: "border-emerald-200"},
+  formato:   { label: "Formato",   color: "text-sky-700",    bg: "bg-sky-50",     border: "border-sky-200"    },
+  momento:   { label: "Momento",   color: "text-amber-700",  bg: "bg-amber-50",   border: "border-amber-200"  },
+};
+
+type TagDef = { id: string; label: string; cat: TagCat };
+
+const ALL_TAGS: TagDef[] = [
+  // etapa
+  { id: "infantil",    label: "Infantil",    cat: "etapa" },
+  { id: "precadetes",  label: "Precadetes",  cat: "etapa" },
+  { id: "cadetes",     label: "Cadetes",     cat: "etapa" },
+  { id: "adultos",     label: "Adultos",     cat: "etapa" },
+  { id: "todos",       label: "Todos",       cat: "etapa" },
+  // nivel
+  { id: "iniciacion",  label: "Iniciación",  cat: "nivel" },
+  { id: "fundamentos", label: "Fundamentos", cat: "nivel" },
+  { id: "intermedio",  label: "Intermedio",  cat: "nivel" },
+  { id: "avanzado",    label: "Avanzado",    cat: "nivel" },
+  { id: "competencia", label: "Competencia", cat: "nivel" },
+  // tecnica
+  { id: "p_frontal",   label: "Patada frontal",   cat: "tecnica" },
+  { id: "p_lateral",   label: "Patada lateral",   cat: "tecnica" },
+  { id: "p_circular",  label: "Patada circular",  cat: "tecnica" },
+  { id: "bloqueos",    label: "Bloqueos",         cat: "tecnica" },
+  { id: "poomsae",     label: "Poomsae",          cat: "tecnica" },
+  { id: "kyorugi",     label: "Kyorugi",          cat: "tecnica" },
+  { id: "combate",     label: "Combate",          cat: "tecnica" },
+  { id: "rompimiento", label: "Rompimiento",      cat: "tecnica" },
+  // capacidad
+  { id: "coordinacion",    label: "Coordinación",     cat: "capacidad" },
+  { id: "equilibrio",      label: "Equilibrio",       cat: "capacidad" },
+  { id: "flexibilidad",    label: "Flexibilidad",     cat: "capacidad" },
+  { id: "fuerza",          label: "Fuerza",           cat: "capacidad" },
+  { id: "control_postural",label: "Control postural", cat: "capacidad" },
+  // uso
+  { id: "estudio",   label: "Estudio",   cat: "uso" },
+  { id: "practica",  label: "Práctica",  cat: "uso" },
+  { id: "repaso",    label: "Repaso",    cat: "uso" },
+  { id: "evaluacion",label: "Evaluación",cat: "uso" },
+  { id: "tarea",     label: "Tarea",     cat: "uso" },
+  // formato
+  { id: "fmt_pdf",   label: "PDF",       cat: "formato" },
+  { id: "fmt_imagen",label: "Imagen",    cat: "formato" },
+  { id: "fmt_video", label: "Video",     cat: "formato" },
+  { id: "fmt_doc",   label: "Documento", cat: "formato" },
+  // momento
+  { id: "antes",    label: "Antes de clase",   cat: "momento" },
+  { id: "durante",  label: "Durante clase",    cat: "momento" },
+  { id: "despues",  label: "Después de clase", cat: "momento" },
+];
+
+const tagById = (id: string) => ALL_TAGS.find(t => t.id === id)!;
+
+// ── Program ───────────────────────────────────────────────────────────────────
+
+const PROGRAM = {
+  nombre: "Infantil — Ciclo Jul/Sep 2026",
+  tags: ["infantil", "iniciacion", "fundamentos", "p_frontal", "p_lateral",
+         "bloqueos", "coordinacion", "control_postural", "equilibrio",
+         "estudio", "practica", "antes", "durante", "fmt_video", "fmt_imagen", "fmt_pdf"],
+};
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type MatType = "image" | "video" | "doc";
+type Grade = { id: string; label: string; dot: string; ring: string; text: string; rowBg: string; rowBorder: string };
+
+type LibMaterial = { id: string; name: string; type: MatType; tags: string[] };
+type Assignment = {
+  id: string; material: LibMaterial;
+  momento: string; criterio: string;
+  destinatario: "individual" | "grupo"; grupoObjetivo: string;
+  fechaApertura: string; fechaCierre: string;
+  gradeIds: string[];
+};
+type ClassSession = { id: string; numero: number; fecha: string; horaInicio: string; horaFin: string; tipo: string; assignments: Assignment[] };
+
+// ── Grades ────────────────────────────────────────────────────────────────────
+
+const GRADES: Grade[] = [
+  { id: "blanco",   label: "Blanco",   dot: "bg-white border border-slate-300", ring: "ring-slate-300",   text: "text-slate-600",   rowBg: "bg-slate-50",   rowBorder: "border-slate-200"   },
+  { id: "amarillo", label: "Amarillo", dot: "bg-yellow-400",                    ring: "ring-yellow-300",  text: "text-yellow-700",  rowBg: "bg-yellow-50",  rowBorder: "border-yellow-200"  },
+  { id: "naranja",  label: "Naranja",  dot: "bg-orange-500",                    ring: "ring-orange-300",  text: "text-orange-700",  rowBg: "bg-orange-50",  rowBorder: "border-orange-200"  },
+  { id: "verde",    label: "Verde",    dot: "bg-emerald-500",                   ring: "ring-emerald-300", text: "text-emerald-700", rowBg: "bg-emerald-50", rowBorder: "border-emerald-200" },
+  { id: "azul",     label: "Azul",     dot: "bg-blue-500",                      ring: "ring-blue-300",    text: "text-blue-700",    rowBg: "bg-blue-50",    rowBorder: "border-blue-200"    },
+  { id: "rojo",     label: "Rojo",     dot: "bg-red-600",                       ring: "ring-red-300",     text: "text-red-700",     rowBg: "bg-red-50",     rowBorder: "border-red-200"     },
+];
+
+// ── Library ───────────────────────────────────────────────────────────────────
+
+const LIBRARY: LibMaterial[] = [
+  { id: "m1",  name: "Fundamentos Tul Chon-Ji",       type: "video", tags: ["iniciacion","fundamentos","poomsae","practica","fmt_video","durante","infantil"] },
+  { id: "m2",  name: "Patadas básicas — guía visual", type: "image", tags: ["iniciacion","p_frontal","p_lateral","coordinacion","fmt_imagen","estudio","infantil","antes"] },
+  { id: "m3",  name: "Teoría cinturón blanco",        type: "doc",   tags: ["iniciacion","fundamentos","estudio","fmt_pdf","antes","infantil"] },
+  { id: "m4",  name: "Posiciones de combate",         type: "image", tags: ["combate","kyorugi","bloqueos","fmt_imagen","durante","precadetes","cadetes"] },
+  { id: "m5",  name: "Poomsae Taegeuk 1장",           type: "video", tags: ["poomsae","fundamentos","fmt_video","practica","durante","iniciacion","infantil"] },
+  { id: "m6",  name: "Técnicas de bloqueo",           type: "image", tags: ["bloqueos","fundamentos","coordinacion","fmt_imagen","durante","antes","iniciacion","infantil"] },
+  { id: "m7",  name: "Teoría cinturón amarillo",      type: "doc",   tags: ["fundamentos","estudio","fmt_pdf","antes","infantil","iniciacion"] },
+  { id: "m8",  name: "Sparring — reglas básicas",     type: "doc",   tags: ["combate","kyorugi","fmt_pdf","estudio","cadetes","precadetes","intermedio"] },
+  { id: "m9",  name: "Poomsae Taegeuk 2장",           type: "video", tags: ["poomsae","intermedio","fmt_video","practica","durante"] },
+  { id: "m10", name: "Control postural — ejercicios", type: "video", tags: ["control_postural","equilibrio","coordinacion","fmt_video","practica","durante","infantil","iniciacion"] },
+  { id: "m11", name: "Flexibilidad y calentamiento",  type: "video", tags: ["flexibilidad","fmt_video","antes","todos","iniciacion"] },
+  { id: "m12", name: "Evaluación cinturón blanco",    type: "doc",   tags: ["iniciacion","evaluacion","fmt_pdf","infantil","antes"] },
+];
+
+const TIPO_COLOR: Record<string, string> = {
+  "Técnica": "bg-blue-100 text-blue-700", "Competencia": "bg-red-100 text-red-700",
+  "Sparring": "bg-orange-100 text-orange-700", "Poomsae": "bg-purple-100 text-purple-700",
+};
+
+const INITIAL_CLASSES: ClassSession[] = [
+  { id: "c1", numero: 1, fecha: "2026-07-05", horaInicio: "08:00", horaFin: "09:00", tipo: "Técnica",     assignments: [] },
+  { id: "c2", numero: 2, fecha: "2026-07-06", horaInicio: "16:00", horaFin: "19:45", tipo: "Competencia", assignments: [] },
+  { id: "c3", numero: 3, fecha: "2026-07-12", horaInicio: "08:00", horaFin: "09:00", tipo: "Técnica",     assignments: [] },
+  { id: "c4", numero: 4, fecha: "2026-07-13", horaInicio: "16:00", horaFin: "19:45", tipo: "Sparring",    assignments: [] },
+  { id: "c5", numero: 5, fecha: "2026-07-19", horaInicio: "08:00", horaFin: "09:00", tipo: "Poomsae",     assignments: [] },
+  { id: "c6", numero: 6, fecha: "2026-07-20", horaInicio: "16:00", horaFin: "19:45", tipo: "Técnica",     assignments: [] },
+  { id: "c7", numero: 7, fecha: "2026-07-26", horaInicio: "08:00", horaFin: "09:00", tipo: "Técnica",     assignments: [] },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+type MatTypeMeta = { icon: React.ReactNode; color: string };
+const TYPE_META: Record<MatType, MatTypeMeta> = {
+  video: { icon: <Film size={11} />,      color: "text-purple-600 bg-purple-50 border-purple-200" },
+  image: { icon: <FileImage size={11} />, color: "text-sky-600 bg-sky-50 border-sky-200" },
+  doc:   { icon: <FileText size={11} />,  color: "text-amber-600 bg-amber-50 border-amber-200" },
+};
+
+function TypeBadge({ type }: { type: MatType }) {
+  const m = TYPE_META[type];
+  return <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold ${m.color}`}>{m.icon}</span>;
+}
+
+function TagChip({ tagId, highlight = false, small = false }: { tagId: string; highlight?: boolean; small?: boolean }) {
+  const t = tagById(tagId);
+  if (!t) return null;
+  const cat = TAG_CATS[t.cat];
+  return (
+    <span className={`inline-flex items-center rounded-full border font-semibold transition-all ${
+      small ? "text-[9px] px-1.5 py-px" : "text-[10px] px-2 py-0.5"
+    } ${highlight ? `${cat.bg} ${cat.border} ${cat.color}` : "bg-muted border-border text-muted-foreground opacity-60"}`}>
+      {t.label}
+    </span>
+  );
+}
+
+function matchCount(mat: LibMaterial) {
+  return mat.tags.filter(t => PROGRAM.tags.includes(t)).length;
+}
+
+// ── Wizard types ──────────────────────────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3;
+type Draft = {
+  materialId: string; momento: string; criterio: string;
+  destinatario: "individual" | "grupo"; grupoObjetivo: string;
+  fechaApertura: string; fechaCierre: string; gradeIds: string[];
+};
+const EMPTY_DRAFT: Draft = {
+  materialId: "", momento: "Antes de la clase", criterio: "Estudio y práctica",
+  destinatario: "grupo", grupoObjetivo: "Todos", fechaApertura: "2026-07-01", fechaCierre: "2026-09-30", gradeIds: [],
+};
+
+// ── Step bar ──────────────────────────────────────────────────────────────────
+
+function StepBar({ step }: { step: WizardStep }) {
+  const steps = [{ n: 1, label: "Material" }, { n: 2, label: "Configurar" }, { n: 3, label: "Grados" }];
+  return (
+    <div className="flex items-center gap-0 mb-5">
+      {steps.map((s, i) => {
+        const done = step > s.n; const active = step === s.n;
+        return (
+          <div key={s.n} className="flex items-center flex-1 last:flex-none">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${done ? "bg-primary text-white" : active ? "bg-primary text-white ring-4 ring-primary/20" : "bg-muted text-muted-foreground"}`}>
+                {done ? <Check size={11} /> : s.n}
+              </div>
+              <span className={`text-xs font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}>{s.label}</span>
+            </div>
+            {i < steps.length - 1 && <div className={`flex-1 h-px mx-2 transition-colors ${done ? "bg-primary" : "bg-border"}`} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Step 1: Material picker with tag matching ─────────────────────────────────
+
+function Step1({ draft, onUpdate, onNext }: { draft: Draft; onUpdate: (d: Partial<Draft>) => void; onNext: () => void }) {
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  const scored = useMemo(() =>
+    LIBRARY
+      .map(m => ({ m, score: matchCount(m) }))
+      .sort((a, b) => b.score - a.score),
+    []
+  );
+
+  const filtered = scored.filter(({ m }) =>
+    m.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const matched = filtered.filter(x => x.score > 0);
+  const unmatched = filtered.filter(x => x.score === 0);
+  const visible = showAll ? filtered : matched;
+
+  return (
+    <div className="space-y-3">
+      {/* Program tag context */}
+      <div className="rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5 flex items-center gap-1">
+          <Tag size={10} /> Tags del programa
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {PROGRAM.tags.slice(0, 10).map(t => <TagChip key={t} tagId={t} highlight />)}
+          {PROGRAM.tags.length > 10 && (
+            <span className="text-[10px] text-muted-foreground px-1">+{PROGRAM.tags.length - 10} más</span>
+          )}
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar material…"
+          className="w-full pl-8 pr-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </div>
+
+      {/* Match count */}
+      <p className="text-xs text-muted-foreground px-0.5">
+        <span className="font-semibold text-primary">{matched.length}</span> materiales hacen match con el programa
+        {unmatched.length > 0 && !showAll && (
+          <button onClick={() => setShowAll(true)} className="ml-2 text-primary hover:underline font-medium">
+            + ver {unmatched.length} sin match
+          </button>
+        )}
+      </p>
+
+      {/* Material list */}
+      <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+        {visible.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-6">Sin resultados</p>
+        )}
+        {visible.map(({ m, score }) => {
+          const selected = draft.materialId === m.id;
+          const matchingTags = m.tags.filter(t => PROGRAM.tags.includes(t));
+          const otherTags = m.tags.filter(t => !PROGRAM.tags.includes(t));
+          return (
+            <button key={m.id} onClick={() => onUpdate({ materialId: m.id })}
+              className={`w-full flex flex-col gap-1.5 px-3 py-2.5 rounded-xl text-left transition-all border ${
+                selected ? "border-primary/40 bg-primary/5 ring-2 ring-primary/20" :
+                score > 0 ? "border-border bg-white hover:bg-muted/40" :
+                "border-border bg-white hover:bg-muted/40 opacity-50"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <TypeBadge type={m.type} />
+                <span className="text-sm text-foreground flex-1 truncate font-medium">{m.name}</span>
+                {score > 0 && (
+                  <span className="shrink-0 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                    {score} match
+                  </span>
+                )}
+                {selected && <Check size={13} className="text-primary shrink-0" />}
+              </div>
+              {/* Tags */}
+              <div className="flex flex-wrap gap-1">
+                {matchingTags.map(t => <TagChip key={t} tagId={t} highlight small />)}
+                {otherTags.slice(0, 3).map(t => <TagChip key={t} tagId={t} small />)}
+              </div>
+            </button>
+          );
+        })}
+        {showAll && unmatched.length > 0 && matched.length > 0 && (
+          <div className="py-1 px-2 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+            Sin match con el programa
+          </div>
+        )}
+      </div>
+
+      <button disabled={!draft.materialId} onClick={onNext}
+        className="w-full bg-primary text-primary-foreground text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+        Continuar <ArrowRight size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ── Step 2: Configure ─────────────────────────────────────────────────────────
+
+function Sel({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div>
+      <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1.5">{label}</label>
+      <div className="relative">
+        <select value={value} onChange={e => onChange(e.target.value)}
+          className="w-full appearance-none bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground pr-7 focus:outline-none focus:ring-2 focus:ring-primary/30">
+          {options.map(o => <option key={o}>{o}</option>)}
+        </select>
+        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
+function Step2({ draft, onUpdate, onBack, onNext }: { draft: Draft; onUpdate: (d: Partial<Draft>) => void; onBack: () => void; onNext: () => void }) {
+  const mat = LIBRARY.find(m => m.id === draft.materialId)!;
+  return (
+    <div className="space-y-4">
+      <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${TYPE_META[mat.type].color}`}>
+        {TYPE_META[mat.type].icon}
+        <span className="text-sm font-semibold truncate">{mat.name}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Sel label="Destinatario" value={draft.destinatario} onChange={v => onUpdate({ destinatario: v as "individual" | "grupo" })} options={["grupo","individual"]} />
+        <Sel label="Grupo objetivo" value={draft.grupoObjetivo} onChange={v => onUpdate({ grupoObjetivo: v })} options={["Todos","Infantil","Juvenil","Adultos"]} />
+        <Sel label="Momento" value={draft.momento} onChange={v => onUpdate({ momento: v })} options={["Antes de la clase","Durante la clase","Después de la clase"]} />
+        <Sel label="Criterio" value={draft.criterio} onChange={v => onUpdate({ criterio: v })} options={["Estudio y práctica","Solo estudio","Solo práctica","Evaluación"]} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[["Apertura","fechaApertura"],["Cierre","fechaCierre"]].map(([lbl, key]) => (
+          <div key={key}>
+            <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground block mb-1.5">{lbl}</label>
+            <input type="date" value={draft[key as keyof Draft] as string}
+              onChange={e => onUpdate({ [key]: e.target.value })}
+              className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button onClick={onBack} className="flex-1 border border-border text-sm font-semibold py-2.5 rounded-xl hover:bg-muted transition-colors">Atrás</button>
+        <button onClick={onNext} className="flex-1 bg-primary text-primary-foreground text-sm font-semibold py-2.5 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+          Continuar <ArrowRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Step 3: Assign to grades ──────────────────────────────────────────────────
+
+function Step3({ draft, onUpdate, onBack, onConfirm }: { draft: Draft; onUpdate: (d: Partial<Draft>) => void; onBack: () => void; onConfirm: () => void }) {
+  const mat = LIBRARY.find(m => m.id === draft.materialId)!;
+  const allSelected = GRADES.every(g => draft.gradeIds.includes(g.id));
+  const toggle = (id: string) => onUpdate({ gradeIds: draft.gradeIds.includes(id) ? draft.gradeIds.filter(g => g !== id) : [...draft.gradeIds, id] });
+  const toggleAll = () => onUpdate({ gradeIds: allSelected ? [] : GRADES.map(g => g.id) });
+
+  return (
+    <div className="space-y-3">
+      <div className={`flex items-center gap-2 text-xs bg-muted rounded-xl px-3 py-2 border border-border`}>
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-semibold ${TYPE_META[mat.type].color}`}>{TYPE_META[mat.type].icon}</span>
+        <span className="font-medium text-foreground truncate flex-1">{mat.name}</span>
+        <span className="shrink-0 text-muted-foreground">{draft.momento.split(" ")[0]}</span>
+      </div>
+
+      <p className="text-sm text-muted-foreground">¿A qué grados aplica este material en esta clase?</p>
+
+      <button onClick={toggleAll}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all ${allSelected ? "bg-primary/5 border-primary/30 text-primary ring-1 ring-primary/20" : "bg-white border-border text-muted-foreground hover:bg-muted/50"}`}>
+        <Layers size={14} /> Todos los grados
+        {allSelected && <Check size={13} className="ml-auto text-primary" />}
+      </button>
+
+      <div className="grid grid-cols-2 gap-2">
+        {GRADES.map(g => {
+          const selected = draft.gradeIds.includes(g.id);
+          return (
+            <button key={g.id} onClick={() => toggle(g.id)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${selected ? `${g.rowBg} ${g.rowBorder} ring-2 ${g.ring}` : "bg-white border-border hover:bg-muted/50"}`}>
+              <span className={`w-3 h-3 rounded-full shrink-0 ${g.dot}`} />
+              <span className={`text-sm font-semibold flex-1 text-left ${selected ? g.text : "text-muted-foreground"}`}>{g.label}</span>
+              {selected && <Check size={12} className={g.text} />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button onClick={onBack} className="flex-1 border border-border text-sm font-semibold py-2.5 rounded-xl hover:bg-muted transition-colors">Atrás</button>
+        <button disabled={draft.gradeIds.length === 0} onClick={onConfirm}
+          className="flex-1 bg-primary text-primary-foreground text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+          <Check size={14} /> Asignar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Assignment row ────────────────────────────────────────────────────────────
+
+function AssignmentRow({ a, onRemove }: { a: Assignment; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const matchingTags = a.material.tags.filter(t => PROGRAM.tags.includes(t));
+  return (
+    <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <TypeBadge type={a.material.type} />
+        <span className="text-sm font-medium text-foreground flex-1 truncate">{a.material.name}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          {a.gradeIds.map(gid => { const g = GRADES.find(x => x.id === gid)!; return <span key={gid} className={`w-2.5 h-2.5 rounded-full ${g.dot}`} title={g.label} />; })}
+        </div>
+        <button onClick={() => setOpen(o => !o)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+          <ChevronDown size={13} className={`text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        <button onClick={onRemove} className="p-1 rounded-lg hover:bg-red-50 transition-colors">
+          <X size={13} className="text-muted-foreground hover:text-red-500" />
+        </button>
+      </div>
+      {open && (
+        <div className="border-t border-border bg-muted/30 px-3 py-3 space-y-2.5">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+            {[["Momento", a.momento], ["Criterio", a.criterio], ["Destinatario", a.destinatario], ["Apertura", a.fechaApertura], ["Cierre", a.fechaCierre],
+              ["Grados", a.gradeIds.length === GRADES.length ? "Todos" : a.gradeIds.map(id => GRADES.find(g => g.id === id)?.label).join(", ")]
+            ].map(([k, v]) => (
+              <div key={k}><p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{k}</p><p className="text-xs text-foreground font-medium mt-0.5">{v}</p></div>
+            ))}
+          </div>
+          {matchingTags.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Tags del programa</p>
+              <div className="flex flex-wrap gap-1">{matchingTags.map(t => <TagChip key={t} tagId={t} highlight small />)}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  const [classes, setClasses] = useState<ClassSession[]>(INITIAL_CLASSES);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [step, setStep] = useState<WizardStep>(1);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+
+  const cls = classes[activeIdx];
+  const nav = (dir: -1 | 1) => setActiveIdx(i => Math.max(0, Math.min(classes.length - 1, i + dir)));
+  const openWizard = () => { setDraft(EMPTY_DRAFT); setStep(1); setWizardOpen(true); };
+
+  const confirmAssignment = () => {
+    const mat = LIBRARY.find(m => m.id === draft.materialId)!;
+    setClasses(prev => prev.map((c, i) => i !== activeIdx ? c : {
+      ...c, assignments: [...c.assignments, { id: `a-${Date.now()}`, material: mat, momento: draft.momento, criterio: draft.criterio, destinatario: draft.destinatario, grupoObjetivo: draft.grupoObjetivo, fechaApertura: draft.fechaApertura, fechaCierre: draft.fechaCierre, gradeIds: draft.gradeIds }],
+    }));
+    setWizardOpen(false);
+  };
+
+  const removeAssignment = (id: string) => setClasses(prev => prev.map((c, i) => i !== activeIdx ? c : { ...c, assignments: c.assignments.filter(a => a.id !== id) }));
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col font-[Inter,sans-serif]">
+      {/* Top bar */}
+      <div className="bg-white border-b border-border px-6 py-3 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+          <GraduationCap size={16} className="text-white" />
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Programa</p>
+          <p className="text-sm font-semibold text-foreground leading-none">{PROGRAM.nombre}</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Dumbbell size={12} className="text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Taekwondo · {classes.length} clases</span>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col max-w-xl mx-auto w-full px-4 py-6 gap-5">
+
+        {/* CLASS CARD */}
+        <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+            <button onClick={() => nav(-1)} disabled={activeIdx === 0} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-25 transition-colors"><ChevronLeft size={16} /></button>
+            <p className="flex-1 text-center text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Clase {activeIdx + 1} de {classes.length}</p>
+            <button onClick={() => nav(1)} disabled={activeIdx === classes.length - 1} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-25 transition-colors"><ChevronRight size={16} /></button>
+          </div>
+
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex flex-col items-center justify-center shrink-0">
+              <span className="text-xl font-bold text-primary leading-none">{cls.numero}</span>
+              <span className="text-[10px] font-semibold text-primary/60 uppercase tracking-wide mt-0.5">clase</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${TIPO_COLOR[cls.tipo] ?? "bg-muted text-muted-foreground"}`}>{cls.tipo}</span>
+              <div className="flex items-center gap-3 text-sm text-foreground font-medium mt-1.5">
+                <span className="flex items-center gap-1.5"><Calendar size={13} className="text-muted-foreground" />{cls.fecha}</span>
+                <span className="flex items-center gap-1.5"><Clock size={13} className="text-muted-foreground" />{cls.horaInicio}–{cls.horaFin}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Class dots */}
+          <div className="px-5 pb-4 flex gap-1.5 overflow-x-auto">
+            {classes.map((c, i) => (
+              <button key={c.id} onClick={() => setActiveIdx(i)}
+                className={`shrink-0 flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${i === activeIdx ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:bg-accent"}`}>
+                <span className="text-[11px] font-bold">{c.numero}</span>
+                {c.assignments.length > 0 && <span className={`w-1.5 h-1.5 rounded-full ${i === activeIdx ? "bg-white/70" : "bg-primary"}`} />}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ASSIGNMENTS */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Materiales asignados
+              {cls.assignments.length > 0 && <span className="ml-1.5 bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded-full">{cls.assignments.length}</span>}
+            </span>
+            <button onClick={openWizard}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition-all active:scale-95 shadow-sm">
+              <Plus size={13} /> Agregar material
+            </button>
+          </div>
+
+          {cls.assignments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-dashed border-border text-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center"><FileText size={18} className="text-muted-foreground" /></div>
+              <p className="text-sm font-medium text-muted-foreground">Sin materiales en esta clase</p>
+              <button onClick={openWizard} className="text-xs text-primary font-semibold hover:underline flex items-center gap-1 mt-1"><Plus size={12} /> Agregar el primero</button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {cls.assignments.map(a => <AssignmentRow key={a.id} a={a} onRemove={() => removeAssignment(a.id)} />)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* WIZARD */}
+      {wizardOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setWizardOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 mb-4 sm:mb-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 pt-5 pb-1">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Clase {cls.numero} · {cls.fecha}</p>
+                <h3 className="text-base font-semibold text-foreground mt-0.5">Asignar material</h3>
+              </div>
+              <button onClick={() => setWizardOpen(false)} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X size={16} className="text-muted-foreground" /></button>
+            </div>
+            <div className="px-5 pt-4 pb-5">
+              <StepBar step={step} />
+              {step === 1 && <Step1 draft={draft} onUpdate={d => setDraft(p => ({...p,...d}))} onNext={() => setStep(2)} />}
+              {step === 2 && <Step2 draft={draft} onUpdate={d => setDraft(p => ({...p,...d}))} onBack={() => setStep(1)} onNext={() => setStep(3)} />}
+              {step === 3 && <Step3 draft={draft} onUpdate={d => setDraft(p => ({...p,...d}))} onBack={() => setStep(2)} onConfirm={confirmAssignment} />}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

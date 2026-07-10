@@ -1,0 +1,565 @@
+# Instrucción de desarrollo para Claude: Módulo Clase en Vivo
+
+Actúa como desarrollador senior. Necesito mejorar el módulo **Clase en Vivo** sin mezclarlo con el desarrollo visual de Agenda.
+
+## 1. Alcance de esta tarea
+
+Esta instrucción corresponde únicamente al módulo **Clase en Vivo**.
+
+No rediseñes Agenda.
+
+No reconstruyas Centro de Estudios.
+
+No crees una lógica paralela de clases.
+
+Clase en Vivo debe consumir la información que ya viene de:
+
+* Agenda.
+* Centro de Estudios.
+* Programas.
+* Clases programadas.
+* Materiales asignados.
+* Grados.
+* Sedes.
+* Maestros.
+* Tenant.
+
+La responsabilidad de Clase en Vivo es operar la clase real en el momento en que ocurre, permitiendo:
+
+* Check-in del estudiante.
+* Check-out del estudiante.
+* Control de asistencia física.
+* Registro de puntualidad.
+* Notificación a acudientes/padres.
+* Registro de horas reales de entrenamiento.
+* Checkpoint de materiales trabajados.
+* Métricas de trazabilidad pedagógica y administrativa.
+
+## 2. Propósito real de Clase en Vivo
+
+Clase en Vivo no es principalmente una transmisión virtual.
+
+Debe entenderse como un módulo de **control, custodia, asistencia, trazabilidad y cierre pedagógico de la clase presencial**.
+
+El flujo principal es:
+
+1. La clase existe previamente en Agenda.
+2. La clase fue creada o estructurada desde Centro de Estudios.
+3. Cuando llega la ventana horaria permitida, Clase en Vivo se habilita.
+4. El maestro, tenant o usuario autorizado escanea el QR del carnet del estudiante.
+5. El sistema registra check-in.
+6. Durante la clase se puede hacer seguimiento ligero de materiales.
+7. Al finalizar, se escanea nuevamente el QR para registrar check-out.
+8. El sistema notifica a los acudientes/padres que el estudiante terminó clase y puede ser recogido.
+9. El sistema acumula horas reales de entrenamiento.
+10. El sistema alimenta reportes internos y KPIs del estudiante, grupo, maestro y tenant.
+
+## 3. Activación temporal de Clase en Vivo
+
+Clase en Vivo debe activarse únicamente cuando exista una clase real programada.
+
+La activación depende de la clase programada en Agenda.
+
+Debe existir una ventana temporal configurable.
+
+Crear o reutilizar constantes como:
+
+```ts
+LIVE_CLASS_OPEN_BEFORE_MINUTES = 15
+LIVE_CLASS_CLOSE_AFTER_MINUTES = 15
+```
+
+Reglas:
+
+* Clase en Vivo se habilita 15 minutos antes de iniciar la clase.
+* Clase en Vivo permanece disponible hasta 15 minutos después de finalizar la clase.
+* Fuera de esa ventana, el acceso debe estar bloqueado, oculto o deshabilitado.
+* No permitir check-in ni check-out fuera de la ventana permitida, salvo que exista un permiso administrativo explícito.
+* No quemar estos valores de forma rígida en varios lugares del código. Centralizar la configuración.
+
+## 4. Relación con Agenda
+
+Agenda sigue siendo la fuente visual de la parrilla de clases.
+
+Clase en Vivo no debe crear clases nuevas.
+
+Clase en Vivo debe recibir o consultar la clase activa desde Agenda.
+
+Debe consumir:
+
+* `classId`
+* `programId`
+* `tenantId`
+* `teacherId`
+* `venueId`
+* `startTime`
+* `endTime`
+* `grades`
+* `assignedMaterials`
+* `activeStatus`
+
+Reglas:
+
+* Si no existe clase programada, no debe abrirse Clase en Vivo.
+* Si la clase está inactiva, no debe abrirse Clase en Vivo.
+* Si la clase fue eliminada o desactivada, Clase en Vivo no debe permitir operación.
+* Si hay más de una clase activa en la ventana horaria, el sistema debe mostrar selector controlado de clase, filtrado por permisos del usuario.
+
+## 5. Relación con Centro de Estudios
+
+Centro de Estudios sigue siendo la fuente principal de:
+
+* Programas.
+* Estructura académica.
+* Grados.
+* Categorías.
+* Materiales.
+* Tags.
+* Relación entre clase y material.
+
+Clase en Vivo no debe crear materiales base.
+
+Clase en Vivo solo debe registrar si los materiales asignados fueron:
+
+* Planeados para la clase.
+* Presentados al inicio.
+* Usados durante la clase.
+* Parcialmente usados.
+* No usados.
+* Pendientes para próxima clase.
+
+## 6. Check-in con QR
+
+El módulo debe permitir escanear el QR del carnet del estudiante usando:
+
+* Cámara de celular.
+* Cámara del computador.
+* Lector compatible si existe.
+
+Al escanear el QR:
+
+Validar:
+
+* Que el estudiante pertenece al tenant.
+* Que el estudiante está activo.
+* Que el estudiante pertenece al grado, grupo o programa de la clase.
+* Que el estudiante está habilitado para esa clase.
+* Que no tenga check-in duplicado en la misma clase.
+* Que el QR corresponde a un estudiante real y no a un dato inválido.
+
+Registrar:
+
+* `studentId`
+* `classId`
+* `programId`
+* `tenantId`
+* `checkInTime`
+* `checkedInBy`
+* `teacherId`
+* `venueId`
+* `status`
+* `isLate`
+* `minutesLate`
+
+Reglas:
+
+* Si el estudiante llega antes o dentro del rango válido, marcar asistencia normal.
+* Si llega después de la hora de inicio, calcular retraso.
+* Si el estudiante no pertenece a esa clase, mostrar alerta clara.
+* No crear estudiantes desde Clase en Vivo.
+* No modificar datos personales del estudiante desde Clase en Vivo.
+
+## 7. Check-out con QR
+
+Al finalizar la clase, el usuario autorizado debe poder escanear nuevamente el QR del carnet para registrar salida.
+
+Validar:
+
+* Que el estudiante tenga check-in previo en esa clase.
+* Que no tenga check-out ya registrado.
+* Que la clase corresponda a la sesión activa.
+* Que el usuario tenga permiso para registrar salida.
+
+Registrar:
+
+* `checkOutTime`
+* `checkedOutBy`
+* `durationMinutes`
+* `attendanceStatus`
+* `notificationStatus`
+
+Después del check-out:
+
+* Calcular tiempo real de permanencia.
+* Acumular horas reales de entrenamiento.
+* Preparar o disparar notificación a acudientes/padres si el sistema ya tiene integración disponible.
+
+## 8. Notificación a padres o acudientes
+
+Cuando un estudiante tenga check-out confirmado, el sistema debe poder notificar a los padres o acudientes.
+
+Mensaje esperado:
+
+* El estudiante terminó la clase.
+* Ya puede ser recogido.
+* Hora de salida.
+* Sede.
+* Nombre de la clase.
+
+Reglas:
+
+* No enviar notificación si no existe acudiente registrado.
+* No enviar duplicados.
+* Registrar estado de la notificación.
+* Si WhatsApp falla, guardar error y permitir reintento controlado.
+* Si ya existe servicio de WhatsApp en el sistema, reutilizarlo.
+* No implementar proveedor nuevo si no está definido.
+
+## 9. Checkpoint de materiales de clase
+
+Agregar una función de checkpoint pedagógico dentro de Clase en Vivo.
+
+No se trata de que el usuario escriba un prompt libre.
+
+Debe ser un flujo guiado con opciones, checkboxes, selects o botones rápidos.
+
+### 9.1 Al inicio de la clase
+
+Mostrar los materiales asignados a la clase desde Centro de Estudios.
+
+El sistema debe presentar algo como:
+
+```md
+Materiales sugeridos para esta clase:
+- Material 1
+- Material 2
+- Material 3
+```
+
+El maestro o usuario autorizado puede marcar:
+
+* Se planea usar hoy.
+* Se deja pendiente.
+* No aplica para esta sesión.
+
+Esta acción debe ser rápida, no obligatoria de forma pesada y no debe bloquear el check-in.
+
+### 9.2 Durante la clase
+
+Permitir marcar avances simples:
+
+* Usado.
+* Mencionado.
+* Explicado.
+* Practicado.
+* Parcialmente cubierto.
+* Pendiente.
+* No usado.
+
+Opcionalmente permitir nota corta, con límite de caracteres.
+
+Ejemplo:
+
+```md
+Material: Patada frontal básica
+Estado: Practicado
+Nota corta: Se trabajó con cinturones blancos infantiles.
+```
+
+### 9.3 Al cierre de la clase
+
+Antes de cerrar la sesión, mostrar un resumen rápido:
+
+```md
+Materiales asignados:
+- Material 1: usado
+- Material 2: parcialmente usado
+- Material 3: no usado
+```
+
+Pedir confirmación rápida:
+
+* Confirmar cierre.
+* Ajustar materiales.
+* Dejar pendiente para próxima clase.
+
+Registrar:
+
+* Qué materiales sí se usaron.
+* Qué materiales se mencionaron.
+* Qué materiales se practicaron.
+* Qué materiales quedaron pendientes.
+* Qué porcentaje aproximado de cobertura tuvo la clase.
+* Quién registró el cierre.
+* Fecha y hora del cierre.
+
+## 10. Registro ligero de observaciones
+
+Agregar una opción opcional de observación rápida.
+
+No debe volverse un formulario pesado.
+
+Puede incluir categorías como:
+
+* Grupo con buena energía.
+* Grupo con baja energía.
+* Requiere refuerzo.
+* Buen avance técnico.
+* Dificultad general con el tema.
+* Clase interrumpida.
+* Material insuficiente.
+* Excelente participación.
+
+También permitir una nota corta opcional.
+
+Reglas:
+
+* No exigir nota individual para 40 estudiantes.
+* Priorizar registros grupales rápidos.
+* Permitir nota individual solo si el maestro lo decide.
+* Evitar que el flujo se vuelva lento.
+
+## 11. Métricas y trazabilidad
+
+Clase en Vivo debe alimentar reportes internos.
+
+Datos útiles:
+
+* Asistencias reales.
+* Ausencias.
+* Llegadas tarde.
+* Salidas registradas.
+* Horas reales acumuladas.
+* Materiales cubiertos.
+* Materiales pendientes.
+* Participación general.
+* Cumplimiento de clase.
+* Historial por estudiante.
+* Historial por grupo.
+* Historial por maestro.
+* Historial por programa.
+* Historial por tenant.
+
+Estos datos deben poder usarse después para KPIs administrativos y pedagógicos.
+
+No es necesario construir todos los dashboards en esta tarea, pero sí dejar la información bien registrada y consultable.
+
+## 12. Roles y permisos
+
+Clase en Vivo debe respetar permisos.
+
+Usuarios que pueden operar Clase en Vivo:
+
+* Tenant/admin.
+* Maestro asignado a la clase.
+* Asistente autorizado si el sistema ya contempla ese rol.
+
+Reglas:
+
+* Un maestro solo puede operar clases donde esté asignado.
+* Un tenant/admin puede operar clases de su tenant.
+* Un estudiante no puede registrar su propia asistencia.
+* Un acudiente no puede modificar asistencia.
+* Un usuario sin permisos no puede escanear QR ni cerrar clase.
+* Toda acción relevante debe registrar quién la hizo.
+
+## 13. Seguridad e integridad de datos
+
+Evitar datos huérfanos.
+
+Reglas:
+
+* No crear registros de asistencia sin `studentId`.
+* No crear registros de asistencia sin `classId`.
+* No crear registros sin `tenantId`.
+* No permitir check-out sin check-in.
+* No permitir duplicidad de asistencia en la misma clase.
+* No permitir que un estudiante de otro tenant sea registrado.
+* No eliminar materiales desde Clase en Vivo.
+* No alterar la estructura base del programa desde Clase en Vivo.
+* No modificar Agenda desde Clase en Vivo, salvo estados operativos estrictamente necesarios.
+* Si se cierra una clase, registrar estado de cierre sin borrar información.
+
+## 14. Estados sugeridos de Clase en Vivo
+
+Usar estados claros:
+
+```ts
+scheduled
+available
+in_progress
+closed
+expired
+cancelled
+```
+
+Significado:
+
+* `scheduled`: existe la clase, pero todavía no está en ventana activa.
+* `available`: ya está dentro de la ventana permitida.
+* `in_progress`: ya se registró operación de clase.
+* `closed`: la clase fue cerrada correctamente.
+* `expired`: pasó la ventana sin cierre formal.
+* `cancelled`: la clase fue cancelada o desactivada desde la fuente correspondiente.
+
+## 15. Flujo visual recomendado
+
+La pantalla de Clase en Vivo debe tener secciones simples.
+
+### A. Encabezado
+
+Mostrar:
+
+* Nombre de la clase.
+* Hora.
+* Sede.
+* Maestro.
+* Estado de la clase.
+* Tiempo restante o estado de ventana.
+
+### B. Escáner QR
+
+Mostrar:
+
+* Botón para activar cámara.
+* Resultado del último escaneo.
+* Estado del estudiante escaneado.
+* Mensaje claro de éxito o error.
+
+### C. Lista de asistencia
+
+Mostrar:
+
+* Estudiantes esperados.
+* Estudiantes con check-in.
+* Estudiantes pendientes.
+* Estudiantes con check-out.
+* Llegadas tarde.
+
+### D. Materiales de la clase
+
+Mostrar:
+
+* Materiales asignados.
+* Estado de uso.
+* Checkpoint inicial.
+* Checkpoint de cierre.
+
+### E. Cierre de clase
+
+Mostrar:
+
+* Resumen de asistencia.
+* Resumen de materiales.
+* Observación rápida.
+* Botón cerrar clase.
+* Confirmación antes de cerrar.
+
+## 16. Casos especiales
+
+Validar estos escenarios:
+
+* Estudiante escanea QR dos veces en check-in.
+* Estudiante intenta check-out sin check-in.
+* Estudiante pertenece al tenant, pero no a esa clase.
+* Estudiante pertenece a otro tenant.
+* Cámara no disponible.
+* QR inválido.
+* Clase fuera de horario permitido.
+* Clase sin materiales asignados.
+* Clase sin estudiantes esperados.
+* Usuario sin permiso intenta operar.
+* WhatsApp falla.
+* Clase terminó pero no fue cerrada.
+* Maestro asignado cambia desde Agenda antes de la clase.
+* Clase desactivada antes de iniciar.
+
+## 17. Implementación por fases
+
+### Fase 1: Auditoría
+
+Antes de modificar código, revisar:
+
+* Dónde está actualmente Clase en Vivo.
+* Cómo se obtiene la clase activa.
+* Cómo se relaciona con Agenda.
+* Cómo se relaciona con Centro de Estudios.
+* Cómo se registran estudiantes.
+* Cómo funciona el QR actual.
+* Cómo se manejan roles y permisos.
+* Si ya existe servicio de WhatsApp.
+* Si ya existen modelos de asistencia o reportes.
+
+Entregar resumen técnico antes de implementar.
+
+### Fase 2: Plan técnico
+
+Indicar:
+
+* Archivos a modificar.
+* Componentes a reutilizar.
+* Servicios a crear o ajustar.
+* Modelos afectados.
+* Riesgos.
+* Cómo validar cada cambio.
+
+### Fase 3: Implementación
+
+Implementar:
+
+* Activación temporal de Clase en Vivo.
+* Validación de clase activa.
+* Check-in con QR.
+* Check-out con QR.
+* Registro de horas reales.
+* Lista de asistencia.
+* Checkpoint de materiales.
+* Observaciones rápidas.
+* Cierre de clase.
+* Registro de estados.
+* Permisos.
+* Integridad de datos.
+* Notificación a padres/acudientes si ya existe integración.
+
+### Fase 4: Validación
+
+Probar:
+
+* Clase activa 15 minutos antes.
+* Clase bloqueada fuera de horario.
+* Maestro asignado puede operar.
+* Maestro no asignado no puede operar.
+* Tenant/admin puede operar.
+* Check-in exitoso.
+* Check-in duplicado bloqueado.
+* Check-out exitoso.
+* Check-out sin check-in bloqueado.
+* QR inválido bloqueado.
+* Estudiante de otro tenant bloqueado.
+* Material usado registrado.
+* Material pendiente registrado.
+* Cierre de clase exitoso.
+* Horas acumuladas calculadas.
+* Notificación enviada o error registrado.
+* No se crean datos huérfanos.
+
+## 18. Criterios de aceptación
+
+La tarea se considera terminada cuando:
+
+* Clase en Vivo se habilita solo para clases reales programadas.
+* El acceso temporal funciona con ventana configurable.
+* El QR permite check-in y check-out.
+* La asistencia queda registrada por estudiante y clase.
+* Se calcula tiempo real de permanencia.
+* Se alimenta acumulado de horas.
+* Se puede marcar uso de materiales asignados.
+* El checkpoint de materiales es rápido y fácil de diligenciar.
+* Se puede cerrar la clase con resumen.
+* Se registran observaciones rápidas.
+* Se respetan permisos por tenant/admin/maestro.
+* No se duplican datos.
+* No se crean datos huérfanos.
+* No se altera la lógica base de Agenda.
+* No se altera la lógica base de Centro de Estudios.
+* La información queda lista para reportes y KPIs.

@@ -27,6 +27,7 @@ import VistaNotificaciones from './vistas/Notificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
 import VistaCentroEstudios from './vistas/CentroEstudios';
 import VistaJornadas from './vistas/admin/JornadasView';
+import VistaAgenda from './vistas/admin/AgendaView';
 import { ClaseEnVivoView } from './vistas/ClaseEnVivoView';
 import Vista404 from './vistas/404';
 import VistaSalidaPublica from './vistas/SalidaPublica';
@@ -51,7 +52,7 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoCalendario, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
 } from './components/Iconos';
@@ -71,6 +72,13 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
         { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
+        // Subtarea 12.8: parrilla semanal de Agenda. Gating ampliado respecto de /jornadas
+        // (que hoy solo permite Admin/Editor): se suma Asistente porque la seccion 9 del
+        // documento de mejora del modulo Agenda dice que "otros maestros" (interpretado
+        // como roles operativos del tenant, no solo Admin) pueden VER la agenda; el gating
+        // de EDICION por jornada puntual lo resuelve `puedeEditarJornada` (12.2) dentro de
+        // la vista, no esta lista de roles.
+        { ruta: "/agenda", texto: "Agenda", icono: IconoCalendario, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         { ruta: jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : "/clase-en-vivo", texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
@@ -330,6 +338,10 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
+                    {/* Subtarea 12.8: gating ampliado respecto de /jornadas -- incluye Asistente y
+                        SuperAdmin (roles operativos del tenant, seccion 9 del documento de mejora de
+                        Agenda: "otros maestros" pueden VER; Estudiante/Tutor no acceden a Agenda). */}
+                    <ReactRouterDOM.Route path="/agenda" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente || usuario?.rol === RolUsuario.SuperAdmin ? <VistaAgenda /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/clase-en-vivo/:jornadaId" element={<ClaseEnVivoView />} />
                     <ReactRouterDOM.Route path="/clase-en-vivo" element={<ClaseEnVivoView />} />
                     <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />

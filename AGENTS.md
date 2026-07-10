@@ -38,3 +38,5 @@ https://github.com/Gentleman-Programming/engram
 Do not commit the live Engram database. Commit only `.engram/` sync exports.
 
 
+
+## Imported Claude Cowork project instructions

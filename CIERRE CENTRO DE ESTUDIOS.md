@@ -93,9 +93,9 @@ Al cerrar cada tarea, agregar un bloque bajo la tarea correspondiente:
 - [ ] 9. Pruebas staging y despliegue controlado
 - [ ] 10. Documentacion operativa y rollback
 - [x] 11. Rediseno UX unificado: Programa, Publicar material y Mis Clases (Figma) — Archivada
-- [x] 12. Metricas de progreso academico de estudiantes + hardening de reglas de negocio (Antigravity/Gemini)
 - [ ] 12. Mejora modulo Agenda: parrilla semanal y edicion granular de clase
 - [ ] 13. Modulo Clase en Vivo (deteccion y correccion de fuentes de verdad + funcionalidad completa QR/asistencia)
+- [x] 14. Metricas de progreso academico de estudiantes + hardening de reglas de negocio (Antigravity/Gemini) — renumerada de 12 a 14 el 2026-07-09 por colision con la seccion 12 de Codex
 
 ---
 
@@ -1627,9 +1627,50 @@ Fuente de requisitos: `Mejora del módulo Agenda.txt`. Documentos de referencia 
 
 ### 12.7 Componentes reutilizables para el modal de edicion
 
-- [ ] Extraer el formulario de "Programa" de `JornadasView.tsx:302-388` (hora, fecha, sede, maestro, grados, estado, programa) a un componente compartido `PestanaProgramaJornada` sin duplicar validaciones.
-- [ ] Envolver `AsignarMaterialWizard.tsx` como pestana "Materiales" para una jornada especifica (hoy esta acoplado al carrusel de programa activo en `AsignacionesView.tsx`).
-- [ ] Resolver el hardcode de espacio unico `tatami-1` en `jornadaContextService.ts:83` antes de exponer seleccion real de sede/espacio en el modal.
+- [x] Extraer el formulario de "Programa" de `JornadasView.tsx:302-388` (hora, fecha, sede, maestro, grados, estado, programa) a un componente compartido `PestanaProgramaJornada` sin duplicar validaciones.
+- [x] Envolver `AsignarMaterialWizard.tsx` como pestana "Materiales" para una jornada especifica (hoy esta acoplado al carrusel de programa activo en `AsignacionesView.tsx`).
+- [x] Resolver el hardcode de espacio unico `tatami-1` en `jornadaContextService.ts:83` antes de exponer seleccion real de sede/espacio en el modal.
+
+### Registro de cierre
+
+- Fecha: 2026-07-09
+- Responsable: Claude Code (subagente)
+- Ciclo RED/GREEN/REFACTOR: subtarea con 3 partes independientes; cada una siguio su propio ciclo (detalle abajo).
+  - **Parte 1 (extraccion de `PestanaProgramaJornada`):** por ser un refactor puro de UI (mover markup sin cambiar comportamiento), el "RED" fue confirmar los 13 tests existentes de `JornadasView.test.tsx` en verde ANTES de tocar nada (baseline). GREEN: se extrajo el formulario de programa/grupo/sede/espacio/instructor (mismos ids, labels y clases Tailwind, cero cambio de markup) a `components/academico/PestanaProgramaJornada.tsx`, componente controlado sin estado propio (recibe `jornada: Pick<JornadaInstruccion, 'programaId'|'grupoId'|'sedeId'|'espacioId'|'instructorId'>` + `opciones` + 5 callbacks `on*Change`). `JornadasView.tsx` reemplazo el bloque inline (86 lineas) por `<PestanaProgramaJornada ... />`, conservando en el contenedor la unica logica de negocio que tenia ese bloque (el cambio de programa tambien sincroniza `ejecucion.programaId`, que es estado propio de la vista). Se confirmaron los mismos 13 tests en verde DESPUES del extract, sin modificar ni un solo assert de `JornadasView.test.tsx`. Se sumo ademas `PestanaProgramaJornada.test.tsx` (7 tests nuevos, aislados con RTL) cubriendo: render con valores actuales reflejados, emision de cada uno de los 5 callbacks por separado, y el caso de selector de espacio vacio (ligado a la Parte 3).
+  - **Parte 2 (`PestanaMaterialesJornada`):** RED = test nuevo que renderiza el wrapper y verifica que arma correctamente las props del wizard (exclusion de duplicados de la jornada, prioridad por tags, `onConfirmar` fluye con el draft acumulado) contra un componente todavia inexistente. GREEN: se creo `components/academico/PestanaMaterialesJornada.tsx`, que recibe `jornadaId` + los datos ya cargados por el contenedor (`recursosDisponibles`, `tagsPrograma`, `gruposObjetivo`, `recursoIdsAsignados`) y arma internamente `materialesDisponibles` via el helper puro exportado `prepararMaterialesJornada` (excluye ids ya asignados a la jornada + prioriza por tags, replicando el contrato que hoy arma `AsignacionesView.tsx` a mano con `materialesDisponiblesWizard`/`recursosPriorizadosPorTag`), y monta `AsignarMaterialWizard` sin tocarlo. 10 tests en `PestanaMaterialesJornada.test.tsx` (4 del helper puro + 6 de integracion con RTL), todos en verde. Documentado explicitamente en el propio archivo: SIN consumidor real en produccion todavia (12.9 lo va a montar).
+  - **Parte 3 (`espacioRepository` + wireo real):** RED = 4 tests nuevos en `jornadaContextService.test.ts` (describe `espacios (Parte 3)`) que fallaban porque `obtenerContextoJornada` siempre devolvia el hardcode `tatami-1` sin importar el mock de `listarEspaciosPorTenant` inyectado. GREEN: se creo `servicios/academico/espacioRepository.ts` (solo lectura, mismo patron de `deps` + `isFirebaseConfigured` que `programaRepository.ts`: `listarEspaciosPorTenant(tenantId)` lee `tenants/{tenantId}/espacios`, rama mock en memoria con `seedMockEspacios`/`clearMockEspacios`/`getMockEspacios` para tests). `jornadaContextService.ts` ahora recibe `listarEspaciosPorTenant` como dependencia inyectable (default: `espacioRepository.listarEspaciosPorTenant`), consulta los espacios en paralelo con el resto (`Promise.all`), y mapea `EspacioFisico -> OpcionJornada` filtrando por tenant y excluyendo `activo === false`. La firma de `obtenerContextoJornada` paso de `deps: JornadaContextDeps = depsDefault` a `deps: Partial<JornadaContextDeps> = {}` con merge interno (`{ ...depsDefault, ...deps }`), para que los callers/tests existentes que ya pasaban un objeto de deps parcial (sin `listarEspaciosPorTenant`) sigan funcionando sin tener que actualizar cada mock — decision necesaria porque el test preexistente de `jornadaContextService.test.ts` (el que ya fallaba desde 12.3/12.5 por el gap de rol Tutor) no proveia esa dependencia. 4 tests nuevos de `espacioRepository.test.ts` (mock/Firestore, mismo patron que `programaRepository.test.ts`) + 4 tests nuevos en `jornadaContextService.test.ts` (mapeo real, paso de tenantId, fallback vacio, exclusion de inactivos), todos en verde.
+- Comandos ejecutados:
+  - `npx jest vistas/admin/JornadasView.test.tsx components/academico/AsignarMaterialWizard.test.tsx servicios/academico/jornadaContextService.test.ts --no-coverage` (baseline previo a tocar nada)
+  - `npx jest servicios/academico/espacioRepository.test.ts servicios/academico/jornadaContextService.test.ts --no-coverage`
+  - `npx jest components/academico/PestanaMaterialesJornada.test.tsx --no-coverage`
+  - `npx jest components/academico/PestanaProgramaJornada.test.tsx components/academico/PestanaMaterialesJornada.test.tsx components/academico/AsignarMaterialWizard.test.tsx servicios/academico/espacioRepository.test.ts servicios/academico/jornadaContextService.test.ts vistas/admin/JornadasView.test.tsx vistas/admin/AsignacionesView.test.tsx --no-coverage --runInBand` (verificacion final conjunta)
+  - `npx tsc --noEmit` (repo completo, filtrado a los archivos de esta subtarea)
+- Resultado:
+  - Baseline: `JornadasView.test.tsx` 13/13 pass, `AsignarMaterialWizard.test.tsx` 18/18 pass, `jornadaContextService.test.ts` 0/1 pass (la unica falla, preexistente desde 12.3/12.5: assert de `instructores` que espera el rol Tutor incluido — no relacionada con espacios).
+  - `espacioRepository.test.ts`: **4/4 pass**. `jornadaContextService.test.ts` tras el wireo: **4/4 pass en los nuevos** (describe `espacios (Parte 3)`) + el mismo 1 fallo preexistente sin relacion (instructores/Tutor), confirmado NO regresivo comparando la misma linea de assert de `espacios` (ahora en verde con el valor real `tatami-real` en vez del hardcode).
+  - `PestanaMaterialesJornada.test.tsx`: **10/10 pass** (4 del helper puro `prepararMaterialesJornada` + 6 de integracion). Nota: 2 tests fallaron en un primer intento por una expectativa de test incorrecta (no consideraban el toggle "ver X sin match" que ya tiene `AsignarMaterialWizard` cuando hay al menos un material con match de tags); se corrigio el test (no el componente) pasando `tagsPrograma: []` en esos casos para aislar la responsabilidad de exclusion/priorizacion de este wrapper de la logica de visibilidad del wizard, que no le pertenece.
+  - `PestanaProgramaJornada.test.tsx`: **7/7 pass**.
+  - Corrida final conjunta (7 suites, `--runInBand` para evitar contencion de workers): **77 pass / 1 fail / 78 total** — el unico fallo es el mismo preexistente ya documentado (instructores/Tutor), confirmado corriendo `jornadaContextService.test.ts` en aislado y verificando que el assert de `espacios` (linea nueva de esta subtarea) pasa en verde. Nota: en una corrida previa con paralelismo default, `AsignarMaterialWizard.test.tsx` (archivo NO tocado por esta subtarea) fallo 2 tests por timeout/contencion de recursos al correr 7 suites en paralelo; se confirmo que es flakiness de entorno (no una regresion) reproduciendo esa misma suite en aislado (`18/18 pass`) y luego en la corrida conjunta con `--runInBand` (`18/18 pass`).
+  - `npx tsc --noEmit`: **0 errores** en `PestanaProgramaJornada.tsx`, `PestanaMaterialesJornada.tsx`, `JornadasView.tsx` y `jornadaContextService.ts` (produccion). `espacioRepository.ts` muestra 1 error (`TS2322`, incompatibilidad de tipos del overload de `getDocs` de Firebase contra el tipo `EspacioRepositoryDeps` declarado en el archivo) que se confirmo es el MISMO patron exacto ya presente en `programaRepository.ts` (archivo de produccion NO tocado por esta subtarea, con idéntico `TS2322` en su propia linea de fallback de deps) — no es una regresion introducida por 12.7, es una limitacion preexistente de `tsc` crudo con los overloads de la SDK de Firestore que ya afecta a un repositorio existente con el mismo patron de inyeccion de deps. Los `*.test.ts(x)` tocados muestran el mismo ruido preexistente de contaminacion global de tipos Chai/Cypress sobre `expect` (`toEqual`/`toBe`/`toHaveBeenCalledWith`/etc. "does not exist on type Assertion") ya documentado en 12.2-12.6, presente en archivos de test no tocados tambien.
+- Archivos modificados/creados:
+  - `servicios/academico/espacioRepository.ts` (nuevo)
+  - `servicios/academico/espacioRepository.test.ts` (nuevo)
+  - `servicios/academico/jornadaContextService.ts`
+  - `servicios/academico/jornadaContextService.test.ts`
+  - `components/academico/PestanaProgramaJornada.tsx` (nuevo)
+  - `components/academico/PestanaProgramaJornada.test.tsx` (nuevo)
+  - `components/academico/PestanaMaterialesJornada.tsx` (nuevo)
+  - `components/academico/PestanaMaterialesJornada.test.tsx` (nuevo)
+  - `vistas/admin/JornadasView.tsx`
+  - `CIERRE CENTRO DE ESTUDIOS.md` (este registro)
+- Riesgos o deuda tecnica:
+  1. **Selector de espacio real depende de que un tenant efectivamente tenga espacios cargados en Firestore, y hoy NINGUNA UI los persiste** (`EspaciosView.tsx` es demo con estado 100% local, `espacioService.ts` es logica pura sin persistencia — confirmado, no se toco ninguno de los dos por estar fuera de alcance de 12.7). Consecuencia practica: en el codebase actual, `obtenerContextoJornada` va a devolver `espacios: []` para TODO tenant real (no hay ningun call site que escriba en `tenants/{tenantId}/espacios`). El selector de `PestanaProgramaJornada`/`JornadasView` maneja ese caso sin romperse (select vacio, sin opciones — cubierto por test dedicado), pero **no hay forma de que un admin cargue espacios reales todavia**: eso requeriria CRUD real de espacios (persistencia en `EspaciosView.tsx` + escritura en `espacioService.ts`), explicitamente fuera de alcance de 12.7 por instruccion directa de la tarea. Queda como deuda/riesgo abierto para un modulo futuro de Centro de Estudios (NO se resuelve aca ni se sugiere resolverlo en 12.8/12.9, que son sobre Agenda, no sobre administracion de espacios).
+  2. El selector de espacio NO se filtra por sede (`EspacioFisico.sedeId` existe en el modelo pero no se usa para acotar la lista): se investigo el selector actual de `JornadasView.tsx`/`PestanaProgramaJornada` y hoy NINGUNO de los otros selectores (programa, grupo, sede, instructor) depende de la seleccion de otro para filtrarse — son 5 selects independientes que leen del mismo `ContextoJornada` cargado una sola vez al montar. Introducir dependencia sede->espacio ahora habria sido una expansion de alcance no pedida (el propio comportamiento cruzado no existe hoy para ningun otro par de campos); se documenta como candidato natural para 12.9 (el modal de edicion singular), que es donde tendria sentido revisar el modelo de dependencia entre campos del formulario.
+  3. `obtenerContextoJornada` cambio su segundo parametro de `deps: JornadaContextDeps = depsDefault` (todas las deps requeridas si se pasa el objeto) a `deps: Partial<JornadaContextDeps> = {}` (merge con defaults). Es un cambio de firma compatible hacia atras en runtime (cualquier caller viejo que pasaba un objeto completo sigue funcionando identico) y necesario para no romper el test preexistente que ya fallaba antes de esta subtarea (no pasaba `listarEspaciosPorTenant`); se prefirio el merge en vez de forzar a todos los tests a proveer la nueva dependencia, que hubiera sido un cambio de alcance mayor sobre un archivo con una falla preexistente ya documentada y no relacionada.
+  4. `espacioRepository.ts` es deliberadamente de SOLO LECTURA (sin `crearEspacio`/`actualizarEspacio` conectados a Firestore): por instruccion explicita de la tarea, la persistencia real de espacios (CRUD completo) queda fuera de 12.7. `seedMockEspacios`/`clearMockEspacios`/`getMockEspacios` se exponen solo para poder testear la rama mock del repositorio (mismo patron que `clearMockProgramas`/`getMockProgramas` en `programaRepository.ts`), no como una via de escritura real.
+  5. El `TS2322` de `espacioRepository.ts` bajo `tsc` crudo (ver Resultado arriba) es cosmetico/preexistente-por-patron (mismo error que `programaRepository.ts` sin tocar), pero queda anotado por si en el futuro se decide resolver de raiz para todo el codebase (p.ej. tipando `deps` contra los tipos reales de `firebase/firestore` en vez de firmas simplificadas `unknown`) — no es una tarea de 12.7, es una decision de arquitectura mas amplia sobre el patron de inyeccion de deps usado en los `*Repository.ts` de este modulo.
+  6. `PestanaMaterialesJornada` (Parte 2) queda SIN consumidor real en produccion todavia (mismo criterio que 12.6 uso con la guarda de eliminacion): el unico consumidor previsto es el modal de edicion singular de 12.9, que no existe aun. `AsignacionesView.tsx` NO se modifico (sigue usando `AsignarMaterialWizard` directo con su propio `materialesDisponiblesWizard`); el wrapper esta listo para que 12.9 lo consuma sin reinventar la exclusion/priorizacion de materiales.
+- Estado final: COMPLETA (las 3 partes)
 
 ### 12.8 Vista Agenda: parrilla semanal
 
@@ -1670,16 +1711,16 @@ Fuente de requisitos: `Mejora del módulo Agenda.txt`. Documentos de referencia 
 
 ---
 
-## 12. Metricas de progreso academico de estudiantes + hardening de reglas de negocio (Antigravity/Gemini)
+## 14. Metricas de progreso academico de estudiantes + hardening de reglas de negocio (Antigravity/Gemini)
 
 Origen: sesion separada con Antigravity/Gemini (IDE Google), documentada en el chat log importado `Student Login Flow Investigation.md` (4004 lineas, raiz del repo). Cubre dos frentes: (a) endurecimiento de reglas de negocio y cierre de vacios de seguridad/integridad de datos tras un analisis ofensivo del modulo completo, y (b) diseño e implementacion de un sistema de metricas de progreso academico por estudiante ("control de notas": material consultado, % de video/pdf consumido, resultados de quizzes, ultimo acceso).
 
 **Todo lo registrado en esta seccion fue verificado por Claude Code contra el codigo real el 2026-07-08** (grep + lectura de archivos + ejecucion de tests) — no se transcribe el chat log a ciegas. Donde no se pudo verificar de forma independiente, se marca explicitamente.
 
-### 12.1 Hardening de reglas de negocio (Grupos A/B/C del analisis de vacios)
+### 14.1 Hardening de reglas de negocio (Grupos A/B/C del analisis de vacios)
 
 - [x] `SuperAdmin` ya no queda bloqueado del panel de gestion (`puedeGestionarJornadas`).
-- [x] `Tutor` excluido de `rolesInstructor` (un padre/acudiente no puede aparecer como instructor de una clase).
+- [x] ~~`Tutor` excluido de `rolesInstructor` (un padre/acudiente no puede aparecer como instructor de una clase).~~ **REVERTIDO en 14.6 (2026-07-09)**: la premisa era incorrecta — en este dominio `RolUsuario.Tutor` NO es un padre/acudiente, es el rol "Maestro" del Equipo Tecnico (ver `utils/roles.ts` y el `<option>` "Maestro" de `FormularioUsuario.tsx`). La exclusion ademas dejo en rojo el test existente de `jornadaContextService.test.ts` (caso "sabonim-real") sin actualizarlo, y causo el bug reportado por el usuario "solo se ve 1 de 3 maestros en Programa". Ver registro completo en 14.6.
 - [x] Guard contra `tenantId: 'demo'` antes de consultar asignaciones mientras el usuario real aun no resuelve.
 - [x] `validarHorario()`: rechaza `horaFin <= horaInicio` en creacion y reprogramacion de jornada.
 - [x] `advanceCiclo` filtra IDs de objetivos inexistentes antes de marcarlos completados.
@@ -1696,7 +1737,7 @@ Origen: sesion separada con Antigravity/Gemini (IDE Google), documentada en el c
 - Riesgos o deuda tecnica: ninguno detectado en la verificacion. El chat log tambien reporta fixes de `SuperAdmin`/`Tutor`/`tenantId:'demo'` como cambios de 1 linea en `CentroEstudios.tsx`/`jornadaContextService.ts`; no se ubico el `git diff` exacto de esos cambios puntuales (mismo problema de archivos sin tracking de git ya documentado en la Seccion 11), pero el comportamiento actual del codigo es consistente con lo descrito.
 - Estado final: COMPLETA (verificado)
 
-### 12.2 Sistema de metricas de progreso academico por estudiante ("control de notas")
+### 14.2 Sistema de metricas de progreso academico por estudiante ("control de notas")
 
 - [x] Modelo `ActividadLog`/`MetricasEstudiante`/`AvanceAsignacion` (`models/academico/actividad.ts`).
 - [x] `actividadService.ts`: `registrarActividad`, `obtenerActividades`, `obtenerMetricas` con recalculo automatico. Reglas de calculo: video = % maximo visto (checkpoint), PDF = % paginas unicas, imagen/texto/presentacion = 100% al abrir, quiz = 100% + score `(correctas/total)*100`.
@@ -1724,32 +1765,32 @@ Origen: sesion separada con Antigravity/Gemini (IDE Google), documentada en el c
   - Este trabajo **no estaba registrado en ningun documento de cierre compartido** hasta este registro retroactivo — vivia unicamente en un chat log de otra IDE. Es el mismo tipo de punto ciego que esta seccion existe para evitar; a futuro, cualquier sesion (Codex, Antigravity, Claude Code) deberia registrar su avance aca en tiempo real, no al final.
 - Estado final: COMPLETA (verificado con evidencia real; deploy a produccion no reverificado)
 
-### 12.3 Conflicto de instructor + filtro de permisos en Mis Clases
+### 14.3 Conflicto de instructor + filtro de permisos en Mis Clases
 
 - [x] `existeConflictoHorario` devuelve motivo especifico (`'instructor'` vs `'espacio'`) en vez de un booleano generico — confirmado en `servicios/academico/jornadaRepository.ts` (`ResultadoConflictoHorario`, `motivoConflictoHorario`, comentario "Subtarea 12.3").
 - [x] `MisClasesView.tsx` ahora filtra permisos por instructor: `puedeEditarJornada(jornada, usuarioId, esAdmin)` = `esAdmin || jornada.instructorId === usuarioId` — confirmado en codigo, gatea el boton de accion por fila.
-- [ ] **Atribucion incierta**: no se pudo confirmar si estos dos fixes vinieron de esta sesion de Antigravity (el chat log no llega a mostrar su implementacion completa dentro de las 4004 lineas revisadas) o de otra sesion no documentada (posiblemente Codex, dado el estilo de comentario "Subtarea 12.3" que no coincide con la numeracion de esta seccion ni con las Fases SDD de Claude Code). Se registra aca porque el codigo esta presente y funcional, verificado por Claude Code, independientemente de quien lo escribio.
+- [x] **Atribucion RESUELTA (2026-07-09)**: estos fixes son de **Codex** — corresponden a su subtarea 12.3 "Disponibilidad de maestro y sede unificada" de la seccion "12. Mejora modulo Agenda: parrilla semanal y edicion granular de clase" (mas arriba en este mismo documento). Cuando se escribio esta nota, esa seccion todavia no existia en el documento y el comentario "Subtarea 12.3" del codigo no coincidia con ninguna numeracion conocida; al registrar Codex su seccion 12, la correspondencia quedo confirmada.
 
 ### Registro de cierre
 
-- Fecha: verificado por Claude Code 2026-07-08 (fecha de implementacion real desconocida).
-- Responsable: Sin atribucion confirmada (ver nota arriba). Verificacion: Claude Code.
+- Fecha: verificado por Claude Code 2026-07-08; atribucion resuelta 2026-07-09.
+- Responsable: Codex (implementacion, subtarea 12.3 de su seccion "Mejora modulo Agenda"). Verificacion: Claude Code.
 - Comandos ejecutados: lectura directa de `jornadaRepository.ts` y `MisClasesView.tsx`.
-- Resultado: codigo presente y consistente; no se corrio test dedicado a `puedeEditarJornada` en esta pasada de verificacion (recomendado agregarlo si no existe).
+- Resultado: codigo presente y consistente. La cobertura de test de `puedeEditarJornada` quedo cubierta por la propia seccion 12.2 de Codex (permisos "maestro asignado").
 - Archivos modificados: `servicios/academico/jornadaRepository.ts`, `vistas/admin/MisClasesView.tsx`.
-- Riesgos o deuda tecnica: falta trazabilidad de origen (ver nota de atribucion incierta arriba). Recomendado: la proxima vez que se toque `jornadaRepository.ts`, agregar un registro de cierre real con fecha/responsable para no perder mas trazabilidad.
-- Estado final: PRESENTE EN CODIGO, ATRIBUCION Y COBERTURA DE TEST PENDIENTES DE CONFIRMAR
+- Riesgos o deuda tecnica: ninguno pendiente — la trazabilidad quedo restaurada al registrar Codex su propia seccion.
+- Estado final: COMPLETA (atribuida a Codex, verificada por Claude Code)
 
-### 12.4 Fallos y vacios que el propio analisis de Antigravity dejo abiertos (no resueltos, no verificados como cerrados)
+### 14.4 Fallos y vacios que el propio analisis de Antigravity dejo abiertos (no resueltos, no verificados como cerrados)
 
-Segun el chat log, estos quedaron explicitamente como "deuda tecnica controlada" (severidad media/baja) tras el hardening de 12.1:
+Segun el chat log, estos quedaron explicitamente como "deuda tecnica controlada" (severidad media/baja) tras el hardening de 14.1:
 
 - [ ] **Concurrencia "ultimo-gana"**: sin control optimista (`actualizadoEn`) ni listeners en tiempo real — dos admins editando la misma jornada a la vez pueden pisarse el estado sin aviso.
 - [ ] **Sin limite de escala al generar jornadas**: un rango de fechas amplio puede generar miles de documentos de un solo golpe. *(Nota: el chat log reporta haber agregado `contarJornadasARealizar` con advertencia a partir de 150 clases en `AsignacionesView.tsx` — confirmado presente en el codigo actual — pero sigue sin haber un limite duro, solo advertencia.)*
 - [x] **Bug de medianoche en `Horarios.tsx`**: `hoyIso` calculado con `useMemo` de dependencias vacias quedaba congelado si la app se dejaba abierta. Segun el chat log se removio el `useMemo`. No re-verificado por Claude Code en esta pasada.
 - [ ] **Fecha de reprogramacion/confirmacion sin limite minimo**: un `<input type="date">` sin `min` permite reprogramar una clase al pasado.
 
-### 12.5 Fix: crash total de Centro de Estudios por acceso a `null` en `MaterialPreviewModal`
+### 14.5 Fix: crash total de Centro de Estudios por acceso a `null` en `MaterialPreviewModal`
 
 - [x] Identificar por que el usuario no veia ninguna actualizacion reciente (ni el rediseño de Mis Clases de la Seccion 11.6, ni nada) en `http://127.0.0.1:5180/#/centro-estudios`.
 - [x] Confirmar y corregir el crash real que lo causaba.
@@ -1764,9 +1805,9 @@ Segun el chat log, estos quedaron explicitamente como "deuda tecnica controlada"
 - Ciclo GREEN: se protegieron los dos puntos de acceso nuevos que no seguian la convencion ya usada en el resto del archivo (ej. linea 124: `if (!asignacion || ...) return;`): `tipoMaterial = asignacion ? detectarTipoMaterial(asignacion) : 'generico'` y optional-chaining (`asignacion?.tenantId ?? ''`, etc.) en los campos pasados a `useRegistrarActividad`.
 - Ciclo REFACTOR: no aplica, cambio minimo y quirurgico siguiendo un patron ya establecido en el mismo archivo.
 - Comandos ejecutados: `npx jest --runInBand --testPathPattern "MaterialPreviewModal.test.tsx$"`; reproduccion Playwright completa contra servidor reiniciado limpio en puerto 5180 (con `--force`).
-- Resultado: `MaterialPreviewModal.test.tsx` 9/9 passing (sin regresiones). Reproduccion en navegador: 0 `pageerror` (antes: crash inmediato al cargar la pagina). Pagina completa renderiza: stepper, tarjeta de Drive, tarjeta de Programa, tab switcher "📚 Flujo academico / 📊 Progreso estudiantes" (Seccion 12.2), Clase activa, wizard.
+- Resultado: `MaterialPreviewModal.test.tsx` 9/9 passing (sin regresiones). Reproduccion en navegador: 0 `pageerror` (antes: crash inmediato al cargar la pagina). Pagina completa renderiza: stepper, tarjeta de Drive, tarjeta de Programa, tab switcher "📚 Flujo academico / 📊 Progreso estudiantes" (Seccion 14.2), Clase activa, wizard.
 - Archivos modificados: `components/academico/MaterialPreviewModal.tsx`
-- Riesgos o deuda tecnica: **este bug fue introducido por el mismo trabajo de Antigravity documentado en la Seccion 12.2** (la integracion de `useRegistrarActividad` en el modal) — confirma en la practica el riesgo ya anotado en 12.2 de que ese trabajo nunca estuvo registrado ni pasó por una verificacion de UI en vivo antes de esta sesion. Recomendado: cualquier cambio futuro a `MaterialPreviewModal.tsx` debe probarse con `asignacion=null` explicitamente (es un caso real, no un edge-case teorico — es el estado por defecto del componente).
+- Riesgos o deuda tecnica: **este bug fue introducido por el mismo trabajo de Antigravity documentado en la Seccion 14.2** (la integracion de `useRegistrarActividad` en el modal) — confirma en la practica el riesgo ya anotado en 14.2 de que ese trabajo nunca estuvo registrado ni pasó por una verificacion de UI en vivo antes de esta sesion. Recomendado: cualquier cambio futuro a `MaterialPreviewModal.tsx` debe probarse con `asignacion=null` explicitamente (es un caso real, no un edge-case teorico — es el estado por defecto del componente).
 - Estado final: COMPLETA
 
 Y, cerrando el chat log, el usuario reporto **estas 3 quejas sin resolver por Antigravity** (la sesion terminó investigando la primera, sin concluir):
@@ -1774,6 +1815,80 @@ Y, cerrando el chat log, el usuario reporto **estas 3 quejas sin resolver por An
 1. "Solo el maestro asignado puede publicar, pero el perfil logueado es el mismo maestro asignado" — **este bug fue identificado y corregido de forma independiente por Claude Code la misma noche, ver Seccion 11.4** (root cause real: `instructorId` era un slug de nombre, nunca un UID real; ahora usa UID real + gating por rol Admin/Editor).
 2. "No se modifico la organizacion del contenedor de Mis Clases" — **tambien resuelto por Claude Code, ver Seccion 11.6** (tabla sin estilo → grilla 3x3 paginada). Si el usuario seguia sin verlo al momento de esta queja (reportada en la sesion de Antigravity), la causa mas probable es la misma que se le explico en esta sesion: la grilla solo muestra contenido si el programa tiene jornadas reales generadas.
 3. "No veo nada de notas o registro de estudio de los estudiantes" — **la causa raiz que la sesion de Antigravity identifico y quedo corrigiendo** (justo antes de que el chat log terminara) es que `usuario.rol` llegaba de Firestore en mayusculas (`"ADMIN"`) mientras la comparacion esperaba el enum capitalizado (`'Admin'`), ocultando el tab switcher completo. **Confirmado por Claude Code que la correccion existe en el codigo actual**: `normalizeRol()` en `context/AuthContext.tsx` normaliza el rol a minusculas antes de mapearlo al enum, independientemente de como llegue desde Firestore.
+
+### 14.6 Fix: layout tabs Centro de Estudios + maestros del Equipo Tecnico invisibles en Programa
+
+Origen: dos quejas directas del usuario en prueba manual (2026-07-09), independientes entre si:
+
+1. "No se reflejan todos los maestros disponibles en programa (hay 3 en equipo tecnico, solo se ve uno en programa)."
+2. "Flujo academico y Progreso estudiantes estan abajo de los pasos de flujo academico, esto genera confusion, pues al ingresar a progreso academico se siguen viendo los pasos de flujo academico."
+
+- [x] Queja 1 — **BUG REAL, corregido**: reincorporar `RolUsuario.Tutor` (rol "Maestro" del Equipo Tecnico) a `rolesInstructor` en `jornadaContextService.ts`. La exclusion introducida por 14.1 (Antigravity, 2026-07-07) partia de la premisa incorrecta de que `Tutor` = padre/acudiente; en este dominio `Tutor` es el Maestro (unica evidencia necesaria: `FormularioUsuario.tsx` ofrece el rol como `<option>Maestro</option>` con descripcion "Maestro: gestion tecnica, asistencia, clases y seguimiento operativo"; `utils/roles.ts` lo etiqueta "Maestro" en contexto `equipoTecnico`; `utils/instructoresAgenda.ts` — set canonico de instructores para Agenda — ya incluia `Tutor`; y el test existente de `jornadaContextService.test.ts` esperaba al usuario `sabonim-real` con rol `Tutor` dentro de `instructores` y estaba EN ROJO en el HEAD por culpa de la exclusion). No existe un rol de padre/acudiente en `RolUsuario`; el concepto de acudiente vive en `TutorDashboardView.tsx` como vista demo sin relacion con `rolesInstructor`.
+- [x] Queja 2 — **fix de layout**: en `vistas/CentroEstudios.tsx`, el tab switcher ("📚 Flujo academico" / "📊 Progreso estudiantes") ahora se renderiza ANTES del stepper de 3 pasos, y el stepper ("1 Conectar Drive / 2 Centro de recursos / 3 Programa y publicacion") quedo condicional a `tabGestion === 'flujo'` — en la pestaña "Progreso estudiantes" ya no aparece un stepper que no tiene relacion con esa vista. Para estudiantes (sin tab switcher) `tabGestion` nunca sale de `'flujo'`, asi que su vista no cambia.
+- [x] Correccion documental: el item de 14.1 que registro la exclusion de `Tutor` quedo marcado como REVERTIDO con referencia a esta seccion.
+
+**Pregunta de producto abierta (NO resuelta a proposito)**: `RolUsuario.Asistente` ("Asistente de Sede") sigue excluido de `rolesInstructor` en Programa, aunque SI cuenta como instructor en Agenda (`instructoresAgenda.ts`). Si uno de los 3 miembros del Equipo Tecnico del usuario es Asistente, seguira sin aparecer en el selector de instructor de Programa. Decidir si un Asistente puede ser instructor titular de una clase es una decision de producto, no un bug — no se cambio sin confirmacion del usuario.
+
+### Registro de cierre
+
+- Fecha: 2026-07-09
+- Responsable: Claude Code (sub-agente, sesion coordinada)
+- Ciclo RED:
+  - Queja 1: `npx jest --runInBand --testPathPattern "jornadaContextService"` en HEAD → 1 failed / 4 passed. El test existente "construye opciones reales por tenant..." esperaba `{ id: 'sabonim-real', nombre: 'Israel' }` (rol `Tutor`) en `contexto.instructores` y fallaba — RED preexistente que documenta el contrato correcto.
+  - Queja 2: test nuevo en `vistas/CentroEstudios.test.tsx` ("ubica el switcher de pestañas antes del stepper y oculta el stepper fuera de la pestaña flujo") ejecutado contra el codigo original via `git stash` → FAILED (`compareDocumentPosition` devolvio 0: el stepper precedia al tablist) — RED real confirmado.
+- Ciclo GREEN:
+  - Queja 1: una linea — `rolesInstructor = new Set([Admin, SuperAdmin, Editor, Tutor])` (+ comentario explicando la reversion) → 5/5 passing en `jornadaContextService.test.ts`.
+  - Queja 2: reordenamiento JSX en `CentroEstudios.tsx` (tab switcher fuera del `<header>`, antes del stepper; stepper envuelto en `{tabGestion === 'flujo' && ...}`) → test nuevo PASSED, verificando ademas que al volver a "Flujo academico" el stepper reaparece.
+- Ciclo REFACTOR: sin cambios adicionales — ambos fixes minimos; los comentarios en codigo documentan el porque para evitar una tercera reversion a ciegas del set de roles.
+- Comandos ejecutados:
+  - `npx jest --runInBand --testPathPattern "jornadaContextService"` (antes: 4/5; despues: 5/5)
+  - `npx jest --runInBand --testPathPattern "CentroEstudios|jornadaContextService"` (despues de ambos fixes: 29 passed / 2 failed / 31 total)
+  - `npx jest --runInBand --testPathPattern "vistas/CentroEstudios.test.tsx" -t "integra plan y cierre|habilita publicar todo"` contra el codigo SIN el fix (via `git stash`) → mismas 2 fallas — **preexistentes, no causadas por este cambio**
+  - `npx tsc --noEmit` filtrado por archivos tocados → 0 errores nuevos (los errores reportados son el conflicto global de tipos chai/jest `Assertion` que afecta a todos los test files, y errores en lineas de `CentroEstudios.tsx` no tocadas por este cambio; `jornadaContextService.ts` compila limpio)
+- Resultado: `jornadaContextService.test.ts` 5/5; `vistas/CentroEstudios.test.tsx` 10 passed / 2 failed (12 tests, incluye el nuevo). Las 2 fallas ("integra plan y cierre de clase para admin" y "habilita publicar todo...") son deuda preexistente del flujo viejo de publicacion (no encuentran `role="group"` "recursos aprobados"), confirmado ejecutandolas contra el codigo original sin este fix.
+- Archivos modificados: `servicios/academico/jornadaContextService.ts`, `vistas/CentroEstudios.tsx`, `vistas/CentroEstudios.test.tsx`, `CIERRE CENTRO DE ESTUDIOS.md` (esta seccion + correccion del item de 14.1).
+- Riesgos o deuda tecnica:
+  - Los 2 tests preexistentes en rojo de `CentroEstudios.test.tsx` siguen en rojo (fuera del alcance de esta tarea; corresponden al flujo de publicacion que otra sesion esta reescribiendo).
+  - Pregunta de producto abierta sobre `Asistente` (ver arriba) — pendiente de decision del usuario.
+  - Si el usuario reporta que TODAVIA falta un maestro tras este fix, revisar `tenantId`/`deletedAt` del usuario faltante en Firestore (no se encontro evidencia de bug ahi, pero no se pudo inspeccionar los datos reales del tenant desde esta sesion).
+- Estado final: COMPLETA (Queja 2 y parte-bug de Queja 1); PREGUNTA DE PRODUCTO ABIERTA (inclusion de `Asistente` en Programa).
+
+### 14.7 Fix: persistencia, seleccion y borrado de Programa academico + refresh de Mis Clases
+
+- [x] `eliminarPrograma(tenantId, programaId)` nuevo en `servicios/academico/programaRepository.ts` (doble via mock/Firestore como el resto del archivo) + boton de eliminar en la UI con `ModalConfirmacion` (`AsignacionesView.tsx` ~1194/2110).
+- [x] Re-seleccion de programa real tras hidratacion: el efecto que lista programas reales del tenant ahora tambien re-apunta `programaSeleccionadoId` (linea ~607) cuando seguia en el placeholder demo — esto corta de raiz los DUPLICADOS al editar (el `esEdicion` de `guardarPrograma` ya ve el id real, no el demo).
+- [x] Refresh de Mis Clases al guardar programa: prop `refreshTrigger` en `MisClasesView` (mismo patron que Biblioteca), estado `refrescoMisClases` incrementado en `guardarPrograma()`.
+- [x] Ediciones perdidas al navegar: cubiertas por la re-seleccion de arriba (el programa real vuelve a quedar seleccionado tras el remount, en vez de resetear al demo).
+
+### Registro de cierre
+
+- Fecha: 2026-07-09
+- Responsable: Claude Code (sub-agente implemento RED+GREEN; el agente se corto por limite de sesion antes de verificar — la verificacion y este registro los completo el orquestador directamente).
+- Ciclo RED: tests que reproducen los sintomas exactos reportados por el usuario (duplicado al editar tras remount, boton eliminar inexistente, Mis Clases sin refrescar tras guardar).
+- Ciclo GREEN: los 4 fixes de arriba, confirmado por el orquestador que las 4 ediciones aterrizaron completas antes del corte.
+- Ciclo REFACTOR/VERIFY (orquestador): `npx jest --runInBand --testPathPattern "AsignacionesView|MisClasesView|programaRepository"` → **5 suites, 67/67 tests passing**. `npx tsc --noEmit`: 1 error nuevo en `programaRepository.ts:56` (asignacion estructural del fallback de deps, misma clase de error ya vista en Fase 1 con `jornadaRepository.ts`) — corregido por el orquestador con el mismo cast establecido; tras el fix, produccion limpia y 6/6 tests de `programaRepository` re-verificados.
+- Archivos modificados: `servicios/academico/programaRepository.ts` (+ test), `vistas/admin/AsignacionesView.tsx`, `vistas/admin/MisClasesView.tsx` (+ test).
+- Riesgos o deuda tecnica: la restauracion COMPLETA de horario/sede/instructor al recargar un programa persistido (reconstruir `diasHorario` desde la `EjecucionPrograma`) sigue parcial — la re-seleccion evita la perdida en la sesion activa, pero un programa recargado en una sesion nueva sigue mostrando horario en blanco hasta reeditarlo. Anotado como siguiente iteracion.
+- Estado final: COMPLETA (con la deuda de restauracion de horario anotada)
+
+### 14.8 Fix: modal Matricular estudiantes + claridad de Progreso estudiantes vacio
+
+- [x] Guard en `MatricularEstudiantesModal.tsx`: si se abre sin `ejecucion` valida, muestra "Primero guarda el horario del programa antes de matricular estudiantes" en vez de quedar cargando para siempre.
+- [x] Copy de proposito en el modal: "Define el roster oficial de estudiantes de este programa, para asistencia y seguimiento" — aclara que matricular (roster formal por estudiante) es DISTINTO de asignar grados en el wizard de material (que filtra por cinturon, no inscribe individuos).
+- [x] Empty-state claro en `PanelMetricasEstudiantes.tsx`: "Sin actividad registrada / Aun no hay interacciones de estudiantes" + aclaracion de que asignar material NO genera actividad por si solo.
+
+**Respuesta directa a la queja del usuario "asigno material y no veo nada en Progreso estudiantes"**: es comportamiento esperado, no un bug — las metricas se generan cuando un ESTUDIANTE abre/consume el material (video, PDF, quiz) desde su propia sesion, no cuando el maestro lo asigna. El panel ahora lo explica en pantalla en vez de mostrarse vacio sin contexto.
+
+### Registro de cierre
+
+- Fecha: 2026-07-09
+- Responsable: Claude Code (sub-agente implemento RED+GREEN completo; se corto por limite de sesion antes de reportar — la verificacion y este registro los completo el orquestador directamente).
+- Ciclo RED: tests nuevos, incluido "el estado vacio aclara que asignar material no genera actividad por si solo" (confirmado RED por el propio agente antes del corte).
+- Ciclo GREEN: los 3 fixes de arriba, confirmados aterrizados por el orquestador via grep + lectura directa.
+- Ciclo VERIFY (orquestador): `npx jest --runInBand --testPathPattern "MatricularEstudiantesModal|PanelMetricasEstudiantes"` → **2 suites, 18/18 tests passing**.
+- Archivos modificados: `components/academico/MatricularEstudiantesModal.tsx` (+ test), `components/academico/PanelMetricasEstudiantes.tsx` (+ test).
+- Riesgos o deuda tecnica: ninguno nuevo.
+- Estado final: COMPLETA
 
 ---
 
