@@ -5,100 +5,430 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Términos del servicio | Tudojang</title>
   <meta name="description" content="Términos del servicio de Tudojang SaaS.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
   <style>
-    :root { color-scheme: light; --blue:#0047a0; --ink:#111827; --muted:#4b5563; --line:#e5e7eb; }
-    body { margin:0; font-family: Arial, Helvetica, sans-serif; color:var(--ink); background:#f8fafc; line-height:1.65; }
-    main { max-width: 920px; margin: 0 auto; padding: 48px 20px 72px; }
-    article { background:#fff; border:1px solid var(--line); border-radius:24px; padding:32px; box-shadow:0 20px 60px rgba(15,23,42,.06); }
-    h1 { color:var(--blue); font-size: clamp(2rem, 4vw, 3rem); line-height:1.1; margin:0 0 8px; }
-    h2 { margin-top:32px; color:#0f172a; font-size:1.25rem; }
-    p, li { color:var(--muted); }
-    a { color:var(--blue); font-weight:700; }
-    .meta { color:#6b7280; font-size:.95rem; margin-bottom:24px; }
-    .brand { display:flex; align-items:center; gap:12px; margin-bottom:24px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#0f172a; }
-    .brand img { width:44px; height:44px; object-fit:contain; }
+    :root {
+      color-scheme: light;
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --warning: #d97706;
+      --warning-bg: #fffbeb;
+      --text-main: #334155;
+      --text-muted: #64748b;
+      --bg-app: #f8fafc;
+      --bg-card: #ffffff;
+      --border: #e2e8f0;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow-md: 0 20px 40px -15px rgba(15,23,42,0.06);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      color: var(--text-main);
+      background: var(--bg-app);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 60px 20px 90px;
+    }
+
+    /* Header legal */
+    .legal-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .legal-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 1.4rem;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+    .legal-brand img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+    }
+    .legal-title {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900;
+      color: var(--primary);
+      letter-spacing: -0.03em;
+      margin: 0 0 12px;
+      line-height: 1.15;
+    }
+    .legal-meta {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    /* Contenedor Premium */
+    .legal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 48px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .legal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--accent), #3b82f6, #60a5fa);
+    }
+
+    /* Secciones */
+    .legal-section {
+      margin-bottom: 40px;
+    }
+    .legal-section:last-child {
+      margin-bottom: 0;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 14px;
+    }
+    .legal-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+    .legal-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .legal-section h2 {
+      font-size: 1.35rem;
+      font-weight: 750;
+      color: var(--primary);
+      margin: 0;
+    }
+    .legal-section p {
+      color: var(--text-main);
+      margin: 0 0 16px;
+    }
+    .legal-section a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .legal-section a:hover {
+      border-color: var(--accent);
+    }
+
+    /* Listas y viñetas */
+    .legal-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px;
+    }
+    .legal-list li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 14px;
+      color: var(--text-main);
+    }
+    .legal-list li::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .legal-list li strong {
+      color: var(--primary);
+    }
+
+    /* Alertas */
+    .legal-alert {
+      background: var(--warning-bg);
+      border-left: 4px solid var(--warning);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      color: #78350f;
+      font-size: 0.95rem;
+    }
+    .legal-alert strong {
+      color: #451a03;
+    }
+
+    /* Footer */
+    .legal-footer {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 48px;
+    }
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: var(--primary);
+      color: #ffffff !important;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s;
+      box-shadow: 0 4px 12px rgba(15,23,42,0.15);
+    }
+    .btn-back:hover {
+      background: #1e293b;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: transparent;
+      color: var(--primary) !important;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      background: var(--border);
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+      .legal-card {
+        padding: 24px;
+      }
+      .legal-footer {
+        flex-direction: column;
+      }
+      .btn-back, .btn-secondary {
+        justify-content: center;
+      }
+    }
   </style>
 </head>
 <body>
   <main>
-    <article>
-      <div class="brand">
-        <img src="/Logo_TuDojang.png" alt="Tudojang">
+    <div class="legal-header">
+      <a href="/" class="legal-brand">
+        <img src="/Logo_TuDojang.png" alt="Logo Tudojang">
         <span>Tudojang</span>
+      </a>
+      <h1 class="legal-title">Términos del servicio</h1>
+      <span class="legal-meta">Última actualización: 12 de julio de 2026</span>
+    </div>
+
+    <article class="legal-card">
+      <div class="legal-section">
+        <p>
+          Te damos la bienvenida a Tudojang. Estos términos y condiciones regulan el acceso y uso de nuestra plataforma SaaS diseñada para la gestión integral de escuelas de artes marciales y centros deportivos. Al registrar tu escuela o acceder como usuario, aceptás plenamente estos términos sin rodeos ni letra chica.
+        </p>
       </div>
-      <h1>Términos del servicio</h1>
-      <p class="meta">Última actualización: 30 de junio de 2026</p>
 
-      <p>
-        Estos términos regulan el uso de Tudojang, una plataforma SaaS para la gestión de escuelas deportivas, dojangs, estudiantes,
-        pagos, eventos, certificaciones y recursos académicos.
-      </p>
+      <!-- Sección 1 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+          <h2>1. Aceptación del Servicio</h2>
+        </div>
+        <p>
+          Al crear una cuenta en Tudojang, declarás estar de acuerdo con estos términos y con nuestra <a href="/privacy">Política de privacidad</a>. Si estás registrando una escuela o dojang en nombre de una persona jurídica, garantizás que tenés las facultades legales para obligar a esa entidad.
+        </p>
+      </div>
 
-      <h2>1. Aceptación</h2>
-      <p>
-        Al usar Tudojang, el usuario acepta estos términos y la política de privacidad disponible en
-        <a href="/privacy">https://tudojang.com/privacy</a>.
-      </p>
+      <!-- Sección 2 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          </div>
+          <h2>2. Uso Permitido y Límites del Plan (Membresías)</h2>
+        </div>
+        <p>
+          Cada escuela (denominada técnicamente como "Tenant") opera de forma aislada e independiente en nuestro sistema. El uso de la plataforma está limitado a las funcionalidades provistas y al volumen acordado en tu plan de suscripción:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Membresías y Topes:</strong> La plataforma ofrece tres niveles de membresías. Cada una otorga acceso a los mismos módulos operativos de la app, variando únicamente en los límites de volumen de uso asignados (ej. cantidad de estudiantes registrados, espacio en base de datos o almacenamiento).</li>
+          <li><strong>Ampliación de Límites (Add-ons):</strong> En caso de que tu escuela requiera ampliar temporal o definitivamente algún tope sin cambiar de plan, podés contratar ampliaciones de límites adicionales. Estos add-ons se mantendrán vigentes, regulados y normalizados en tanto se sostenga el pago del abono principal.</li>
+          <li><strong>Exceso de Topes:</strong> Si alcanzás el límite máximo de tu membresía sin adquirir una ampliación, la creación de nuevos registros en el módulo afectado se suspenderá temporalmente hasta el nuevo ciclo o hasta que se regularice la ampliación.</li>
+        </ul>
+      </div>
 
-      <h2>2. Uso permitido</h2>
-      <ul>
-        <li>Gestionar información institucional, académica, administrativa y operativa de una escuela autorizada.</li>
-        <li>Administrar estudiantes, acudientes, usuarios, roles, pagos, eventos, certificados y materiales académicos.</li>
-        <li>Conectar servicios externos autorizados, como Google Drive, únicamente para las finalidades funcionales del servicio.</li>
-      </ul>
+      <!-- Sección 3 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+          </div>
+          <h2>3. Delimitación Contable y Módulo Laboral</h2>
+        </div>
+        <p>
+          Tudojang está pensado para facilitarte el día a día. Sin embargo, para que no haya confusiones ni malentendidos, definimos los alcances reales de estas dos herramientas:
+        </p>
+        
+        <div class="legal-alert">
+          <strong>⚠️ Delimitación Contable Importante:</strong> El módulo de finanzas de la plataforma es una herramienta meramente auxiliar y de registro interno de cobros de matrículas y mensualidades. <strong>Tudojang NO es un software de contabilidad fiscal ni reemplaza las funciones de un Contador Público matriculado.</strong> Es responsabilidad exclusiva del Club validar sus reportes contables con un profesional idóneo y cumplir con las regulaciones de impuestos vigentes de su jurisdicción.
+        </div>
 
-      <h2>3. Responsabilidades del usuario</h2>
-      <ul>
-        <li>Usar información real, actualizada y autorizada.</li>
-        <li>Proteger sus credenciales de acceso.</li>
-        <li>No intentar acceder a datos de otros tenants, usuarios o escuelas sin autorización.</li>
-        <li>No usar la plataforma para fines ilegales, abusivos, fraudulentos o contrarios a derechos de terceros.</li>
-        <li>Obtener las autorizaciones necesarias de estudiantes, acudientes, colaboradores o terceros cuyos datos registre.</li>
-      </ul>
+        <div class="legal-alert">
+          <strong>💼 Delimitación del Módulo Laboral:</strong> Los formatos, plantillas y herramientas de contratos laborales provistos por la plataforma son únicamente modelos estándar de referencia general para formalizar vinculaciones. <strong>Estos modelos no constituyen asesoramiento legal y no están por encima de lo que impone la legislación laboral local.</strong> Cada escuela debe validar y adecuar estos contratos bajo la supervisión de un asesor legal calificado antes de su suscripción.
+        </div>
+      </div>
 
-      <h2>4. Google Drive y servicios externos</h2>
-      <p>
-        Cuando un administrador conecta Google Drive, Tudojang solicita permisos limitados para operar con archivos o carpetas autorizados explícitamente.
-        El usuario puede revocar el acceso desde su cuenta de Google. Si revoca el acceso, ciertas funciones del Centro de Estudios pueden dejar de operar.
-      </p>
+      <!-- Sección 4 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <h2>4. Suspensión del Servicio por Falta de Pago</h2>
+        </div>
+        <p>
+          La prestación activa del servicio en la nube se mantiene vigente en tanto se conserve al día el pago de la membresía contratada:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Regla de Pago Vigente:</strong> Tudojang presta sus servicios de forma ininterrumpida hasta el vencimiento del abono prepago.</li>
+          <li><strong>Mora y Suspensión:</strong> Si no se registra el pago correspondiente dentro de la fecha de vencimiento, la plataforma otorgará un margen de cortesía de hasta 5 días corridos. Cumplido este plazo sin novedad de pago, se suspenderá automáticamente el acceso a la plataforma para el Club y sus usuarios asociados.</li>
+          <li><strong>Restauración:</strong> El servicio y el acceso completo a la información cargada se reactivarán de inmediato una vez canceladas las sumas pendientes de pago.</li>
+        </ul>
+      </div>
 
-      <h2>5. Disponibilidad y cambios</h2>
-      <p>
-        Tudojang puede evolucionar, actualizar funciones, corregir errores, ajustar integraciones o modificar componentes técnicos para mejorar el servicio.
-        Aunque buscamos disponibilidad estable, no garantizamos operación ininterrumpida o libre de errores.
-      </p>
+      <!-- Sección 5 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          <h2>5. Módulo de Carnetización Física</h2>
+        </div>
+        <p>
+          Tudojang cuenta con una funcionalidad para la creación y generación de carnets (credenciales) de acceso y control de estudiantes. Dicho módulo produce un archivo en formato digital (.pdf) listo para ser impreso:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Costo del Software:</strong> El diseño, estructuración y generación del archivo digital del carnet (individual o masivo) está plenamente costeado dentro de la operación y el abono regular de la membresía contratada por la escuela.</li>
+          <li><strong>Gastos Excluidos:</strong> La elaboración física del carnet (tarjeta plástica, impresión térmica, insumos físicos) y su distribución o despacho logístico a domicilio **no están cubiertos por la membresía mensual**. Aliant Labs ofrece de forma opcional y facturada como gasto adicional el servicio de producción física y envío de las credenciales a las sedes o destinatarios que indique el Club.</li>
+        </ul>
+      </div>
 
-      <h2>6. Pagos, licencias y planes</h2>
-      <p>
-        El acceso a determinadas funciones puede depender del plan contratado, estado de licencia, límites de uso, pagos y condiciones comerciales vigentes.
-        El incumplimiento de pago o el uso fuera de los límites del plan puede suspender o restringir funcionalidades.
-      </p>
+      <!-- Sección 6 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          </div>
+          <h2>6. Integración con Google Drive</h2>
+        </div>
+        <p>
+          Cuando un administrador conecta su cuenta de Google Drive, Tudojang solicita exclusivamente permisos limitados bajo el alcance <code>https://www.googleapis.com/auth/drive.file</code>. Esto faculta a la aplicación a gestionar únicamente aquellos archivos o carpetas autorizados de forma explícita por el usuario administrador para su vinculación al Centro de Estudios. El acceso puede ser revocado en cualquier momento desde los paneles de seguridad de Google. De realizarse la revocación, las funciones de visualización de contenidos vinculados a Google Drive quedarán inactivas.
+        </p>
+      </div>
 
-      <h2>7. Propiedad intelectual</h2>
-      <p>
-        Tudojang, su diseño, software, documentación, marca y componentes asociados pertenecen a sus titulares.
-        El usuario conserva la responsabilidad sobre el contenido, datos y materiales que cargue o vincule a la plataforma.
-      </p>
+      <!-- Sección 7 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <h2>7. Centro Académico e Propiedad Intelectual</h2>
+        </div>
+        <p>
+          El módulo de Centro Académico permite a instructores y escuelas subir y organizar recursos pedagógicos, videos, formas y exámenes:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Gestión de Contenidos:</strong> Tudojang actúa estrictamente como un entorno de administración, hospedaje técnico y distribución de estos contenidos para los alumnos habilitados de la escuela.</li>
+          <li><strong>Propiedad Intacta:</strong> El uso de esta herramienta no otorga a Aliant Labs ningún tipo de propiedad, coautoría, derecho moral o cesión sobre los materiales educativos subidos por el Club. El contenido intelectual e instructivo sigue perteneciendo al 100% al Club o sus respectivos creadores.</li>
+        </ul>
+      </div>
 
-      <h2>8. Limitación de responsabilidad</h2>
-      <p>
-        Tudojang es una herramienta de apoyo administrativo y académico. Las decisiones operativas, deportivas, legales, contables o médicas tomadas por la escuela
-        siguen siendo responsabilidad de sus administradores y usuarios autorizados.
-      </p>
+      <!-- Sección 8 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <h2>8. Confidencialidad de Datos del Tenant (Club)</h2>
+        </div>
+        <p>
+          Garantizamos la seguridad y confidencialidad de la información de tu organización:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Datos Protegidos:</strong> La información propia de la identidad y facturación de la escuela (tales como dirección física, NIT/cédula, correo administrativo, números de teléfono y datos fiscales) **no serán compartidos** bajo ningún concepto con externos ni comercializados.</li>
+          <li><strong>Uso Interno Exclusivo:</strong> Estos datos se usarán con el único fin de emitir comprobantes de pago, brindar soporte, realizar integraciones funcionales internas y optimizar el desarrollo y experiencia de la app de Tudojang.</li>
+        </ul>
+      </div>
 
-      <h2>9. Soporte y contacto</h2>
-      <p>
-        Para soporte, solicitudes o consultas relacionadas con estos términos, escribe a
-        <a href="mailto:gengepardo@gmail.com">gengepardo@gmail.com</a>.
-      </p>
-
-      <h2>10. Cambios a los términos</h2>
-      <p>
-        Podemos actualizar estos términos cuando sea necesario. La versión vigente estará disponible públicamente en esta página.
-      </p>
-
-      <p><a href="/">Volver a Tudojang</a></p>
+      <!-- Sección 9 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+          </div>
+          <h2>9. Soporte y Contacto</h2>
+        </div>
+        <p>
+          Si tenés dudas acerca de la interpretación o alcances de estos Términos de Servicio, escribinos sin vacilar al correo de soporte técnico y de atención: <a href="mailto:aliantlab@gmail.com">aliantlab@gmail.com</a>.
+        </p>
+      </div>
     </article>
+
+    <div class="legal-footer">
+      <a href="/" class="btn-back">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Volver a Tudojang
+      </a>
+      <a href="/privacy.html" class="btn-secondary">
+        Ver Política de Privacidad
+      </a>
+    </div>
   </main>
 </body>
 </html>
