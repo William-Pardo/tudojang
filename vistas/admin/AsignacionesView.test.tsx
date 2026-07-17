@@ -6,8 +6,6 @@ import type { RecursoAcademico } from '../../models/academico/recurso';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { JornadaRepository } from '../../servicios/academico/jornadaRepository';
 import type { ProgramaRepository } from '../../servicios/academico/programaRepository';
-import type { InscripcionRepository } from '../../servicios/academico/inscripcionRepository';
-import { GradoTKD, GrupoEdad, type Estudiante } from '../../tipos';
 
 // ---------------------------------------------------------------------------
 // Fase 4 (rewrite completo, ver "CIERRE SDD CLAUDE CODE - CENTRO ESTUDIOS.md"
@@ -57,6 +55,18 @@ jest.mock('../../servicios/academico/asignacionService', () => ({
 
 import { listarRecursosAprobados } from '../../servicios/academico/bibliotecaService';
 import { listarAsignacionesPorTenant } from '../../servicios/academico/asignacionService';
+
+// Default inmune a jest.clearAllMocks() (solo limpia llamadas, no la implementación de
+// fábrica): reproduce el mismo comportamiento que sin mock -- contexto vacío, cae al
+// fallback interno `opcionesJornadaFallback` (sede-principal). Los tests que necesitan un
+// catálogo de sedes realista (con un id que NO es el slug del nombre, como pasa en
+// producción con IDs auto-generados de Firestore) usan mockResolvedValueOnce puntual.
+jest.mock('../../servicios/academico/jornadaContextService', () => ({
+  obtenerContextoJornada: jest.fn(() => Promise.resolve({
+    programas: [], grupos: [], sedes: [], espacios: [], instructores: [],
+  })),
+}));
+import { obtenerContextoJornada } from '../../servicios/academico/jornadaContextService';
 
 jest.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
@@ -558,6 +568,96 @@ describe('Programa academico: crear, validar y editar', () => {
     }));
   });
 
+  it('regresión: las jornadas generadas usan el ID REAL de la sede, no un slug de su nombre (bug: Tutor/Estudiante nunca veían su Agenda)', async () => {
+    // Catálogo de sedes realista: el id es un push-id de Firestore, NO el slug del nombre
+    // ("sede-real-xyz789" !== slugificar("Sede Norte") === "sede-norte"). Antes del fix,
+    // jornada.sedeId quedaba en "sede-norte" -- un valor que jamás coincide con
+    // estudiante.sedeId (que SIEMPRE es el id real del documento `sedes/{id}`).
+    (obtenerContextoJornada as jest.Mock).mockResolvedValueOnce({
+      programas: [],
+      grupos: [],
+      sedes: [{ id: 'sede-real-xyz789', nombre: 'Sede Norte' }],
+      espacios: [],
+      instructores: [],
+    });
+
+    const user = userEvent.setup();
+    const { repositoryJornada } = renderVista();
+
+    // Espera a que el catálogo real de sedes (mockResolvedValueOnce de arriba) termine de
+    // cargar antes de abrir el modal, para que el programa nuevo arranque con "Sede Norte"
+    // preseleccionada en vez del fallback inicial "Sede principal".
+    await user.click(screen.getByRole('button', { name: /crear programa/i }));
+    await waitFor(() => {
+      expect(within(screen.getByRole('dialog', { name: /crear programa/i })).getByLabelText(/^sede$/i)).toHaveValue('Sede Norte');
+    });
+
+    await completarFormularioMinimo(user);
+    await user.click(screen.getByRole('button', { name: /^aceptar$/i }));
+    const dialogConfirmar = screen.getByText('Confirmar programa').closest('[role="dialog"]') as HTMLElement;
+    await user.click(within(dialogConfirmar).getByRole('button', { name: /^confirmar$/i }));
+
+    await waitFor(() => expect(repositoryJornada.guardarJornadasEnLote).toHaveBeenCalledTimes(1));
+    const jornadasGeneradas = (repositoryJornada.guardarJornadasEnLote as jest.Mock).mock.calls[0][0];
+    expect(jornadasGeneradas.length).toBeGreaterThan(0);
+    for (const jornada of jornadasGeneradas) {
+      expect(jornada.sedeId).toBe('sede-real-xyz789');
+      expect(jornada.sedeId).not.toBe('sede-norte');
+    }
+  });
+
+  // Fix 2026-07-16 (bug real reportado por el usuario: "necesito validar que las reglas de
+  // generacion y asignacion de clases en Agenda eviten conflictos de asignacion doble al
+  // mismo maestro, sede u horario"). Antes de este fix, crear un programa nuevo generaba TODA
+  // su agenda semanal recurrente sin revisar si el maestro ya tenia otra clase asignada en
+  // ese horario -- el unico chequeo de conflicto real (existeConflictoHorario, subtarea 12.3)
+  // solo corria al editar UNA jornada a mano desde ModalEdicionJornada.
+  it('bloquea el guardado si el maestro ya tiene otra clase asignada en el mismo horario (conflicto de agenda)', async () => {
+    const user = userEvent.setup();
+    const jornadaExistenteDelMaestro = {
+      id: 'jornada-choque',
+      tenantId: 'tenant-real',
+      programaId: 'otro-programa-ya-existente',
+      ejecucionProgramaId: 'ejecucion-otro-programa-ya-existente',
+      grupoId: 'precadetes',
+      sedeId: 'sede-distinta',
+      espacioId: 'tatami-2',
+      // Mismo maestro que se auto-asigna al crear (rol Editor -- ver "Fix 1" en el mock de
+      // useAuth: siempre se autoasigna quien crea, no puede elegir otro instructor).
+      instructorId: 'maestro-real',
+      // Lunes dentro del rango por defecto de "Crear programa" (fechaApertura 2026-06-27 /
+      // fechaCierre vacio -> cae a programaInicial.fechaFin 2026-09-30). completarFormularioMinimo
+      // selecciona dia=Lun con horaInicio/horaFin por defecto 08:00-09:00 (mismo horario exacto).
+      fecha: '2026-07-06',
+      horaInicio: '08:00',
+      horaFin: '09:00',
+      estado: 'confirmada' as const,
+      objetivosPlaneados: [],
+      objetivosImpartidos: [],
+      asistenciaRegistrada: false,
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+    };
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([jornadaExistenteDelMaestro]),
+      eliminarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
+    });
+    const repositoryPrograma = crearRepoProgramaFake();
+
+    renderVista({ repositoryJornada, repositoryPrograma });
+
+    await user.click(screen.getByRole('button', { name: /crear programa/i }));
+    await completarFormularioMinimo(user);
+    await user.click(screen.getByRole('button', { name: /^aceptar$/i }));
+    const dialogConfirmar = screen.getByText('Confirmar programa').closest('[role="dialog"]') as HTMLElement;
+    await user.click(within(dialogConfirmar).getByRole('button', { name: /^confirmar$/i }));
+
+    expect(await screen.findByText(/el maestro ya tiene otra clase asignada/i)).toBeInTheDocument();
+    expect(repositoryJornada.guardarJornadasEnLote).not.toHaveBeenCalled();
+    expect(repositoryPrograma.guardarPrograma).not.toHaveBeenCalled();
+    expect(repositoryJornada.eliminarJornadasEnLote).not.toHaveBeenCalled();
+  });
+
   it('al editar un programa existente, se reutiliza su ID de programa, se reutiliza su ID de ejecucion, y se eliminan las jornadas no cerradas anteriores', async () => {
     const user = userEvent.setup();
     const programaReal = {
@@ -877,6 +977,69 @@ describe('Fix 4: refresco de "Mis clases" tras guardar el programa', () => {
   });
 });
 
+// Bug reportado por el usuario en verificacion manual (2026-07-11): tras publicar
+// material desde el asistente, "Mis clases" (embebido, ver linea ~1847) no se
+// refrescaba -- el usuario tenia que navegar afuera y volver para verlo. Causa:
+// `setRefrescoMisClases` (mismo mecanismo de "Fix 4" ya probado arriba para
+// guardar/eliminar el programa) nunca se llamaba tras publicar/editar/eliminar
+// una asignacion. `listarAsignacionesPorTenant` es la senal indirecta mas simple
+// de verificar: AsignacionesView la llama UNA vez al montar (hidratacion, linea
+// ~759, deps solo [tenantId]) y `<MisClasesView>` embebido la llama otra vez al
+// montar (su propio cargar(), deps incluyen refreshTrigger) -- total 2 llamadas
+// antes de publicar. Si el fix funciona, publicar debe disparar UNA llamada mas
+// (la de MisClasesView reaccionando al refreshTrigger incrementado), sin
+// necesidad de navegar afuera y volver.
+describe('Fix 5: refresco de "Mis clases" tras publicar/editar/eliminar material', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('tras publicar material tras el asistente, "Mis clases" se refresca sin navegar afuera y volver', async () => {
+    const user = userEvent.setup();
+    renderVista();
+
+    await waitFor(() => expect(listarAsignacionesPorTenant).toHaveBeenCalledTimes(2));
+
+    await crearAsignacion(user, /material a fundamentos/i);
+
+    await waitFor(() => expect(listarAsignacionesPorTenant).toHaveBeenCalledTimes(3));
+  });
+
+  it('tras eliminar una asignacion ya publicada, "Mis clases" se refresca', async () => {
+    const asignacionHidratada: AsignacionAcademica = {
+      id: 'asignacion-fix5-1',
+      tenantId: 'tenant-real',
+      recursoId: materialA.id,
+      jornadaId: JORNADA_SINTETICA_ID,
+      titulo: materialA.nombre,
+      destinatario: { tipo: 'grupo', grupo: 'Infantil', grados: ['Blanco'] },
+      uso: 'estudio',
+      momento: 'preparacion',
+      obligatoria: true,
+      fechaApertura: '2026-07-01T00:00:00.000Z',
+      fechaCierre: '2026-09-30T23:59:59.000Z',
+      estado: 'publicada',
+      creadoPorUid: 'maestro-real',
+      creadoEn: '2026-07-01T00:00:00.000Z',
+      actualizadoEn: '2026-07-01T00:00:00.000Z',
+    };
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([asignacionHidratada]);
+    const user = userEvent.setup();
+    const { eliminarAsignacionFn } = renderVista();
+
+    await screen.findByText(materialA.nombre);
+    await waitFor(() => expect(listarAsignacionesPorTenant).toHaveBeenCalledTimes(2));
+
+    await user.click(screen.getByRole('button', { name: new RegExp(`eliminar ${materialA.nombre}`, 'i') }));
+    await user.click(await screen.findByRole('button', { name: /^eliminar$/i }));
+
+    await waitFor(() => expect(eliminarAsignacionFn).toHaveBeenCalled());
+    await waitFor(() => expect(listarAsignacionesPorTenant).toHaveBeenCalledTimes(3));
+  });
+});
+
 describe('Fix 1: Eliminar programa academico', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -974,75 +1137,172 @@ describe('Fix 1: Eliminar programa academico', () => {
     ));
     await waitFor(() => expect(screen.queryByRole('option', { name: /programa a borrar/i })).not.toBeInTheDocument());
   });
+
+  // Fix 2026-07-16 (bug real reportado: jornadas huerfanas mostrando "programa-xxxx" crudo
+  // en Agenda para programas que ya no existen en la bandeja). El match SOLO por
+  // `ejecucionProgramaId === \`ejecucion-${programaId}\`` es fragil: si por cualquier motivo
+  // una jornada quedo con un ejecucionProgramaId que no sigue esa convencion exacta (datos de
+  // pruebas, ediciones repetidas de sesiones anteriores), el borrado del programa la dejaba
+  // huerfana en vez de limpiarla. `jornada.programaId` es el campo directo y confiable.
+  it('limpia una jornada huerfana cuyo ejecucionProgramaId NO sigue la convencion determinista, con tal de que su programaId calce', async () => {
+    const user = userEvent.setup();
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa a borrar',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['x'],
+    };
+    const jornadaConEjecucionIrregular = {
+      id: 'jornada-huerfana',
+      tenantId: 'tenant-real',
+      programaId: 'programa-real-1',
+      // Ejecucion con un ID que NO sigue `ejecucion-${programaId}` -- simula datos reales
+      // creados fuera de la convencion determinista actual.
+      ejecucionProgramaId: 'ejecucion-1783467019144-irregular',
+      grupoId: 'infantil',
+      sedeId: 'sede-principal',
+      espacioId: 'tatami-1',
+      instructorId: 'maestro-1',
+      fecha: '2026-07-13',
+      horaInicio: '08:00',
+      horaFin: '09:00',
+      estado: 'confirmada' as const,
+      objetivosPlaneados: ['obj-1'],
+      objetivosImpartidos: [],
+      asistenciaRegistrada: false,
+      creadoEn: '2026-07-01T00:00:00.000Z',
+      actualizadoEn: '2026-07-01T00:00:00.000Z',
+    };
+
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([jornadaConEjecucionIrregular]),
+      eliminarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
+    });
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+      eliminarPrograma: jest.fn().mockResolvedValue(undefined),
+    });
+
+    renderVista({ repositoryJornada, repositoryPrograma });
+
+    const select = await screen.findByRole('combobox', { name: /programa/i });
+    await user.selectOptions(select, 'programa-real-1');
+
+    await user.click(screen.getByRole('button', { name: /eliminar programa/i }));
+    await user.click(screen.getByRole('button', { name: /^eliminar$/i }));
+
+    await waitFor(() => expect(repositoryJornada.eliminarJornadasEnLote).toHaveBeenCalledWith(
+      'tenant-real',
+      ['jornada-huerfana'],
+    ));
+  });
 });
 
-describe('Matricular estudiantes (Fase 0: roster explicito de matricula)', () => {
+// Rediseño 2026-07-13 (pedido explicito del usuario): el boton+modal "Asistencia a
+// Clase en Vivo" se elimino por completo -- la unica razon real para que un estudiante
+// no pueda estar en Clase en Vivo es pago vencido, ya cubierto automaticamente por
+// perteneceAutomaticamente()/registrarAsistenciaJornada. Sin excepciones manuales.
+describe('Rediseño: se elimino Asistencia a Clase en Vivo', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
     (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
   });
 
-  const estudianteDemo: Estudiante = {
-    id: 'estudiante-1',
+  it('ya no existe el boton "Asistencia a Clase en Vivo"', async () => {
+    renderVista();
+    await screen.findByText('3. Programa');
+    expect(screen.queryByRole('button', { name: /asistencia a clase en vivo/i })).not.toBeInTheDocument();
+  });
+});
+
+// Rediseño 2026-07-11 (Parte B): el icono editar de la tarjeta de Mis Clases
+// (MisClasesView, embebida aca) tiene que abrir el asistente de material correcto:
+// modo 'editar' preservando configuracion si la jornada ya tiene material, modo 'crear'
+// apuntando a ESA jornada especifica si todavia no tiene.
+describe('Rediseño: icono editar de Mis Clases abre el asistente de material correcto', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+  });
+
+  const jornadaReal = {
+    id: 'jornada-real-1',
     tenantId: 'tenant-real',
-    nombres: 'Ana',
-    apellidos: 'Gomez',
-    numeroIdentificacion: '123',
-    fechaNacimiento: '2015-01-01',
-    grado: GradoTKD.Blanco,
-    grupo: GrupoEdad.Infantil,
-    horasAcumuladasGrado: 0,
+    programaId: PROGRAMA_ID_DEMO,
+    ejecucionProgramaId: 'ejecucion-real-1',
+    grupoId: 'grupo-infantil',
     sedeId: 'sede-principal',
-    telefono: '',
-    correo: '',
-    fechaIngreso: '2026-01-01',
-    estadoPago: 'Al día' as any,
-    saldoDeudor: 0,
-    historialPagos: [],
-    consentimientoInformado: true,
-    contratoServiciosFirmado: true,
-    consentimientoImagenFirmado: true,
-    consentimientoFotosVideos: true,
-    carnetGenerado: true,
+    espacioId: 'tatami-1',
+    instructorId: 'maestro-real',
+    fecha: '2026-07-08',
+    horaInicio: '08:00',
+    horaFin: '09:00',
+    estado: 'confirmada' as const,
+    objetivosPlaneados: [],
+    objetivosImpartidos: [],
+    asistenciaRegistrada: false,
+    creadoEn: '2026-07-01T00:00:00.000Z',
+    actualizadoEn: '2026-07-01T00:00:00.000Z',
   };
 
-  const crearRepoInscripcionFake = (overrides: Partial<InscripcionRepository> = {}): InscripcionRepository => ({
-    matricular: jest.fn().mockResolvedValue(undefined),
-    retirar: jest.fn().mockResolvedValue(undefined),
-    listarPorEjecucion: jest.fn().mockResolvedValue([]),
-    estaInscritoEnEjecucion: jest.fn().mockResolvedValue(false),
-    ...overrides,
+  it('con material ya asignado: abre el wizard en modo editar, preservando la configuracion existente', async () => {
+    const asignacionExistente = {
+      id: 'asignacion-real-1',
+      tenantId: 'tenant-real',
+      recursoId: materialA.id,
+      jornadaId: 'jornada-real-1',
+      titulo: materialA.nombre,
+      destinatario: { tipo: 'grupo' as const, grupo: 'Infantil', grados: ['Blanco'] },
+      uso: 'estudio' as const,
+      momento: 'preparacion' as const,
+      obligatoria: true,
+      fechaApertura: '2026-07-01T00:00:00.000Z',
+      estado: 'publicada' as const,
+      creadoPorUid: 'maestro-real',
+      creadoEn: '2026-07-01T00:00:00.000Z',
+      actualizadoEn: '2026-07-01T00:00:00.000Z',
+    };
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([asignacionExistente]);
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([jornadaReal]),
+    });
+    const user = userEvent.setup();
+    renderVista({ repositoryJornada });
+
+    await user.click(await screen.findByRole('button', { name: /editar material de la clase/i }));
+
+    expect(await screen.findByText(/editar asignaci[oó]n/i)).toBeInTheDocument();
   });
 
-  it('el boton "Matricular estudiantes" abre el modal con la ejecucion derivada del programa seleccionado', async () => {
+  it('sin material asignado: abre el wizard en modo crear, apuntando a esa jornada especifica', async () => {
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+    const repositoryJornada = crearRepoJornadaFake({
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([jornadaReal]),
+    });
     const user = userEvent.setup();
-    const repositoryInscripcion = crearRepoInscripcionFake();
-    renderVista({ estudiantes: [estudianteDemo], repositoryInscripcion });
+    const { publicarAsignacionFn } = renderVista({ repositoryJornada });
 
-    expect(screen.queryByRole('dialog', { name: /matricular estudiantes/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /editar material de la clase/i }));
 
-    await user.click(screen.getByRole('button', { name: /matricular estudiantes/i }));
+    expect(await screen.findByText(/^asignar material$/i)).toBeInTheDocument();
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(PROGRAMA_ID_DEMO, { exact: false })).toBeInTheDocument();
-    await waitFor(() => expect(repositoryInscripcion.listarPorEjecucion).toHaveBeenCalledWith(
-      'tenant-real',
-      `ejecucion-${PROGRAMA_ID_DEMO}`,
+    // Confirma el flujo completo y verifica que apunta a jornada-real-1 (no a la
+    // sintetica/demo), confirmando que jornadaActivaIndex se sincronizo correctamente.
+    await user.click(await screen.findByRole('button', { name: /material a fundamentos/i }));
+    await user.click(screen.getByRole('button', { name: /continuar/i }));
+    await user.click(screen.getByRole('button', { name: /continuar/i }));
+    await user.click(screen.getByRole('button', { name: /^Blanco$/ }));
+    await user.click(screen.getByRole('button', { name: /^asignar$/i }));
+
+    await waitFor(() => expect(publicarAsignacionFn).toHaveBeenCalledWith(
+      expect.objectContaining({ jornadaId: 'jornada-real-1' }),
     ));
-    expect(screen.getByRole('checkbox', { name: /ana gomez/i })).toBeInTheDocument();
-  });
-
-  it('cerrar el modal de matricula no persiste inscripciones', async () => {
-    const user = userEvent.setup();
-    const repositoryInscripcion = crearRepoInscripcionFake();
-    renderVista({ estudiantes: [estudianteDemo], repositoryInscripcion });
-
-    await user.click(screen.getByRole('button', { name: /matricular estudiantes/i }));
-    await screen.findByRole('dialog');
-    await user.click(screen.getByRole('button', { name: /cancelar/i }));
-
-    expect(repositoryInscripcion.matricular).not.toHaveBeenCalled();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

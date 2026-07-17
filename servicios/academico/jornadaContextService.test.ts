@@ -1,4 +1,4 @@
-import { RolUsuario, TipoCobroPrograma, GrupoEdad } from '../../tipos';
+import { RolUsuario } from '../../tipos';
 import type { EspacioFisico } from '../../models/academico/espacio';
 import { obtenerContextoJornada } from './jornadaContextService';
 
@@ -35,39 +35,42 @@ function depsBase() {
 describe('jornadaContextService', () => {
   it('construye opciones reales por tenant desde programas, sedes e instructores activos', async () => {
     const contexto = await obtenerContextoJornada('tenant-1', {
+      // Fix 2026-07-16: obtenerProgramas ahora lee ProgramaAcademico (tenants/{tenantId}/
+      // programasAcademicos), no el `Programa` legacy de la raiz -- el campo real de
+      // estado es `estado: 'publicado'`, no `.activo` (que nunca existio en este tipo).
       obtenerProgramas: jest.fn().mockResolvedValue([
         {
           id: 'programa-1',
           tenantId: 'tenant-1',
           nombre: 'Programa base',
           descripcion: 'Base',
-          tipoCobro: TipoCobroPrograma.Recurrente,
-          valor: 0,
-          horario: 'Lunes',
-          activo: true,
-          bloquesHorarios: [
-            {
-              id: 'bloque-1',
-              dia: 'Lunes',
-              horaInicio: '08:00',
-              horaFin: '09:00',
-              sedeId: 'sede-real',
-              instructorId: 'instructor-real',
-              grupo: GrupoEdad.Precadetes,
-              programaId: 'programa-1',
-              nombrePrograma: 'Programa base',
-            },
-          ],
+          version: 1,
+          estado: 'publicado',
+          unidades: [],
+          creadoEn: '2026-07-01T00:00:00.000Z',
+          actualizadoEn: '2026-07-01T00:00:00.000Z',
+        },
+        {
+          id: 'programa-borrador',
+          tenantId: 'tenant-1',
+          nombre: 'Todavia no publicado',
+          descripcion: 'No deberia aparecer',
+          version: 1,
+          estado: 'borrador',
+          unidades: [],
+          creadoEn: '2026-07-01T00:00:00.000Z',
+          actualizadoEn: '2026-07-01T00:00:00.000Z',
         },
         {
           id: 'programa-otro-tenant',
           tenantId: 'tenant-2',
           nombre: 'Otro tenant',
           descripcion: 'No visible',
-          tipoCobro: TipoCobroPrograma.Recurrente,
-          valor: 0,
-          horario: 'Martes',
-          activo: true,
+          version: 1,
+          estado: 'publicado',
+          unidades: [],
+          creadoEn: '2026-07-01T00:00:00.000Z',
+          actualizadoEn: '2026-07-01T00:00:00.000Z',
         },
       ]),
       obtenerSedes: jest.fn().mockResolvedValue([
@@ -135,8 +138,18 @@ describe('jornadaContextService', () => {
       ]),
     });
 
+    // Solo el programa publicado del tenant correcto aparece -- "programa-borrador"
+    // (estado: 'borrador') y "programa-otro-tenant" (tenant-2) quedan afuera.
     expect(contexto.programas).toEqual([{ id: 'programa-1', nombre: 'Programa base' }]);
-    expect(contexto.grupos).toEqual([{ id: 'grupo-precadetes', nombre: 'Grupo Precadetes' }]);
+    // Los grupos son el catalogo FIJO de GrupoEdad, no algo derivado de los programas
+    // mockeados arriba (ver comentario en jornadaContextService.ts).
+    expect(contexto.grupos).toEqual([
+      { id: 'infantil', nombre: 'Infantil' },
+      { id: 'precadetes', nombre: 'Precadetes' },
+      { id: 'cadetes', nombre: 'Cadetes' },
+      { id: 'adultos', nombre: 'Adultos' },
+      { id: 'no-asignado', nombre: 'No Asignado' },
+    ]);
     expect(contexto.sedes).toEqual([
       { id: 'principal', nombre: 'Cocodrilos principal' },
       { id: 'sede-real', nombre: 'Cocodrilos' },
@@ -223,6 +236,70 @@ describe('jornadaContextService', () => {
       );
 
       expect(contexto.instructores).toEqual([]);
+    });
+
+    // 12.12 (seccion 22 del documento de mejora, caso "No se puede asignar maestro
+    // inactivo"): este dominio no tiene un campo `activo` en Usuario, el equivalente real es
+    // el soft delete (`deletedAt`, ya filtrado por la implementacion en la linea
+    // `!usuario.deletedAt && rolesInstructorEfectivos.has(...)`) -- nadie probaba esta rama
+    // todavia, solo el filtro por rol.
+    it('excluye instructores con soft delete (deletedAt) del selector, aunque tengan un rol valido', async () => {
+      const contexto = await obtenerContextoJornada('tenant-1', depsConUsuarios([
+        usuarioConRol('maestro-1', 'Maestro Activo', RolUsuario.Maestro),
+        { ...usuarioConRol('maestro-2', 'Maestro Eliminado', RolUsuario.Maestro), deletedAt: '2026-06-01T00:00:00.000Z' },
+      ]));
+
+      expect(contexto.instructores.map((opcion) => opcion.id)).toEqual(['maestro-1']);
+    });
+  });
+
+  // Fix 2026-07-16 (bug real: la Agenda mostraba "programa-1783222231030-ek..." en vez
+  // del nombre del programa, en toda la app -- ver comentario extenso en
+  // jornadaContextService.ts). Antes esta funcion leia de la coleccion RAIZ legacy
+  // `programas` y filtraba por `.activo` (un campo inexistente en ProgramaAcademico),
+  // asi que `programasTenant` daba SIEMPRE vacio.
+  describe('programas (fix 2026-07-16 -- nombre de programa en vez de ID crudo)', () => {
+    it('pasa el tenantId a obtenerProgramas (lee tenants/{tenantId}/programasAcademicos, no la coleccion raiz legacy)', async () => {
+      const obtenerProgramas = jest.fn().mockResolvedValue([]);
+
+      await obtenerContextoJornada('tenant-42', { ...depsBase(), obtenerProgramas });
+
+      expect(obtenerProgramas).toHaveBeenCalledWith('tenant-42');
+    });
+
+    it('excluye programas en borrador (solo un programa publicado puede tener jornadas reales)', async () => {
+      const contexto = await obtenerContextoJornada('tenant-1', {
+        ...depsBase(),
+        obtenerProgramas: jest.fn().mockResolvedValue([
+          { id: 'p-borrador', tenantId: 'tenant-1', nombre: 'Sin publicar', descripcion: '', version: 1, estado: 'borrador', unidades: [], creadoEn: '', actualizadoEn: '' },
+        ]),
+      });
+
+      expect(contexto.programas).toEqual([]);
+    });
+
+    it('excluye programas archivados', async () => {
+      const contexto = await obtenerContextoJornada('tenant-1', {
+        ...depsBase(),
+        obtenerProgramas: jest.fn().mockResolvedValue([
+          { id: 'p-archivado', tenantId: 'tenant-1', nombre: 'Archivado', descripcion: '', version: 1, estado: 'archivado', unidades: [], creadoEn: '', actualizadoEn: '' },
+        ]),
+      });
+
+      expect(contexto.programas).toEqual([]);
+    });
+
+    it('grupos es siempre el catalogo fijo de GrupoEdad, sin importar que devuelva obtenerProgramas', async () => {
+      const sinProgramas = await obtenerContextoJornada('tenant-1', depsBase());
+      const conProgramas = await obtenerContextoJornada('tenant-1', {
+        ...depsBase(),
+        obtenerProgramas: jest.fn().mockResolvedValue([
+          { id: 'p-1', tenantId: 'tenant-1', nombre: 'Uno', descripcion: '', version: 1, estado: 'publicado', unidades: [], creadoEn: '', actualizadoEn: '' },
+        ]),
+      });
+
+      expect(sinProgramas.grupos).toEqual(conProgramas.grupos);
+      expect(sinProgramas.grupos.map((g) => g.id)).toEqual(['infantil', 'precadetes', 'cadetes', 'adultos', 'no-asignado']);
     });
   });
 

@@ -9,6 +9,7 @@ import {
   jornadaRepository,
   MENSAJE_ADVERTENCIA_AUDITORIA,
   esJornadaOperada,
+  detectarConflictosEnLote,
   type JornadaRepository,
 } from '../../servicios/academico/jornadaRepository';
 import { programaRepository, type ProgramaRepository } from '../../servicios/academico/programaRepository';
@@ -20,7 +21,6 @@ import {
   generarJornadasDeEjecucion,
 } from '../../servicios/academico/programaService';
 import type { BloqueRecurrente, JornadaInstruccion } from '../../models/academico/jornada';
-import type { EjecucionPrograma } from '../../models/academico/programa';
 import {
   publicarAsignacion,
   publicarAsignacionesBatch,
@@ -30,13 +30,12 @@ import {
   listarAsignacionesPorTenant,
   type PublicarAsignacionResponse,
 } from '../../servicios/academico/asignacionService';
-import { GradoTKD, RolUsuario, type Estudiante } from '../../tipos';
+import { GradoTKD, RolUsuario } from '../../tipos';
 import AsignarMaterialWizard, {
   type AsignacionDraft,
   familiaDeGrado,
   PALETA_FAMILIAS_GRADO,
 } from '../../components/academico/AsignarMaterialWizard';
-import MatricularEstudiantesModal from '../../components/academico/MatricularEstudiantesModal';
 import type {
   AsignacionSalteada,
 } from '../../models/academico/asignacionService.types';
@@ -45,14 +44,12 @@ import {
   IconoContrato,
   IconoEditar,
   IconoEliminar,
-  IconoEstudiantes,
   IconoFirma,
   IconoFlechaDerecha,
   IconoFlechaIzquierda,
   IconoImagen,
 } from '../../components/Iconos';
 import ModalConfirmacion from '../../components/ModalConfirmacion';
-import { inscripcionRepository, type InscripcionRepository } from '../../servicios/academico/inscripcionRepository';
 
 const recursosAprobados: RecursoAcademico[] = [
   {
@@ -303,6 +300,17 @@ const DIA_SEMANA_A_INDICE: Record<string, number> = {
 const INDICE_A_DIA_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const slugificar = (valor: string) => valor.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+// Fix 2026-07-16 (bug reportado: Tutor/Estudiante nunca ven ninguna clase en su Agenda):
+// jornada.sedeId se guardaba como slugificar(nombreDeSede) -- un slug del NOMBRE ("sede-principal")
+// -- mientras que Estudiante.sedeId (FormularioEstudiante.tsx) es el ID real del documento
+// `sedes/{id}` de Firestore. Nunca podian coincidir en `j.sedeId === hijo.sedeId`
+// (AgendaView.tsx), asi que la Agenda del consultor quedaba SIEMPRE vacia. Se resuelve el
+// ID real buscando la sede por nombre en el catalogo ya cargado (sedesActivas); si por algun
+// motivo no se encuentra (dato inconsistente), cae al slug como ultimo recurso defensivo.
+function resolverSedeIdPorNombre(nombreSede: string, sedesActivas: OpcionJornada[]): string {
+  return sedesActivas.find((sede) => sede.nombre === nombreSede)?.id ?? slugificar(nombreSede);
+}
+
 function contarJornadasARealizar(fechaInicio?: string, fechaFin?: string, diasHorario?: { dia: string }[]): number {
   if (!fechaInicio || !fechaFin || !diasHorario?.length) return 0;
   
@@ -335,13 +343,14 @@ function contarJornadasARealizar(fechaInicio?: string, fechaFin?: string, diasHo
 
 function crearBloquesDesdePrograma(
   programa: ProgramaAcademicoAsignacion,
-  tenantId: string
+  tenantId: string,
+  sedeId: string
 ): BloqueRecurrente[] {
   return (programa.diasHorario ?? []).map((bloque) => ({
     id: `bloque-${slugificar(programa.id)}-${slugificar(bloque.dia)}`,
     tenantId,
     grupoId: slugificar(programa.grupoObjetivo),
-    sedeId: slugificar(programa.sede),
+    sedeId,
     espacioId: 'tatami-1',
     // Fix 1: UID real, no un slug del nombre (ver comentario en
     // ProgramaAcademicoAsignacion.instructorId).
@@ -442,8 +451,6 @@ interface AsignacionesViewProps {
   eliminarAsignacionFn?: typeof eliminarAsignacion;
   repositoryJornada?: JornadaRepository;
   repositoryPrograma?: ProgramaRepository;
-  repositoryInscripcion?: InscripcionRepository;
-  estudiantes?: Estudiante[];
 }
 
 const AsignacionesView: React.FC<AsignacionesViewProps> = ({
@@ -459,8 +466,6 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
   eliminarAsignacionFn = eliminarAsignacion,
   repositoryJornada = jornadaRepository,
   repositoryPrograma = programaRepository,
-  repositoryInscripcion = inscripcionRepository,
-  estudiantes = [],
 }) => {
   const { usuario } = useAuth();
   const tenantId = usuario?.tenantId ?? 'tenant-local';
@@ -802,27 +807,6 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     && (programaEditando.diasHorario ?? []).every((bloque) => bloque.horaInicio && bloque.horaFin)
   );
   const programaExisteEnBandeja = Boolean(programaSeleccionado?.id && programas.some((programa) => programa.id === programaSeleccionado.id));
-  // Fase 0 (roster explicito): matricula opera sobre la EjecucionPrograma
-  // derivada del programa seleccionado con el MISMO id determinista que ya
-  // usa guardarPrograma() (`ejecucion-${programa.id}`, ver linea ~1024).
-  // No requiere un fetch adicional: el id se deriva, la subcoleccion de
-  // inscripciones es independiente de que el documento padre ya se haya
-  // persistido con horario real.
-  const [matriculaAbierta, setMatriculaAbierta] = React.useState(false);
-  const ejecucionParaMatricula: EjecucionPrograma | null = programaSeleccionado ? {
-    id: `ejecucion-${programaSeleccionado.id}`,
-    tenantId,
-    programaId: programaSeleccionado.id,
-    grupoId: slugificar(programaSeleccionado.grupoObjetivo || 'Infantil'),
-    sedeId: slugificar(programaSeleccionado.sede || 'Sede principal'),
-    estado: 'activo',
-    fechaInicio: programaSeleccionado.fechaInicio,
-    unidadActualId: null,
-    objetivoActualId: null,
-    objetivosCompletados: [],
-    creadoEn: new Date().toISOString(),
-    actualizadoEn: new Date().toISOString(),
-  } : null;
 
   React.useEffect(() => {
     setOpcionesPrograma((actuales) => ({
@@ -1038,6 +1022,10 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
       });
       setAsignacionEditandoId('');
       setPasoPublicacion(4);
+      // Fix 5: mismo mecanismo que Fix 4 (guardar/eliminar programa) -- sin esto
+      // "Mis clases" no reflejaba el material recien publicado hasta navegar
+      // afuera y volver.
+      setRefrescoMisClases((actual) => actual + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo publicar la asignacion.');
     } finally {
@@ -1129,21 +1117,53 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
 
           const programaReal = publishPrograma(createPrograma(programaRealInput));
           const ejecucionId = `ejecucion-${programaReal.id}`;
-          const bloques = crearBloquesDesdePrograma(programaNormalizado, tenantId);
+          const sedeIdReal = resolverSedeIdPorNombre(programaNormalizado.sede, sedesActivas);
+          const bloques = crearBloquesDesdePrograma(programaNormalizado, tenantId, sedeIdReal);
           const ejecucion = assignProgramaToGrupo(programaReal, {
             id: ejecucionId,
             grupoId: slugificar(programaNormalizado.grupoObjetivo),
-            sedeId: slugificar(programaNormalizado.sede),
+            sedeId: sedeIdReal,
             fechaInicio: programaNormalizado.fechaInicio,
             bloques,
             fechaFin: programaNormalizado.fechaFin,
           });
 
-          // Obtener jornadas existentes para limpiar duplicados antes de guardar el nuevo horario
+          // Obtener jornadas existentes para limpiar duplicados Y para chequear conflictos
+          // antes de guardar el nuevo horario.
+          // Fix 2026-07-16 (mismo bug real de jornadas huerfanas que en eliminarProgramaSeleccionado
+          // -- ver comentario extenso ahi): matchear tambien por `j.programaId`, no solo por
+          // `ejecucionProgramaId`, para no dejar huerfanas jornadas de una ejecucion anterior que
+          // no haya seguido la convencion determinista de ID.
           const todasJornadas = await repositoryJornada.listarJornadasPorTenant(tenantId);
           const jornadasViejasNoCerradas = todasJornadas
-            .filter((j) => j.ejecucionProgramaId === ejecucionId && j.estado !== 'cerrada');
-          
+            .filter((j) => (j.programaId === programaReal.id || j.ejecucionProgramaId === ejecucionId) && j.estado !== 'cerrada');
+
+          const jornadasGeneradas = generarJornadasDeEjecucion(programaReal, ejecucion);
+
+          // Fix 2026-07-16 (bug real reportado: dar de alta un programa generaba TODA su
+          // agenda semanal recurrente sin revisar si el maestro o la sede ya estaban ocupados
+          // en ese horario por OTRO programa -- el unico chequeo de conflicto que existia
+          // [existeConflictoHorario, subtarea 12.3] solo corria al editar UNA jornada a mano
+          // desde ModalEdicionJornada, nunca en esta alta masiva). Se compara contra las
+          // jornadas activas del tenant EXCLUYENDO las que este mismo guardado va a
+          // reemplazar (las jornadas viejas de ESTE programa no deben chocar contra si
+          // mismas al reguardar). Si hay conflicto, se aborta ANTES de borrar nada o
+          // escribir el programa nuevo -- mismo criterio "bloquear, no solo avisar" que ya
+          // usa ModalEdicionJornada.
+          const idsAReemplazar = new Set(jornadasViejasNoCerradas.map((j) => j.id));
+          const jornadasParaChequeoConflicto = todasJornadas.filter((j) => !idsAReemplazar.has(j.id));
+          const conflictos = detectarConflictosEnLote(jornadasGeneradas, jornadasParaChequeoConflicto);
+          if (conflictos.length > 0) {
+            const primero = conflictos[0];
+            const motivoTexto = primero.motivo === 'instructor'
+              ? 'el maestro ya tiene otra clase asignada'
+              : 'la sede ya tiene otra clase asignada';
+            setError(
+              `No se puede guardar: ${motivoTexto} el ${primero.jornadaNueva.fecha} de ${primero.jornadaNueva.horaInicio} a ${primero.jornadaNueva.horaFin}. Ajustá el horario, sede o instructor del programa antes de guardar.`
+            );
+            return;
+          }
+
           if (jornadasViejasNoCerradas.length > 0) {
             await repositoryJornada.eliminarJornadasEnLote(
               tenantId,
@@ -1151,7 +1171,6 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
             );
           }
 
-          const jornadasGeneradas = generarJornadasDeEjecucion(programaReal, ejecucion);
           await repositoryPrograma.guardarPrograma(programaReal);
           await repositoryJornada.guardarEjecucion(ejecucion);
           await repositoryJornada.guardarJornadasEnLote(jornadasGeneradas);
@@ -1197,10 +1216,20 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     setError('');
     const programaId = programaSeleccionado.id;
     try {
+      // Fix 2026-07-16 (bug real: jornadas huerfanas -- "programa-xxxx" crudo en Agenda
+      // para programas que ya NO existen en la lista). Antes esto matcheaba SOLO por
+      // `jornada.ejecucionProgramaId === \`ejecucion-${programaId}\`` -- un match indirecto
+      // que depende de que la ejecucion siga esa convencion exacta de ID. `jornada.programaId`
+      // es un campo DIRECTO que `generarJornadasDeEjecucion` siempre setea al ID real del
+      // programa (programaService.ts), sin pasar por el nombre de la ejecucion -- matchear
+      // por ahi es mas confiable y no deja huerfanos si alguna ejecucion vieja no siguio la
+      // convencion determinista (datos de pruebas, ediciones repetidas, etc.).
       const ejecucionId = `ejecucion-${programaId}`;
       const todasJornadas = await repositoryJornada.listarJornadasPorTenant(tenantId);
       const jornadasEliminables = todasJornadas.filter(
-        (jornada) => jornada.ejecucionProgramaId === ejecucionId && !esJornadaOperada(jornada),
+        (jornada) =>
+          (jornada.programaId === programaId || jornada.ejecucionProgramaId === ejecucionId) &&
+          !esJornadaOperada(jornada),
       );
       if (jornadasEliminables.length > 0) {
         await repositoryJornada.eliminarJornadasEnLote(
@@ -1382,6 +1411,25 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     setDraftInicialWizard(null);
   };
 
+  // Rediseño 2026-07-11: el icono editar de la tarjeta de Mis Clases (MisClasesView)
+  // delega la jornada clickeada aca. Si esa jornada ya tiene material, se edita
+  // preservando su configuracion (mismo camino que el lapiz de "Materiales asignados").
+  // Si no tiene, se abre el wizard en modo crear -- pero antes hay que sincronizar
+  // `jornadaActivaIndex` (el wizard resuelve el jornadaId de destino via jornadaActiva/
+  // asegurarJornadaPrograma, no recibe la jornada por parametro).
+  const handleEditarMaterialDesdeClase = (jornada: JornadaInstruccion) => {
+    const existente = asignacionesPublicadas.find((item) => item.jornadaId === jornada.id);
+    if (existente) {
+      abrirWizardEditar(existente);
+      return;
+    }
+    const indice = jornadasProgramaActivas.findIndex((item) => item.id === jornada.id);
+    if (indice >= 0) {
+      setJornadaActivaIndex(indice);
+    }
+    abrirWizardCrear();
+  };
+
   // Confirmacion del asistente: crea (publicarAsignacionFn) o edita
   // (actualizarAsignacionFn, upsert con mismo id). Reutiliza publishAsignacion
   // para validar recurso aprobado y armar la asignacion, igual que publicar().
@@ -1448,6 +1496,9 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
       const sinDuplicado = actuales.filter((item) => item.id !== asignacionPublicada.id);
       return [asignacionPublicada, ...sinDuplicado];
     });
+    // Fix 5: mismo mecanismo que Fix 4 -- sin esto "Mis clases" no reflejaba el
+    // material recien publicado/editado hasta navegar afuera y volver.
+    setRefrescoMisClases((actual) => actual + 1);
     cerrarWizard();
   };
 
@@ -1457,6 +1508,8 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     try {
       await eliminarAsignacionFn({ tenantId, asignacionId: asignacionEliminando.id });
       setAsignacionesPublicadas((actuales) => actuales.filter((item) => item.id !== asignacionEliminando.id));
+      // Fix 5: idem -- "Mis clases" seguia mostrando el material ya eliminado.
+      setRefrescoMisClases((actual) => actual + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la asignacion.');
     } finally {
@@ -1581,7 +1634,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
 
         <article ref={bloqueJornadaRef} className="relative overflow-hidden rounded-[2rem] border border-gray-100 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900">
           <section className="p-5">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">4. Programa</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">3. Programa</p>
             <p className="mt-2 max-w-xs text-xs font-bold text-gray-400">
               Los tags del programa deben coincidir con los tags del material.
             </p>
@@ -1621,17 +1674,6 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
                   title="Editar programa"
                 >
                   <IconoEditar className="h-5 w-5" />
-                </button>
-              )}
-              {programaExisteEnBandeja && (
-                <button
-                  type="button"
-                  onClick={() => setMatriculaAbierta(true)}
-                  className="inline-flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-red-50 text-tkd-red transition hover:bg-red-100"
-                  aria-label="Matricular estudiantes"
-                  title="Matricular estudiantes"
-                >
-                  <IconoEstudiantes className="h-5 w-5" />
                 </button>
               )}
               {programaExisteEnBandeja && (
@@ -1850,8 +1892,10 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
               usuarioId={usuarioId}
               esAdmin={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin}
               rol={usuario?.rol}
+              permisoEdicionAgenda={usuario?.permisoEdicionAgenda}
               repository={repositoryJornada}
               refreshTrigger={refrescoMisClases}
+              onEditarMaterial={handleEditarMaterialDesdeClase}
             />
           </section>
         </article>
@@ -2134,15 +2178,6 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
           textoBotonConfirmar="Eliminar"
         />
 
-        <MatricularEstudiantesModal
-          abierto={matriculaAbierta}
-          ejecucion={ejecucionParaMatricula}
-          estudiantes={estudiantes}
-          tenantId={tenantId}
-          usuarioId={usuarioId}
-          onCerrar={() => setMatriculaAbierta(false)}
-          repository={repositoryInscripcion}
-        />
         </div>
 
         {error && (

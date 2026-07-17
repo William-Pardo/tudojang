@@ -1,11 +1,12 @@
-import { obtenerProgramas } from '../programasApi';
 import { obtenerSedes } from '../sedesApi';
 import { obtenerUsuarios } from '../usuariosApi';
 import { obtenerConfiguracionClub } from '../configuracionApi';
 import { getSedesVisibles } from '../../utils/dataIntegrity';
 import { espacioRepository } from './espacioRepository';
+import { programaRepository } from './programaRepository';
 import type { EspacioFisico } from '../../models/academico/espacio';
-import { GrupoEdad, RolUsuario, type ConfiguracionClub, type Programa, type Sede, type Usuario } from '../../tipos';
+import type { ProgramaAcademico } from '../../models/academico/programa';
+import { GrupoEdad, RolUsuario, type ConfiguracionClub, type Sede, type Usuario } from '../../tipos';
 
 export interface OpcionJornada {
   id: string;
@@ -21,7 +22,19 @@ export interface ContextoJornada {
 }
 
 interface JornadaContextDeps {
-  obtenerProgramas: () => Promise<Programa[]>;
+  // Fix 2026-07-16 (bug real: la Agenda mostraba el ID crudo del programa -- "programa-
+  // 1783222231030-ek..." -- en vez del nombre, en TODA la app). Esta funcion leia de
+  // `programasApi.obtenerProgramas()`, la coleccion RAIZ legacy `programas` (el catalogo
+  // de "Programas Extra" para licenciamiento -- un concepto DISTINTO, ver Configuracion.tsx),
+  // no de `tenants/{tenantId}/programasAcademicos`, donde realmente viven los programas
+  // que generan jornadas (createPrograma/publishPrograma/assignProgramaToGrupo, ver
+  // programaService.ts). Ademas el filtro comparaba contra `.activo`, un campo que ni
+  // siquiera existe en ProgramaAcademico (el campo real es `estado: 'borrador' |
+  // 'publicado' | 'archivado'`). Entre ambos bugs, `programasTenant` -- y por lo tanto
+  // `nombresPrograma` en cada consumidor (AgendaView, AsignacionesView, JornadasView,
+  // PestanaProgramaJornada, ModalEdicionJornada) -- daba SIEMPRE vacio, para cualquier
+  // tenant, siempre: el fallback a `jornada.programaId` crudo nunca dejaba de activarse.
+  obtenerProgramas: (tenantId: string) => Promise<ProgramaAcademico[]>;
   obtenerSedes: (tenantId?: string) => Promise<Sede[]>;
   obtenerUsuarios: () => Promise<Usuario[]>;
   obtenerConfiguracionClub: (tenantId?: string) => Promise<ConfiguracionClub>;
@@ -32,7 +45,7 @@ interface JornadaContextDeps {
 }
 
 const depsDefault: JornadaContextDeps = {
-  obtenerProgramas,
+  obtenerProgramas: (tenantId: string) => programaRepository.listarProgramasPorTenant(tenantId),
   obtenerSedes,
   obtenerUsuarios,
   obtenerConfiguracionClub,
@@ -60,7 +73,13 @@ export interface OpcionesContextoJornada {
   permitirAsistenteInstructor?: boolean;
 }
 
-const grupoId = (grupo: GrupoEdad | string) => `grupo-${String(grupo).toLowerCase().replace(/\s+/g, '-')}`;
+// Mismo slug que realmente escribe AsignacionesView.tsx en `jornada.grupoId`
+// (`slugificar(programa.grupoObjetivo)`, ej. "Precadetes" -> "precadetes", SIN prefijo
+// "grupo-"). El lookup de nombresGrupo en AgendaView.tsx es una comparacion directa
+// contra `jornada.grupoId` tal cual esta guardado -- si el id generado aca no calza
+// exactamente con ese formato, el mapa nunca encuentra match y se vuelve a caer al id
+// crudo (el mismo bug de fondo que el de programas, aplicado a grupos).
+const slugificarGrupo = (grupo: string) => grupo.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 function uniqueById(opciones: OpcionJornada[]): OpcionJornada[] {
   return Array.from(new Map(opciones.map((opcion) => [opcion.id, opcion])).values());
@@ -77,25 +96,34 @@ export async function obtenerContextoJornada(
   // parcial siguen funcionando y caen al repositorio real para los espacios.
   const resolved: JornadaContextDeps = { ...depsDefault, ...deps };
   const [programas, sedes, usuarios, configClub, espacios] = await Promise.all([
-    resolved.obtenerProgramas(),
+    resolved.obtenerProgramas(tenantId),
     resolved.obtenerSedes(tenantId),
     resolved.obtenerUsuarios(),
     resolved.obtenerConfiguracionClub(tenantId),
     resolved.listarEspaciosPorTenant(tenantId),
   ]);
 
-  const programasTenant = programas.filter((programa) => programa.tenantId === tenantId && programa.activo);
-  const bloques = programasTenant.flatMap((programa) => programa.bloquesHorarios ?? []);
+  // `programa.tenantId === tenantId` es defensa en profundidad (listarProgramasPorTenant
+  // ya filtra por tenant); `estado === 'publicado'` es la condicion real (ver comentario
+  // en JornadaContextDeps.obtenerProgramas mas arriba) -- assignProgramaToGrupo exige
+  // que el programa este publicado antes de generar ninguna jornada real, asi que todo
+  // programa con jornadas asociadas SIEMPRE pasa este filtro.
+  const programasTenant = programas.filter((programa) => programa.tenantId === tenantId && programa.estado === 'publicado');
 
   const programasOpciones = programasTenant.map((programa) => ({
     id: programa.id,
     nombre: programa.nombre,
   }));
 
-  const grupos = uniqueById(bloques.map((bloque) => ({
-    id: grupoId(bloque.grupo),
-    nombre: `Grupo ${bloque.grupo}`,
-  })));
+  // Los grupos NO son un catalogo dinamico por programa -- ProgramaAcademico no tiene
+  // horarios/bloques (eso vive en EjecucionPrograma.bloques, ligado a sede+horario, no a
+  // nombre de grupo). Son el catalogo FIJO de GrupoEdad (tipos.ts), igual en todos los
+  // tenants -- por eso se listan directo del enum en vez de intentar derivarlos de datos
+  // que nunca tuvieron esa forma.
+  const grupos = Object.values(GrupoEdad).map((grupo) => ({
+    id: slugificarGrupo(grupo),
+    nombre: grupo,
+  }));
 
   const sedesOpciones = uniqueById(
     getSedesVisibles(configClub, sedes)

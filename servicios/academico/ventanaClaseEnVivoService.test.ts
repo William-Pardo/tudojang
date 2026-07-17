@@ -1,4 +1,8 @@
-import { calcularVentanaClaseEnVivo, estaJornadaEnVentana } from './ventanaClaseEnVivoService';
+import {
+  calcularVentanaClaseEnVivo,
+  estaJornadaEnVentana,
+  calcularIndicadorClaseEnVivo,
+} from './ventanaClaseEnVivoService';
 import type { JornadaInstruccion } from '../../models/academico/jornada';
 
 function crearJornada(overrides: Partial<JornadaInstruccion> = {}): JornadaInstruccion {
@@ -80,6 +84,56 @@ describe('ventanaClaseEnVivoService', () => {
       expect(
         estaJornadaEnVentana({ fecha: '2026-06-06', horaInicio: '10:00', horaFin: '11:00' }, '2026-06-06T08:00:00.000Z')
       ).toBe(false);
+    });
+  });
+
+  // Subtarea 12.10 (Agenda, seccion 14 del documento de mejora), simplificado 2026-07-16
+  // a 4 estados (pedido explicito del usuario -- ver comentario extenso en
+  // ventanaClaseEnVivoService.ts): indicador de estado de Clase en Vivo que cruza `estado`
+  // academico con la ventana horaria ya existente.
+  describe('calcularIndicadorClaseEnVivo', () => {
+    const base = { fecha: '2026-06-06', horaInicio: '10:00', horaFin: '11:00' };
+
+    it("devuelve 'cancelada' si la jornada esta cancelada, sin importar la hora", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'cancelada' }, '2026-06-06T10:30:00.000Z')
+      ).toBe('cancelada');
+    });
+
+    it("devuelve 'finalizada' si la jornada ya esta cerrada academicamente, aunque siga en la ventana horaria", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'cerrada' }, '2026-06-06T10:30:00.000Z')
+      ).toBe('finalizada');
+    });
+
+    it("devuelve 'activa' si el estado academico es 'en_curso', sin importar la ventana horaria", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'en_curso' }, '2026-06-06T23:00:00.000Z')
+      ).toBe('activa');
+    });
+
+    it("devuelve 'activa' cuando esta dentro de la ventana [horaInicio-15, horaFin+15] y no esta en_curso/cerrada/cancelada (fusion de la vieja 'disponible')", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'confirmada' }, '2026-06-06T09:50:00.000Z')
+      ).toBe('activa');
+    });
+
+    it("devuelve 'finalizada' cuando ya paso horaFin+15 y el estado academico no se cerro manualmente", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'confirmada' }, '2026-06-06T11:20:00.000Z')
+      ).toBe('finalizada');
+    });
+
+    it("devuelve 'proxima' cuando falta para la ventana y es el MISMO dia calendario", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'confirmada' }, '2026-06-06T07:00:00.000Z')
+      ).toBe('proxima');
+    });
+
+    it("devuelve 'proxima' cuando la jornada es de OTRO dia calendario (fusion de la vieja 'programada' -- ya no se distingue de 'proxima')", () => {
+      expect(
+        calcularIndicadorClaseEnVivo({ ...base, estado: 'confirmada' }, '2026-06-05T07:00:00.000Z')
+      ).toBe('proxima');
     });
   });
 });

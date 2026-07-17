@@ -48,10 +48,10 @@ export interface CambioAuditoriaJornada {
 
 // Vistas reales del codebase vigente que hoy escriben auditoria de jornada: JornadasView
 // (flujo standalone de plan/cierre), MisClasesView (gestion de clases del maestro, embebida
-// en AsignacionesView) y AsignacionesView (publicacion de material -- solo referencia una
-// jornada ya existente, sin mutar sus campos). No se incluye 'agenda': esa vista no existe
-// en este codebase todavia (ver subtarea 12.8 del documento de mejora).
-export type FuenteAuditoriaJornada = 'jornadas' | 'mis_clases' | 'asignaciones';
+// en AsignacionesView), AsignacionesView (publicacion de material -- solo referencia una
+// jornada ya existente, sin mutar sus campos) y Agenda (subtarea 12.9: el modal de edicion
+// singular de la parrilla semanal -- 12.8 ya agrego la vista, ver AgendaView.tsx).
+export type FuenteAuditoriaJornada = 'jornadas' | 'mis_clases' | 'asignaciones' | 'agenda';
 
 export interface AuditoriaJornadaInput {
   tenantId: string;
@@ -61,7 +61,11 @@ export interface AuditoriaJornadaInput {
   rol: RolUsuario;
   // Subtarea 12.5: vista de origen del cambio (requisito de negocio, seccion 19).
   fuente: FuenteAuditoriaJornada;
-  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar';
+  // Subtarea 12.9: se agrega 'eliminar' (antes solo se sugeria reutilizar 'cancelar', ver
+  // deuda tecnica anotada en el cierre de 12.6) porque un borrado fisico via
+  // eliminarJornadaSegura es una accion distinta y mas fuerte que cancelar (soft, reversible
+  // en los hechos via reprogramar/editar) -- la auditoria debe poder distinguir ambas.
+  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar' | 'eliminar';
   // Subtarea 12.5: diff por campo (valor anterior y nuevo). Antes era el estado resultante
   // plano (p.ej. `{ estado: 'confirmada' }`), sin el valor anterior -- ver diffCambiosJornada.
   cambios: CambioAuditoriaJornada[];
@@ -358,6 +362,39 @@ function construirResultadoConflicto(candidatas: JornadaInstruccion[], jornada: 
     if (motivo) return { hayConflicto: true, motivo };
   }
   return { hayConflicto: false };
+}
+
+export interface ConflictoJornadaLote {
+  jornadaNueva: JornadaInstruccion;
+  jornadaExistente: JornadaInstruccion;
+  motivo: MotivoConflictoHorario;
+}
+
+// Fix 2026-07-16 (bug real reportado: la generacion masiva de jornadas al guardar un
+// Programa academico -- AsignacionesView.tsx, `crearBloquesDesdePrograma` +
+// `generarJornadasDeEjecucion` -- nunca revisaba si el maestro o la sede ya estaban
+// ocupados en ese horario contra jornadas de OTRO programa. `existeConflictoHorario` (el
+// mismo chequeo que ya usa ModalEdicionJornada.tsx al editar UNA jornada, subtarea 12.3)
+// solo se llamaba en el flujo de edicion individual -- el flujo de ALTA MASIVA, que es el
+// camino real por el que se crea la agenda semanal recurrente de un programa, quedaba sin
+// ninguna proteccion). Version en memoria de la MISMA logica pura (`motivoConflictoHorario`)
+// para no pagar una consulta a Firestore por cada jornada nueva generada: el caller ya tiene
+// (o puede pedir una sola vez) la lista completa de jornadas existentes del tenant.
+export function detectarConflictosEnLote(
+  nuevas: JornadaInstruccion[],
+  existentes: JornadaInstruccion[],
+): ConflictoJornadaLote[] {
+  const conflictos: ConflictoJornadaLote[] = [];
+  for (const jornadaNueva of nuevas) {
+    for (const jornadaExistente of existentes) {
+      const motivo = motivoConflictoHorario(jornadaExistente, jornadaNueva);
+      if (motivo) {
+        conflictos.push({ jornadaNueva, jornadaExistente, motivo });
+        break;
+      }
+    }
+  }
+  return conflictos;
 }
 
 function upsertById<T extends { id: string }>(items: T[], value: T): T[] {

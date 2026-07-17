@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
+import type { PreguntaQuiz } from '../../models/academico/quiz';
 import { IconoCerrar } from '../Iconos';
 import QuizView, { type ResultadoQuiz } from './QuizView';
 import PdfViewer from './PdfViewer';
@@ -7,16 +8,26 @@ import VideoPlayer from './VideoPlayer';
 import type { ProgresoSyncPayload } from '../../hooks/academico/useProgressSync';
 import { progresoRepository, type FirestoreProgressRepository, type ProgresoRepository } from '../../servicios/academico/progresoRepository';
 import { driveService as defaultDriveService, type TemporaryFileUrlResult } from '../../services/storage/driveService';
+import { quizService as defaultQuizService } from '../../servicios/academico/quizService';
 import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
 interface MaterialPreviewModalProps {
   asignacion: AsignacionCentroEstudios | null;
   onCerrar: () => void;
   repository?: ProgresoRepository | FirestoreProgressRepository;
-  driveService?: Pick<typeof defaultDriveService, 'obtenerUrlTemporal'>;
+  driveService?: Pick<typeof defaultDriveService, 'obtenerUrlTemporal' | 'obtenerUrlTemporalRecurso' | 'obtenerBlobProtegido'>;
+  quizService?: Pick<typeof defaultQuizService, 'obtenerQuiz'>;
   /** Datos del estudiante para registrar actividad académica en métricas */
   estudianteId?: string;
   estudianteNombre?: string;
+  /**
+   * Vista previa administrativa de un recurso de Biblioteca (Admin/Editor/Asistente/Maestro
+   * confirmando el contenido antes/después de asignarlo) -- pedido explícito del usuario
+   * (2026-07-16). `asignacion` en este modo es una construida en memoria, no persistida
+   * (ver `construirAsignacionPreview` en BibliotecaView.tsx), así que la URL de Drive se
+   * resuelve contra el RECURSO (`obtenerUrlTemporalRecurso`) y no contra una asignación real.
+   */
+  modoVistaPrevia?: boolean;
 }
 
 function obtenerTipoMaterial(asignacion: AsignacionCentroEstudios): string {
@@ -59,7 +70,13 @@ const obtenerMensajeAccesoDrive = (err: unknown): string => {
     return 'Archivo de Drive no disponible. La asignacion debe revisarse antes de continuar.';
   }
 
-  if (normalizado.includes('unauthenticated') || normalizado.includes('invalid_grant') || normalizado.includes('revoked')) {
+  // 401 de nuestro proxy (proxyDriveMedia): el ID token de Firebase del usuario venció o es
+  // inválido -- distinto de que la conexión de Drive del tenant esté revocada (más abajo).
+  if (code === 'unauthenticated') {
+    return 'Tu sesion expiro. Volve a iniciar sesion e intenta de nuevo.';
+  }
+
+  if (normalizado.includes('invalid_grant') || normalizado.includes('revoked')) {
     return 'Conexion de Drive expirada. Solicita al administrador reconectar Google Drive.';
   }
 
@@ -75,13 +92,18 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   onCerrar,
   repository = progresoRepository,
   driveService = defaultDriveService,
+  quizService = defaultQuizService,
   estudianteId,
   estudianteNombre,
+  modoVistaPrevia = false,
 }) => {
   const [resultadoQuiz, setResultadoQuiz] = React.useState<ResultadoQuiz | null>(null);
   const [accesoTemporal, setAccesoTemporal] = React.useState<TemporaryFileUrlResult | null>(null);
   const [errorAcceso, setErrorAcceso] = React.useState('');
   const [textoContenido, setTextoContenido] = React.useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+  const [preguntasQuiz, setPreguntasQuiz] = React.useState<PreguntaQuiz[] | null>(null);
+  const [cargandoPreguntasQuiz, setCargandoPreguntasQuiz] = React.useState(false);
 
   const tipoMaterial = React.useMemo(
     () => (asignacion ? detectarTipoMaterial(asignacion) : 'generico'),
@@ -120,30 +142,66 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     setResultadoQuiz(null);
   }, [asignacion?.id]);
 
+  // Carga el banco de preguntas real del recurso -- antes de este wire, QuizView siempre
+  // caía a su pregunta demo hardcodeada sin importar el recurso.
+  React.useEffect(() => {
+    setPreguntasQuiz(null);
+    if (!asignacion || tipoMaterial !== 'quiz') return;
+
+    let activo = true;
+    setCargandoPreguntasQuiz(true);
+    quizService.obtenerQuiz(asignacion.tenantId, asignacion.recursoId)
+      .then((preguntas) => {
+        if (activo) setPreguntasQuiz(preguntas);
+      })
+      .catch((err) => {
+        console.warn('[MaterialPreviewModal] No se pudo cargar el banco de preguntas', err);
+        if (activo) setPreguntasQuiz(null);
+      })
+      .finally(() => {
+        if (activo) setCargandoPreguntasQuiz(false);
+      });
+
+    return () => { activo = false; };
+  }, [asignacion, tipoMaterial, quizService]);
+
   React.useEffect(() => {
     setAccesoTemporal(null);
     setErrorAcceso('');
+    setTextoContenido(null);
+    setBlobUrl(null);
 
     if (!asignacion || asignacion.uso === 'evaluacion' || !asignacion.externalFileId) return;
 
     let activo = true;
-    driveService.obtenerUrlTemporal(asignacion.tenantId, asignacion.id, asignacion.externalFileId)
+    let objectUrlCreada: string | null = null;
+    const promesaUrl = modoVistaPrevia
+      ? driveService.obtenerUrlTemporalRecurso(asignacion.tenantId, asignacion.recursoId)
+      : driveService.obtenerUrlTemporal(asignacion.tenantId, asignacion.id, asignacion.externalFileId);
+    promesaUrl
       .then((resultado) => {
-        if (!activo) return;
+        if (!activo) return undefined;
         setAccesoTemporal(resultado);
 
-        // Si es texto, intentar leer el contenido
-        const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
-        if (['txt', 'md'].includes(ext) && resultado.url) {
-          fetch(resultado.url)
-            .then(res => res.text())
-            .then(text => {
-              if (activo) setTextoContenido(text);
-            })
-            .catch(err => {
-              console.warn('[MaterialPreviewModal] Falló fetch de texto', err);
-            });
-        }
+        // El proxy exige un ID token de Firebase en el header Authorization -- <video>/<img>/
+        // react-pdf no pueden mandar headers, así que bajamos los bytes reales acá (autenticado)
+        // y armamos un blob: URL local para pasarles a esos componentes sin tocarlos.
+        return driveService.obtenerBlobProtegido(resultado.url).then((blob) => {
+          if (!activo) return;
+          objectUrlCreada = URL.createObjectURL(blob);
+          setBlobUrl(objectUrlCreada);
+
+          const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
+          if (['txt', 'md'].includes(ext)) {
+            blob.text()
+              .then((texto) => {
+                if (activo) setTextoContenido(texto);
+              })
+              .catch((err) => {
+                console.warn('[MaterialPreviewModal] Falló lectura de texto', err);
+              });
+          }
+        });
       })
       .catch((err) => {
         if (activo) setErrorAcceso(obtenerMensajeAccesoDrive(err));
@@ -151,8 +209,9 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
     return () => {
       activo = false;
+      if (objectUrlCreada) URL.revokeObjectURL(objectUrlCreada);
     };
-  }, [asignacion, driveService]);
+  }, [asignacion, driveService, modoVistaPrevia]);
 
   if (!asignacion) return null;
 
@@ -206,20 +265,36 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
           )}
 
           {tipoMaterial === 'quiz' ? (
-            <QuizView
-              asignacion={asignacion}
-              onResultado={setResultadoQuiz}
-              repository={repository}
-              estudianteId={estudianteId}
-              estudianteNombre={estudianteNombre}
-              recursoId={asignacion.recursoId}
-            />
+            cargandoPreguntasQuiz ? (
+              <div className="rounded-[1.5rem] bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-6 text-sm font-bold text-gray-400 text-center">
+                Cargando preguntas...
+              </div>
+            ) : preguntasQuiz && preguntasQuiz.length > 0 ? (
+              <QuizView
+                asignacion={asignacion}
+                preguntas={preguntasQuiz}
+                onResultado={setResultadoQuiz}
+                repository={repository}
+                estudianteId={estudianteId}
+                estudianteNombre={estudianteNombre}
+                recursoId={asignacion.recursoId}
+              />
+            ) : (
+              <div className="rounded-[1.5rem] bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900 p-6 text-center">
+                <p className="text-sm font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-300">
+                  Este quiz todavía no tiene preguntas configuradas
+                </p>
+                <p className="mt-2 text-xs font-bold text-yellow-600 dark:text-yellow-400">
+                  Un Admin o Maestro puede cargarlas desde la Biblioteca.
+                </p>
+              </div>
+            )
           ) : tipoMaterial === 'video' ? (
             <VideoPlayer
               tenantId={asignacion.tenantId}
               asignacionId={asignacion.id}
               titulo={asignacion.titulo}
-              url={accesoTemporal?.url ?? asignacion.driveFileUrl ?? ''}
+              url={blobUrl ?? asignacion.driveFileUrl ?? ''}
               totalSegundos={asignacion.duracionSegundos ?? 120}
               sincronizar={sincronizarProgreso}
               cargarProgreso={() => repository.leerSync(asignacion.tenantId, asignacion.id)}
@@ -232,6 +307,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               tenantId={asignacion.tenantId}
               asignacionId={asignacion.id}
               titulo={asignacion.titulo}
+              url={blobUrl ?? undefined}
               totalPaginas={asignacion.totalPaginas ?? 3}
               sincronizar={sincronizarProgreso}
               cargarProgreso={() => repository.leerSync(asignacion.tenantId, asignacion.id)}
@@ -251,9 +327,9 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               </div>
 
               {/* Render de imágenes */}
-              {accesoTemporal?.url && (asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') || asignacion.titulo.endsWith('.gif')) && (
+              {blobUrl && (asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') || asignacion.titulo.endsWith('.gif')) && (
                 <img
-                  src={accesoTemporal.url}
+                  src={blobUrl}
                   alt={asignacion.titulo}
                   className="max-h-[40vh] object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3"
                 />
@@ -267,7 +343,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               )}
 
               {/* Si no se puede previsualizar */}
-              {!accesoTemporal?.url && !errorAcceso && (
+              {!blobUrl && !errorAcceso && (
                 <div className="text-sm text-gray-500 font-bold mt-2">
                   Cargando recurso seguro desde Google Drive...
                 </div>

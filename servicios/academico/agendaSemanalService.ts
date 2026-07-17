@@ -24,27 +24,43 @@ export const DIAS_SEMANA: Array<{ indiceIso: number; etiqueta: string }> = [
   { indiceIso: 6, etiqueta: 'Domingo' },
 ];
 
-// Subtarea 12.8: franja horaria fija 7:00-22:00, intervalo de 60 minutos. El documento
-// de mejora sugiere "intervalos configurables de 30 o 60 minutos" pero no lo exige para
-// esta primera version; se elige 60 min fijo por simplicidad y se documenta el atajo.
-export const HORA_INICIO_GRILLA_MINUTOS = 7 * 60; // 7:00 a.m.
-export const HORA_FIN_GRILLA_MINUTOS = 22 * 60; // 10:00 p.m.
-export const INTERVALO_MINUTOS_GRILLA = 60;
+// Simplificado 2026-07-17, SEGUNDA vuelta (pedido explicito del usuario: la primera vuelta
+// -- un eje continuo proporcional recortado al rango real de la semana -- seguia dejando
+// huecos grandes en blanco cuando habia horas SIN clases en el medio del rango, ej. clases
+// a las 09:00 y a las 15:00 dejaban 10:00-14:00 vacio en pantalla). Se abandona el eje
+// continuo por completo: la grilla ahora es un conjunto de FILAS DISCRETAS, una por cada
+// franja horaria EXACTA (horaInicio-horaFin) que realmente tiene alguna jornada esa semana
+// -- sin fila para huecos donde NINGUN dia tiene clase, sin importar cuan separadas esten
+// las franjas entre si. Si dos jornadas distintas (mismo dia, distinto programa/grupo) caen
+// en la MISMA franja exacta, terminan en la MISMA fila -- el consumidor (AgendaView) las
+// layoutea lado a lado en esa celda en vez de superponerlas.
+//
+// A diferencia de la primera vuelta (que SI excluia canceladas, porque una cancelada
+// aislada no debia estirar el eje continuo), aca NO se filtran: subtarea 12.8 documenta a
+// proposito que una jornada cancelada sigue siendo VISIBLE en la grilla (atenuada, no
+// desaparece) para no perder trazabilidad de que existio/se cancelo una clase esa
+// fecha/hora -- si se excluyera aca, una semana con SOLO una clase cancelada perderia su
+// unica fila y la cancelacion dejaria de verse por completo.
+export interface FranjaHorariaAgenda {
+  horaInicio: string;
+  horaFin: string;
+}
 
-// Marcas de hora (gridlines) desde las 7:00 hasta las 22:00 INCLUSIVE (16 marcas: una
-// por cada limite de hora, incluyendo el borde final de la ultima fila 21:00-22:00).
-export function obtenerHorasGrilla(): string[] {
-  const horas: string[] = [];
-  for (
-    let minuto = HORA_INICIO_GRILLA_MINUTOS;
-    minuto <= HORA_FIN_GRILLA_MINUTOS;
-    minuto += INTERVALO_MINUTOS_GRILLA
-  ) {
-    const horaEntera = String(Math.floor(minuto / 60)).padStart(2, '0');
-    const minutos = String(minuto % 60).padStart(2, '0');
-    horas.push(`${horaEntera}:${minutos}`);
+export function calcularFilasHorarioAgenda(jornadas: JornadaInstruccion[]): FranjaHorariaAgenda[] {
+  const clavesVistas = new Set<string>();
+  const franjas: FranjaHorariaAgenda[] = [];
+
+  for (const jornada of jornadas) {
+    const clave = `${jornada.horaInicio}-${jornada.horaFin}`;
+    if (clavesVistas.has(clave)) continue;
+    clavesVistas.add(clave);
+    franjas.push({ horaInicio: jornada.horaInicio, horaFin: jornada.horaFin });
   }
-  return horas;
+
+  return franjas.sort((a, b) => {
+    const inicioDiff = minutosDesdeHora(a.horaInicio) - minutosDesdeHora(b.horaInicio);
+    return inicioDiff !== 0 ? inicioDiff : minutosDesdeHora(a.horaFin) - minutosDesdeHora(b.horaFin);
+  });
 }
 
 // Construye una fecha LOCAL (no UTC) a partir de un string YYYY-MM-DD, para que los
@@ -116,32 +132,4 @@ export function agruparJornadasPorFecha(jornadas: JornadaInstruccion[]): Record<
 function minutosDesdeHora(hora: string): number {
   const [horas, minutos] = hora.split(':').map(Number);
   return horas * 60 + minutos;
-}
-
-export interface PosicionBloque {
-  topPercent: number;
-  heightPercent: number;
-}
-
-// Calcula la posicion vertical proporcional (0-100%) de un bloque de clase dentro de la
-// franja horaria visible (7:00-22:00), para posicionarlo con CSS absoluto dentro de la
-// columna del dia -- refleja proporcionalmente el horario real, no solo "cae en la fila
-// de las 8". Si la clase empieza antes de las 7:00 o termina despues de las 22:00, se
-// recorta (clamp) a los bordes de la franja para no romper el layout.
-export function calcularPosicionBloque(horaInicio: string, horaFin: string): PosicionBloque {
-  const totalMinutos = HORA_FIN_GRILLA_MINUTOS - HORA_INICIO_GRILLA_MINUTOS;
-  const inicioMin = Math.min(
-    Math.max(minutosDesdeHora(horaInicio), HORA_INICIO_GRILLA_MINUTOS),
-    HORA_FIN_GRILLA_MINUTOS,
-  );
-  const finMin = Math.min(
-    Math.max(minutosDesdeHora(horaFin), HORA_INICIO_GRILLA_MINUTOS),
-    HORA_FIN_GRILLA_MINUTOS,
-  );
-
-  const topPercent = ((inicioMin - HORA_INICIO_GRILLA_MINUTOS) / totalMinutos) * 100;
-  // Piso minimo de 2% de altura para que bloques muy cortos sigan siendo clickeables/legibles.
-  const heightPercent = Math.max(((finMin - inicioMin) / totalMinutos) * 100, 2);
-
-  return { topPercent, heightPercent };
 }

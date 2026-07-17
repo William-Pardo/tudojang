@@ -76,7 +76,10 @@ export function crearProgramaRepository(options: CrearProgramaRepositoryOptions 
       const programasRef = deps.collection(getDatabase(), 'tenants', tenantId, 'programasAcademicos');
       const snap = await deps.getDocs(programasRef);
 
-      return snap.docs.map((item) => ({ id: item.id, ...(item.data() as object) } as ProgramaAcademico));
+      // El ID real del documento SIEMPRE debe ganar sobre cualquier campo `id` que pueda
+      // venir dentro de la data guardada -- mismo bug real ya encontrado y corregido en
+      // sedesApi.ts (2026-07-16): `...doc.data()` va ANTES de `id: doc.id`, no despues.
+      return snap.docs.map((item) => ({ ...(item.data() as object), id: item.id } as ProgramaAcademico));
     },
 
     async eliminarPrograma(tenantId, programaId) {

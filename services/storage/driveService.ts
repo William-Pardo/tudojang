@@ -5,6 +5,7 @@
 // IMPORTANTE: Nunca maneja tokens de Drive directamente — todo pasa por Cloud Functions.
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -74,6 +75,13 @@ export interface DriveServiceDeps {
    * Si no se provee, se usa `httpsCallable(getFunctions(), ...)` por defecto.
    */
   callFn?: <TReq, TRes>(name: string) => (data: TReq) => Promise<{ data: TRes }>;
+  /**
+   * Resuelve el ID token de Firebase del usuario actual (inyectable para tests).
+   * Por defecto usa `getAuth().currentUser?.getIdToken()`.
+   */
+  obtenerIdToken?: () => Promise<string | null>;
+  /** fetch inyectable para tests. Por defecto usa el `fetch` global del navegador. */
+  fetchFn?: typeof fetch;
 }
 
 /**
@@ -86,6 +94,42 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
         const fn = httpsCallable<TReq, TRes>(getFunctions(), name);
         return (data: TReq) => fn(data);
       };
+
+  const obtenerIdToken = deps.obtenerIdToken
+    ? deps.obtenerIdToken
+    : async () => getAuth().currentUser?.getIdToken() ?? null;
+
+  /**
+   * Descarga el contenido real de un archivo protegido (video/pdf/imagen) vía nuestro proxy
+   * (`proxyDriveMedia`), autenticando con el ID token REAL de Firebase del usuario actual --
+   * NO con ningún token de Drive (ese nunca sale del servidor). Se usa para armar un
+   * `blob:` local que `<video>`/`<img>`/react-pdf pueden reproducir sin volver a pedir nada
+   * a través de la red por su cuenta.
+   *
+   * `fetch` se resuelve recién acá adentro (no al crear el servicio): el singleton del
+   * módulo se instancia al importar, y en algunos entornos (tests bajo Jest/jsdom) `fetch`
+   * global todavía no existe en ese momento.
+   */
+  const obtenerBlobProtegido = async (url: string): Promise<Blob> => {
+    const fetchFn = deps.fetchFn ?? fetch;
+    const idToken = await obtenerIdToken();
+    const response = await fetchFn(url, {
+      headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+    });
+    if (!response.ok) {
+      const error = new Error(`No se pudo cargar el recurso protegido (status ${response.status})`);
+      // El proxy re-valida rol/tenant/asignación-o-recurso y también re-verifica el archivo en
+      // Drive -- distintos status reflejan causas bien distintas, no todas son "sin permiso".
+      const codigoPorStatus: Record<number, string> = {
+        401: 'unauthenticated',
+        403: 'permission-denied',
+        404: 'not-found',
+      };
+      (error as Error & { code?: string }).code = codigoPorStatus[response.status] ?? 'server-error';
+      throw error;
+    }
+    return response.blob();
+  };
 
   /**
    * Inicia el flujo OAuth de Google Drive.
@@ -228,11 +272,32 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     return result.data;
   };
 
+  /**
+   * Vista previa de un recurso de la Biblioteca (Admin/Editor/Asistente/Maestro), pedida
+   * explícitamente para poder confirmar el contenido real de un archivo antes/después de
+   * asignarlo. A diferencia de `obtenerUrlTemporal`, NO depende de que exista una
+   * asignación publicada -- valida directo contra el recurso.
+   */
+  const obtenerUrlTemporalRecurso = async (
+    tenantId: string,
+    recursoId: string
+  ): Promise<TemporaryFileUrlResult> => {
+    const callGetUrlRecurso = call<
+      { tenantId: string; recursoId: string },
+      TemporaryFileUrlResult
+    >('getTemporaryFileUrlRecurso');
+
+    const result = await callGetUrlRecurso({ tenantId, recursoId });
+    return result.data;
+  };
+
   return {
     iniciarConexionOAuth,
     procesarCallbackOAuth,
     listarCarpetaDrive,
     obtenerUrlTemporal,
+    obtenerUrlTemporalRecurso,
+    obtenerBlobProtegido,
     desconectarDrive,
     obtenerConexionDrive,
     guardarCarpetaActiva,

@@ -15,6 +15,7 @@ import {
   esJornadaOperada,
   EliminacionNoPermitidaError,
   MENSAJE_ELIMINACION_NO_PERMITIDA,
+  detectarConflictosEnLote,
 } from './jornadaRepository';
 
 function crearJornadaDeLote(indice: number): JornadaInstruccion {
@@ -292,6 +293,135 @@ describe('jornadaRepository', () => {
     await expect(repository.existeConflictoHorario(jornadaNueva)).resolves.toEqual({
       hayConflicto: true,
       motivo: 'espacio',
+    });
+  });
+
+  // Fix 2026-07-16 (bug real reportado por el usuario: la alta masiva de jornadas al
+  // guardar un Programa academico -- AsignacionesView.tsx -- generaba TODA la agenda
+  // semanal recurrente sin revisar contra jornadas existentes de OTRO programa. Version
+  // en memoria de la MISMA logica pura que ya usa existeConflictoHorario, para poder
+  // chequear un lote completo sin pagar una consulta a Firestore por cada jornada nueva.
+  describe('detectarConflictosEnLote', () => {
+    it('detecta conflicto de instructor entre una jornada nueva y una existente activa', () => {
+      const existente = createJornada({
+        tenantId: 'tenant-1',
+        programaId: 'programa-1',
+        ejecucionProgramaId: 'ejecucion-1',
+        grupoId: 'grupo-infantil',
+        sedeId: 'sede-a',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-1',
+        fecha: '2026-07-06',
+        horaInicio: '08:00',
+        horaFin: '09:00',
+        estadoInicial: 'confirmada',
+        objetivosPlaneados: ['obj-1'],
+      });
+      const nueva = createJornada({
+        tenantId: 'tenant-1',
+        programaId: 'programa-2',
+        ejecucionProgramaId: 'ejecucion-2',
+        grupoId: 'grupo-precadetes',
+        // Distinta sede/espacio a proposito -- el choque debe detectarse SOLO por
+        // instructor, sin depender de que la sede tambien coincida.
+        sedeId: 'sede-b',
+        espacioId: 'tatami-2',
+        instructorId: 'maestro-1',
+        fecha: '2026-07-06',
+        horaInicio: '08:00',
+        horaFin: '09:00',
+        objetivosPlaneados: ['obj-2'],
+      });
+
+      const conflictos = detectarConflictosEnLote([nueva], [existente]);
+
+      expect(conflictos).toEqual([{ jornadaNueva: nueva, jornadaExistente: existente, motivo: 'instructor' }]);
+    });
+
+    it('detecta conflicto de sede+espacio entre una jornada nueva y una existente activa (distinto instructor)', () => {
+      const existente = createJornada({
+        tenantId: 'tenant-1',
+        programaId: 'programa-1',
+        ejecucionProgramaId: 'ejecucion-1',
+        grupoId: 'grupo-infantil',
+        sedeId: 'sede-a',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-1',
+        fecha: '2026-07-06',
+        horaInicio: '08:00',
+        horaFin: '09:00',
+        estadoInicial: 'confirmada',
+        objetivosPlaneados: ['obj-1'],
+      });
+      const nueva = createJornada({
+        tenantId: 'tenant-1',
+        programaId: 'programa-2',
+        ejecucionProgramaId: 'ejecucion-2',
+        grupoId: 'grupo-precadetes',
+        sedeId: 'sede-a',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-2',
+        fecha: '2026-07-06',
+        horaInicio: '08:30',
+        horaFin: '09:30',
+        objetivosPlaneados: ['obj-2'],
+      });
+
+      const conflictos = detectarConflictosEnLote([nueva], [existente]);
+
+      expect(conflictos).toEqual([{ jornadaNueva: nueva, jornadaExistente: existente, motivo: 'espacio' }]);
+    });
+
+    it('no detecta conflicto si no hay solapamiento de horario, aunque coincidan instructor/sede/fecha', () => {
+      const existente = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-1', ejecucionProgramaId: 'e-1', grupoId: 'grupo-infantil',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '08:00', horaFin: '09:00', estadoInicial: 'confirmada', objetivosPlaneados: [],
+      });
+      const nueva = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-2', ejecucionProgramaId: 'e-2', grupoId: 'grupo-precadetes',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '09:00', horaFin: '10:00', objetivosPlaneados: [],
+      });
+
+      expect(detectarConflictosEnLote([nueva], [existente])).toEqual([]);
+    });
+
+    it('ignora jornadas existentes en estado inactivo (borrador/cerrada/cancelada) -- mismo criterio que existeConflictoHorario', () => {
+      const existenteBorrador = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-1', ejecucionProgramaId: 'e-1', grupoId: 'grupo-infantil',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '08:00', horaFin: '09:00', estadoInicial: 'borrador', objetivosPlaneados: [],
+      });
+      const nueva = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-2', ejecucionProgramaId: 'e-2', grupoId: 'grupo-precadetes',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '08:00', horaFin: '09:00', objetivosPlaneados: [],
+      });
+
+      expect(detectarConflictosEnLote([nueva], [existenteBorrador])).toEqual([]);
+    });
+
+    it('detecta un conflicto por cada jornada nueva que choque, dentro de un lote de varias', () => {
+      const existente = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-1', ejecucionProgramaId: 'e-1', grupoId: 'grupo-infantil',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '08:00', horaFin: '09:00', estadoInicial: 'confirmada', objetivosPlaneados: [],
+      });
+      const nuevaSinChoque = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-2', ejecucionProgramaId: 'e-2', grupoId: 'grupo-precadetes',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-13', horaInicio: '08:00', horaFin: '09:00', objetivosPlaneados: [],
+      });
+      const nuevaConChoque = createJornada({
+        tenantId: 'tenant-1', programaId: 'p-2', ejecucionProgramaId: 'e-2', grupoId: 'grupo-precadetes',
+        sedeId: 'sede-a', espacioId: 'tatami-1', instructorId: 'maestro-1',
+        fecha: '2026-07-06', horaInicio: '08:00', horaFin: '09:00', objetivosPlaneados: [],
+      });
+
+      const conflictos = detectarConflictosEnLote([nuevaSinChoque, nuevaConChoque], [existente]);
+
+      expect(conflictos).toEqual([{ jornadaNueva: nuevaConChoque, jornadaExistente: existente, motivo: 'instructor' }]);
     });
   });
 
