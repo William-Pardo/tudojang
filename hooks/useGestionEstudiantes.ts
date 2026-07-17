@@ -105,6 +105,20 @@ export const useGestionEstudiantes = () => {
                 ...datosPersistibles
             } = datosEstudiante;
 
+            // Fix tutor-role-end-to-end (2026-07-14): normalizar emails a minúsculas.
+            // La regla de Firestore compara `estudiante.tutor.correo == request.auth.token.email`
+            // (que Firebase entrega en minúsculas), y el resolver también consulta en minúsculas.
+            // Sin esto, un correo con mayúsculas rompería silenciosamente la resolución tutor→hijo.
+            if (datosPersistibles.correo) {
+                datosPersistibles.correo = datosPersistibles.correo.toLowerCase().trim();
+            }
+            if (datosPersistibles.tutor?.correo) {
+                datosPersistibles.tutor = {
+                    ...datosPersistibles.tutor,
+                    correo: datosPersistibles.tutor.correo.toLowerCase().trim(),
+                };
+            }
+
             const enviarInvitacionAcademica = async (estudiante: Estudiante, rol: RolAcademico) => {
                 const tenantId = estudiante.tenantId || configClub.tenantId;
                 const correoDestino = rol === 'Estudiante' ? estudiante.correo : estudiante.tutor?.correo;
@@ -117,10 +131,36 @@ export const useGestionEstudiantes = () => {
                 }
 
                 try {
-                    await createInvitation(tenantId, correoDestino, rol);
-                    mostrarNotificacion(`Invitación de login enviada a ${correoDestino}.`, 'success');
+                    // Fix consistencia de plantillas (2026-07-15): manda el nombre real para
+                    // que el correo (plantillas por rol) salga personalizado, no con fallback
+                    // genérico. Tutor necesita AMBOS nombres (suyo + el del alumno vinculado).
+                    const nombreAlumno = `${estudiante.nombres || ''} ${estudiante.apellidos || ''}`.trim();
+                    const nombreDestinatario = rol === 'Estudiante'
+                        ? nombreAlumno
+                        : `${estudiante.tutor?.nombres || ''} ${estudiante.tutor?.apellidos || ''}`.trim();
+                    const invitacion = await createInvitation(tenantId, correoDestino, rol, {
+                        nombreDestinatario: nombreDestinatario || undefined,
+                        nombreAlumno: rol === 'Tutor' ? (nombreAlumno || undefined) : undefined,
+                    });
+
+                    // Fix tutor-role-end-to-end (2026-07-14, ajuste post-feedback): NO abrir
+                    // WhatsApp ni tomar el portapapeles por cada guardado — en registro masivo
+                    // eso genera conflictos (pedido explícito del usuario). La invitación se
+                    // entrega por CORREO (la CF ya usa el dominio correcto). Solo notificamos.
+                    if (!invitacion.activationLink) {
+                        mostrarNotificacion(`Estudiante guardado, pero no se pudo generar la invitación para ${correoDestino}.`, 'warning');
+                        return;
+                    }
+
+                    if (invitacion.emailEnviado) {
+                        mostrarNotificacion(`Invitación de login enviada por correo a ${correoDestino}.`, 'success');
+                    } else {
+                        // El correo no salió (Resend), pero la invitación quedó creada y válida.
+                        // El admin puede reenviarla desde Configuración → Invitaciones.
+                        mostrarNotificacion(`Invitación creada para ${correoDestino}. El correo automático no salió — reenvíala desde Invitaciones si hace falta.`, 'info');
+                    }
                 } catch (error: any) {
-                    mostrarNotificacion(`Estudiante guardado, pero no se pudo enviar la invitación a ${correoDestino}: ${error.message}`, 'warning');
+                    mostrarNotificacion(`Estudiante guardado, pero no se pudo generar la invitación a ${correoDestino}: ${error.message}`, 'warning');
                 }
             };
 

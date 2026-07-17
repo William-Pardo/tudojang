@@ -11,6 +11,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
   Firestore
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../../firebase/config';
@@ -174,6 +175,16 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       actualizadoEn: new Date().toISOString(),
       ...(tituloVisibleLimpio ? { tituloVisible: tituloVisibleLimpio } : {})
     });
+
+    // Fix (bug reportado: renombrar un material no actualizaba el nombre en cascada):
+    // AsignacionAcademica.titulo es una copia del título tomada al publicar (ver
+    // AsignacionesView.tsx `titulo: recursoDraft.tituloVisible || recursoDraft.nombre`),
+    // no una referencia en vivo al recurso. Sin este fan-out, renombrar un recurso ya
+    // asignado dejaba el nombre viejo "huérfano" en Agenda, Centro de Estudios y el
+    // panel de Progreso por Estudiante (todos leen `asignacion.titulo`, no el recurso).
+    if (tituloVisibleLimpio && tituloVisibleLimpio !== recurso.tituloVisible) {
+      await propagarTituloAAsignaciones(getDatabase(), tenantId, recursoId, tituloVisibleLimpio);
+    }
   };
 
   /**
@@ -321,4 +332,32 @@ function normalizarNombreRecurso_(nombre: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+}
+
+/**
+ * Actualiza `titulo` en todas las asignaciones (`tenants/{tenantId}/asignaciones`) que
+ * referencian este recurso, para que el nuevo nombre se refleje en cascada en Agenda,
+ * Centro de Estudios y el panel de Progreso por Estudiante. No falla la clasificaci\u00f3n del
+ * recurso si esto da error (se loggea y se sigue) -- el t\u00edtulo del recurso ya qued\u00f3
+ * guardado correctamente, que es la operaci\u00f3n principal del usuario.
+ */
+async function propagarTituloAAsignaciones(
+  database: Firestore,
+  tenantId: string,
+  recursoId: string,
+  tituloNuevo: string
+): Promise<void> {
+  try {
+    const asignacionesRef = collection(database, 'tenants', tenantId, 'asignaciones');
+    const snap = await getDocs(query(asignacionesRef, where('recursoId', '==', recursoId)));
+    if (snap.empty) return;
+
+    const batch = writeBatch(database);
+    for (const docSnap of snap.docs) {
+      batch.update(docSnap.ref, { titulo: tituloNuevo, actualizadoEn: new Date().toISOString() });
+    }
+    await batch.commit();
+  } catch (err) {
+    console.error(`[bibliotecaService] No se pudo propagar el nuevo t\u00edtulo a las asignaciones de ${recursoId}:`, err);
+  }
 }

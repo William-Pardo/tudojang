@@ -24,7 +24,7 @@ function crearError(message, code = 'failed-precondition') {
   return error;
 }
 
-function crearServicioConsolidateProgress({ obtenerAsignacion, guardarProgreso, actualizarAsignacion = async () => undefined }) {
+function crearServicioConsolidateProgress({ obtenerAsignacion, guardarProgreso, actualizarAsignacion = async () => undefined, notificarAvance = async () => undefined }) {
   return async function consolidateProgress(request) {
     const uid = request?.auth?.uid;
     const tenantIdToken = request?.auth?.token?.tenantId;
@@ -70,6 +70,17 @@ function crearServicioConsolidateProgress({ obtenerAsignacion, guardarProgreso, 
         ultimoProgresoPorcentaje: resultado.porcentaje,
         ultimoProgresoEstudianteId: uid,
         actualizadoEn: payload.actualizadoEn,
+      });
+
+      // Plan B #2 (fix tutor-role-end-to-end): al completar un material, avisar al buzón del
+      // consultor. El adaptador mapea el uid del visor a su estudiante y deduplica por
+      // (estudianteId + asignacionId), así que llamar en cada completitud no genera duplicados.
+      await notificarAvance({
+        tenantId: data.tenantId,
+        uid,
+        asignacion,
+        asignacionId: data.asignacionId,
+        porcentaje: resultado.porcentaje,
       });
     }
 

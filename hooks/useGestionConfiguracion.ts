@@ -2,6 +2,7 @@
 // hooks/useGestionConfiguracion.ts
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Usuario, ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
+import { RolUsuario } from '../tipos';
 import { useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
@@ -95,13 +96,21 @@ export const useGestionConfiguracion = () => {
         return obtenerLimiteEquipoTecnico(configClub);
     }, [configClub]);
 
+    // Fix tutor-role-end-to-end (2026-07-14): el cupo del plan es de STAFF (equipo técnico).
+    // Tutor/Estudiante son consultores y NO deben contar contra ese límite. Se cuentan solo
+    // los usuarios de staff para las validaciones de cupo.
+    const cantidadStaff = useMemo(
+        () => usuarios.filter((u) => u.rol !== RolUsuario.Tutor && u.rol !== RolUsuario.Estudiante).length,
+        [usuarios]
+    );
+
     const notificarLimiteUsuarios = () => {
         mostrarNotificacion(`Límite de equipo técnico alcanzado (${limiteUsuariosPermitido}). Mejora tu plan o compra cupos adicionales para agregar más perfiles.`, "warning");
     };
 
     const abrirFormularioUsuario = (usuario: Usuario | null = null) => {
         // VALIDACIÓN SAAS: Límite de usuarios (instructores/asistentes)
-        if (!usuario && limiteUsuariosPermitido > 0 && usuarios.length >= limiteUsuariosPermitido) {
+        if (!usuario && limiteUsuariosPermitido > 0 && cantidadStaff >= limiteUsuariosPermitido) {
             notificarLimiteUsuarios();
             return;
         }
@@ -115,7 +124,7 @@ export const useGestionConfiguracion = () => {
     };
 
     const guardarUsuarioHandler = async (datos: any, id?: string) => {
-        if (!id && limiteUsuariosPermitido > 0 && usuarios.length >= limiteUsuariosPermitido) {
+        if (!id && limiteUsuariosPermitido > 0 && cantidadStaff >= limiteUsuariosPermitido) {
             notificarLimiteUsuarios();
             cerrarFormularioUsuario();
             return;

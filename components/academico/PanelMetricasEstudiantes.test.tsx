@@ -57,6 +57,12 @@ jest.mock('../../servicios/academico/actividadService', () => ({
   obtenerMetricas: jest.fn(),
 }));
 
+const mockCallableDemo = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => 'functions-mock'),
+  httpsCallable: jest.fn(() => mockCallableDemo),
+}));
+
 beforeEach(() => {
   jest.clearAllMocks();
   (actividadServiceModule.actividadService.obtenerMetricas as jest.Mock).mockResolvedValue({
@@ -150,5 +156,49 @@ describe('PanelMetricasEstudiantes', () => {
     await waitFor(() => screen.getByText('Bruno López'));
     // 'Atrasado' aparece en el badge Y en la opción del select
     expect(screen.getAllByText('Atrasado').length).toBeGreaterThanOrEqual(1);
+  });
+
+  describe('datos demo', () => {
+    it('muestra botón "Generar datos demo" en el estado vacío y llama a la Cloud Function', async () => {
+      (actividadServiceModule.actividadService.obtenerMetricas as jest.Mock).mockResolvedValue({
+        metricas: [],
+      });
+      mockCallableDemo.mockResolvedValue({ data: { ok: true, generados: 8 } });
+
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText(/sin actividad registrada/i));
+
+      fireEvent.click(screen.getByRole('button', { name: /generar datos demo/i }));
+
+      await waitFor(() => {
+        expect(mockCallableDemo).toHaveBeenCalledWith({ tenantId: 'tenant-1' });
+        expect(screen.getByText(/se generaron 8 estudiantes de ejemplo/i)).toBeInTheDocument();
+      });
+    });
+
+    it('no muestra el botón "Limpiar datos demo" si ninguna métrica es demo', async () => {
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+      expect(screen.queryByRole('button', { name: /limpiar datos demo/i })).not.toBeInTheDocument();
+    });
+
+    it('muestra "Limpiar datos demo" cuando hay métricas con el prefijo demo- y llama a la Cloud Function', async () => {
+      (actividadServiceModule.actividadService.obtenerMetricas as jest.Mock).mockResolvedValue({
+        metricas: [
+          { ...metricasDemo[0], estudianteId: 'demo-progreso-01' },
+        ],
+      });
+      mockCallableDemo.mockResolvedValue({ data: { ok: true, eliminados: 1 } });
+
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByRole('button', { name: /limpiar datos demo/i }));
+
+      fireEvent.click(screen.getByRole('button', { name: /limpiar datos demo/i }));
+
+      await waitFor(() => {
+        expect(mockCallableDemo).toHaveBeenCalledWith({ tenantId: 'tenant-1' });
+        expect(screen.getByText(/se eliminaron 1 estudiantes de ejemplo/i)).toBeInTheDocument();
+      });
+    });
   });
 });

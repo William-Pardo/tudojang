@@ -5,9 +5,10 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../context/AuthContext';
-import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoEmail, IconoLogin, IconoInformacion, IconoLogoOficial } from '../components/Iconos';
+import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoEmail, IconoLogin, IconoInformacion } from '../components/Iconos';
 import FormInputError from '../components/FormInputError';
 import ModalRecuperarContrasena from '../components/ModalRecuperarContrasena';
+import AuthCardShell from '../components/AuthCardShell';
 
 const schema = yup.object({
   email: yup.string().email('Debe ser un correo válido.').required('El correo electrónico es obligatorio.'),
@@ -36,25 +37,14 @@ const Login: React.FC = () => {
 
   return (
     <>
-      <div className="flex items-center justify-center min-h-screen bg-tkd-blue p-4 transition-colors duration-500 overflow-y-auto">
-        <div className="w-full max-w-md p-6 sm:p-8 landscape:p-6 space-y-6 sm:space-y-8 landscape:space-y-4 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-white/10 relative my-auto">
-
-          {/* HEADER: SIEMPRE ORIGINAL TUDOJANG */}
-          <div className="text-center landscape:flex landscape:items-center landscape:text-left landscape:gap-5">
-            <div className="bg-tkd-gray dark:bg-gray-800 w-20 h-20 sm:w-24 sm:h-24 landscape:w-16 landscape:h-16 rounded-2xl flex items-center justify-center mx-auto landscape:mx-0 shadow-inner border border-gray-100 dark:border-gray-700 flex-shrink-0">
-              <IconoLogoOficial className="w-12 h-12 sm:w-16 sm:h-16 landscape:w-10 landscape:h-10 text-tkd-red" />
-            </div>
-            <div className="mt-4 sm:mt-6 landscape:mt-0">
-              <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
-                Tudojang <span className="text-tkd-blue">SaaS</span>
-              </h2>
-              <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-widest leading-none">Gestión Premium para Dojangs</p>
-              <div className="mt-2 inline-block px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
-                <span className="text-[8px] font-black text-green-700 dark:text-green-400 uppercase tracking-wider">✓ Versión Actualizada 16-FEB-2026</span>
-              </div>
-            </div>
+      <AuthCardShell>
+        <div className="text-center -mt-2">
+          <div className="inline-block px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+            <span className="text-[8px] font-black text-green-700 dark:text-green-400 uppercase tracking-wider">✓ Versión Actualizada 16-FEB-2026</span>
           </div>
+        </div>
 
+        <div>
           <form className="space-y-4 sm:space-y-5 landscape:space-y-3" onSubmit={handleSubmit(manejarSubmit)}>
             <div>
               <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">Correo Electrónico</label>
@@ -96,7 +86,7 @@ const Login: React.FC = () => {
             </button>
           </div>
         </div>
-      </div>
+      </AuthCardShell>
       <ModalRecuperarContrasena abierto={modalRecuperarAbierto} onCerrar={() => setModalRecuperarAbierto(false)} />
     </>
   );

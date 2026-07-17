@@ -49,16 +49,24 @@ export const obtenerEventos = async (): Promise<Evento[]> => {
         return [];
     }
     const q = query(eventosCollection, orderBy('fechaEvento', 'desc'));
-    const [eventosSnap, solicitudesSnap] = await Promise.all([
-        getDocs(q),
-        getDocs(query(solicitudesCollection, where('estado', '==', EstadoSolicitud.Pendiente)))
-    ]);
-    
+    const eventosSnap = await getDocs(q);
+
+    // Fix (bug reportado: a Tutor "le falta la vista Evento"): el conteo de solicitudes
+    // pendientes es informativo para staff (gestión de eventos). Tutor/Estudiante no tienen
+    // permiso de leer `solicitudesInscripcion` (datos de inscripción de otras familias) ni
+    // lo necesitan. Antes esto vivía en el mismo Promise.all que la lectura de `eventos`:
+    // el permission-denied de solicitudesInscripcion tiraba abajo TODA la carga de eventos,
+    // aunque `eventos` en sí ya tenía permiso de lectura para esos roles.
     const solicitudesPendientesMap = new Map<string, number>();
-    solicitudesSnap.forEach(doc => {
-        const solicitud = doc.data() as SolicitudInscripcion;
-        solicitudesPendientesMap.set(solicitud.eventoId, (solicitudesPendientesMap.get(solicitud.eventoId) || 0) + 1);
-    });
+    try {
+        const solicitudesSnap = await getDocs(query(solicitudesCollection, where('estado', '==', EstadoSolicitud.Pendiente)));
+        solicitudesSnap.forEach(doc => {
+            const solicitud = doc.data() as SolicitudInscripcion;
+            solicitudesPendientesMap.set(solicitud.eventoId, (solicitudesPendientesMap.get(solicitud.eventoId) || 0) + 1);
+        });
+    } catch (err) {
+        console.warn('[eventosApi] No se pudo cargar el conteo de solicitudes pendientes (rol sin permiso o error de red):', err);
+    }
 
     return eventosSnap.docs.map(doc => ({
         id: doc.id,

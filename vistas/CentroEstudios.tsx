@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { RolUsuario } from '../tipos';
 import { centroEstudiosRepository, prepararAsignacionesCentroEstudios } from '../servicios/academico/centroEstudiosRepository';
+import { resolveStudentsForConsultor } from '../servicios/academico/tutorStudentResolver';
 import { crearProgresoRepository } from '../servicios/academico/progresoRepository';
 import type { AsignacionCentroEstudios } from '../models/academico/asignacionService.types';
 import AsignacionCard from '../components/academico/AsignacionCard';
@@ -41,6 +42,8 @@ const CentroEstudios: React.FC = () => {
   const [cargando, setCargando] = React.useState(true);
   const [triggerRecursos, setTriggerRecursos] = React.useState(0);
   const [tabGestion, setTabGestion] = React.useState<TabGestion>('flujo');
+  const [estudianteResueltoId, setEstudianteResueltoId] = React.useState<string | null>(null);
+  const [estudianteResueltoNombre, setEstudianteResueltoNombre] = React.useState<string | null>(null);
   const [estadoBiblioteca, setEstadoBiblioteca] = React.useState({
     driveConectado: false,
     carpetaSeleccionada: false,
@@ -56,24 +59,64 @@ const CentroEstudios: React.FC = () => {
   });
   const [recursosParaLote, setRecursosParaLote] = React.useState<string[]>([]);
 
+  // Phase 5: Resolver linked student for Tutores
   React.useEffect(() => {
     let activo = true;
 
     if (!usuario?.tenantId) return;
 
-    centroEstudiosRepository.obtenerAsignaciones({
-      tenantId: usuario.tenantId,
-      estudianteId: usuario?.id || 'demo-estudiante',
-    }).then((respuesta) => {
-      if (!activo) return;
-      setAsignaciones(respuesta.asignaciones);
-      setCargando(false);
-    });
+    const cargarAsignaciones = async () => {
+      let estudianteIdParaQuery = usuario.id || 'demo-estudiante';
+      let estudianteNombreDisplay = usuario.nombreUsuario || 'Estudiante';
+
+      // Fix tutor-role-end-to-end (2026-07-14): consultores (Tutor y Estudiante) resuelven
+      // su estudiante por EMAIL de login — Tutor por `tutor.correo`, Estudiante por `correo`
+      // (ver resolveStudentsForConsultor). Antes el Estudiante usaba usuario.id (Auth UID),
+      // que no es el docId del estudiante -> consultaba materiales con id incorrecto.
+      const esConsultor = usuario.rol === RolUsuario.Tutor || usuario.rol === RolUsuario.Estudiante;
+      if (esConsultor) {
+        try {
+          const esTutor = usuario.rol === RolUsuario.Tutor;
+          const estudiantesResueltos = await resolveStudentsForConsultor(usuario.tenantId, usuario.email, esTutor);
+          if (estudiantesResueltos.length > 0) {
+            estudianteIdParaQuery = estudiantesResueltos[0].id;
+            estudianteNombreDisplay = `${estudiantesResueltos[0].nombres} ${estudiantesResueltos[0].apellidos}`;
+            setEstudianteResueltoId(estudianteIdParaQuery);
+            setEstudianteResueltoNombre(estudianteNombreDisplay);
+          } else {
+            console.warn('Consultor sin estudiante resuelto');
+            setCargando(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Error resolviendo estudiante del consultor:', err);
+          setCargando(false);
+          return;
+        }
+      }
+
+      try {
+        const respuesta = await centroEstudiosRepository.obtenerAsignaciones({
+          tenantId: usuario.tenantId,
+          estudianteId: estudianteIdParaQuery,
+        });
+        if (!activo) return;
+        setAsignaciones(respuesta.asignaciones);
+      } catch (err) {
+        console.error('Error cargando asignaciones:', err);
+      } finally {
+        if (activo) {
+          setCargando(false);
+        }
+      }
+    };
+
+    cargarAsignaciones();
 
     return () => {
       activo = false;
     };
-  }, [usuario?.id, usuario?.tenantId]);
+  }, [usuario?.id, usuario?.tenantId, usuario?.rol]);
 
   const cerrarMaterial = () => {
     setAsignacionAbierta(null);
@@ -135,10 +178,18 @@ const CentroEstudios: React.FC = () => {
       <header className="space-y-5">
         <div>
           <h1 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
-            Centro de Estudios
+            {usuario?.rol === RolUsuario.Tutor && estudianteResueltoNombre
+              ? `Materiales de ${estudianteResueltoNombre}`
+              : usuario?.rol === RolUsuario.Estudiante
+              ? 'Mis materiales'
+              : 'Centro de Estudios'}
           </h1>
           <p className="mt-2 max-w-3xl text-sm font-bold text-gray-500 dark:text-gray-300">
-            Convierte archivos de Drive en recursos aprobados y publicalos a una clase, grupo o estudiante.
+            {usuario?.rol === RolUsuario.Tutor
+              ? 'Recursos académicos asignados a tu hijo'
+              : usuario?.rol === RolUsuario.Estudiante
+              ? 'Tus recursos académicos asignados'
+              : 'Convierte archivos de Drive en recursos aprobados y publicalos a una clase, grupo o estudiante.'}
           </p>
         </div>
       </header>
@@ -185,8 +236,12 @@ const CentroEstudios: React.FC = () => {
           activa. Para estudiantes (sin `puedeGestionarJornadas`, sin tab switcher)
           `tabGestion` nunca cambia de 'flujo', por lo que el stepper sigue visible
           para ellos igual que antes. */}
-      {tabGestion === 'flujo' && (
-        <ol className="rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900 grid gap-3 lg:grid-cols-[16fr_47fr_37fr] lg:items-center" aria-label="Flujo principal de Centro de Estudios">
+      {/* Fix tutor-role-end-to-end (2026-07-14): el stepper de 3 pasos (Conectar Drive /
+          Centro de recursos / Programa y publicación) describe el pipeline de GESTIÓN de
+          contenido — solo aplica a staff. Un consultor (Tutor/Estudiante) no debe verlo:
+          su vista es exclusivamente sus materiales/progreso. Se gatea a puedeGestionarJornadas. */}
+      {puedeGestionarJornadas && tabGestion === 'flujo' && (
+        <ol className="rounded-[2rem] border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-900 grid gap-3 lg:grid-cols-[18fr_34fr_48fr] lg:items-center" aria-label="Flujo principal de Centro de Estudios">
           {pasosConEstado.map((paso) => (
               <li
                 key={paso.numero}
@@ -219,7 +274,7 @@ const CentroEstudios: React.FC = () => {
               id="panel-flujo"
               role="tabpanel"
               aria-labelledby="tab-flujo"
-              className="grid gap-5 xl:grid-cols-[16fr_47fr_37fr]"
+              className="grid gap-5 xl:grid-cols-[18fr_34fr_48fr]"
             >
               <BibliotecaView
                 embedded
@@ -295,8 +350,17 @@ const CentroEstudios: React.FC = () => {
         asignacion={asignacionAbierta}
         onCerrar={cerrarMaterial}
         repository={progresoAcademicoRepository}
-        estudianteId={usuario?.id}
-        estudianteNombre={usuario?.nombreUsuario}
+        // Fix 2026-07-16 (bug reportado: un Tutor viendo el material de su hijo para
+        // confirmar la asignación inflaba las métricas de consumo del estudiante): antes se
+        // pasaba usuario?.id (el Auth UID de QUIEN ESTÁ LOGUEADO) sin importar el rol -- para
+        // Tutor eso es su propia cuenta, no el estudiante, y de todas formas activaba el
+        // registro de actividad (useRegistrarActividad solo revisa "¿hay estudianteId?").
+        // Ahora solo se pasa cuando el propio Estudiante es quien mira (con su id REAL de
+        // `estudiantes/{id}`, resuelto por email -- no su Auth UID, que tampoco coincidía).
+        // Tutor sigue pudiendo reproducir/ver el contenido real (ver fix de rolPermitido en
+        // getTemporaryFileUrl), simplemente sin que cuente como consumo de nadie.
+        estudianteId={usuario?.rol === RolUsuario.Estudiante ? (estudianteResueltoId ?? undefined) : undefined}
+        estudianteNombre={usuario?.rol === RolUsuario.Estudiante ? (estudianteResueltoNombre ?? undefined) : undefined}
       />
     </div>
   );

@@ -13,6 +13,7 @@ export default {
   moduleNameMapper: {
     'framer-motion': '<rootDir>/__mocks__/framer-motion.tsx',
     '^d3-(.*)$': '<rootDir>/node_modules/d3-$1',
+    '^\\./pdfWorkerConfig$': '<rootDir>/components/academico/pdfWorkerConfig.mock.ts',
   },
   transform: {
     '^.+\\.tsx?$': 'ts-jest',

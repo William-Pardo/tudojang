@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { acceptInvitation } from '../servicios/academico/invitacionService';
+import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoLogin } from '../components/Iconos';
+import AuthCardShell from '../components/AuthCardShell';
 
 const passwordMinLength = 8;
 
@@ -9,6 +11,7 @@ const VistaActivarCuenta: React.FC = () => {
   const navigate = ReactRouterDOM.useNavigate();
   const [password, setPassword] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
+  const [verClave, setVerClave] = useState(false);
   const [estado, setEstado] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [mensaje, setMensaje] = useState('');
 
@@ -28,7 +31,16 @@ const VistaActivarCuenta: React.FC = () => {
   const puedeEnviar = enlaceCompleto
     && password.length >= passwordMinLength
     && password === confirmacion
-    && estado !== 'loading';
+    && estado !== 'loading'
+    && estado !== 'success';
+
+  // Fix tutor-role-end-to-end (2026-07-14): al activar con éxito, redirigir SOLO al login
+  // automáticamente (sin un segundo botón "Ir al login" que confundía y no respondía).
+  useEffect(() => {
+    if (estado !== 'success') return;
+    const t = setTimeout(() => navigate('/login', { replace: true }), 1800);
+    return () => clearTimeout(t);
+  }, [estado, navigate]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -39,92 +51,107 @@ const VistaActivarCuenta: React.FC = () => {
     try {
       await acceptInvitation(tenantId, invitacionId, token, password);
       setEstado('success');
-      setMensaje('Cuenta activada correctamente. Ya puedes iniciar sesión.');
+      setMensaje('Cuenta activada. Redirigiendo al inicio de sesión...');
     } catch (error) {
       setEstado('error');
       setMensaje(error instanceof Error ? error.message : 'No fue posible activar la cuenta.');
     }
   };
 
-  return (
-    <main className="min-h-screen bg-tkd-blue flex items-center justify-center p-6">
-      <section className="w-full max-w-xl bg-white rounded-[2rem] shadow-2xl p-8 md:p-10 space-y-8">
-        <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">Acceso académico</p>
-          <h1 className="text-3xl md:text-4xl font-black uppercase text-tkd-dark">Crear login</h1>
-          <p className="text-sm font-bold text-gray-500">
-            Define una contraseña segura para activar tu cuenta de estudiante o tutor en Tudojang.
-          </p>
-        </div>
+  // Fix consistencia UX de autenticación (2026-07-15): mismos estilos de input/botón que
+  // Login.tsx (reutiliza el mismo lenguaje visual, no solo el mismo shell).
+  const inputClase = (conError: boolean) =>
+    `w-full py-2.5 sm:py-3 pl-10 pr-10 rounded-xl border-2 transition-all outline-none font-bold text-sm sm:text-base ${
+      conError ? 'border-red-500' : 'border-gray-100 focus:border-tkd-blue dark:bg-gray-800 dark:border-gray-700 dark:text-white'
+    }`;
+  const OjoBtn = (
+    <button
+      type="button"
+      onClick={() => setVerClave((v) => !v)}
+      aria-label={verClave ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-tkd-blue"
+    >
+      {verClave ? <IconoOjoCerrado className="w-4 h-4 sm:w-5 sm:h-5" /> : <IconoOjoAbierto className="w-4 h-4 sm:w-5 sm:h-5" />}
+    </button>
+  );
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="password" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-              Contraseña
-            </label>
+  return (
+    <AuthCardShell>
+      <div className="text-center -mt-2 space-y-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-tkd-red">Acceso académico</p>
+        <p className="text-xs font-bold text-gray-500">
+          Definí tu contraseña para activar tu cuenta en Tudojang.
+        </p>
+      </div>
+
+      <form className="space-y-4 sm:space-y-5" onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="password" className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">
+            Contraseña
+          </label>
+          <div className="relative">
+            <IconoCandado className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-tkd-blue" />
             <input
               id="password"
-              type="password"
+              type={verClave ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:border-tkd-blue"
+              disabled={estado === 'success'}
+              className={inputClase(false)}
               placeholder="Mínimo 8 caracteres"
             />
+            {OjoBtn}
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="confirmacion" className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
-              Confirmar contraseña
-            </label>
+        <div>
+          <label htmlFor="confirmacion" className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-1 tracking-widest">
+            Confirmar contraseña
+          </label>
+          <div className="relative">
+            <IconoCandado className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-tkd-blue" />
             <input
               id="confirmacion"
-              type="password"
+              type={verClave ? 'text' : 'password'}
               value={confirmacion}
               onChange={(event) => setConfirmacion(event.target.value)}
               autoComplete="new-password"
-              className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm font-bold outline-none focus:border-tkd-blue"
+              disabled={estado === 'success'}
+              className={inputClase(false)}
               placeholder="Repite la contraseña"
             />
+            {OjoBtn}
           </div>
+        </div>
 
-          {(errorFormulario || mensaje) && (
-            <div
-              role="status"
-              className={`rounded-2xl px-5 py-4 text-xs font-black uppercase tracking-wider ${
-                estado === 'success'
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-tkd-red'
-              }`}
-            >
-              {mensaje || errorFormulario}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={!puedeEnviar}
-            className="w-full rounded-2xl bg-tkd-dark px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-white transition hover:bg-tkd-blue disabled:cursor-not-allowed disabled:opacity-40"
+        {(errorFormulario || mensaje) && (
+          <div
+            role="status"
+            className={`p-2 sm:p-3 rounded-xl text-[10px] sm:text-xs font-bold text-center border uppercase ${
+              estado === 'success'
+                ? 'bg-green-50 text-green-700 border-green-100'
+                : 'bg-red-50 text-red-600 border-red-100'
+            }`}
           >
-            {estado === 'loading' ? 'Activando...' : 'Activar cuenta'}
-          </button>
+            {mensaje || errorFormulario}
+          </div>
+        )}
 
-          {estado === 'success' && (
-            <button
-              type="button"
-              onClick={() => navigate('/login', { replace: true })}
-              className="w-full rounded-2xl border border-tkd-blue px-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-tkd-blue"
-            >
-              Ir al login
-            </button>
-          )}
-        </form>
+        <button
+          type="submit"
+          disabled={!puedeEnviar}
+          className="w-full py-3.5 sm:py-4 bg-tkd-red text-white rounded-xl font-black uppercase text-[10px] sm:text-xs tracking-widest shadow-xl hover:bg-red-700 active:scale-95 transition-all disabled:bg-gray-300 flex items-center justify-center gap-2"
+        >
+          <IconoLogin className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span>{estado === 'loading' ? 'Activando...' : estado === 'success' ? 'Redirigiendo...' : 'Aceptar'}</span>
+        </button>
+      </form>
 
-        <p className="text-[11px] font-bold text-gray-400">
-          Este enlace es personal, temporal y de un solo uso. No compartas tu contraseña por ningún canal.
-        </p>
-      </section>
-    </main>
+      <p className="text-[9px] font-bold text-gray-400 text-center pt-2">
+        Este enlace es personal, temporal y de un solo uso. No compartas tu contraseña por ningún canal.
+      </p>
+    </AuthCardShell>
   );
 };
 

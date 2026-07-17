@@ -63,6 +63,16 @@ describe('eventosApi', () => {
       ]);
     });
 
+    it('regresión: si solicitudesInscripcion deniega permiso (Tutor/Estudiante), igual devuelve los eventos con solicitudesPendientes en 0', async () => {
+      (getDocs as jest.Mock)
+        .mockResolvedValueOnce({ docs: [{ id: 'ev1', data: () => ({ nombre: 'Uno' }) }] })
+        .mockRejectedValueOnce(Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' }));
+
+      await expect(obtenerEventos()).resolves.toEqual([
+        { id: 'ev1', nombre: 'Uno', solicitudesPendientes: 0 },
+      ]);
+    });
+
     it('obtiene evento por id y falla si no existe', async () => {
         (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => true, id: 'ev1', data: () => ({ nombre: 'Uno' }) });
         await expect(obtenerEventoPorId('ev1')).resolves.toEqual({ id: 'ev1', nombre: 'Uno' });

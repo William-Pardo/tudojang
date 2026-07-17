@@ -29,10 +29,10 @@ describe('VistaActivarCuenta', () => {
 
     await user.type(screen.getByLabelText(/^contraseña$/i), 'ClaveSegura123');
     await user.type(screen.getByLabelText(/confirmar contraseña/i), 'ClaveSegura123');
-    await user.click(screen.getByRole('button', { name: /activar cuenta/i }));
+    await user.click(screen.getByRole('button', { name: /aceptar/i }));
 
     expect(acceptInvitation).toHaveBeenCalledWith('tenant-1', 'inv-1', 'tok-1', 'ClaveSegura123');
-    expect(await screen.findByText(/cuenta activada correctamente/i)).toBeInTheDocument();
+    expect(await screen.findByText(/cuenta activada/i)).toBeInTheDocument();
   });
 
   it('bloquea envio si el enlace esta incompleto', () => {
@@ -44,7 +44,25 @@ describe('VistaActivarCuenta', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('button', { name: /activar cuenta/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /aceptar/i })).toBeDisabled();
     expect(screen.getByText(/enlace de activación está incompleto/i)).toBeInTheDocument();
+  });
+
+  it('el ojito alterna entre ocultar y mostrar la contraseña', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/activar-cuenta?tenantId=tenant-1&invitacionId=inv-1&token=tok-1']}>
+        <Routes>
+          <Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const passwordInput = screen.getByLabelText(/^contraseña$/i) as HTMLInputElement;
+    expect(passwordInput.type).toBe('password');
+
+    // Hay un ojito por campo (comparten el mismo estado verClave) -- tomamos el primero.
+    await user.click(screen.getAllByRole('button', { name: /mostrar contraseña/i })[0]);
+    expect(passwordInput.type).toBe('text');
   });
 });

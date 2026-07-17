@@ -4,9 +4,14 @@
 // Permite buscar, filtrar y ver el detalle de cada estudiante.
 
 import React from 'react';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { actividadService } from '../../servicios/academico/actividadService';
 import type { MetricasEstudiante } from '../../models/academico/actividad';
 import ProgresoEstudianteCard from './ProgresoEstudianteCard';
+
+// Prefijo usado por functions/academico/datosDemoProgreso.js para identificar (y poder
+// limpiar) los registros sembrados por "Generar datos demo" — no son estudiantes reales.
+const PREFIJO_DEMO = 'demo-progreso-';
 
 // ---------------------------------------------------------------------------
 // Helper: estado de badge de avance global
@@ -35,32 +40,70 @@ const PanelMetricasEstudiantes: React.FC<PanelMetricasEstudiantesProps> = ({ ten
   const [busqueda, setBusqueda] = React.useState('');
   const [filtroEstado, setFiltroEstado] = React.useState<'todos' | 'al_dia' | 'en_progreso' | 'atrasado' | 'sin_iniciar'>('todos');
   const [expandidoId, setExpandidoId] = React.useState<string | null>(null);
+  const [accionDemo, setAccionDemo] = React.useState<'generando' | 'limpiando' | null>(null);
+  const [mensajeDemo, setMensajeDemo] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  const cargarMetricas = React.useCallback(async () => {
     if (!tenantId) return;
-    let activo = true;
     setCargando(true);
     setError(null);
-
-    actividadService
-      .obtenerMetricas({ tenantId })
-      .then(({ metricas: datos }) => {
-        if (!activo) return;
-        setMetricas(datos.sort((a, b) =>
-          (a.estudianteNombre ?? a.estudianteId).localeCompare(b.estudianteNombre ?? b.estudianteId)
-        ));
-      })
-      .catch((err: unknown) => {
-        if (!activo) return;
-        setError('No se pudieron cargar las métricas de estudiantes.');
-        console.error('[PanelMetricasEstudiantes]', err);
-      })
-      .finally(() => {
-        if (activo) setCargando(false);
-      });
-
-    return () => { activo = false; };
+    try {
+      const { metricas: datos } = await actividadService.obtenerMetricas({ tenantId });
+      setMetricas(datos.sort((a, b) =>
+        (a.estudianteNombre ?? a.estudianteId).localeCompare(b.estudianteNombre ?? b.estudianteId)
+      ));
+    } catch (err: unknown) {
+      setError('No se pudieron cargar las métricas de estudiantes.');
+      console.error('[PanelMetricasEstudiantes]', err);
+    } finally {
+      setCargando(false);
+    }
   }, [tenantId]);
+
+  React.useEffect(() => {
+    cargarMetricas();
+  }, [cargarMetricas]);
+
+  // ---- Datos demo (temporal, para presentaciones) ----
+  const hayDatosDemo = metricas.some((m) => m.estudianteId.startsWith(PREFIJO_DEMO));
+
+  const handleGenerarDemo = React.useCallback(async () => {
+    setAccionDemo('generando');
+    setMensajeDemo(null);
+    try {
+      const generar = httpsCallable<{ tenantId: string }, { ok: boolean; generados: number }>(
+        getFunctions(),
+        'generarDatosDemoProgreso'
+      );
+      const { data } = await generar({ tenantId });
+      setMensajeDemo(`Se generaron ${data.generados} estudiantes de ejemplo.`);
+      await cargarMetricas();
+    } catch (err: unknown) {
+      setMensajeDemo('No se pudieron generar los datos demo.');
+      console.error('[PanelMetricasEstudiantes] generarDatosDemoProgreso', err);
+    } finally {
+      setAccionDemo(null);
+    }
+  }, [tenantId, cargarMetricas]);
+
+  const handleLimpiarDemo = React.useCallback(async () => {
+    setAccionDemo('limpiando');
+    setMensajeDemo(null);
+    try {
+      const limpiar = httpsCallable<{ tenantId: string }, { ok: boolean; eliminados: number }>(
+        getFunctions(),
+        'limpiarDatosDemoProgreso'
+      );
+      const { data } = await limpiar({ tenantId });
+      setMensajeDemo(`Se eliminaron ${data.eliminados} estudiantes de ejemplo.`);
+      await cargarMetricas();
+    } catch (err: unknown) {
+      setMensajeDemo('No se pudieron eliminar los datos demo.');
+      console.error('[PanelMetricasEstudiantes] limpiarDatosDemoProgreso', err);
+    } finally {
+      setAccionDemo(null);
+    }
+  }, [tenantId, cargarMetricas]);
 
   // ---- Filtrado ----
   const metricasFiltradas = React.useMemo(() => {
@@ -123,12 +166,28 @@ const PanelMetricasEstudiantes: React.FC<PanelMetricasEstudiantesProps> = ({ ten
       aria-label="Panel de métricas académicas por estudiante"
     >
       {/* Encabezado del panel */}
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Métricas académicas</p>
-        <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white">
-          Progreso por Estudiante
-        </h2>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-gray-400">Métricas académicas</p>
+          <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white">
+            Progreso por Estudiante
+          </h2>
+        </div>
+        {hayDatosDemo && (
+          <button
+            type="button"
+            onClick={handleLimpiarDemo}
+            disabled={accionDemo !== null}
+            className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors disabled:opacity-50 self-start sm:self-auto"
+          >
+            {accionDemo === 'limpiando' ? 'Eliminando datos demo...' : '✕ Limpiar datos demo'}
+          </button>
+        )}
       </div>
+
+      {mensajeDemo && (
+        <p className="text-xs font-bold text-tkd-blue">{mensajeDemo}</p>
+      )}
 
       {/* KPIs del panel */}
       {metricas.length > 0 && (
@@ -196,6 +255,14 @@ const PanelMetricasEstudiantes: React.FC<PanelMetricasEstudiantesProps> = ({ ten
             Asignar material a una clase no genera actividad por sí solo: cada estudiante
             debe abrirlo desde su propio Centro de Estudios.
           </p>
+          <button
+            type="button"
+            onClick={handleGenerarDemo}
+            disabled={accionDemo !== null}
+            className="mt-5 rounded-2xl bg-tkd-blue px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {accionDemo === 'generando' ? 'Generando...' : 'Generar datos demo'}
+          </button>
         </div>
       ) : metricasFiltradas.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 dark:border-white/10 p-6 text-sm text-gray-400 text-center">

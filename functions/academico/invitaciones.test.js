@@ -113,11 +113,14 @@ describe('crearServicioInviteUser', () => {
     ).rejects.toThrow('Ya existe un usuario');
   });
 
-  it('crea invitacion con token hasheado y envia correo formal para Estudiante', async () => {
+  // Fix consistencia de plantillas (2026-07-15): usa la plantilla HTML real por rol
+  // (plantillasInvitacion.js, antes en --/asignación_de_contraseña_*.html sin conectar) en
+  // vez del HTML generico anterior.
+  it('crea invitacion con token hasheado y envia correo con la plantilla de Estudiante', async () => {
     const { service, firestore, enviarCorreo } = buildService();
 
     const result = await service(
-      { email: 'nuevo@b.com', rol: 'Estudiante', tenantId: 'tenant-abc' },
+      { email: 'nuevo@b.com', rol: 'Estudiante', tenantId: 'tenant-abc', nombreDestinatario: 'Ana Pérez' },
       makeContext()
     );
 
@@ -132,19 +135,22 @@ describe('crearServicioInviteUser', () => {
     expect(firestore._docRef.set.mock.calls[0][0].activationLink).toContain('invitacionId=inv-123');
     expect(firestore._docRef.set.mock.calls[0][0]).not.toHaveProperty('token');
     expect(enviarCorreo).toHaveBeenCalledTimes(1);
-    expect(enviarCorreo.mock.calls[0][1].subject).toContain('estudiante');
-    expect(enviarCorreo.mock.calls[0][1].html).toContain('Crear mi acceso');
+    expect(enviarCorreo.mock.calls[0][1].subject).toContain('bienvenida');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Asignar mi Contraseña');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Ana Pérez');
   });
 
-  it('crea invitacion con asunto de portal de seguimiento para Tutor', async () => {
+  it('crea invitacion con la plantilla de Tutor (incluye nombre del tutor y del alumno)', async () => {
     const { service, enviarCorreo } = buildService();
 
     await service(
-      { email: 'padre@familia.com', rol: 'Tutor', tenantId: 'tenant-abc' },
+      { email: 'padre@familia.com', rol: 'Tutor', tenantId: 'tenant-abc', nombreDestinatario: 'Carlos Gómez', nombreAlumno: 'Sofía Gómez' },
       makeContext()
     );
 
-    expect(enviarCorreo.mock.calls[0][1].subject).toContain('portal de seguimiento');
+    expect(enviarCorreo.mock.calls[0][1].subject).toContain('Tutores');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Carlos Gómez');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Sofía Gómez');
   });
 });
 
@@ -237,5 +243,34 @@ describe('crearServicioAcceptInvitation', () => {
       uid: 'uid-nuevo',
       tokenHash: null,
     }));
+  });
+
+  // Bug real encontrado 2026-07-15: si el email de la invitacion YA tenia una cuenta Auth
+  // (p.ej. invitado antes con otro rol), el flujo reusaba el uid pero nunca aplicaba la
+  // contrasena que la persona acaba de escribir en el formulario -- quedaba con la vieja en
+  // silencio, sin ningun error visible, y no podia loguear con la "nueva" clave.
+  it('si el email ya tiene cuenta, actualiza su contrasena con la recien escrita (no la ignora)', async () => {
+    const updateUser = jest.fn().mockResolvedValue();
+    const createUser = jest.fn();
+    const { service, auth } = buildService(defaultInvitacion, true, {
+      getUserByEmail: jest.fn().mockResolvedValue({ uid: 'uid-existente' }),
+      updateUser,
+      createUser,
+    });
+
+    const result = await service({
+      invitacionId: 'inv-123',
+      tenantId: 'tenant-abc',
+      token: 'token-valido',
+      password: 'claveNuevaSegura1',
+    });
+
+    expect(result.uid).toBe('uid-existente');
+    expect(updateUser).toHaveBeenCalledWith('uid-existente', { password: 'claveNuevaSegura1' });
+    expect(createUser).not.toHaveBeenCalled();
+    expect(auth.setCustomUserClaims).toHaveBeenCalledWith('uid-existente', {
+      rol: 'Estudiante',
+      tenantId: 'tenant-abc',
+    });
   });
 });

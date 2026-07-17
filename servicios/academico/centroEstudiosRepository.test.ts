@@ -232,5 +232,34 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
 
     expect(respuesta.asignaciones).toHaveLength(0);
   });
+
+  it('regresión: completa estadoProgreso/porcentajeProgreso/urgencia con defaults seguros (bug: crasheaba MaterialPreviewModal con "Cannot read properties of undefined (reading \'replace\')" al abrir una asignación real)', async () => {
+    // Los docs reales de `tenants/{tenantId}/asignaciones` (mockAsignacionesDocs) son
+    // AsignacionAcademica -- NUNCA traen estadoProgreso/porcentajeProgreso/urgencia,
+    // esos campos son específicos de AsignacionCentroEstudios y antes de este fix
+    // quedaban `undefined`, lo que hacía crashear `asignacion.estadoProgreso.replace(...)`
+    // en el primer render real (no en el fixture demo, que sí los traía hardcodeados).
+    const { crearCentroEstudiosRepository } = require('./centroEstudiosRepository');
+    const repository = crearCentroEstudiosRepository({
+      modo: 'firestore',
+      firestoreDeps: depsMock,
+    });
+
+    const respuesta = await repository.obtenerAsignaciones({
+      tenantId: 'tenant-1',
+      estudianteId: 'est-1',
+    });
+
+    expect(respuesta.asignaciones.length).toBeGreaterThan(0);
+    for (const asignacion of respuesta.asignaciones) {
+      expect(asignacion.estadoProgreso).toBeDefined();
+      expect(typeof asignacion.estadoProgreso).toBe('string');
+      expect(asignacion.porcentajeProgreso).toBeDefined();
+      expect(asignacion.urgencia).toBeDefined();
+    }
+
+    const asig1 = respuesta.asignaciones.find((a: any) => a.id === 'asig-1');
+    expect(asig1).toMatchObject({ estadoProgreso: 'disponible', porcentajeProgreso: 0, urgencia: 'sin_fecha' });
+  });
 });
 

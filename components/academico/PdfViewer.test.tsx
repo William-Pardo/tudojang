@@ -26,7 +26,7 @@ describe('PdfViewer', () => {
     jest.useRealTimers();
   });
 
-  it('renderiza paginas del PDF y registra pagina vista', async () => {
+  it('renderiza la primera pagina y permite navegar con los controles', async () => {
     const user = userEvent.setup();
 
     render(
@@ -41,11 +41,51 @@ describe('PdfViewer', () => {
 
     expect(screen.getByRole('heading', { name: /manual tecnico/i })).toBeInTheDocument();
     expect(screen.getByText(/pagina 1 de 3/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /anterior/i })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }));
+    expect(screen.getByText(/pagina 2 de 3/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /anterior/i })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /siguiente/i }));
     expect(screen.getByText(/pagina 3 de 3/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeDisabled();
+  });
 
-    await user.click(screen.getByRole('button', { name: /marcar pagina 2 como vista/i }));
+  it('marca la pagina actual como vista manualmente', async () => {
+    const user = userEvent.setup();
 
-    expect(mockRegistrarPaginaPdf).toHaveBeenCalledWith(2);
+    render(
+      <PdfViewer
+        tenantId="tenant-1"
+        asignacionId="asig-1"
+        titulo="Manual tecnico"
+        totalPaginas={3}
+        sincronizar={jest.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /marcar pagina actual como vista/i }));
+
+    expect(mockRegistrarPaginaPdf).toHaveBeenCalledWith(1);
+  });
+
+  it('cuando recibe una url real, renderiza el documento y usa el numero de paginas real del PDF', async () => {
+    render(
+      <PdfViewer
+        tenantId="tenant-1"
+        asignacionId="asig-1"
+        titulo="Manual tecnico"
+        url="https://drive-temporal.test/archivo.pdf"
+        totalPaginas={3}
+        sincronizar={jest.fn()}
+      />
+    );
+
+    // El mock de react-pdf (__mocks__/react-pdf.tsx) resuelve siempre 5 paginas al recibir
+    // `file`, y el numero real debe reemplazar la estimacion de totalPaginas (3).
+    expect(await screen.findByText(/pagina 1 de 5/i)).toBeInTheDocument();
+    expect(screen.getByTestId('mock-pdf-document')).toBeInTheDocument();
   });
 
   it('fuerza sincronizacion manual del avance acumulado', async () => {
@@ -78,7 +118,7 @@ describe('PdfViewer', () => {
     );
 
     expect(screen.getByText(/sin paginas disponibles/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /marcar pagina/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /marcar pagina actual/i })).not.toBeInTheDocument();
   });
 
   it('conecta la carga de progreso guardado para reanudar lectura', () => {
@@ -103,7 +143,7 @@ describe('PdfViewer', () => {
     }));
   });
 
-  it('no cuenta pagina solo por navegar; registra tras permanencia minima visible', async () => {
+  it('no cuenta pagina solo por navegar; registra automaticamente tras permanencia minima', async () => {
     jest.useFakeTimers();
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
 
@@ -118,7 +158,7 @@ describe('PdfViewer', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /abrir pagina 2/i }));
+    await user.click(screen.getByRole('button', { name: /siguiente/i }));
     expect(mockRegistrarPaginaPdf).not.toHaveBeenCalledWith(2);
 
     jest.advanceTimersByTime(4999);

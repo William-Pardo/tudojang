@@ -5,6 +5,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { construirCorreoInvitacion } = require('./plantillasInvitacion');
 
 const ROLES_ACADEMICOS_VALIDOS = ['Estudiante', 'Tutor'];
 const TTL_INVITACION_DIAS = 7;
@@ -38,7 +39,7 @@ const crearServicioInviteUser = ({ auth, firestore, enviarCorreo, resend, appUrl
       throw crearErrorOperativo('No autenticado', 'unauthenticated');
     }
 
-    const { email, rol, tenantId } = data;
+    const { email, rol, tenantId, nombreDestinatario, nombreAlumno } = data;
 
     if (
       context.auth.token.rol !== 'Admin' &&
@@ -105,28 +106,46 @@ const crearServicioInviteUser = ({ auth, firestore, enviarCorreo, resend, appUrl
 
     await invitacionRef.set(invitacion);
 
-    const asunto = rol === 'Tutor'
-      ? 'Tu acceso al portal de seguimiento de Tudojang esta listo'
-      : 'Tu cuenta de estudiante en Tudojang esta lista';
-
-    const cuerpo = `
-      <p>Hola,</p>
-      <p>Has sido invitado a acceder a <strong>Tudojang</strong> como <strong>${rol}</strong>.</p>
-      <p>Haz clic en el siguiente enlace para crear tu contrasena y activar tu cuenta. Este link es valido por ${TTL_INVITACION_DIAS} dias y solo puede usarse una vez:</p>
-      <p><a href="${activationLink}" style="background:#1a73e8;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">Crear mi acceso</a></p>
-      <p>Por seguridad, Tudojang nunca te pedira compartir tu contrasena por correo o WhatsApp.</p>
-      <p>Si no esperabas este correo, puedes ignorarlo.</p>
-    `;
-
-    const resendClient = typeof resend === 'function' ? resend() : resend;
-    await enviarCorreo(resendClient, {
-      from: 'Tudojang <notificaciones@tudojang.com>',
-      to: [emailLimpio],
-      subject: asunto,
-      html: cuerpo,
+    // Fix consistencia de plantillas (2026-07-15): antes había un HTML generico inline (mismo
+    // para Estudiante y Tutor, sin logo ni marca). Ahora usa la plantilla real por rol
+    // (--/asignación_de_contraseña_*.html, ver plantillasInvitacion.js), con el nombre del
+    // destinatario si el llamador lo mandó (FormularioEstudiante lo conoce; la invitación
+    // manual de Configuración → Cuentas Externas no, y usa un fallback razonable).
+    const { asunto, html: cuerpo } = construirCorreoInvitacion(rol, {
+      nombreDestinatario,
+      nombreAlumno,
+      enlace: activationLink,
     });
 
-    return { ok: true, invitacionId: invitacionRef.id, expiraEn: expiracion.toISOString() };
+    // Fix tutor-role-end-to-end (2026-07-14): el correo es una NOTIFICACIÓN, no el
+    // núcleo de la operación. Si el proveedor de email (Resend) falla, la invitación ya
+    // quedó creada en Firestore con su `activationLink` válido — NO debe abortarse todo.
+    // Se devuelve `emailEnviado` + `activationLink` para que el frontend surface el enlace
+    // (p.ej. compartir por WhatsApp) y el tutor pueda activar su cuenta igual.
+    let emailEnviado = false;
+    try {
+      const resendClient = typeof resend === 'function' ? resend() : resend;
+      await enviarCorreo(resendClient, {
+        from: 'Tudojang <notificaciones@tudojang.com>',
+        to: [emailLimpio],
+        subject: asunto,
+        html: cuerpo,
+      });
+      emailEnviado = true;
+    } catch (errorCorreo) {
+      console.error('[inviteUser] La invitación se creó pero el correo no pudo enviarse:', {
+        email: emailLimpio,
+        message: errorCorreo && errorCorreo.message,
+      });
+    }
+
+    return {
+      ok: true,
+      invitacionId: invitacionRef.id,
+      expiraEn: expiracion.toISOString(),
+      emailEnviado,
+      activationLink,
+    };
   };
 };
 
@@ -179,6 +198,13 @@ const crearServicioAcceptInvitation = ({ auth, firestore }) => {
     try {
       const existing = await auth.getUserByEmail(invitacion.email);
       uid = existing.uid;
+      // Bug real encontrado 2026-07-15: si el email YA tenia cuenta (p.ej. invitado antes con
+      // otro rol, o un reintento tras un submit duplicado), este branch reusaba el uid pero
+      // NUNCA aplicaba la contrasena que la persona acaba de escribir -- quedaba con la
+      // contrasena vieja en silencio, y el usuario no podia loguear con la que "acababa de
+      // asignar". El token ya se valido arriba (hash + vigencia), asi que aplicar la nueva
+      // contrasena aca es seguro -- es la misma garantia que el branch de creacion.
+      await auth.updateUser(uid, { password });
     } catch (err) {
       if (err.code === 'auth/user-not-found') {
         const newUser = await auth.createUser({

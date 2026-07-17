@@ -6,9 +6,10 @@ import { motion } from 'framer-motion';
 
 import { isFirebaseConfigured } from './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
+import { DataProvider, useEventos } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
 import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
+import { useNotificacion } from './context/NotificacionContext';
 import BrandingProvider, { useTenant } from './components/BrandingProvider';
 import { RolUsuario, type Usuario } from './tipos';
 
@@ -21,15 +22,18 @@ import VistaAdministracion from './vistas/Administracion';
 import { VistaEstudiantes } from './vistas/Estudiantes';
 import { VistaEventos } from './vistas/Eventos';
 import VistaTienda from './vistas/Tienda';
-import VistaMisionKicho from './MisionKicho';
+import VistaMisionKicho from './vistas/MisionKicho';
 import MasterAccess from './vistas/MasterAccess';
 import VistaNotificaciones from './vistas/Notificaciones';
+import VistaBuzonNotificaciones from './vistas/BuzonNotificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
 import VistaCentroEstudios from './vistas/CentroEstudios';
 import VistaJornadas from './vistas/admin/JornadasView';
 import VistaAgenda from './vistas/admin/AgendaView';
 import { ClaseEnVivoView } from './vistas/ClaseEnVivoView';
 import Vista404 from './vistas/404';
+import VistaActivarCuenta from './vistas/ActivarCuenta';
+import VistaRestablecerClave from './vistas/RestablecerClave';
 import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
@@ -52,7 +56,7 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoCalendario, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoAgenda, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
 } from './components/Iconos';
@@ -68,21 +72,38 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     // Recalculado cada 60s (mismo intervalo que tenia el placeholder).
     const { jornadaActiva } = useVentanaClaseEnVivo();
 
+    // Fix tutor-role-end-to-end (2026-07-14): el link "Eventos" se muestra al Tutor SOLO
+    // cuando existe un evento con inscripción abierta hoy (al que puede inscribir a su hijo).
+    // Para el resto de roles la visibilidad no depende de esto.
+    const { eventos } = useEventos();
+    const hoyIsoNav = new Date().toISOString().slice(0, 10);
+    const hayEventoAplicable = eventos.some(
+        (ev) => ev.fechaInicioInscripcion <= hoyIsoNav && hoyIsoNav <= ev.fechaFinInscripcion
+    );
+
     const todosLosEnlaces = [
         { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
-        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
-        // Subtarea 12.8: parrilla semanal de Agenda. Gating ampliado respecto de /jornadas
-        // (que hoy solo permite Admin/Editor): se suma Asistente porque la seccion 9 del
-        // documento de mejora del modulo Agenda dice que "otros maestros" (interpretado
-        // como roles operativos del tenant, no solo Admin) pueden VER la agenda; el gating
-        // de EDICION por jornada puntual lo resuelve `puedeEditarJornada` (12.2) dentro de
-        // la vista, no esta lista de roles.
-        { ruta: "/agenda", texto: "Agenda", icono: IconoCalendario, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
-        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
-        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
+        // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
+        // Centro de Estudios (materiales del hijo) + Alertas.
+        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
+        // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
+        // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
+        // entrada de menu duplicada. Maestro/Estudiante (y Tutor, ya habilitado por el fix
+        // tutor-role-end-to-end) NO tienen acceso a Administracion, asi que necesitan seguir
+        // llegando a su agenda por este link. La ruta /agenda en si NO se elimina (sigue
+        // gateada igual mas abajo), solo se recorta a quien realmente la necesita en el menu.
+        { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
+        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
+        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
         { ruta: jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : "/clase-en-vivo", texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
+        // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
+        // gestión de Alertas del staff.
+        { ruta: "/buzon", texto: "Notificaciones", icono: IconoCampana, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
@@ -91,6 +112,11 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
             // Fuera de la ventana horaria, el link queda oculto (Módulo Clase en Vivo.txt §3:
             // "Fuera de esa ventana, el acceso debe estar bloqueado, oculto o deshabilitado").
             return enlace.roles.includes(usuario.rol) && !!jornadaActiva;
+        }
+        // Fix tutor-role-end-to-end (2026-07-14): para consultores (Tutor/Estudiante), "Eventos"
+        // solo aparece cuando hay un evento con inscripción abierta al que puede aplicar.
+        if (enlace.texto === 'Eventos' && (usuario.rol === RolUsuario.Tutor || usuario.rol === RolUsuario.Estudiante)) {
+            return enlace.roles.includes(usuario.rol) && hayEventoAplicable;
         }
         return enlace.roles.includes(usuario.rol);
     });
@@ -145,6 +171,9 @@ const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
     const { puntos, heatmapActivo } = useAnalytics();
     const { suspendido, cargando: cargandoLicencia } = useEstadoLicencia();
+    const { mostrarNotificacion } = useNotificacion();
+    const navigate = ReactRouterDOM.useNavigate();
+    const location = ReactRouterDOM.useLocation();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
@@ -153,6 +182,10 @@ const AppLayout: React.FC = () => {
         if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     });
+
+    // Fix tutor-role-end-to-end (2026-07-14): el Tutor (consultor) ahora SÍ accede a Tienda
+    // y Eventos, así que se retiró el guard que lo redirigía de esas rutas. La visibilidad
+    // se controla desde el menú (Eventos solo con inscripción abierta).
 
     useEffect(() => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -163,7 +196,6 @@ const AppLayout: React.FC = () => {
 
     const { tenant, estaCargado } = useTenant();
     const esSuperAdmin = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
-    const location = ReactRouterDOM.useLocation();
 
     // SPINNER DE CARGA INICIAL
     if (!estaCargado) {
@@ -294,6 +326,15 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                     <ReactRouterDOM.Route path="/login" element={<Login />} />
                     <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
+                    {/* Fix 2026-07-15: alguien que llega desde el link de un correo (activar
+                        cuenta / restablecer clave) casi siempre lo hace SIN sesión y SIN tenant
+                        aún resuelto (pestaña nueva / incógnito) -- cae justo en este bloque
+                        restringido. Faltaban acá, así que el catch-all de abajo las mandaba a
+                        "/" sin completar el proceso. Ninguna de las dos depende de `tenant`
+                        (ActivarCuenta usa tenantId del query string; RestablecerClave usa
+                        oobCode contra Firebase Auth directo), así que son seguras acá. */}
+                    <ReactRouterDOM.Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
+                    <ReactRouterDOM.Route path="/restablecer-clave" element={<VistaRestablecerClave />} />
                     <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
                 </ReactRouterDOM.Routes>
                 {debugDiv}
@@ -331,22 +372,46 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
+                {/* Fix tutor-role-end-to-end (2026-07-14): la vista ActivarCuenta existía
+                    pero nunca se ruteó — el enlace de invitación (/#/activar-cuenta) caía en
+                    el catch-all. Ruta pública (sin login): el tutor/estudiante crea su
+                    contraseña acá vía acceptInvitation y luego entra por /login. */}
+                <ReactRouterDOM.Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
+                {/* Fix UX de restablecimiento de clave (2026-07-15): página propia, con marca,
+                    que reemplaza la genérica de Firebase (tudojang.firebaseapp.com/__/auth/action)
+                    a la que redirigía sendPasswordResetEmail() del SDK cliente. */}
+                <ReactRouterDOM.Route path="/restablecer-clave" element={<VistaRestablecerClave />} />
                 <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
 
                 <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
-                    <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
+                    {/* Fix (bug reportado: el login de Estudiante abría en VistaAdministracion, una
+                        pantalla de gestión de staff que no debería ver): faltaba el mismo caso
+                        especial que ya existía para Tutor. Se redirige a /centro-estudios (no
+                        /mi-perfil) para que apenas entre vea sus materiales/clases -- justo lo
+                        que este bug le impedía ver -- consistente con la intención de diseño ya
+                        documentada en App.routing.test.ts ("Centro de Estudios como inicio
+                        operativo" para ambos roles consultor). */}
+                    <ReactRouterDOM.Route path="/" element={(usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante) ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
                     {/* Subtarea 12.8: gating ampliado respecto de /jornadas -- incluye Asistente y
                         SuperAdmin (roles operativos del tenant, seccion 9 del documento de mejora de
-                        Agenda: "otros maestros" pueden VER; Estudiante/Tutor no acceden a Agenda). */}
-                    <ReactRouterDOM.Route path="/agenda" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente || usuario?.rol === RolUsuario.SuperAdmin ? <VistaAgenda /> : <ReactRouterDOM.Navigate to="/" />} />
+                        Agenda: "otros maestros" pueden VER; Tutor no accede a Agenda).
+                        Extension posterior al cierre del modulo 12 (matriz de roles + iconos de la
+                        parrilla, decision explicita del usuario, ver CIERRE CENTRO DE ESTUDIOS.md):
+                        se agrega RolUsuario.Estudiante en modo SOLO LECTURA (AgendaView.tsx nunca le
+                        muestra los iconos de editar/eliminar -- ver puedeEditarJornada). Mantener este
+                        set de roles en sync con ROLES_CON_ACCESO_AGENDA de AgendaView.tsx. */}
+                    <ReactRouterDOM.Route path="/agenda" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Maestro || usuario?.rol === RolUsuario.Estudiante || usuario?.rol === RolUsuario.Tutor ? <VistaAgenda /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/clase-en-vivo/:jornadaId" element={<ClaseEnVivoView />} />
                     <ReactRouterDOM.Route path="/clase-en-vivo" element={<ClaseEnVivoView />} />
+                    {/* Fix tutor-role-end-to-end (2026-07-14): el Tutor (consultor) ahora accede
+                        a Tienda y Eventos (solo lectura / inscripción de su hijo). */}
                     <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
                     <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
                     <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />
+                    <ReactRouterDOM.Route path="/buzon" element={<VistaBuzonNotificaciones />} />
                     <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
                     <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />

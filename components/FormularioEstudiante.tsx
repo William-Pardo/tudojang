@@ -102,7 +102,10 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         metodoPago: 'efectivo',
         cobrarMesSiguiente: false,
         enviarInvitacionLoginEstudiante: !!configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear,
-        enviarInvitacionLoginTutor: !!configClub.configuracionCuentasExternas?.invitarTutorAlCrear
+        // Fix tutor-role-end-to-end (2026-07-14): la invitación al TUTOR viene tildada por
+        // defecto en registros nuevos (el padre = usuario real del sistema en un dojo de
+        // menores). El club puede desactivarla poniendo invitarTutorAlCrear: false.
+        enviarInvitacionLoginTutor: configClub.configuracionCuentasExternas?.invitarTutorAlCrear !== false
     });
 
     const { register, handleSubmit, formState: { errors, isValid }, watch, setValue, reset } = useForm<any>({
@@ -120,6 +123,7 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     const watchedFechaNacimiento = watch('fechaNacimiento');
     const watchedMetodoPago = watch('metodoPago') || 'efectivo';
     const watchedCorreo = watch('correo') || '';
+    const watchedTutorCorreo = watch('tutor.correo') || '';
 
     const { usuario } = useAuth();
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Editor;
@@ -329,15 +333,36 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                         )}
 
 
+                        {/* Fix tutor-role-end-to-end (2026-07-14): en un dojo de menores quien
+                            loguea es el PADRE/ACUDIENTE (rol Tutor), no el niño. El acceso digital
+                            por defecto invita al TUTOR (rol=Tutor) a su correo — así cada registro,
+                            uno a uno, deja al padre clasificado como Tutor sin asignación manual.
+                            Se mantiene además la opción de login del propio alumno para dojos que la
+                            usen (estudiantes mayores). */}
                         {configClub.configuracionCuentasExternas?.loginEstudiantesActivo && (
                             <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30 space-y-4">
                                 <div>
                                     <p className="text-[10px] font-black uppercase text-tkd-blue tracking-[0.25em]">Acceso digital</p>
-                                    <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white mt-1">Login externo del alumno</h4>
+                                    <h4 className="text-sm font-black uppercase text-gray-900 dark:text-white mt-1">Login del padre / acudiente (Tutor)</h4>
                                     <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mt-2 leading-relaxed uppercase">
-                                        Envía una invitación oficial para que el alumno cree contraseña y acceda al Centro de Estudios.
+                                        Envía una invitación oficial para que el padre/acudiente cree su contraseña y siga el progreso de su hijo. Queda con rol de Tutor automáticamente.
                                     </p>
                                 </div>
+
+                                <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all ${watchedTutorCorreo ? 'bg-white dark:bg-gray-800 border-blue-100 dark:border-blue-900/40 cursor-pointer' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-100 dark:border-white/5 opacity-60 cursor-not-allowed'}`}>
+                                    <input
+                                        type="checkbox"
+                                        {...register('enviarInvitacionLoginTutor')}
+                                        disabled={!watchedTutorCorreo}
+                                        className="w-5 h-5 accent-tkd-blue mt-0.5"
+                                    />
+                                    <span>
+                                        <span className="block text-xs font-black uppercase text-gray-900 dark:text-white">Enviar invitación de login al tutor</span>
+                                        <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                                            {watchedTutorCorreo ? `Destino: ${watchedTutorCorreo}` : 'Primero registra el correo del tutor.'}
+                                        </span>
+                                    </span>
+                                </label>
 
                                 <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all ${watchedCorreo ? 'bg-white dark:bg-gray-800 border-blue-100 dark:border-blue-900/40 cursor-pointer' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-100 dark:border-white/5 opacity-60 cursor-not-allowed'}`}>
                                     <input
@@ -347,9 +372,9 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                         className="w-5 h-5 accent-tkd-blue mt-0.5"
                                     />
                                     <span>
-                                        <span className="block text-xs font-black uppercase text-gray-900 dark:text-white">Enviar invitación de login al guardar</span>
+                                        <span className="block text-xs font-black uppercase text-gray-900 dark:text-white">Enviar invitación de login al alumno (opcional)</span>
                                         <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
-                                            {watchedCorreo ? `Destino: ${watchedCorreo}` : 'Primero registra el correo del estudiante.'}
+                                            {watchedCorreo ? `Destino: ${watchedCorreo}` : 'Solo si el alumno tiene correo propio.'}
                                         </span>
                                     </span>
                                 </label>

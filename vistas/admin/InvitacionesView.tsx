@@ -7,6 +7,7 @@ import {
   resendInvitation,
   InvitacionUsuario
 } from '../../servicios/academico/invitacionService';
+import { enviarCorreoRecuperacion } from '../../servicios/usuariosApi';
 import { RolAcademico } from '../../models/academico';
 
 const InvitacionesView: React.FC = () => {
@@ -57,12 +58,44 @@ const InvitacionesView: React.FC = () => {
     }
   };
 
-  const handleReenviar = async (id: string) => {
+  const handleReenviar = async (id: string, email: string) => {
     try {
-      await resendInvitation(tenantId, id);
-      mostrarNotificacion('Invitación reenviada con éxito.', 'success');
+      const resultado = await resendInvitation(tenantId, id);
+      if (resultado.emailEnviado) {
+        mostrarNotificacion('Invitación reenviada por correo con éxito.', 'success');
+      } else if (resultado.activationLink) {
+        // El correo no salió, pero la invitación nueva quedó creada y válida. Copiamos el
+        // enlace para que el admin lo comparta manualmente (WhatsApp, etc.) sin depender del
+        // correo -- misma mitigación que "Copiar enlace" en la tabla.
+        try {
+          await navigator.clipboard.writeText(resultado.activationLink);
+          mostrarNotificacion('El correo no salió, pero el enlace de activación se copió al portapapeles.', 'info');
+        } catch {
+          mostrarNotificacion('El correo no salió. Usa "Copiar enlace" en la fila para compartirlo manualmente.', 'info');
+        }
+      } else {
+        mostrarNotificacion('Invitación reenviada, pero no se pudo confirmar el envío del correo.', 'info');
+      }
       cargarInvitaciones();
     } catch (error: any) {
+      // Mitigación de login (2026-07-15): "Ya existe un usuario con el email X" significa que
+      // esta persona YA activó su cuenta (o se creó por otro medio). Reenviar la invitación
+      // NUNCA va a funcionar en ese caso -- lo correcto es restablecer su contraseña, no crear
+      // una cuenta nueva. En vez de dejar al admin con un error confuso, disparamos el reset
+      // de contraseña automáticamente (mismo mecanismo nativo de Firebase que "¿Olvidaste tu
+      // acceso?" en el Login) y se lo explicamos.
+      if (typeof error?.message === 'string' && error.message.includes('Ya existe un usuario')) {
+        try {
+          await enviarCorreoRecuperacion(email);
+          mostrarNotificacion(
+            `${email} ya tiene una cuenta activa. Le enviamos un correo para restablecer su contraseña en su lugar.`,
+            'info'
+          );
+        } catch (resetError: any) {
+          mostrarNotificacion('No se pudo enviar el correo de restablecimiento: ' + resetError.message, 'error');
+        }
+        return;
+      }
       mostrarNotificacion('Error al reenviar invitación: ' + error.message, 'error');
     }
   };
@@ -194,7 +227,7 @@ const InvitacionesView: React.FC = () => {
                         )}
                         <button
                           type="button"
-                          onClick={() => handleReenviar(inv.id)}
+                          onClick={() => handleReenviar(inv.id, inv.email)}
                           className="text-tkd-blue hover:text-tkd-red font-bold text-xs uppercase tracking-wider transition-colors"
                         >
                           Reenviar

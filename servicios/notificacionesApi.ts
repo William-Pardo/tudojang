@@ -90,6 +90,41 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
 };
 
 /**
+ * Buzón del consultor (Tutor/Estudiante): notificaciones de un conjunto de estudiantes.
+ * Query por `estudianteId in [...]` (single-field, auto-indexado; se trocea de a 10 por el
+ * límite de Firestore) y se ordena por fecha desc en cliente para evitar índice compuesto.
+ */
+export const obtenerNotificacionesPorEstudiantes = async (
+  estudianteIds: string[]
+): Promise<NotificacionHistorial[]> => {
+  const idsUnicos = Array.from(new Set(estudianteIds.filter(Boolean)));
+  if (idsUnicos.length === 0) return [];
+
+  if (!isFirebaseConfigured) {
+    const todas = await obtenerHistorialNotificaciones();
+    return todas.filter(n => idsUnicos.includes(n.estudianteId));
+  }
+
+  // Firestore limita el operador `in` a 10 valores -> troceamos.
+  const lotes: string[][] = [];
+  for (let i = 0; i < idsUnicos.length; i += 10) {
+    lotes.push(idsUnicos.slice(i, i + 10));
+  }
+
+  const resultados = await Promise.all(
+    lotes.map(async (lote) => {
+      const q = query(historialCollection, where('estudianteId', 'in', lote));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as NotificacionHistorial));
+    })
+  );
+
+  return resultados
+    .flat()
+    .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+};
+
+/**
  * Marca una notificación específica como leída.
  * @param idNotificacion - El ID de la notificación a marcar.
  */

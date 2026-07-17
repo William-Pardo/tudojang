@@ -1,4 +1,6 @@
 import React from 'react';
+import { Document, Page } from 'react-pdf';
+import './pdfWorkerConfig';
 import { type ProgresoLocalSync, type ProgresoSyncPayload, useProgressSync } from '../../hooks/academico/useProgressSync';
 import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
@@ -6,6 +8,9 @@ interface PdfViewerProps {
   tenantId: string;
   asignacionId: string;
   titulo: string;
+  /** URL temporal firmada de Drive (services/storage/driveService). Sin ella, se muestra
+   *  solo el seguimiento por página, sin contenido real (fallback si Drive no responde). */
+  url?: string;
   totalPaginas: number;
   permanenciaMinimaMs?: number;
   sincronizar: (payload: ProgresoSyncPayload) => void | Promise<void>;
@@ -20,6 +25,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   tenantId,
   asignacionId,
   titulo,
+  url,
   totalPaginas,
   permanenciaMinimaMs = 5000,
   sincronizar,
@@ -35,16 +41,21 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
     sincronizar,
     cargarProgreso,
   });
-  const [paginaAbierta, setPaginaAbierta] = React.useState<number | null>(null);
+
+  const [numPaginasReal, setNumPaginasReal] = React.useState<number | null>(null);
+  const [errorCarga, setErrorCarga] = React.useState(false);
+  const [paginaActual, setPaginaActual] = React.useState(1);
   const temporizadorPermanenciaRef = React.useRef<number | null>(null);
+  const progresoRef = React.useRef(progreso);
+  progresoRef.current = progreso;
 
-  const paginas = Array.from({ length: Math.max(totalPaginas, 0) }, (_, index) => index + 1);
+  // El PDF real manda sobre la estimación guardada en la asignación en cuanto carga.
+  const totalPaginasEfectivo = numPaginasReal ?? totalPaginas;
+  const hayPaginas = totalPaginasEfectivo > 0;
 
-  React.useEffect(() => () => {
-    if (temporizadorPermanenciaRef.current) {
-      window.clearTimeout(temporizadorPermanenciaRef.current);
-    }
-  }, []);
+  React.useEffect(() => {
+    setPaginaActual((actual) => Math.min(Math.max(actual, 1), Math.max(totalPaginasEfectivo, 1)));
+  }, [totalPaginasEfectivo]);
 
   // Hook de métricas — solo activo si se proveen los datos del estudiante
   const { registrarProgresoPdf } = useRegistrarActividad({
@@ -57,31 +68,40 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   });
 
   const registrarPaginaConMetrica = React.useCallback(
-    (pagina: number, paginasAcumuladas: number[]) => {
+    (pagina: number) => {
       registrarPaginaPdf(pagina);
 
-      if (estudianteId && totalPaginas > 0) {
-        const paginasUnicas = Array.from(new Set([...paginasAcumuladas, pagina]));
-        const porcentajePaginas = Math.round((paginasUnicas.length / totalPaginas) * 100);
+      if (estudianteId && totalPaginasEfectivo > 0) {
+        const paginasUnicas = Array.from(new Set([...progresoRef.current.paginasVistas, pagina]));
+        const porcentajePaginas = Math.round((paginasUnicas.length / totalPaginasEfectivo) * 100);
         registrarProgresoPdf({
           paginasVistas: paginasUnicas.sort((a, b) => a - b),
-          totalPaginas,
+          totalPaginas: totalPaginasEfectivo,
           porcentajePaginas,
         });
       }
     },
-    [estudianteId, registrarPaginaPdf, registrarProgresoPdf, totalPaginas]
+    [estudianteId, registrarPaginaPdf, registrarProgresoPdf, totalPaginasEfectivo]
   );
 
-  const abrirPagina = (pagina: number) => {
-    setPaginaAbierta(pagina);
+  // Permanencia automática: la página visible se cuenta como "vista" recién después de
+  // permanecer abierta permanenciaMinimaMs (mismo criterio que el visor anterior, ahora
+  // atado a la navegación real en vez de un click de "abrir página X").
+  React.useEffect(() => {
+    if (!hayPaginas) return;
     if (temporizadorPermanenciaRef.current) {
       window.clearTimeout(temporizadorPermanenciaRef.current);
     }
     temporizadorPermanenciaRef.current = window.setTimeout(() => {
-      registrarPaginaConMetrica(pagina, progreso.paginasVistas);
+      registrarPaginaConMetrica(paginaActual);
     }, permanenciaMinimaMs);
-  };
+
+    return () => {
+      if (temporizadorPermanenciaRef.current) {
+        window.clearTimeout(temporizadorPermanenciaRef.current);
+      }
+    };
+  }, [paginaActual, hayPaginas, permanenciaMinimaMs, registrarPaginaConMetrica]);
 
   return (
     <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6">
@@ -90,7 +110,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">Visor PDF</p>
           <h3 className="mt-2 text-xl font-black uppercase text-tkd-dark dark:text-white">{titulo}</h3>
           <p className="mt-2 text-sm text-gray-500">
-            Paginas registradas: {progreso.paginasVistas.length}/{totalPaginas}
+            Paginas registradas: {progreso.paginasVistas.length}/{totalPaginasEfectivo}
           </p>
         </div>
         <button
@@ -102,53 +122,73 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
         </button>
       </div>
 
-      <div className="space-y-4">
-        {paginas.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-sm font-bold text-gray-400">
-            Sin paginas disponibles
-          </div>
-        )}
-
-        {paginas.map((pagina) => (
-          <article
-            key={pagina}
-            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-5"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm font-black text-tkd-dark dark:text-white">
-                Pagina {pagina} de {totalPaginas}
-                {progreso.paginasVistas.includes(pagina) && (
-                  <span className="ml-2 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
-                )}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => abrirPagina(pagina)}
-                  className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest"
-                >
-                  Abrir pagina {pagina}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => registrarPaginaConMetrica(pagina, progreso.paginasVistas)}
-                  className="rounded-xl bg-tkd-blue text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest"
-                >
-                  Marcar pagina {pagina} como vista
-                </button>
-              </div>
-            </div>
-            {paginaAbierta === pagina && (
-              <p className="mt-3 text-xs font-bold text-gray-400">
-                Permanencia en curso para pagina {pagina}
+      {!hayPaginas ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-sm font-bold text-gray-400">
+          Sin paginas disponibles
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center min-h-[280px] overflow-auto p-4">
+            {url && !errorCarga ? (
+              <Document
+                file={url}
+                onLoadSuccess={({ numPages }) => setNumPaginasReal(numPages)}
+                onLoadError={() => setErrorCarga(true)}
+                loading={<p className="text-sm font-bold text-gray-400 py-10">Cargando documento...</p>}
+                error={<p className="text-sm font-bold text-red-500 py-10">No se pudo cargar el PDF.</p>}
+              >
+                <Page
+                  pageNumber={Math.min(paginaActual, totalPaginasEfectivo)}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                  width={640}
+                />
+              </Document>
+            ) : (
+              <p className="text-sm font-bold text-gray-400 text-center py-10">
+                {url ? 'No se pudo cargar el PDF real. Se sigue registrando el avance por página.' : 'Vista previa no disponible.'}
               </p>
             )}
-          </article>
-        ))}
-      </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+              disabled={paginaActual <= 1}
+              className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+            >
+              ‹ Anterior
+            </button>
+
+            <p className="text-sm font-black text-tkd-dark dark:text-white">
+              Pagina {paginaActual} de {totalPaginasEfectivo}
+              {progreso.paginasVistas.includes(paginaActual) && (
+                <span className="ml-2 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
+              )}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginasEfectivo, p + 1))}
+              disabled={paginaActual >= totalPaginasEfectivo}
+              className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+            >
+              Siguiente ›
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => registrarPaginaConMetrica(paginaActual)}
+            className="w-full rounded-xl bg-tkd-blue text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+          >
+            Marcar pagina actual como vista
+          </button>
+        </div>
+      )}
     </section>
   );
 };
 
 export default PdfViewer;
-

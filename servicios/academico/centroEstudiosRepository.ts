@@ -3,7 +3,7 @@ import type {
   ObtenerAsignacionesRequest,
   ObtenerAsignacionesResponse,
 } from '../../models/academico/asignacionService.types';
-import { ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios.ts';
+import { ordenarAsignacionesPorUrgencia, calcularUrgenciaAsignacion } from '../../utils/academico/centroEstudios.ts';
 import { obtenerAsignacionesPorEstudiante, aplicaAlEstudiante } from './asignacionService';
 import { progresoRepository, type ProgresoRepository, type FirestoreProgressRepository } from './progresoRepository';
 
@@ -107,10 +107,20 @@ export class FirestoreCentroEstudiosRepository implements CentroEstudiosReposito
 
       const asignacionesValidas: AsignacionCentroEstudios[] = [];
       for (const docSnap of snap.docs) {
-        const data = docSnap.data();
+        const data = docSnap.data() as Partial<AsignacionCentroEstudios>;
+        // Fix (bug reportado: abrir un material real crasheaba MaterialPreviewModal con
+        // "Cannot read properties of undefined (reading 'replace')"): un doc real de
+        // `asignaciones` es un AsignacionAcademica -- NUNCA tiene estadoProgreso/
+        // porcentajeProgreso/urgencia (son específicos de AsignacionCentroEstudios,
+        // calculados). Antes de este fix quedaban `undefined` para cualquier asignación
+        // real (solo el fixture demo los traía hardcodeados), y este era el primer
+        // camino que llegaba a renderizar una asignación real end-to-end.
         const asignacion = {
           id: docSnap.id,
           ...data,
+          estadoProgreso: data.estadoProgreso ?? 'disponible',
+          porcentajeProgreso: data.porcentajeProgreso ?? 0,
+          urgencia: calcularUrgenciaAsignacion(data.fechaCierre),
         } as AsignacionCentroEstudios;
 
         if (aplicaAlEstudiante(asignacion, estudiante)) {
