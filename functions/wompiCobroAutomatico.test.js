@@ -51,7 +51,7 @@ test('calcularMontoMensualPesos: límites por debajo del plan base no generan ad
     limiteUsuarios: 1,
     limiteSedes: 1,
   });
-  assert.equal(monto, 1000000);
+  assert.equal(monto, 1200000);
 });
 
 test('calcularMontoMensualCentavos: convierte pesos a centavos igual que construirUrlCheckoutWompi (*100)', () => {

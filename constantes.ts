@@ -95,46 +95,40 @@ export const PLANES_SAAS = {
     starter: {
         id: 'starter',
         nombre: 'Plan Starter',
-        precio: 160000,
+        precio: 200000,
         limiteEstudiantes: 50,
         limiteUsuarios: 2,
         limiteSedes: 2, // 1 Principal + 1 Adicional
         caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede Adicional', 'Gestión de Tienda', 'Eventos Básicos'],
-        popular: false,
-        urlPago: 'https://checkout.wompi.co/l/1GGerS',
-        wompiPlanId: ''
+        popular: false
     },
     growth: {
         id: 'growth',
         nombre: 'Plan Growth',
-        precio: 340000,
+        precio: 540000,
         limiteEstudiantes: 150,
         limiteUsuarios: 5,
         limiteSedes: 3, // 1 Principal + 2 Adicionales
         caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes Adicionales', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
-        popular: true,
-        urlPago: 'https://checkout.wompi.co/l/JeY7cH',
-        wompiPlanId: ''
+        popular: true
     },
     pro: {
         id: 'pro',
         nombre: 'Plan Pro',
-        precio: 580000,
+        precio: 1200000,
         limiteEstudiantes: 350,
         limiteUsuarios: 10,
         limiteSedes: 6, // 1 Principal + 5 Adicionales
         caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes Adicionales', 'Soporte Sabonim AI', 'Exportación Pro'],
-        popular: false,
-        urlPago: 'https://checkout.wompi.co/l/M3ayL6',
-        wompiPlanId: ''
+        popular: false
     }
 };
 
 
 export const COSTOS_ADICIONALES = {
-    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes', urlPago: 'https://checkout.wompi.co/l/SmeaJa' },
-    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor', urlPago: 'https://checkout.wompi.co/l/CKvRj2' },
-    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede', urlPago: 'https://checkout.wompi.co/l/cNOILo' }
+    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 36000, key: 'estudiantes' },
+    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 36000, key: 'instructor' },
+    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 89900, key: 'sede' }
 };
 
 export const CONFIGURACION_WOMPI = {

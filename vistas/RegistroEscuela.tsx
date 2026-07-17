@@ -7,9 +7,8 @@ import { registrarNuevaEscuela, buscarTenantPorSlug } from '../servicios/configu
 import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
-import { CONFIGURACION_WOMPI } from '../constantes';
 import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
-import { firmarCheckoutWompi } from '../servicios/wompiApi';
+import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -175,27 +174,18 @@ const RegistroEscuela: React.FC = () => {
 
             console.log("Calculando firmas...");
             const precioParam = getParam('precio') || '50000';
-            const montoCentavos = parseInt(precioParam) * 100;
-            const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
-            const moneda = 'COP';
 
             log("Generando firma...");
-            const precioWompi = parseInt(precioParam) * 100;
-            const firmaIntegridad = await firmarCheckoutWompi({
-                reference: nuevoTenantId,
-                amountInCents: precioWompi,
-                currency: 'COP',
+            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
+            const urlWompi = await construirUrlCheckoutWompi({
+                tenantId: nuevoTenantId,
+                itemType: 'alta',
+                itemId: planId || 'starter',
+                periodo: 'mensual',
+                montoEnPesos: parseInt(precioParam, 10),
+                redirectUrl: urlRetorno,
             });
             log("Firma generada. Preparando URL...");
-
-            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
-            const urlWompi = `https://checkout.wompi.co/p/?` +
-                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                `currency=COP&` +
-                `amount-in-cents=${precioWompi}&` +
-                `reference=${nuevoTenantId}&` +
-                `signature:integrity=${firmaIntegridad}&` +
-                `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
             console.log("Redirigiendo a Wompi:", urlWompi);
             log("URL Lista. Redirigiendo...");

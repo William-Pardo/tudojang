@@ -22,7 +22,7 @@ const WOMPI_PUBLIC_KEY = 'pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB';
 const PLANES_SAAS = {
   starter: { precio: 200000, limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2 },
   growth: { precio: 540000, limiteEstudiantes: 150, limiteUsuarios: 5, limiteSedes: 3 },
-  pro: { precio: 1000000, limiteEstudiantes: 350, limiteUsuarios: 10, limiteSedes: 6 },
+  pro: { precio: 1200000, limiteEstudiantes: 350, limiteUsuarios: 10, limiteSedes: 6 },
 };
 
 const COSTOS_ADICIONALES = {
