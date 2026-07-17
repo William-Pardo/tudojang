@@ -406,6 +406,21 @@ service cloud.firestore {
       allow write: if canWriteOwnStudentProgress(tenantId, uid);
     }
 
+    // Visualizaciones de video de YouTube (reemplazo de Drive SOLO para video, decisión de
+    // producto 2026-07: costo $0 de hosting + tracking real de reproducción vía la IFrame
+    // Player API -- ver servicios/academico/visualizacionRepository.ts). Estructura por
+    // RECURSO -> alumno (no alumno -> asignación como `progreso` arriba) para que el
+    // reporte de staff (Paso 7) pueda listar todos los alumnos de un recurso sin
+    // collectionGroup query. Mismo criterio de lectura que `progreso` pero ampliado a
+    // isInstructor() (no solo isAdmin) porque el reporte lo consume cualquier staff
+    // operativo (Maestro/Editor/Asistente), igual que `metricasEstudiante`/`actividadLogs`.
+    match /tenants/{tenantId}/visualizaciones/{recursoId}/alumnos/{uid} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == uid || isInstructor() || tutorLinkedToStudent(tenantId, uid));
+      allow write: if canWriteOwnStudentProgress(tenantId, uid);
+    }
+
     // Logs de actividad académica
     match /tenants/{tenantId}/actividadLogs/{logId} {
       allow create: if authenticated()

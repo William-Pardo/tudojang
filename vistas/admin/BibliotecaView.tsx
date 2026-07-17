@@ -1,9 +1,14 @@
 import React from 'react';
 import type { FichaAcademica, RecursoAcademico } from '../../models/academico/recurso';
 import type { TipoRecurso } from '../../models/academico';
+import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 import { bibliotecaService as defaultBibliotecaService } from '../../servicios/academico/bibliotecaService';
 import { driveService as defaultDriveService, type DriveFile } from '../../services/storage/driveService';
 import { useNotificacion } from '../../context/NotificacionContext';
+import { parsearYoutubeVideoId } from '../../utils/academico/youtubeUrl';
+import QuizEditorModal from '../../components/academico/QuizEditorModal';
+import MaterialPreviewModal from '../../components/academico/MaterialPreviewModal';
+import ReporteVisualizacionVideo from '../../components/academico/ReporteVisualizacionVideo';
 import {
   IconoAprobar,
   IconoContrato,
@@ -11,7 +16,41 @@ import {
   IconoEliminar,
   IconoFirma,
   IconoImagen,
+  IconoQuiz,
+  IconoOjoAbierto,
+  IconoAnalisis,
 } from '../../components/Iconos';
+
+// Vista previa administrativa (pedido explícito del usuario, 2026-07-16): permite a
+// Admin/Editor/Asistente/Maestro reproducir/ver el contenido real de un recurso desde la
+// Biblioteca, para confirmar que el archivo correcto antes/después de asignarlo -- SIN
+// depender de que exista una asignación publicada. Se arma en memoria, nunca se persiste;
+// el visor la trata como cualquier asignación gracias a `modoVistaPrevia` en
+// MaterialPreviewModal, que resuelve la URL de Drive contra el RECURSO en vez de una
+// asignación real (ver getTemporaryFileUrlRecurso).
+function construirAsignacionPreview(recurso: RecursoAcademico): AsignacionCentroEstudios {
+  const ahora = new Date().toISOString();
+  return {
+    id: `preview-${recurso.id}`,
+    tenantId: recurso.tenantId,
+    recursoId: recurso.id,
+    externalFileId: recurso.externalFileId,
+    youtubeVideoId: recurso.youtubeVideoId ?? null,
+    titulo: recurso.tituloVisible || recurso.nombre,
+    destinatario: { tipo: 'grupo', grupo: 'Todos' },
+    uso: recurso.ficha?.tipo === 'quiz' ? 'evaluacion' : 'estudio',
+    momento: 'preparacion',
+    obligatoria: false,
+    fechaApertura: ahora,
+    estado: 'publicada',
+    creadoPorUid: 'preview',
+    creadoEn: ahora,
+    actualizadoEn: ahora,
+    estadoProgreso: 'disponible',
+    porcentajeProgreso: 0,
+    urgencia: 'sin_fecha',
+  };
+}
 
 const TIPOS_RECURSO: TipoRecurso[] = ['pdf', 'video', 'imagen', 'presentacion', 'enlace', 'quiz', 'actividad_practica'];
 
@@ -234,7 +273,16 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   const [selectorCargando, setSelectorCargando] = React.useState(false);
   const [tagsTexto, setTagsTexto] = React.useState('');
   const [tituloVisible, setTituloVisible] = React.useState('');
+  // Paso 3 (reemplazo Drive -> YouTube SOLO para video, decisión de producto 2026-07): URL
+  // que pega el staff y su ID de 11 caracteres ya parseado -- ver utils/academico/youtubeUrl.ts.
+  const [youtubeUrlTexto, setYoutubeUrlTexto] = React.useState('');
+  const [errorYoutubeUrl, setErrorYoutubeUrl] = React.useState('');
   const [modalClasificacionAbierto, setModalClasificacionAbierto] = React.useState(false);
+  const [recursoQuizEnEdicion, setRecursoQuizEnEdicion] = React.useState<RecursoAcademico | null>(null);
+  const [recursoEnVistaPrevia, setRecursoEnVistaPrevia] = React.useState<RecursoAcademico | null>(null);
+  // Paso 7: reporte de visualización de video para staff -- solo aplica a recursos de
+  // video con youtubeVideoId (los que usan el proxy de Drive no tienen tracking real).
+  const [recursoReporteVisualizacion, setRecursoReporteVisualizacion] = React.useState<RecursoAcademico | null>(null);
   const carpetaListadaRef = React.useRef('');
   const selectorAutoAbiertoRef = React.useRef('');
 
@@ -306,6 +354,8 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
     if (!recursoSeleccionado) {
       setTagsTexto('');
       setTituloVisible('');
+      setYoutubeUrlTexto('');
+      setErrorYoutubeUrl('');
       return;
     }
 
@@ -313,6 +363,8 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
     setTipo(recursoSeleccionado.ficha?.tipo ?? inferirTipoRecursoDesdeMime(recursoSeleccionado.mimeType));
     setTagsTexto(recursoSeleccionado.ficha?.tags?.join(', ') ?? '');
     setTituloVisible(recursoSeleccionado.tituloVisible ?? '');
+    setYoutubeUrlTexto(recursoSeleccionado.youtubeVideoId ?? '');
+    setErrorYoutubeUrl('');
   }, [recursoSeleccionado?.id]);
 
   React.useEffect(() => {
@@ -678,6 +730,23 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   const guardarClasificacion = async () => {
     if (!recursoSeleccionado) return;
     setError('');
+    setErrorYoutubeUrl('');
+
+    // Paso 3 (reemplazo Drive -> YouTube SOLO para video): parsear+validar la URL pegada.
+    // Campo opcional -- vacío = seguir usando Drive (compatibilidad con videos ya cargados).
+    const youtubeUrlLimpia = youtubeUrlTexto.trim();
+    let youtubeVideoId: string | null | undefined;
+    if (tipo === 'video' && youtubeUrlLimpia) {
+      const idParseado = parsearYoutubeVideoId(youtubeUrlLimpia);
+      if (!idParseado) {
+        setErrorYoutubeUrl('La URL de YouTube no es válida. Pegá el link completo (youtube.com/watch?v=... o youtu.be/...) o el ID de 11 caracteres.');
+        return;
+      }
+      youtubeVideoId = idParseado;
+    } else if (tipo === 'video' && !youtubeUrlLimpia && recursoSeleccionado.youtubeVideoId) {
+      // El staff borró el texto: interpretamos que quiere volver a usar Drive.
+      youtubeVideoId = null;
+    }
 
     const ficha: FichaAcademica = {
       disciplina,
@@ -688,12 +757,25 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
     const tituloVisibleLimpio = tituloVisible.trim();
 
     try {
-      await bibliotecaService.updateFicha(
-        tenantId,
-        recursoSeleccionado.id,
-        ficha,
-        tituloVisibleLimpio || undefined,
-      );
+      // Solo se pasa el 5to argumento cuando realmente hay algo que tocar -- si no,
+      // se preserva la firma de 4 argumentos para no persistir un `youtubeVideoId: undefined`
+      // innecesario en recursos que nunca fueron video (PDF, imagen, etc.).
+      if (youtubeVideoId !== undefined) {
+        await bibliotecaService.updateFicha(
+          tenantId,
+          recursoSeleccionado.id,
+          ficha,
+          tituloVisibleLimpio || undefined,
+          youtubeVideoId,
+        );
+      } else {
+        await bibliotecaService.updateFicha(
+          tenantId,
+          recursoSeleccionado.id,
+          ficha,
+          tituloVisibleLimpio || undefined,
+        );
+      }
       await bibliotecaService.approveRecurso(tenantId, recursoSeleccionado.id, usuarioId);
       setRecursos((actuales) => actuales.map((recurso) => (
         recurso.id === recursoSeleccionado.id
@@ -701,6 +783,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
             ...recurso,
             ficha,
             ...(tituloVisibleLimpio ? { tituloVisible: tituloVisibleLimpio } : {}),
+            ...(youtubeVideoId !== undefined ? { youtubeVideoId } : {}),
             estado: 'aprobado' as const,
             aprobadoPorUid: usuarioId,
             aprobadoEn: new Date().toISOString(),
@@ -1041,6 +1124,39 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                       </button>
                     ) : tieneFicha ? (
                       <>
+                        {recursoLocal && (
+                          <button
+                            type="button"
+                            onClick={() => setRecursoEnVistaPrevia(recursoLocal)}
+                            aria-label={`Vista previa de ${archivo.nombre}`}
+                            title="Vista previa del contenido real"
+                            className={claseBotonIconoDocumentoCentroEstudios}
+                          >
+                            <IconoOjoAbierto className="h-4 w-4" />
+                          </button>
+                        )}
+                        {recursoLocal?.ficha?.tipo === 'quiz' && (
+                          <button
+                            type="button"
+                            onClick={() => setRecursoQuizEnEdicion(recursoLocal)}
+                            aria-label={`Editar preguntas de ${archivo.nombre}`}
+                            title="Editar preguntas del quiz"
+                            className={claseBotonIconoDocumentoCentroEstudios}
+                          >
+                            <IconoQuiz className="h-4 w-4" />
+                          </button>
+                        )}
+                        {recursoLocal?.ficha?.tipo === 'video' && recursoLocal?.youtubeVideoId && (
+                          <button
+                            type="button"
+                            onClick={() => setRecursoReporteVisualizacion(recursoLocal)}
+                            aria-label={`Ver reporte de visualización de ${archivo.nombre}`}
+                            title="Ver reporte de visualización"
+                            className={claseBotonIconoDocumentoCentroEstudios}
+                          >
+                            <IconoAnalisis className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => void abrirClasificacion(archivo)}
@@ -1143,6 +1259,36 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                 </select>
               </div>
 
+              {tipo === 'video' && (
+                <div>
+                  <label htmlFor="clasificacion-youtube-url" className="block text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Video de YouTube (opcional)
+                  </label>
+                  <input
+                    id="clasificacion-youtube-url"
+                    value={youtubeUrlTexto}
+                    onChange={(event) => {
+                      setYoutubeUrlTexto(event.target.value);
+                      if (errorYoutubeUrl) setErrorYoutubeUrl('');
+                    }}
+                    placeholder="Pegá la URL del video de YouTube (youtube.com/watch?v=... o youtu.be/...)"
+                    aria-invalid={errorYoutubeUrl ? 'true' : undefined}
+                    aria-describedby={errorYoutubeUrl ? 'clasificacion-youtube-url-error' : undefined}
+                    className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm font-normal dark:border-white/10 dark:bg-gray-950/40 dark:text-white"
+                  />
+                  <p className="mt-2 text-xs font-normal text-gray-400">
+                    Si pegás un video de YouTube, los alumnos lo ven directo (sin costo de Drive) y
+                    queda registrado si realmente lo miraron. Dejá vacío para seguir sirviendo el
+                    archivo desde Google Drive.
+                  </p>
+                  {errorYoutubeUrl && (
+                    <p id="clasificacion-youtube-url-error" role="alert" className="mt-2 text-xs font-bold text-red-600">
+                      {errorYoutubeUrl}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label htmlFor="clasificacion-tags" className="block text-[10px] font-black uppercase tracking-widest text-gray-400">
                   Tags (separados por coma)
@@ -1204,6 +1350,33 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {recursoQuizEnEdicion && (
+        <QuizEditorModal
+          tenantId={tenantId}
+          recursoId={recursoQuizEnEdicion.id}
+          tituloRecurso={recursoQuizEnEdicion.tituloVisible || recursoQuizEnEdicion.nombre}
+          usuarioId={usuarioId}
+          onCerrar={() => setRecursoQuizEnEdicion(null)}
+        />
+      )}
+
+      {recursoEnVistaPrevia && (
+        <MaterialPreviewModal
+          asignacion={construirAsignacionPreview(recursoEnVistaPrevia)}
+          onCerrar={() => setRecursoEnVistaPrevia(null)}
+          modoVistaPrevia
+        />
+      )}
+
+      {recursoReporteVisualizacion && (
+        <ReporteVisualizacionVideo
+          tenantId={tenantId}
+          recursoId={recursoReporteVisualizacion.id}
+          tituloRecurso={recursoReporteVisualizacion.tituloVisible || recursoReporteVisualizacion.nombre}
+          onCerrar={() => setRecursoReporteVisualizacion(null)}
+        />
       )}
     </section>
   );

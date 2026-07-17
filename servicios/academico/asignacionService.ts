@@ -261,6 +261,7 @@ export function publishAsignacion({
     ...asignacion,
     recursoId: recurso.id,
     externalFileId: recurso.externalFileId,
+    youtubeVideoId: recurso.youtubeVideoId ?? null,
     estado: 'publicada',
     creadoPorUid: publicadoPorUid,
     actualizadoEn: new Date().toISOString(),

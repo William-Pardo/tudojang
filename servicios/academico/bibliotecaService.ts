@@ -136,9 +136,14 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     tenantId: string,
     recursoId: string,
     ficha: FichaAcademica,
-    tituloVisible?: string
+    tituloVisible?: string,
+    youtubeVideoId?: string | null
   ): Promise<void> => {
     const tituloVisibleLimpio = tituloVisible?.trim() ?? '';
+    // `youtubeVideoId` viaja separado de `ficha` (igual que `tituloVisible`): es un dato
+    // técnico del archivo, no de la clasificación pedagógica. `undefined` = no tocar el
+    // valor existente; `null` = borrarlo explícitamente (volver a usar Drive).
+    const tocaYoutubeVideoId = youtubeVideoId !== undefined;
 
     if (!checkConfigured()) {
       const recurso = mockRecursos.find(r => r.id === recursoId && r.tenantId === tenantId);
@@ -151,6 +156,9 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       recurso.ficha = ficha;
       if (tituloVisibleLimpio) {
         recurso.tituloVisible = tituloVisibleLimpio;
+      }
+      if (tocaYoutubeVideoId) {
+        recurso.youtubeVideoId = youtubeVideoId;
       }
       if (recurso.estado === 'borrador') {
         recurso.estado = 'pendiente';
@@ -173,7 +181,8 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       ficha,
       estado: nuevoEstado,
       actualizadoEn: new Date().toISOString(),
-      ...(tituloVisibleLimpio ? { tituloVisible: tituloVisibleLimpio } : {})
+      ...(tituloVisibleLimpio ? { tituloVisible: tituloVisibleLimpio } : {}),
+      ...(tocaYoutubeVideoId ? { youtubeVideoId } : {})
     });
 
     // Fix (bug reportado: renombrar un material no actualizaba el nombre en cascada):

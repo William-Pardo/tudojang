@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MaterialPreviewModal from './MaterialPreviewModal';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
@@ -279,6 +279,144 @@ describe('MaterialPreviewModal', () => {
 
     const video = await screen.findByLabelText(/video clase\.mp4/i);
     expect(video).toHaveAttribute('src', 'blob:mock-url');
+  });
+
+  describe('material de video con youtubeVideoId (reemplazo de Drive por YouTube)', () => {
+    class FakeYoutubePlayer {
+      static instancias: FakeYoutubePlayer[] = [];
+      currentTime = 0;
+      duration = 90;
+      events: any;
+
+      constructor(_elementId: string, config: any) {
+        this.events = config.events;
+        FakeYoutubePlayer.instancias.push(this);
+        Promise.resolve().then(() => this.events?.onReady?.());
+      }
+
+      getCurrentTime() { return this.currentTime; }
+      getDuration() { return this.duration; }
+      destroy() {}
+
+      dispararEstado(estado: number) {
+        this.events?.onStateChange?.({ data: estado });
+      }
+    }
+
+    const YT_PLAYER_STATE = { ENDED: 0, PLAYING: 1, PAUSED: 2 };
+
+    beforeEach(() => {
+      FakeYoutubePlayer.instancias = [];
+      (window as any).YT = { Player: FakeYoutubePlayer, PlayerState: YT_PLAYER_STATE };
+    });
+
+    afterEach(() => {
+      delete (window as any).YT;
+    });
+
+    it('usa el reproductor de YouTube y NO pide acceso temporal de Drive (elimina el costo de proxyDriveMedia)', async () => {
+      const driveService = {
+        obtenerUrlTemporal: jest.fn(),
+        obtenerBlobProtegido: jest.fn(),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-fundamentos.mp4',
+            externalFileId: 'drive-file-real',
+            youtubeVideoId: 'dQw4w9WgXcQ',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      expect(await screen.findByLabelText(/reproductor de youtube/i)).toBeInTheDocument();
+      expect(driveService.obtenerUrlTemporal).not.toHaveBeenCalled();
+      expect(driveService.obtenerBlobProtegido).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText(/^video clase/i)).not.toBeInTheDocument();
+    });
+
+    it('registra la visualizacion en visualizacionRepository (tenant, recurso, alumno) al pausar', async () => {
+      const registrarSync = jest.fn().mockResolvedValue(undefined);
+      const visualizacionRepository = { registrarSync } as any;
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-fundamentos.mp4',
+            recursoId: 'recurso-yt-1',
+            youtubeVideoId: 'dQw4w9WgXcQ',
+          }}
+          onCerrar={jest.fn()}
+          visualizacionRepository={visualizacionRepository}
+          estudianteId="est-1"
+          estudianteNombre="Juan Perez"
+        />
+      );
+
+      await screen.findByLabelText(/reproductor de youtube/i);
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const player = FakeYoutubePlayer.instancias[0];
+      player.currentTime = 45;
+      player.duration = 90;
+
+      act(() => { player.dispararEstado(YT_PLAYER_STATE.PLAYING); });
+      act(() => { player.dispararEstado(YT_PLAYER_STATE.PAUSED); });
+
+      await waitFor(() => {
+        expect(registrarSync).toHaveBeenCalledWith(
+          'tenant-1',
+          'recurso-yt-1',
+          'est-1',
+          expect.objectContaining({
+            estudianteNombre: 'Juan Perez',
+            posicionSegundos: 45,
+            duracionSegundos: 90,
+            nuevoInicio: true,
+          }),
+        );
+      });
+    });
+
+    it('sigue usando VideoPlayer + Drive para material de video SIN youtubeVideoId (compatibilidad hacia atras)', async () => {
+      const blobVideo = new Blob(['fake-video-bytes'], { type: 'video/mp4' });
+      const driveService = {
+        obtenerUrlTemporal: jest.fn().mockResolvedValue({
+          ok: true,
+          url: 'https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?tenantId=tenant-1&fileId=f1&asignacionId=a1',
+          fileName: 'clase-vieja.mp4',
+          mimeType: 'video/mp4',
+          expiresAt: '2026-06-28T12:15:00.000Z',
+        }),
+        obtenerBlobProtegido: jest.fn().mockResolvedValue(blobVideo),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-vieja.mp4',
+            externalFileId: 'drive-file-real',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      expect(await screen.findByLabelText(/video clase-vieja\.mp4/i)).toBeInTheDocument();
+      expect(driveService.obtenerUrlTemporal).toHaveBeenCalled();
+      expect(screen.queryByLabelText(/reproductor de youtube/i)).not.toBeInTheDocument();
+    });
   });
 
   it('muestra error controlado si el archivo Drive fue eliminado', async () => {

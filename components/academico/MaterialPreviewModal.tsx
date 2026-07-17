@@ -5,8 +5,10 @@ import { IconoCerrar } from '../Iconos';
 import QuizView, { type ResultadoQuiz } from './QuizView';
 import PdfViewer from './PdfViewer';
 import VideoPlayer from './VideoPlayer';
+import YoutubePlayer from './YoutubePlayer';
 import type { ProgresoSyncPayload } from '../../hooks/academico/useProgressSync';
 import { progresoRepository, type FirestoreProgressRepository, type ProgresoRepository } from '../../servicios/academico/progresoRepository';
+import { visualizacionRepository as defaultVisualizacionRepository, type VisualizacionRepository, type VisualizacionSyncInput } from '../../servicios/academico/visualizacionRepository';
 import { driveService as defaultDriveService, type TemporaryFileUrlResult } from '../../services/storage/driveService';
 import { quizService as defaultQuizService } from '../../servicios/academico/quizService';
 import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
@@ -15,6 +17,12 @@ interface MaterialPreviewModalProps {
   asignacion: AsignacionCentroEstudios | null;
   onCerrar: () => void;
   repository?: ProgresoRepository | FirestoreProgressRepository;
+  /**
+   * Repositorio de tracking de reproducción de YouTube (Paso 5). Independiente de
+   * `repository` (progreso genérico PDF/quiz/video-Drive) porque el reporte de staff
+   * necesita listar por RECURSO -- ver servicios/academico/visualizacionRepository.ts.
+   */
+  visualizacionRepository?: VisualizacionRepository;
   driveService?: Pick<typeof defaultDriveService, 'obtenerUrlTemporal' | 'obtenerUrlTemporalRecurso' | 'obtenerBlobProtegido'>;
   quizService?: Pick<typeof defaultQuizService, 'obtenerQuiz'>;
   /** Datos del estudiante para registrar actividad académica en métricas */
@@ -91,6 +99,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   asignacion,
   onCerrar,
   repository = progresoRepository,
+  visualizacionRepository = defaultVisualizacionRepository,
   driveService = defaultDriveService,
   quizService = defaultQuizService,
   estudianteId,
@@ -171,7 +180,9 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     setTextoContenido(null);
     setBlobUrl(null);
 
-    if (!asignacion || asignacion.uso === 'evaluacion' || !asignacion.externalFileId) return;
+    // Si el material tiene youtubeVideoId, el reproductor de YouTube lo maneja directo --
+    // NO pedimos acceso temporal de Drive (ese es justamente el costo que se elimina).
+    if (!asignacion || asignacion.uso === 'evaluacion' || !asignacion.externalFileId || asignacion.youtubeVideoId) return;
 
     let activo = true;
     let objectUrlCreada: string | null = null;
@@ -232,6 +243,29 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     }
   };
 
+  // Paso 5: tracking real de visualización de YouTube -- un doc por (tenant, recurso,
+  // alumno) en vez del progreso genérico (paginasVistas/segundosUnicos) que usa Drive.
+  const sincronizarVisualizacionYoutube = async (
+    asignacionActual: AsignacionCentroEstudios,
+    input: { estudianteNombre?: string; posicionSegundos: number; duracionSegundos: number; nuevoInicio: boolean }
+  ) => {
+    if (!estudianteId) return;
+
+    const payload: VisualizacionSyncInput = {
+      estudianteNombre: input.estudianteNombre,
+      posicionSegundos: input.posicionSegundos,
+      duracionSegundos: input.duracionSegundos,
+      nuevoInicio: input.nuevoInicio,
+    };
+
+    await visualizacionRepository.registrarSync(
+      asignacionActual.tenantId,
+      asignacionActual.recursoId,
+      estudianteId,
+      payload,
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-[120] bg-tkd-dark/70 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-3xl bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10">
@@ -289,6 +323,14 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
                 </p>
               </div>
             )
+          ) : tipoMaterial === 'video' && asignacion.youtubeVideoId ? (
+            <YoutubePlayer
+              videoId={asignacion.youtubeVideoId}
+              titulo={asignacion.titulo}
+              estudianteId={estudianteId}
+              estudianteNombre={estudianteNombre}
+              registrarSync={(input) => sincronizarVisualizacionYoutube(asignacion, input)}
+            />
           ) : tipoMaterial === 'video' ? (
             <VideoPlayer
               tenantId={asignacion.tenantId}

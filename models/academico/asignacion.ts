@@ -50,6 +50,14 @@ export interface AsignacionAcademica {
   externalFileId?: string;
 
   /**
+   * ID de video de YouTube copiado desde `RecursoAcademico.youtubeVideoId` al publicar
+   * (ver `publishAsignacion` en asignacionService.ts). Cuando está presente, el alumno ve
+   * el reproductor real de YouTube (IFrame Player API) en vez del proxy de Drive -- solo
+   * aplica a material de video; PDF sigue igual, con Drive.
+   */
+  youtubeVideoId?: string | null;
+
+  /**
    * Jornada (clase) real a la que se asignó el material.
    * Ausente en asignaciones publicadas antes de este campo o sin jornada asociada.
    */

@@ -1238,3 +1238,204 @@ test("instructor from another tenant cannot write the question bank", async () =
     updateDoc(doc(otroTenantDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-3"), { preguntas: [] })
   );
 });
+
+// =========================================================================
+// Visualizaciones de video de YouTube (reemplazo de Drive SOLO para video, decisión
+// de producto 2026-07 -- ver firestore.rules y servicios/academico/visualizacionRepository.ts).
+// Reusa canReadProgress-like criteria (isInstructor en vez de isAdmin) y
+// canWriteOwnStudentProgress, ya cubiertos por los tests de `progreso` de arriba, pero
+// nadie había verificado puntualmente el caso cross-tenant ni la matriz de roles staff
+// sobre esta colección concreta (path por RECURSO -> alumno, no alumno -> asignación).
+// =========================================================================
+
+const visualizacionPath = (db, tenantId, recursoId, uid) => doc(
+  db, "tenants", tenantId, "visualizaciones", recursoId, "alumnos", uid
+);
+
+const VISUALIZACION_DATA = {
+  tenantId: "tenant-1",
+  recursoId: "recurso-video-1",
+  porcentajeVisto: 40,
+  completado: false,
+  vecesIniciado: 1,
+};
+
+test("student can read their own visualizaciones doc in their tenant", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const estudianteDb = client("est-1", "tenant-1", "Estudiante");
+
+  await assertSucceeds(
+    getDoc(visualizacionPath(estudianteDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+});
+
+test("student cannot read another student's visualizaciones doc in the same tenant", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-ajeno"),
+      { ...VISUALIZACION_DATA, tenantId: "tenant-1" }
+    );
+  });
+
+  const estudianteDb = client("est-1", "tenant-1", "Estudiante");
+
+  await assertFails(
+    getDoc(visualizacionPath(estudianteDb, "tenant-1", "recurso-video-1", "est-ajeno"))
+  );
+});
+
+// Caso mas importante para el dueño del producto: un alumno de OTRO tenant no puede
+// leer, aunque el recurso/uid coincidan.
+test("student from another tenant cannot read a visualizaciones doc (cross-tenant read denied)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const otroTenantDb = client("est-2", "tenant-2", "Estudiante");
+
+  await assertFails(
+    getDoc(visualizacionPath(otroTenantDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+});
+
+// isInstructor() cubre Admin/Editor/Asistente/Maestro/SuperAdmin -- necesario para que
+// el reporte de staff (Paso 7) pueda leer el progreso de cualquier alumno de su tenant.
+test("staff roles (Admin, Editor, Asistente, Maestro) can read any student's visualizaciones doc in their own tenant", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  for (const rol of ["Admin", "Editor", "Asistente", "Maestro"]) {
+    const staffDb = client(`staff-${rol}`, "tenant-1", rol);
+    await assertSucceeds(
+      getDoc(visualizacionPath(staffDb, "tenant-1", "recurso-video-1", "est-1"))
+    );
+  }
+});
+
+test("instructor from another tenant cannot read a visualizaciones doc", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const otroTenantDb = client("maestro-otro-tenant", "tenant-2", "Maestro");
+
+  await assertFails(
+    getDoc(visualizacionPath(otroTenantDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+});
+
+test("linked tutor can read their child's visualizaciones doc", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", "tenant-1", "vinculos", "tutor@test.com_est-1"),
+      {
+        tenantId: "tenant-1",
+        tutorEmail: "tutor@test.com",
+        estudianteId: "est-1",
+      }
+    );
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "tutor@test.com" });
+
+  const snapshot = await assertSucceeds(
+    getDoc(visualizacionPath(tutorDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+  assert.equal(snapshot.data().porcentajeVisto, 40);
+});
+
+test("unlinked tutor cannot read a student's visualizaciones doc", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const tutorDb = client("tutor-2", "tenant-1", "Tutor", { email: "otro@test.com" });
+
+  await assertFails(
+    getDoc(visualizacionPath(tutorDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+});
+
+test("student can write their own visualizaciones doc", async () => {
+  const estudianteDb = client("est-1", "tenant-1", "Estudiante");
+
+  await assertSucceeds(
+    setDoc(
+      visualizacionPath(estudianteDb, "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    )
+  );
+});
+
+test("student cannot write another student's visualizaciones doc (same tenant or another tenant)", async () => {
+  const estudianteDb = client("est-1", "tenant-1", "Estudiante");
+
+  await assertFails(
+    setDoc(
+      visualizacionPath(estudianteDb, "tenant-1", "recurso-video-1", "est-ajeno"),
+      VISUALIZACION_DATA
+    )
+  );
+
+  const otroTenantDb = client("est-2", "tenant-2", "Estudiante");
+
+  await assertFails(
+    setDoc(
+      visualizacionPath(otroTenantDb, "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    )
+  );
+});
+
+test("tutor cannot write student visualizaciones but can read it in same tenant", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", "tenant-1", "vinculos", "tutor@test.com_est-1"),
+      {
+        tenantId: "tenant-1",
+        tutorEmail: "tutor@test.com",
+        estudianteId: "est-1",
+      }
+    );
+    await setDoc(
+      visualizacionPath(context.firestore(), "tenant-1", "recurso-video-1", "est-1"),
+      VISUALIZACION_DATA
+    );
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "tutor@test.com" });
+
+  await assertSucceeds(
+    getDoc(visualizacionPath(tutorDb, "tenant-1", "recurso-video-1", "est-1"))
+  );
+
+  await assertFails(
+    setDoc(
+      visualizacionPath(tutorDb, "tenant-1", "recurso-video-1", "est-1"),
+      { ...VISUALIZACION_DATA, porcentajeVisto: 99, completado: true, vecesIniciado: 2 }
+    )
+  );
+});

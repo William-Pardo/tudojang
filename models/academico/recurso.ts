@@ -92,6 +92,22 @@ export interface RecursoAcademico {
    */
   externalFileId: string;
 
+  /**
+   * ID de 11 caracteres de un video de YouTube (ver `utils/academico/youtubeUrl.ts`).
+   * SOLO aplica a recursos de video (`ficha.tipo === 'video'`). Campo ADICIONAL a
+   * `externalFileId`/Drive -- no lo reemplaza, para no romper videos ya cargados en Drive
+   * antes de este cambio ni el flujo de PDF (que sigue siendo 100% Drive).
+   *
+   * Motivo (decisión de producto, 2026-07): el material de video no genera ingreso
+   * directo para Tudojang, asi que no se justifica pagar por servirlo protegido.
+   * `proxyDriveMedia` (functions/academico/drive.js) no tiene Cache-Control/ETag, asi que
+   * cada reproduccion redescarga el archivo completo de Drive -- costoso y sin
+   * visibilidad real de si el alumno miro el video. Cuando este campo esta presente, el
+   * reproductor usa la YouTube IFrame Player API (costo $0 de hosting + eventos reales de
+   * reproduccion) en vez del proxy de Drive. `null`/`undefined` = seguir usando Drive.
+   */
+  youtubeVideoId?: string | null;
+
   /** Nombre actual del archivo (sincronizado desde Drive). */
   nombre: string;
 

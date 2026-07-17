@@ -88,6 +88,69 @@ describe('BibliotecaView', () => {
     expect(getMockRecursos()[0]?.tituloVisible).toBe('Fundamentos nivel 1');
   });
 
+  it('muestra "Editar preguntas" solo para recursos clasificados como quiz y abre el editor', async () => {
+    const user = userEvent.setup();
+    const driveService = {
+      iniciarConexionOAuth: jest.fn(),
+      procesarCallbackOAuth: jest.fn(),
+      listarCarpetaDrive: jest.fn().mockResolvedValue([
+        { id: 'file-quiz-1', name: 'Evaluacion cinturon amarillo.pdf', mimeType: 'application/pdf' },
+      ]),
+    };
+    window.localStorage.setItem('tudojang:driveConnection:tenant-quiz', 'conn-1');
+    window.localStorage.setItem('tudojang:driveFolder:tenant-quiz', 'folder-root');
+
+    render(<BibliotecaView driveService={driveService as any} tenantId="tenant-quiz" usuarioId="admin-quiz" />);
+
+    await user.click(await screen.findByRole('button', { name: /clasificar evaluacion cinturon amarillo.pdf/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+    // Sin clasificar como quiz todavia -> no debe verse el boton de editar preguntas
+    expect(screen.queryByRole('button', { name: /editar preguntas/i })).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/tipo de recurso/i), 'quiz');
+    await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    const botonEditarPreguntas = await screen.findByRole('button', { name: /editar preguntas de evaluacion cinturon amarillo.pdf/i });
+    await user.click(botonEditarPreguntas);
+
+    const dialogoQuiz = await screen.findByRole('dialog');
+    expect(dialogoQuiz).toHaveTextContent(/banco de preguntas/i);
+  });
+
+  it('el boton "Vista previa" abre MaterialPreviewModal en modoVistaPrevia para un recurso aprobado', async () => {
+    const user = userEvent.setup();
+    const driveService = {
+      iniciarConexionOAuth: jest.fn(),
+      procesarCallbackOAuth: jest.fn(),
+      listarCarpetaDrive: jest.fn().mockResolvedValue([
+        { id: 'file-preview-1', name: 'Manual tecnico.pdf', mimeType: 'application/pdf' },
+      ]),
+    };
+    window.localStorage.setItem('tudojang:driveConnection:tenant-preview', 'conn-1');
+    window.localStorage.setItem('tudojang:driveFolder:tenant-preview', 'folder-root');
+
+    render(<BibliotecaView driveService={driveService as any} tenantId="tenant-preview" usuarioId="admin-preview" />);
+
+    await user.click(await screen.findByRole('button', { name: /clasificar manual tecnico.pdf/i }));
+    await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    const botonVistaPrevia = await screen.findByRole('button', { name: /vista previa de manual tecnico.pdf/i });
+    await user.click(botonVistaPrevia);
+
+    const dialogoPreview = await screen.findByRole('dialog');
+    expect(dialogoPreview).toHaveTextContent(/vista previa del recurso/i);
+    expect(dialogoPreview).toHaveTextContent(/manual tecnico.pdf/i);
+  });
+
   it('inicia la conexion OAuth de Google Drive desde Biblioteca academica', async () => {
     const user = userEvent.setup();
     const navegarOAuth = jest.fn();
@@ -661,5 +724,142 @@ describe('BibliotecaView', () => {
     // Al retirar llama a archiveRecurso
     await user.click(botonRetirar);
     expect(bibliotecaService.archiveRecurso).toHaveBeenCalledWith('tenant-real', 'rec-aprobado-uno');
+  });
+
+  describe('clasificacion de video -- reemplazo de Drive por YouTube (solo video)', () => {
+    const driveServiceConVideo = () => ({
+      iniciarConexionOAuth: jest.fn(),
+      procesarCallbackOAuth: jest.fn(),
+      listarCarpetaDrive: jest.fn().mockResolvedValue([
+        { id: 'file-video-1', name: 'Clase 1 patadas.mp4', mimeType: 'video/mp4' },
+      ]),
+    });
+
+    it('no muestra el campo de URL de YouTube para un recurso PDF', async () => {
+      const user = userEvent.setup();
+      const driveService = {
+        iniciarConexionOAuth: jest.fn(),
+        procesarCallbackOAuth: jest.fn(),
+        listarCarpetaDrive: jest.fn().mockResolvedValue([
+          { id: 'file-pdf-1', name: 'Manual.pdf', mimeType: 'application/pdf' },
+        ]),
+      };
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveService as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar manual.pdf/i }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+      expect(screen.queryByLabelText(/video de youtube/i)).not.toBeInTheDocument();
+    });
+
+    it('muestra el campo de URL de YouTube cuando el tipo de recurso es video', async () => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveServiceConVideo() as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar clase 1 patadas.mp4/i }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+
+      // El tipo se infiere automaticamente como 'video' por el mimeType -- el campo ya
+      // deberia estar visible sin tener que tocar el select "Tipo de recurso".
+      expect(screen.getByLabelText(/video de youtube/i)).toBeInTheDocument();
+    });
+
+    it('muestra un error inline y no guarda si la URL de YouTube pegada es invalida', async () => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveServiceConVideo() as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar clase 1 patadas.mp4/i }));
+      await screen.findByRole('dialog');
+      await user.type(await screen.findByLabelText(/video de youtube/i), 'https://vimeo.com/123456789');
+      await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/url de youtube no es v.lida/i);
+      // El modal sigue abierto: el guardado se abortó.
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(getMockRecursos().find((r) => r.nombre === 'Clase 1 patadas.mp4')?.estado).not.toBe('aprobado');
+    });
+
+    it('parsea y guarda el ID de YouTube (no la URL cruda) al guardar la clasificacion', async () => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveServiceConVideo() as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar clase 1 patadas.mp4/i }));
+      await screen.findByRole('dialog');
+      await user.type(
+        await screen.findByLabelText(/video de youtube/i),
+        'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10s',
+      );
+      await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      const guardado = getMockRecursos().find((r) => r.nombre === 'Clase 1 patadas.mp4');
+      expect(guardado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+      expect(guardado?.estado).toBe('aprobado');
+    });
+
+    it('acepta dejar el campo de YouTube vacio (sigue usando Drive, compatibilidad hacia atras)', async () => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveServiceConVideo() as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar clase 1 patadas.mp4/i }));
+      await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      const guardado = getMockRecursos().find((r) => r.nombre === 'Clase 1 patadas.mp4');
+      expect(guardado?.youtubeVideoId).toBeFalsy();
+      expect(guardado?.estado).toBe('aprobado');
+    });
+
+    it('el boton de reporte de visualizacion solo aparece para video con youtubeVideoId, y abre ReporteVisualizacionVideo', async () => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('tudojang:driveConnection:tenant-video', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-video', 'folder-root');
+
+      render(<BibliotecaView driveService={driveServiceConVideo() as any} tenantId="tenant-video" usuarioId="admin-video" />);
+
+      await user.click(await screen.findByRole('button', { name: /clasificar clase 1 patadas.mp4/i }));
+      await screen.findByRole('dialog');
+
+      // Sin youtubeVideoId todavia -> no debe verse el boton de reporte
+      expect(screen.queryByRole('button', { name: /ver reporte de visualizaci.n/i })).not.toBeInTheDocument();
+
+      await user.type(
+        await screen.findByLabelText(/video de youtube/i),
+        'https://youtu.be/dQw4w9WgXcQ',
+      );
+      await user.click(screen.getByRole('button', { name: /guardar clasificaci/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      });
+
+      const botonReporte = await screen.findByRole('button', { name: /ver reporte de visualizaci.n de clase 1 patadas.mp4/i });
+      await user.click(botonReporte);
+
+      const dialogoReporte = await screen.findByRole('dialog');
+      expect(dialogoReporte).toHaveTextContent(/reporte de visualizaci.n/i);
+      expect(dialogoReporte).toHaveTextContent(/clase 1 patadas.mp4/i);
+    });
   });
 });

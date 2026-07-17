@@ -73,3 +73,80 @@ describe('bibliotecaService.approveRecurso', () => {
     ).rejects.toThrow(/transici.n inv.lida/i);
   });
 });
+
+describe('bibliotecaService.updateFicha -- youtubeVideoId', () => {
+  beforeEach(() => {
+    clearMockRecursos();
+  });
+
+  it('guarda youtubeVideoId como campo adicional, sin tocar externalFileId', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-1.mp4' });
+
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
+
+    // approveRecurso + listarRecursosAprobados exponen el objeto completo del recurso,
+    // que es donde verificamos que el campo nuevo haya quedado guardado.
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
+
+    expect(guardado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+    expect(guardado?.externalFileId).toBeTruthy();
+  });
+
+  it('no pisa youtubeVideoId existente cuando se llama updateFicha sin pasar el parametro (undefined)', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-2.mp4' });
+
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
+
+    // Segundo guardado (ej. solo cambia tags) sin tocar youtubeVideoId.
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'], tags: ['nuevo-tag'] } as any
+    );
+
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
+
+    expect(guardado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+  });
+
+  it('permite borrar youtubeVideoId pasando null explicito (volver a usar Drive)', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-3.mp4' });
+
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      null
+    );
+
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
+
+    expect(guardado?.youtubeVideoId).toBeNull();
+  });
+});

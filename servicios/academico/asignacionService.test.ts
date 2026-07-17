@@ -115,6 +115,28 @@ describe('asignacionService', () => {
     });
   });
 
+  it('copia youtubeVideoId del recurso a la asignacion al publicar (reemplazo Drive->YouTube solo video)', () => {
+    const asignacion = crearAsignacion({ id: 'asignacion-video-yt', estado: 'borrador' });
+    const recurso = crearRecurso({
+      estado: 'aprobado',
+      ficha: { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] },
+      youtubeVideoId: 'dQw4w9WgXcQ',
+    });
+
+    expect(publishAsignacion({ asignacion, recurso, publicadoPorUid: 'maestro-1' })).toMatchObject({
+      youtubeVideoId: 'dQw4w9WgXcQ',
+    });
+  });
+
+  it('deja youtubeVideoId en null cuando el recurso no tiene video de YouTube (compatibilidad Drive)', () => {
+    const asignacion = crearAsignacion({ id: 'asignacion-pdf', estado: 'borrador' });
+    const recurso = crearRecurso({ estado: 'aprobado' });
+
+    expect(publishAsignacion({ asignacion, recurso, publicadoPorUid: 'maestro-1' })).toMatchObject({
+      youtubeVideoId: null,
+    });
+  });
+
   it('bloquea asignacion antes de la fecha de apertura', () => {
     expect(resolverEstadoTemporalAsignacion(
       crearAsignacion({
