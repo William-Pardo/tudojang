@@ -87,4 +87,52 @@ describe('espacioRepository', () => {
 
     expect(resultado).toEqual([]);
   });
+
+  // Subtarea "espacios" (cierre Centro de Estudios): guardarEspacio soldó el lado de
+  // escritura del repositorio, que en 12.7 se dejó deliberadamente como solo lectura.
+  // Sin esto, EspaciosView.tsx solo guardaba en memoria local y el selector de la Agenda
+  // siempre recibia [] (ver DT-0007).
+  it('guardarEspacio persiste en memoria cuando Firebase no esta configurado', async () => {
+    const repository = crearEspacioRepository({ isFirebaseConfigured: false });
+    const espacio = crearEspacioBase({ id: 'espacio-nuevo', tenantId: 'tenant-1' });
+
+    await repository.guardarEspacio(espacio);
+
+    const resultado = await repository.listarEspaciosPorTenant('tenant-1');
+    expect(resultado).toEqual([espacio]);
+  });
+
+  it('guardarEspacio hace upsert por id en memoria (no duplica un espacio existente)', async () => {
+    const repository = crearEspacioRepository({ isFirebaseConfigured: false });
+    seedMockEspacios([crearEspacioBase({ id: 'espacio-1', nombre: 'Tatami principal' })]);
+
+    await repository.guardarEspacio(crearEspacioBase({ id: 'espacio-1', nombre: 'Tatami renovado' }));
+
+    const resultado = await repository.listarEspaciosPorTenant('tenant-1');
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].nombre).toBe('Tatami renovado');
+  });
+
+  it('guardarEspacio escribe en Firestore con setDoc merge en la coleccion del tenant', async () => {
+    const espacio = crearEspacioBase({ id: 'espacio-1', tenantId: 'tenant-1' });
+    const rutasDoc: any[][] = [];
+    const setDocCalls: Array<{ data: unknown; options: unknown }> = [];
+    const repository = crearEspacioRepository({
+      isFirebaseConfigured: true,
+      db: 'db-mock' as any,
+      deps: {
+        doc: (...path: any[]) => { rutasDoc.push(path); return path; },
+        setDoc: async (_ref: unknown, data: unknown, options: unknown) => {
+          setDocCalls.push({ data, options });
+        },
+      },
+    });
+
+    await repository.guardarEspacio(espacio);
+
+    expect(rutasDoc).toEqual([['db-mock', 'tenants', 'tenant-1', 'espacios', 'espacio-1']]);
+    expect(setDocCalls).toHaveLength(1);
+    expect(setDocCalls[0].data).toEqual(espacio);
+    expect(setDocCalls[0].options).toEqual({ merge: true });
+  });
 });

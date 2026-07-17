@@ -11,8 +11,10 @@ function makeContext({ uid = 'maestro-1', rol = 'Editor', tenantId = 'tenant-1' 
   return { auth: { uid, token: { rol, tenantId } } };
 }
 
-function makeFirestore({ jornada, inscripciones = [], asistencias = {}, writes = [] } = {}) {
-  const state = { jornada, inscripciones, asistencias, writes };
+function makeFirestore({
+  jornada, inscripciones = [], asistencias = {}, writes = [], estudiantes = {}, ejecucion,
+} = {}) {
+  const state = { jornada, inscripciones, asistencias, writes, estudiantes, ejecucion };
   return {
     collection: (name) => makeRef([name], state),
     _state: state,
@@ -37,10 +39,24 @@ function makeRef(path, state) {
       );
       if (inscripcionMatch) {
         const [, , ejecucionProgramaId, estudianteId] = inscripcionMatch;
-        const existe = state.inscripciones.some(
+        const inscripcion = state.inscripciones.find(
           (i) => i.ejecucionProgramaId === ejecucionProgramaId && i.estudianteId === estudianteId
         );
-        return makeSnap(existe ? { ejecucionProgramaId, estudianteId } : null);
+        return makeSnap(inscripcion || null);
+      }
+
+      // Colección top-level (no anidada bajo tenants/{t}), igual que en produccion
+      // (servicios/estudiantesApi.ts: doc(db, 'estudiantes', id)).
+      const estudianteMatch = joined.match(/^estudiantes\/([^/]+)$/);
+      if (estudianteMatch) {
+        const [, estudianteId] = estudianteMatch;
+        return makeSnap(state.estudiantes[estudianteId] || null);
+      }
+
+      const ejecucionMatch = joined.match(/^tenants\/([^/]+)\/ejecucionesPrograma\/([^/]+)$/);
+      if (ejecucionMatch) {
+        const [, , ejecucionProgramaId] = ejecucionMatch;
+        return makeSnap(state.ejecucion && state.ejecucion.id === ejecucionProgramaId ? state.ejecucion : null);
       }
 
       const asistenciaMatch = joined.match(
@@ -194,16 +210,179 @@ test('registrarAsistenciaJornada permite rol Asistente operar la jornada de otro
   assert.equal(resultado.ok, true);
 });
 
-// --- Cycle B: pertenencia via roster explicito (Fase 0) ---------------------
+// Bug relacionado al reportado por el usuario en verificacion manual (2026-07-11):
+// ROLES_AUTORIZADOS y assertInstructorAsignado nunca se actualizaron cuando 'Maestro'
+// se separo de 'Editor' como rol docente real (14.9). Un Maestro real quedaba
+// rechazado por rol al intentar registrar asistencia de SU PROPIA jornada, y (en
+// sentido opuesto) un Maestro SI podia operar la jornada de OTRO instructor sin ser
+// rechazado, porque assertInstructorAsignado solo miraba rol === 'Editor'.
+test('registrarAsistenciaJornada permite rol Maestro asignado a su propia jornada', async () => {
+  const firestore = makeFirestore({
+    jornada: jornadaEnCurso, // instructorId: 'maestro-1'
+    inscripciones: [inscripcionEstudiante1],
+  });
+  const servicio = crearServicioRegistrarAsistencia({ firestore });
 
-test('registrarAsistenciaJornada rechaza estudiante sin inscripcion en la ejecucion de la jornada', async () => {
+  const resultado = await servicio(dataBase(), makeContext({ uid: 'maestro-1', rol: 'Maestro' }));
+
+  assert.equal(resultado.ok, true);
+});
+
+test('registrarAsistenciaJornada rechaza rol Maestro que NO es el instructor asignado a la jornada', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso, // instructorId: 'maestro-1'
+      inscripciones: [inscripcionEstudiante1],
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext({ uid: 'otro-maestro', rol: 'Maestro' })),
+    /maestro asignado/i
+  );
+});
+
+// --- Cycle B: matricula automatica por grupo+sede+pago (reemplaza el roster ---
+// 100% manual/fail-closed de Fase 0). Decision de arquitectura 2026-07-11 (ver
+// engram centro-estudios/matricula-automatica): sin inscripcion explicita, un
+// estudiante pertenece si esta en el mismo grupo+sede que la ejecucion y su
+// pago no esta Vencido. Una inscripcion explicita SIGUE mandando: 'retirada' es
+// una excepcion (excluye aunque coincida todo), 'activa' es una inclusion manual
+// (incluye aunque NO coincida, ej. clase de prueba). gradosExcluidos en la
+// jornada permite armar clases especificas para ciertos grados sin romper la
+// regla general (ver models/academico/jornada.ts).
+
+// grupoId: mismo slug que produce vistas/admin/AsignacionesView.tsx::slugificar
+// para EjecucionPrograma.grupoId real ('Precadetes' -> 'precadetes', SIN prefijo
+// 'grupo-' -- no confundir con jornadaContextService.ts::grupoId(), que es una
+// funcion distinta sin relacion, solo para options de un <select>).
+const ejecucionActiva = {
+  id: 'ejecucion-1',
+  tenantId: 'tenant-1',
+  grupoId: 'precadetes',
+  sedeId: 'sede-1',
+};
+
+const estudianteActivo = {
+  id: 'estudiante-1',
+  tenantId: 'tenant-1',
+  grado: 'Blanco',
+  grupo: 'Precadetes',
+  sedeId: 'sede-1',
+  estadoPago: 'Al día',
+};
+
+test('registrarAsistenciaJornada permite AUTOMATICAMENTE a un estudiante sin inscripcion explicita cuando coincide grupo+sede y el pago no esta Vencido', async () => {
   const servicio = crearServicioRegistrarAsistencia({
     firestore: makeFirestore({
       jornada: jornadaEnCurso,
-      // El estudiante existe matriculado, pero en OTRA ejecucion (misma materia,
-      // seccion distinta) — comparte grado/grupo pero no debe pasar la validacion.
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': estudianteActivo },
+    }),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.ok, true);
+});
+
+test('registrarAsistenciaJornada rechaza automaticamente si el grupo del estudiante no coincide con el de la ejecucion', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': { ...estudianteActivo, grupo: 'Cadetes' } },
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /no est(a|á) matriculado/i
+  );
+});
+
+test('registrarAsistenciaJornada rechaza automaticamente si la sede del estudiante no coincide con la de la ejecucion', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': { ...estudianteActivo, sedeId: 'otra-sede' } },
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /no est(a|á) matriculado/i
+  );
+});
+
+test('registrarAsistenciaJornada rechaza automaticamente si el pago del estudiante esta Vencido', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': { ...estudianteActivo, estadoPago: 'Vencido' } },
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /no est(a|á) matriculado/i
+  );
+});
+
+test('registrarAsistenciaJornada rechaza si el estudiante pertenece a OTRO tenant (defensa en profundidad)', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': { ...estudianteActivo, tenantId: 'otro-tenant' } },
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /no est(a|á) matriculado/i
+  );
+});
+
+test('registrarAsistenciaJornada rechaza si el grado del estudiante esta en gradosExcluidos de la jornada (clase especifica para otros grados)', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: { ...jornadaEnCurso, gradosExcluidos: ['Blanco', 'Amarillo'] },
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': estudianteActivo }, // grado: 'Blanco'
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /no est(a|á) matriculado/i
+  );
+});
+
+test('registrarAsistenciaJornada permite a un estudiante de grado NO excluido aunque la jornada excluya otros grados', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: { ...jornadaEnCurso, gradosExcluidos: ['Amarillo'] },
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': estudianteActivo }, // grado: 'Blanco', no excluido
+    }),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.ok, true);
+});
+
+test('registrarAsistenciaJornada rechaza (excepcion explicita) a un estudiante con inscripcion "retirada" aunque coincida grupo+sede', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': estudianteActivo },
       inscripciones: [
-        { ejecucionProgramaId: 'otra-ejecucion', estudianteId: 'estudiante-1' },
+        { ejecucionProgramaId: 'ejecucion-1', estudianteId: 'estudiante-1', estado: 'retirada' },
       ],
     }),
   });
@@ -214,9 +393,26 @@ test('registrarAsistenciaJornada rechaza estudiante sin inscripcion en la ejecuc
   );
 });
 
-test('registrarAsistenciaJornada rechaza a TODOS los estudiantes cuando la ejecucion no tiene roster (fail-closed)', async () => {
+test('registrarAsistenciaJornada permite (inclusion manual) a un estudiante con inscripcion "activa" aunque NO coincida grupo/sede', async () => {
   const servicio = crearServicioRegistrarAsistencia({
-    firestore: makeFirestore({ jornada: jornadaEnCurso, inscripciones: [] }),
+    firestore: makeFirestore({
+      jornada: jornadaEnCurso,
+      ejecucion: ejecucionActiva,
+      estudiantes: { 'estudiante-1': { ...estudianteActivo, grupo: 'Cadetes', sedeId: 'otra-sede' } },
+      inscripciones: [
+        { ejecucionProgramaId: 'ejecucion-1', estudianteId: 'estudiante-1', estado: 'activa' },
+      ],
+    }),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.ok, true);
+});
+
+test('registrarAsistenciaJornada rechaza si el estudiante no existe en absoluto', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({ jornada: jornadaEnCurso, ejecucion: ejecucionActiva, estudiantes: {} }),
   });
 
   await assert.rejects(
@@ -227,7 +423,13 @@ test('registrarAsistenciaJornada rechaza a TODOS los estudiantes cuando la ejecu
 
 // --- Cycle C: toggle server-side check-in / check-out / 3er rechazo --------
 
-const inscripcionEstudiante1 = { ejecucionProgramaId: 'ejecucion-1', estudianteId: 'estudiante-1' };
+// estado: 'activa' explicito -- con la matricula automatica (Cycle B), una
+// inscripcion sin 'estado' ya no basta por si sola para pertenecer (ver
+// perteneceAEjecucion en asistencia.js: solo 'activa' cuenta como inclusion
+// manual). El resto de los tests de este archivo (permisos, toggle check-in/
+// check-out) no les interesa la matricula automatica, asi que siguen usando
+// este fixture de inclusion explicita sin tener que agregar estudiante/ejecucion.
+const inscripcionEstudiante1 = { ejecucionProgramaId: 'ejecucion-1', estudianteId: 'estudiante-1', estado: 'activa' };
 
 test('primer escaneo registra check-in (horaEntrada) y no toca horaSalida', async () => {
   const firestore = makeFirestore({ jornada: jornadaEnCurso, inscripciones: [inscripcionEstudiante1] });

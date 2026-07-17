@@ -14,6 +14,12 @@ interface CrearJornadaInput {
   horaInicio: string;
   horaFin: string;
   objetivosPlaneados: string[];
+  // Rediseño 2026-07-12 (pedido explicito del usuario: "borrador como estado ya no
+  // deberia existir", clases malleables por defecto): permite a un llamador especifico
+  // (generateJornadasFromBloque, usado por Centro de Estudios) saltear el estado
+  // 'borrador'. Default 'borrador' preservado para no romper el flujo de creacion
+  // manual singular de JornadasView.tsx (createJornada -> confirmar explicito).
+  estadoInicial?: EstadoJornada;
 }
 
 interface PendienteCierreInput {
@@ -44,13 +50,18 @@ function validarHorario(horaInicio: string, horaFin: string): void {
 }
 
 const transicionesPermitidas: Record<EstadoJornada, EstadoJornada[]> = {
-  borrador: ['confirmada', 'cancelada'],
+  // Rediseño 2026-07-12: se agrega 'reprogramada' -- una jornada en borrador (legacy o
+  // creada manualmente desde JornadasView.tsx) ahora se puede reprogramar directamente,
+  // sin exigir confirmar primero (jornadas malleables por defecto).
+  borrador: ['confirmada', 'cancelada', 'reprogramada'],
   pendiente_confirmacion: ['confirmada', 'cancelada', 'pendiente_sustitucion'],
   confirmada: ['en_curso', 'cancelada', 'reprogramada'],
   en_curso: ['pendiente_cierre', 'parcial', 'cancelada'],
   pendiente_cierre: ['cerrada', 'parcial'],
   cerrada: [],
-  cancelada: [],
+  // Rediseño 2026-07-13 (pedido explicito del usuario): "restituir" una clase cancelada
+  // por error -- unico camino de salida de 'cancelada', vuelve directo a 'confirmada'.
+  cancelada: ['confirmada'],
   reprogramada: ['confirmada', 'pendiente_confirmacion', 'cancelada'],
   parcial: ['cerrada'],
   pendiente_sustitucion: ['confirmada', 'cancelada'],
@@ -85,7 +96,7 @@ export function createJornada(input: CrearJornadaInput): JornadaInstruccion {
     fecha: input.fecha,
     horaInicio: input.horaInicio,
     horaFin: input.horaFin,
-    estado: 'borrador',
+    estado: input.estadoInicial ?? 'borrador',
     objetivosPlaneados: [...input.objetivosPlaneados],
     objetivosImpartidos: [],
     asistenciaRegistrada: false,
@@ -188,6 +199,9 @@ export function generateJornadasFromBloque({
       horaFin: bloque.horaFin,
       objetivosPlaneados,
       bloqueRecurrenteId: bloque.id,
+      // Rediseño 2026-07-12: las clases generadas por Centro de Estudios nacen
+      // directamente confirmadas -- "borrador" deja de ser un paso manual para este flujo.
+      estadoInicial: 'confirmada',
     }));
   }
 

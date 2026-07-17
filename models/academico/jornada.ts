@@ -1,4 +1,5 @@
 import type { EstadoJornada } from './index';
+import type { GradoTKD } from '../../tipos';
 
 export interface JornadaInstruccion {
   id: string;
@@ -19,6 +20,13 @@ export interface JornadaInstruccion {
   asistenciaRegistrada: boolean;
   motivoCancelacion?: string;
   tema?: string;
+  /**
+   * Grados excluidos de ESTA jornada puntual (matrícula automática por grado).
+   * Ausente o vacío = cubre todos los grados del grupo (default). Sirve para
+   * armar clases especiales para ciertos grados (ej. "solo avanzados") sin
+   * romper la regla general de que todos los grados tienen su clase regular.
+   */
+  gradosExcluidos?: GradoTKD[];
   creadoEn: string;
   actualizadoEn: string;
 }

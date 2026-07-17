@@ -6,7 +6,8 @@
 import { collection, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../../firebase/config';
-import type { AsignacionAcademica } from '../../models/academico/asignacion';
+import type { AsignacionAcademica, DestinatarioAsignacion, TipoDestinatarioAsignacion } from '../../models/academico/asignacion';
+import type { MomentoAsignacion } from '../../models/academico';
 import type { RecursoAcademico } from '../../models/academico/recurso';
 import type {
   AsignacionCentroEstudios,
@@ -353,4 +354,91 @@ export async function eliminarAsignacion(
   }
 
   return { ok: true };
+}
+
+// Subtarea 12.9: primer consumidor real es la pestana "Materiales" del modal de edicion
+// singular de Agenda (components/academico/ModalEdicionJornada.tsx), via
+// PestanaMaterialesJornada (12.7, sin consumidor real hasta ahora). AsignacionesView.tsx ya
+// resuelve este mismo problema (armar+validar+persistir una AsignacionAcademica a partir de
+// un AsignacionDraft del wizard) con helpers PRIVADOS (crearDestinatario, mapearCriterioAUso,
+// confirmarWizard) que no estan exportados. En vez de reabrir ese archivo grande y activamente
+// tocado por otra sesion para exportar 3 helpers, se centraliza aca una version de servicio
+// reutilizable equivalente: valida el recurso con publishAsignacion (funcion pura ya
+// existente en este mismo archivo) y persiste con publicarAsignacion (mismo Cloud Function
+// real que ya usa AsignacionesView) -- NO se inventa un segundo camino de persistencia.
+export interface AsignarMaterialAJornadaInput {
+  tenantId: string;
+  jornadaId: string;
+  recurso: RecursoAcademico;
+  recursoId: string;
+  tipoDestinatario: TipoDestinatarioAsignacion;
+  grupoObjetivo: string;
+  grados: string[];
+  momento: MomentoAsignacion;
+  criterio: 'estudio' | 'repaso' | 'refuerzo' | 'evaluacion' | 'quiz';
+  fechaApertura: string;
+  fechaCierre?: string;
+  publicadoPorUid: string;
+  /** Si se pasa (modo editar), reutiliza este id en vez de generar uno nuevo determinista. */
+  asignacionIdExistente?: string;
+}
+
+function construirDestinatarioMaterial(
+  tipo: TipoDestinatarioAsignacion,
+  grupo: string,
+  grados: string[],
+): DestinatarioAsignacion {
+  if (tipo === 'estudiante') {
+    return {
+      tipo,
+      estudianteIds: grupo.split(',').map((item) => item.trim()).filter(Boolean),
+    };
+  }
+  return {
+    tipo,
+    grupo: grupo.trim(),
+    grados: grados.map((grado) => grado.trim()).filter(Boolean),
+  };
+}
+
+// Mismo mapeo que el helper privado mapearCriterioAUso de AsignacionesView.tsx: 'quiz' ->
+// 'evaluacion', 'repaso' -> 'estudio', el resto pasa igual (los valores coinciden con
+// UsoAcademico salvo esos dos casos).
+function mapearCriterioAUsoAcademico(criterio: AsignarMaterialAJornadaInput['criterio']) {
+  if (criterio === 'quiz') return 'evaluacion' as const;
+  if (criterio === 'repaso') return 'estudio' as const;
+  return criterio;
+}
+
+export async function asignarMaterialAJornada(
+  input: AsignarMaterialAJornadaInput,
+): Promise<PublicarAsignacionResponse> {
+  const id = input.asignacionIdExistente ?? `asignacion-agenda-${input.jornadaId}-${input.recursoId}`;
+  const destinatario = construirDestinatarioMaterial(input.tipoDestinatario, input.grupoObjetivo, input.grados);
+  const ahora = new Date().toISOString();
+
+  const asignacion = publishAsignacion({
+    asignacion: {
+      id,
+      tenantId: input.tenantId,
+      recursoId: input.recursoId,
+      jornadaId: input.jornadaId,
+      titulo: input.recurso.tituloVisible || input.recurso.nombre,
+      tags: input.recurso.ficha?.tags ?? [],
+      destinatario,
+      uso: mapearCriterioAUsoAcademico(input.criterio),
+      momento: input.momento,
+      obligatoria: true,
+      fechaApertura: input.fechaApertura,
+      fechaCierre: input.fechaCierre,
+      estado: 'publicada',
+      creadoPorUid: input.publicadoPorUid,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+    },
+    recurso: input.recurso,
+    publicadoPorUid: input.publicadoPorUid,
+  });
+
+  return publicarAsignacion({ tenantId: input.tenantId, jornadaId: input.jornadaId, asignacion });
 }

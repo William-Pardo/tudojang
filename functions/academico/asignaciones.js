@@ -47,11 +47,16 @@ function validarAsignacionBase({ tenantId, asignacion, recurso }) {
   }
 }
 
-function validarJornada({ tenantId, jornada, uid }) {
+// Mismo criterio que puedeEditarJornada (MisClasesView.tsx) y que isAdmin() en
+// firestore.rules: Admin/SuperAdmin operan cualquier jornada del tenant. Antes esta
+// funcion no tenia ningun bypass de rol -- un Admin quedaba rechazado con el mismo
+// mensaje que un maestro no asignado (bug real reportado, ver DT en bitacora.json).
+function validarJornada({ tenantId, jornada, uid, rol }) {
   if (jornada.tenantId !== tenantId) {
     throw crearError('permission-denied', 'Tenant de jornada no autorizado');
   }
-  if (jornada.instructorId !== uid) {
+  const esAdmin = rol === 'Admin' || rol === 'SuperAdmin';
+  if (!esAdmin && jornada.instructorId !== uid) {
     throw crearError('permission-denied', 'Solo el maestro asignado a la jornada puede publicar la asignacion');
   }
 }
@@ -80,7 +85,7 @@ function crearServicioPublishAsignacion({ firestore }) {
     );
 
     validarAsignacionBase({ tenantId, asignacion, recurso });
-    validarJornada({ tenantId, jornada, uid: auth.uid });
+    validarJornada({ tenantId, jornada, uid: auth.uid, rol: auth.token?.rol });
 
     const ahora = new Date().toISOString();
     const asignacionId = asignacion.id || `asignacion-${Date.now()}`;
@@ -151,7 +156,7 @@ function crearServicioPublishAsignacionesBatch({ firestore }) {
             tenant.collection('jornadas').doc(jornadaId),
             'Jornada no encontrada'
           );
-          validarJornada({ tenantId, jornada, uid: auth.uid });
+          validarJornada({ tenantId, jornada, uid: auth.uid, rol: auth.token?.rol });
         } catch {
           skipped.push({ recursoId, jornadaId, reason: 'jornada_no_encontrada' });
           continue;

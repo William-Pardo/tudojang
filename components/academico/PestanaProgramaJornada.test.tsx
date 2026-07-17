@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PestanaProgramaJornada, {
   type OpcionesProgramaJornada,
@@ -101,5 +101,109 @@ describe('PestanaProgramaJornada', () => {
 
     const espacio = screen.getByLabelText(/espacio/i) as HTMLSelectElement;
     expect(espacio.options).toHaveLength(0);
+  });
+
+  // Subtarea 12.9: campos adicionales que pide la seccion 6 del documento de mejora
+  // (hora de inicio, hora de fin, fecha) y que JornadasView.tsx NUNCA paso como prop (esa
+  // vista no los edita, solo los muestra como texto de solo lectura fuera de este
+  // componente). Se implementan como OPCIONALES: cada bloque nuevo solo se renderiza si su
+  // callback on*Change correspondiente esta presente, para que el consumidor existente
+  // (JornadasView, que no pasa estos props) siga viendo exactamente el mismo markup que
+  // antes -- ver los 4 tests de esta suite que NO pasan overrides, siguen en verde sin
+  // cambios.
+  it('no renderiza fecha/hora cuando el consumidor no pasa esos callbacks (compatibilidad con JornadasView)', () => {
+    renderPestana();
+
+    expect(screen.queryByLabelText(/fecha de la clase/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/hora de inicio/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/hora de fin/i)).not.toBeInTheDocument();
+  });
+
+  it('renderiza fecha/hora cuando el consumidor pasa valores y callbacks, y emite el cambio de cada uno', async () => {
+    const onFechaChange = jest.fn();
+    const onHoraInicioChange = jest.fn();
+    const onHoraFinChange = jest.fn();
+
+    renderPestana({
+      fecha: '2026-07-07',
+      horaInicio: '08:00',
+      horaFin: '09:00',
+      onFechaChange,
+      onHoraInicioChange,
+      onHoraFinChange,
+    });
+
+    expect((screen.getByLabelText(/fecha de la clase/i) as HTMLInputElement).value).toBe('2026-07-07');
+    expect((screen.getByLabelText(/hora de inicio/i) as HTMLInputElement).value).toBe('08:00');
+    expect((screen.getByLabelText(/hora de fin/i) as HTMLInputElement).value).toBe('09:00');
+
+    fireEvent.change(screen.getByLabelText(/fecha de la clase/i), { target: { value: '2026-07-08' } });
+    expect(onFechaChange).toHaveBeenCalledWith('2026-07-08');
+
+    fireEvent.change(screen.getByLabelText(/hora de inicio/i), { target: { value: '10:00' } });
+    expect(onHoraInicioChange).toHaveBeenCalledWith('10:00');
+
+    fireEvent.change(screen.getByLabelText(/hora de fin/i), { target: { value: '11:00' } });
+    expect(onHoraFinChange).toHaveBeenCalledWith('11:00');
+  });
+
+  it('deshabilita el selector de instructor cuando instructorDeshabilitado es true (maestro asignado no-admin no puede reasignar)', () => {
+    renderPestana({ instructorDeshabilitado: true });
+
+    expect(screen.getByLabelText(/instructor/i)).toBeDisabled();
+  });
+
+  it('no deshabilita el selector de instructor por defecto', () => {
+    renderPestana();
+
+    expect(screen.getByLabelText(/instructor/i)).not.toBeDisabled();
+  });
+
+  // Rediseño post-cierre modulo 12 (ver CIERRE CENTRO DE ESTUDIOS.md): Programa/Grupo/
+  // Espacio pasan a ser OPCIONALES porque el modal de edicion singular de una clase ya no
+  // los edita (decision explicita del usuario) pero JornadasView.tsx (creacion de clases)
+  // SI los sigue necesitando. Sede e Instructor quedan siempre obligatorios/visibles.
+  describe('Programa/Grupo/Espacio opcionales (compatibilidad con el modal de edicion singular)', () => {
+    it('no renderiza Programa/Grupo/Espacio cuando el consumidor no pasa esos callbacks, pero si Sede e Instructor', () => {
+      render(
+        <PestanaProgramaJornada
+          jornada={jornadaBase}
+          opciones={opciones}
+          onSedeChange={jest.fn()}
+          onInstructorChange={jest.fn()}
+        />
+      );
+
+      expect(screen.queryByLabelText(/^programa$/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^grupo$/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^espacio$/i)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^sede$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^instructor$/i)).toBeInTheDocument();
+    });
+
+    it('renderiza Programa/Grupo/Espacio cuando el consumidor SI pasa los 3 callbacks (JornadasView sigue viendo los 5 campos)', () => {
+      renderPestana();
+
+      expect(screen.getByLabelText(/^programa$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^grupo$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^espacio$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^sede$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^instructor$/i)).toBeInTheDocument();
+    });
+  });
+
+  // Estado y "grados excluidos de esta clase" se ELIMINARON por completo de este
+  // componente (rediseño post-cierre modulo 12): eran exclusivos del modal de edicion
+  // singular, que ahora los maneja de otra forma (ver ModalEdicionJornada.tsx). Este
+  // componente ya no conoce ninguno de los dos conceptos.
+  it('ya no expone un selector de Estado ni el checklist de grados excluidos', () => {
+    renderPestana({
+      fecha: '2026-07-07',
+      onFechaChange: jest.fn(),
+    });
+
+    expect(screen.queryByLabelText(/^estado$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/grados excluidos/i)).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 });

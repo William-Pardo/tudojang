@@ -12,13 +12,12 @@ import {
 import { listarAsignacionesPorTenant } from '../../servicios/academico/asignacionService';
 import {
   confirmarJornada,
-  iniciarJornada,
   cerrarJornada,
   marcarPendienteCierre,
   cancelarJornada,
   reprogramarJornada,
 } from '../../servicios/academico/jornadaService';
-import { IconoCalendario, IconoReloj } from '../../components/Iconos';
+import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar } from '../../components/Iconos';
 
 interface MisClasesViewProps {
   tenantId: string;
@@ -33,6 +32,12 @@ interface MisClasesViewProps {
   // JornadasView) -- recibe usuarioId/esAdmin por prop, asi que el rol tambien se recibe
   // por prop desde quien la embebe (AsignacionesView, con usuario.rol de useAuth()).
   rol?: RolUsuario;
+  // Extension posterior al cierre del modulo 12 (matriz de roles de Agenda): flag nuevo
+  // de `Usuario` (tipos.ts) que un Admin le otorga a un Asistente/Editor puntual para que
+  // pueda editar jornadas ajenas (no solo las suyas). Se pasa a `puedeEditarJornada` junto
+  // con `rol` para que esta vista respete la MISMA matriz que AgendaView/ModalEdicionJornada
+  // -- ver comentario extendido junto a `puedeEditarJornada` mas abajo.
+  permisoEdicionAgenda?: boolean;
   repository?: JornadaRepository;
   // Fix 4 (persistencia/seleccion de Programa academico): contador que el padre
   // (AsignacionesView) incrementa tras guardar/eliminar un programa para forzar la
@@ -41,6 +46,11 @@ interface MisClasesViewProps {
   // no cambia (edicion in-place), cargar() jamas volvia a ejecutarse y "Mis clases"
   // quedaba desactualizado hasta navegar afuera y volver.
   refreshTrigger?: number;
+  // Rediseño 2026-07-11: el icono editar (lapiz) del pill abre el asistente de material,
+  // que vive en el padre (AsignacionesView, unico lugar con el wizard de 3 pasos). Esta
+  // vista no conoce el wizard -- solo delega la jornada clickeada. Opcional: sin este
+  // callback, el icono editar no se renderiza (mismo patron que el resto de props opcionales).
+  onEditarMaterial?: (jornada: JornadaInstruccion) => void;
 }
 
 // Subtarea 12.2 — permiso "maestro asignado". Solo el maestro asignado
@@ -51,11 +61,56 @@ interface MisClasesViewProps {
 // Subtarea 12.8: exportada (antes privada de este archivo) para que la parrilla semanal
 // de Agenda (vistas/admin/AgendaView.tsx) reutilice el MISMO criterio de permiso para
 // mostrar/ocultar el icono de edicion, en vez de duplicar la logica en un segundo lugar.
-export function puedeEditarJornada(jornada: JornadaInstruccion, usuarioId: string, esAdmin: boolean): boolean {
-  return esAdmin || jornada.instructorId === usuarioId;
+//
+// Extension posterior al cierre del modulo 12 (matriz de roles de Agenda, ver CIERRE
+// CENTRO DE ESTUDIOS.md): se agrega un 4to parametro OPCIONAL `contexto` con el rol de
+// quien opera y el flag `permisoEdicionAgenda` (nuevo en `Usuario`, tipos.ts). Es
+// opcional a proposito -- retrocompatible con cualquier call site que todavia no lo pase,
+// que sigue comportandose EXACTO igual que antes (esAdmin || instructorId === usuarioId).
+// Con `contexto.rol` informado, la matriz completa es:
+//   - Admin/SuperAdmin (esAdmin=true): siempre true.
+//   - Estudiante/Tutor: siempre false (nunca editan Agenda, sin excepcion).
+//   - Asistente/Editor: true SOLO si `contexto.permisoEdicionAgenda === true` (otorgado
+//     por un Admin; el toggle de UI para activarlo queda pendiente de Codex).
+//   - Maestro (o rol no informado, retrocompatibilidad): solo el instructor asignado.
+export interface ContextoPermisoEdicionJornada {
+  rol?: RolUsuario;
+  permisoEdicionAgenda?: boolean;
 }
 
-type ClaveAccion = 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'reprogramar';
+export function puedeEditarJornada(
+  jornada: JornadaInstruccion,
+  usuarioId: string,
+  esAdmin: boolean,
+  contexto?: ContextoPermisoEdicionJornada,
+): boolean {
+  if (esAdmin) return true;
+
+  const rol = contexto?.rol;
+  // Estudiante/Tutor nunca editan, sin excepcion -- se chequea ANTES que el match de
+  // instructor para blindar el caso raro de datos donde instructorId coincidiera con un
+  // uid de un rol no docente.
+  if (rol === RolUsuario.Estudiante || rol === RolUsuario.Tutor) return false;
+
+  // El instructor asignado de la jornada siempre puede editar SU clase, sin importar el
+  // rol exacto -- Maestro es el caso tipico, pero call sites/tests preexistentes (12.2-12.9)
+  // tambien usan roles operativos (Editor/Asistente) como "el maestro asignado" en datos de
+  // transicion (ver DT-0019 en firestore.rules sobre la separacion tardia del rol Maestro).
+  // Este chequeo va ANTES del gate de flag de abajo a proposito: no reinventa el criterio
+  // ya establecido en 12.2, solo lo preserva mientras se agrega el caso NUEVO (Asistente/
+  // Editor NO asignado, con permiso explicito).
+  if (jornada.instructorId === usuarioId) return true;
+
+  // Asistente/Editor NO asignados a esta jornada: solo editan si el Admin les otorgo el
+  // permiso explicito (`permisoEdicionAgenda`, ver tipos.ts).
+  if (rol === RolUsuario.Asistente || rol === RolUsuario.Editor) {
+    return contexto?.permisoEdicionAgenda === true;
+  }
+
+  return false;
+}
+
+type ClaveAccion = 'cerrar' | 'cancelar' | 'reprogramar' | 'restaurar';
 
 interface CambiosReprogramacion {
   fecha: string;
@@ -63,8 +118,9 @@ interface CambiosReprogramacion {
   horaFin: string;
 }
 
-// Fase 3.7 (2026-07-07): tarjetas por pagina en la grilla 3x3 de "Mis clases".
-const porPagina = 9;
+// Fase 3.7 (2026-07-07): tarjetas por pagina en la grilla de "Mis clases".
+// Rediseño 2026-07-12 (pedido explicito del usuario): grilla 3x3 (9) -> 4x3 (12).
+const porPagina = 12;
 
 // Fase 3.7 (2026-07-07): convencion de color por estado de jornada — no existia antes en el
 // proyecto (confirmado por busqueda: ninguna otra vista mapea EstadoJornada a color). Eleccion:
@@ -74,7 +130,10 @@ const porPagina = 9;
 // este flujo (ver transicionar()/cancelarClase()/reprogramarClase() abajo) hoy solo produce
 // borrador/confirmada/en_curso/cerrada/cancelada.
 const ESTILO_POR_ESTADO: Record<JornadaInstruccion['estado'], { bg: string; text: string; etiqueta: string }> = {
-  borrador: { bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-500 dark:text-gray-300', etiqueta: 'Borrador' },
+  // Rediseño 2026-07-13 (pedido explicito del usuario: "borra el estado borrador, tanto
+  // de los estados como de la visualizacion del contenedor"): borrador ya no se muestra
+  // distinto de confirmada -- mismo color, misma etiqueta ("Confirmada").
+  borrador: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-tkd-blue', etiqueta: 'Confirmada' },
   pendiente_confirmacion: { bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-500 dark:text-gray-300', etiqueta: 'Pendiente de confirmacion' },
   confirmada: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-tkd-blue', etiqueta: 'Confirmada' },
   en_curso: { bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400', etiqueta: 'En curso' },
@@ -88,19 +147,32 @@ const ESTILO_POR_ESTADO: Record<JornadaInstruccion['estado'], { bg: string; text
 
 function accionesDisponibles(estado: JornadaInstruccion['estado']): { clave: ClaveAccion; etiqueta: string }[] {
   switch (estado) {
+    // Rediseño 2026-07-12 (pedido explicito del usuario: "borrador como estado ya no
+    // deberia existir... la idea es hacer maleable cada clase, donde por default todo
+    // quede tal como se muestra en el contenedor"): borrador ofrece EXACTAMENTE las
+    // mismas acciones que confirmada -- ya no existe un paso manual de "Confirmar"
+    // (jornadaService.ts ya permite reprogramar directo desde borrador, ver
+    // transicionesPermitidas). El estado sigue mostrandose como texto informativo, solo
+    // dejan de variar las acciones disponibles.
     case 'borrador':
-      return [{ clave: 'confirmar', etiqueta: 'Confirmar' }];
     case 'confirmada':
+      // Rediseño 2026-07-11 (pedido explicito del usuario): "Iniciar" ya no existe -- la
+      // transicion confirmada -> en_curso ahora es automatica por horario (ver
+      // functions/academico/jornadasScheduler.js, iniciarJornadasPorHorario).
       return [
-        { clave: 'iniciar', etiqueta: 'Iniciar' },
         { clave: 'reprogramar', etiqueta: 'Reprogramar' },
-        { clave: 'cancelar', etiqueta: 'Cancelar' },
+        { clave: 'cancelar', etiqueta: 'Cancelar clase' },
       ];
     case 'en_curso':
       return [
         { clave: 'cerrar', etiqueta: 'Cerrar' },
-        { clave: 'cancelar', etiqueta: 'Cancelar' },
+        { clave: 'cancelar', etiqueta: 'Cancelar clase' },
       ];
+    // Rediseño 2026-07-13 (pedido explicito del usuario): posibilidad de restituir una
+    // clase cancelada por error. Unica accion disponible -- reagendar/editar/cancelar no
+    // aplican a una clase ya cancelada.
+    case 'cancelada':
+      return [{ clave: 'restaurar', etiqueta: 'Restaurar' }];
     default:
       return [];
   }
@@ -123,8 +195,10 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   // Subtarea 12.5: mismo fallback que usuarioId ('maestro-local'/Editor) para no romper
   // los call sites/tests existentes que todavia no pasan rol explicitamente.
   rol = RolUsuario.Editor,
+  permisoEdicionAgenda,
   repository = jornadaRepository,
   refreshTrigger = 0,
+  onEditarMaterial,
 }) => {
   const [jornadas, setJornadas] = React.useState<JornadaInstruccion[]>([]);
   const [materialPorJornadaId, setMaterialPorJornadaId] = React.useState<Record<string, string[]>>({});
@@ -142,6 +216,12 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   // C1: previene doble escritura si el usuario hace clic rapido mientras
   // una operacion async ya esta en vuelo.
   const [guardando, setGuardando] = React.useState(false);
+  // Pedido del usuario (2026-07-11): tema editable inline directo desde el pill de la
+  // tarjeta, sin salir de Mis Clases (antes solo se podia desde un panel separado en
+  // AsignacionesView, navegando de a una clase). Persiste con actualizarTemaJornada,
+  // que ya existe en JornadaRepository y ya es por jornada individual.
+  const [temaEditandoJornadaId, setTemaEditandoJornadaId] = React.useState<string | null>(null);
+  const [temaBorradorPorJornadaId, setTemaBorradorPorJornadaId] = React.useState<Record<string, string>>({});
 
   const cargar = React.useCallback(() => {
     // Las jornadas y las asignaciones (material) se cargan de forma independiente:
@@ -186,21 +266,16 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
     setError('');
     try {
       let actualizada: JornadaInstruccion;
-      if (jornada.estado === 'borrador') {
-        const resultadoConflicto = await repository.existeConflictoHorario(jornada);
-        if (resultadoConflicto.hayConflicto) {
-          setError(mensajeConflictoHorario(resultadoConflicto, jornada));
-          return;
-        }
-        actualizada = confirmarJornada(jornada);
-      } else if (jornada.estado === 'confirmada') {
-        actualizada = iniciarJornada(jornada);
-      } else if (jornada.estado === 'en_curso') {
+      if (jornada.estado === 'en_curso') {
         const pendiente = marcarPendienteCierre(jornada, {
           asistenciaRegistrada: Boolean(asistenciaPorJornadaId[jornada.id]),
           objetivosImpartidos: objetivosImpartidosPorJornadaId[jornada.id] ? jornada.objetivosPlaneados : [],
         });
         actualizada = cerrarJornada(pendiente);
+      } else if (jornada.estado === 'cancelada') {
+        // Rediseño 2026-07-13: "restaurar" reutiliza confirmarJornada -- unico camino de
+        // salida de 'cancelada' (jornadaService.ts, transicionesPermitidas.cancelada).
+        actualizada = confirmarJornada(jornada);
       } else {
         return;
       }
@@ -217,7 +292,9 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
           // (esta vista es "mis_clases").
           rol,
           fuente: 'mis_clases',
-          accion: actualizada.estado === 'confirmada' ? 'confirmar' : actualizada.estado === 'en_curso' ? 'iniciar' : 'cerrar',
+          // Rediseño 2026-07-13: transicionar() ahora cubre 'cerrar' (en_curso) y
+          // 'restaurar' (cancelada -> confirmada).
+          accion: actualizada.estado === 'confirmada' ? 'restaurar' : 'cerrar',
           // Subtarea 12.5: diff campo por campo (anterior/nuevo) en vez del estado
           // resultante plano.
           cambios: diffCambiosJornada(jornada, actualizada),
@@ -243,6 +320,27 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
 
   const cerrarAccionExpandida = (jornadaId: string) => {
     setAccionExpandidaPorJornadaId((actual) => ({ ...actual, [jornadaId]: null }));
+  };
+
+  const abrirEdicionTemaInline = (jornada: JornadaInstruccion) => {
+    setTemaBorradorPorJornadaId((actual) => ({ ...actual, [jornada.id]: jornada.tema ?? '' }));
+    setTemaEditandoJornadaId(jornada.id);
+  };
+
+  const cancelarEdicionTemaInline = () => {
+    setTemaEditandoJornadaId(null);
+  };
+
+  const guardarTemaInline = async (jornada: JornadaInstruccion) => {
+    setTemaEditandoJornadaId(null);
+    const nuevoTema = (temaBorradorPorJornadaId[jornada.id] ?? '').trim();
+    if (nuevoTema === (jornada.tema ?? '')) return;
+    setJornadas((actuales) => actuales.map((item) => (item.id === jornada.id ? { ...item, tema: nuevoTema } : item)));
+    try {
+      await repository.actualizarTemaJornada(tenantId, jornada.id, nuevoTema);
+    } catch (err) {
+      console.warn('[MisClasesView] No se pudo guardar el tema de la jornada', err);
+    }
   };
 
   const handleAccionClick = (jornada: JornadaInstruccion, clave: ClaveAccion) => {
@@ -349,7 +447,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
         <p className="mt-4 text-sm font-bold text-gray-400">Este programa todavia no tiene clases generadas.</p>
       ) : (
         <>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {jornadasPagina.map((jornada) => {
               const material = materialPorJornadaId[jornada.id] ?? [];
               const acciones = accionesDisponibles(jornada.estado);
@@ -360,34 +458,139 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                 horaFin: jornada.horaFin,
               };
               const estilo = ESTILO_POR_ESTADO[jornada.estado];
-              const puedeEditar = puedeEditarJornada(jornada, usuarioId, esAdmin);
+              const puedeEditar = puedeEditarJornada(jornada, usuarioId, esAdmin, { rol, permisoEdicionAgenda });
+              const puedeReprogramar = acciones.some((accion) => accion.clave === 'reprogramar');
+              const puedeCancelar = acciones.some((accion) => accion.clave === 'cancelar');
+              const puedeRestaurar = acciones.some((accion) => accion.clave === 'restaurar');
 
               return (
                 <article
                   key={jornada.id}
-                  className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-gray-900"
+                  className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-gray-900"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 text-sm font-bold text-tkd-dark dark:text-white">
-                        <IconoCalendario aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span>{jornada.fecha}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                        <IconoReloj aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span>{jornada.horaInicio} - {jornada.horaFin}</span>
-                      </div>
+                  {/* Rediseño 2026-07-12 (pedido explicito del usuario sobre un screenshot en
+                      vivo): el pill queda SOLO en su propia linea arriba de la tarjeta -- los
+                      iconos de accion se mueven a la fila de fecha/hora (a la derecha), y el
+                      estado pasa a su propia linea debajo de esa fila de iconos. */}
+                  <div>
+                    {temaEditandoJornadaId === jornada.id ? (
+                      <input
+                        autoFocus
+                        aria-label="Tema de la clase"
+                        value={temaBorradorPorJornadaId[jornada.id] ?? ''}
+                        onChange={(event) => setTemaBorradorPorJornadaId((actual) => ({ ...actual, [jornada.id]: event.target.value }))}
+                        onBlur={() => guardarTemaInline(jornada)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') { event.preventDefault(); guardarTemaInline(jornada); }
+                          if (event.key === 'Escape') { cancelarEdicionTemaInline(); }
+                        }}
+                        className={`min-w-0 max-w-full truncate rounded-full border border-tkd-blue px-3 py-1 text-xs font-black focus:outline-none ${estilo.bg} ${estilo.text}`}
+                      />
+                    ) : puedeEditar ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirEdicionTemaInline(jornada)}
+                        className={`max-w-full truncate rounded-full px-3 py-1 text-left text-xs font-black transition hover:opacity-80 ${estilo.bg} ${estilo.text}`}
+                      >
+                        {jornada.tema?.trim() ? jornada.tema : 'Sin tema'}
+                      </button>
+                    ) : (
+                      <span
+                        className={`inline-block max-w-full truncate rounded-full px-3 py-1 text-xs font-black ${estilo.bg} ${estilo.text}`}
+                      >
+                        {jornada.tema?.trim() ? jornada.tema : 'Sin tema'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Rediseño 2026-07-12 (segundo pase, pedido explicito del usuario sobre un
+                      screenshot en vivo): fecha completa en su propia linea, horario en una
+                      linea separada debajo (antes iban combinados en una sola linea); los
+                      iconos de accion pasan de fila horizontal a COLUMNA VERTICAL a la
+                      derecha, en este orden: Reagendar, Editar, Cancelar/Eliminar. */}
+                  <div className="flex items-start justify-between gap-x-4">
+                    <div className="flex flex-col gap-1 text-xs font-medium text-gray-400">
+                      <span className="flex items-center gap-1.5">
+                        <IconoCalendario aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                        {jornada.fecha}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <IconoReloj aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                        {jornada.horaInicio} - {jornada.horaFin}
+                      </span>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${estilo.bg} ${estilo.text}`}
-                    >
+                    {puedeEditar && (puedeRestaurar || puedeReprogramar || puedeCancelar || onEditarMaterial) && (
+                      <div className="flex shrink-0 flex-col gap-2">
+                        {/* Rediseño 2026-07-13 (pedido explicito del usuario): "puede ser que
+                            haga switch con el icono check" -- para una clase CANCELADA, el
+                            check reemplaza por completo a reagendar/editar/cancelar (ninguno
+                            aplica a una clase ya cancelada). */}
+                        {puedeRestaurar ? (
+                          <button
+                            type="button"
+                            disabled={guardando}
+                            onClick={() => handleAccionClick(jornada, 'restaurar')}
+                            aria-label="Restaurar"
+                            title="Restaurar"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-900/20 dark:text-green-400"
+                          >
+                            <IconoAprobar className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <>
+                            {puedeReprogramar && (
+                              <button
+                                type="button"
+                                disabled={guardando}
+                                onClick={() => handleAccionClick(jornada, 'reprogramar')}
+                                aria-label="Reprogramar"
+                                title="Reprogramar"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-tkd-blue transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-900/20 dark:text-blue-400"
+                              >
+                                <IconoReprogramar className="h-4 w-4" />
+                              </button>
+                            )}
+                            {onEditarMaterial && (
+                              <button
+                                type="button"
+                                onClick={() => onEditarMaterial(jornada)}
+                                aria-label={`Editar material de la clase del ${jornada.fecha}`}
+                                title="Editar material de la clase"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200 dark:bg-white/10 dark:text-gray-300"
+                              >
+                                <IconoEditar className="h-4 w-4" />
+                              </button>
+                            )}
+                            {/* "Cancelar clase" es icono solo (sin texto visible), ultimo en
+                                la columna -- el nombre accesible se conserva via aria-label. */}
+                            {puedeCancelar && (
+                              <button
+                                type="button"
+                                disabled={guardando}
+                                onClick={() => handleAccionClick(jornada, 'cancelar')}
+                                aria-label="Cancelar clase"
+                                title="Cancelar clase"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-tkd-red transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400"
+                              >
+                                <IconoEliminar className="h-4 w-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Estado: su propia linea, debajo de la fila de iconos. */}
+                  <div>
+                    <span className={`text-[9px] font-bold uppercase tracking-widest ${estilo.text}`}>
                       {estilo.etiqueta}
                     </span>
                   </div>
 
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Material asignado</p>
-                    <p className="mt-1 text-sm font-bold text-tkd-dark dark:text-white">
+                    <p className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">
                       {material.length > 0 ? material.join(', ') : 'Sin material asignado'}
                     </p>
                   </div>
@@ -424,9 +627,16 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                     </div>
                   )}
 
-                  {puedeEditar && acciones.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {acciones.map((accion) => (
+                  {/* Rediseño 2026-07-12: 'confirmar' ya no existe (borrador = confirmada) y
+                      'reprogramar'/'cancelar' se manejan arriba como iconos junto a fecha/hora
+                      -- este listado generico ahora solo cubre 'cerrar' (texto sin ambiguedad)
+                      y el caso especial "Forzar Cierre". */}
+                  {puedeEditar && (
+                    acciones.some((accion) => accion.clave === 'cerrar')
+                    || (jornada.estado === 'en_curso' && esFechaHoraPasada(jornada.fecha, jornada.horaFin))
+                  ) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {acciones.filter((accion) => accion.clave === 'cerrar').map((accion) => (
                         <button
                           key={accion.clave}
                           type="button"

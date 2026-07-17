@@ -2,6 +2,7 @@ import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { RecursoAcademico } from '../../models/academico/recurso';
 import {
   actualizarAsignacion,
+  asignarMaterialAJornada,
   eliminarAsignacion,
   getAsignacionesByEstudiante,
   listarAsignacionesPorTenant,
@@ -281,6 +282,115 @@ describe('asignacionService', () => {
     })).resolves.toEqual({ ok: false });
 
     expect(callable).not.toHaveBeenCalled();
+  });
+
+  // Subtarea 12.9: primer consumidor real es la pestana "Materiales" del modal de edicion
+  // singular de Agenda (ModalEdicionJornada.tsx). En vez de reimplementar en el componente
+  // la logica de construir destinatario/mapear criterio->uso/validar recurso aprobado (que
+  // ya existe, duplicada, dentro de AsignacionesView.tsx), se centraliza aca como funcion de
+  // servicio reutilizable: valida con publishAsignacion (ya existente) y persiste
+  // reutilizando publicarAsignacion (mismo Cloud Function real, sin duplicar el flujo).
+  it('asignarMaterialAJornada arma la asignacion, valida el recurso aprobado y persiste via publicarAsignacion', async () => {
+    const callable = jest.fn().mockResolvedValue({ data: { ok: true, asignacionId: 'asignacion-agenda-jornada-9-recurso-1' } });
+    (httpsCallable as jest.Mock).mockReturnValue(callable);
+    const recurso = crearRecurso({ id: 'recurso-1', tituloVisible: 'Fundamentos tecnicos' });
+
+    await expect(asignarMaterialAJornada({
+      tenantId: 'tenant-1',
+      jornadaId: 'jornada-9',
+      recurso,
+      recursoId: 'recurso-1',
+      tipoDestinatario: 'grupo',
+      grupoObjetivo: 'Infantil',
+      grados: ['Blanco', 'Amarillo'],
+      momento: 'preparacion',
+      criterio: 'estudio',
+      fechaApertura: '2026-07-10',
+      publicadoPorUid: 'maestro-1',
+    })).resolves.toEqual({ ok: true, id: 'asignacion-agenda-jornada-9-recurso-1' });
+
+    expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'publishAsignacion');
+    const solicitud = callable.mock.calls[0][0];
+    expect(solicitud.tenantId).toBe('tenant-1');
+    expect(solicitud.jornadaId).toBe('jornada-9');
+    expect(solicitud.asignacion).toMatchObject({
+      id: 'asignacion-agenda-jornada-9-recurso-1',
+      tenantId: 'tenant-1',
+      recursoId: 'recurso-1',
+      titulo: 'Fundamentos tecnicos',
+      destinatario: { tipo: 'grupo', grupo: 'Infantil', grados: ['Blanco', 'Amarillo'] },
+      uso: 'estudio',
+      momento: 'preparacion',
+      estado: 'publicada',
+      creadoPorUid: 'maestro-1',
+    });
+  });
+
+  it('asignarMaterialAJornada rechaza si el recurso no esta aprobado, sin invocar publicarAsignacion', async () => {
+    const callable = jest.fn();
+    (httpsCallable as jest.Mock).mockReturnValue(callable);
+    const recurso = crearRecurso({ id: 'recurso-2', estado: 'pendiente' });
+
+    await expect(asignarMaterialAJornada({
+      tenantId: 'tenant-1',
+      jornadaId: 'jornada-9',
+      recurso,
+      recursoId: 'recurso-2',
+      tipoDestinatario: 'grupo',
+      grupoObjetivo: 'Infantil',
+      grados: [],
+      momento: 'preparacion',
+      criterio: 'estudio',
+      fechaApertura: '2026-07-10',
+      publicadoPorUid: 'maestro-1',
+    })).rejects.toThrow(/recurso aprobado/i);
+
+    expect(callable).not.toHaveBeenCalled();
+  });
+
+  it('asignarMaterialAJornada mapea criterio "quiz" a uso "evaluacion" y "repaso" a "estudio"', async () => {
+    const callable = jest.fn().mockResolvedValue({ data: { ok: true, asignacionId: 'a' } });
+    (httpsCallable as jest.Mock).mockReturnValue(callable);
+    const recurso = crearRecurso({ id: 'recurso-3' });
+
+    await asignarMaterialAJornada({
+      tenantId: 'tenant-1',
+      jornadaId: 'jornada-9',
+      recurso,
+      recursoId: 'recurso-3',
+      tipoDestinatario: 'grupo',
+      grupoObjetivo: 'Infantil',
+      grados: [],
+      momento: 'preparacion',
+      criterio: 'quiz',
+      fechaApertura: '2026-07-10',
+      publicadoPorUid: 'maestro-1',
+    });
+
+    expect(callable.mock.calls[0][0].asignacion.uso).toBe('evaluacion');
+  });
+
+  it('asignarMaterialAJornada reutiliza el id existente cuando se pasa asignacionIdExistente (modo editar)', async () => {
+    const callable = jest.fn().mockResolvedValue({ data: { ok: true, asignacionId: 'asignacion-fija' } });
+    (httpsCallable as jest.Mock).mockReturnValue(callable);
+    const recurso = crearRecurso({ id: 'recurso-4' });
+
+    await asignarMaterialAJornada({
+      tenantId: 'tenant-1',
+      jornadaId: 'jornada-9',
+      recurso,
+      recursoId: 'recurso-4',
+      tipoDestinatario: 'grupo',
+      grupoObjetivo: 'Infantil',
+      grados: [],
+      momento: 'preparacion',
+      criterio: 'estudio',
+      fechaApertura: '2026-07-10',
+      publicadoPorUid: 'maestro-1',
+      asignacionIdExistente: 'asignacion-fija',
+    });
+
+    expect(callable.mock.calls[0][0].asignacion.id).toBe('asignacion-fija');
   });
 });
 

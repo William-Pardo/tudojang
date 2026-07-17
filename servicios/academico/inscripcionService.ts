@@ -1,4 +1,4 @@
-import type { Estudiante } from '../../tipos';
+import { EstadoPago, type Estudiante } from '../../tipos';
 import type { EjecucionPrograma } from '../../models/academico/programa';
 import type { InscripcionEjecucionPrograma } from '../../models/academico/inscripcion';
 
@@ -37,4 +37,26 @@ export function sugerirEstudiantesPorAtributo(
   estudiantes: Estudiante[],
 ): Estudiante[] {
   return estudiantes.filter((estudiante) => slugificar(estudiante.grupo) === ejecucion.grupoId);
+}
+
+/**
+ * Matrícula automática (decisión de arquitectura 2026-07-11, ver engram
+ * centro-estudios/matricula-automatica): mismo criterio que el callable
+ * server-side `registrarAsistenciaJornada` (functions/academico/asistencia.js,
+ * perteneceAEjecucion) — grupo + sede coinciden y el pago no está Vencido. Se
+ * usa para pre-tildar el checklist del modal de asistencia (a diferencia de
+ * `sugerirEstudiantesPorAtributo`, que solo mira grupo y es apenas una
+ * sugerencia de conveniencia, no la fuente de verdad real de pertenencia).
+ *
+ * Riesgo conocido y aceptado (deuda técnica): `ejecucion.sedeId` es un slug del
+ * NOMBRE de la sede (`slugificar(programa.sede)`), no una referencia real al
+ * documento de la sede — coincide con `estudiante.sedeId` solo si el ID real de
+ * la sede resulta ser igual a su propio nombre slugificado.
+ */
+export function perteneceAutomaticamente(
+  estudiante: Estudiante,
+  ejecucion: EjecucionPrograma,
+): boolean {
+  if (estudiante.estadoPago === EstadoPago.Vencido) return false;
+  return slugificar(estudiante.grupo) === ejecucion.grupoId && estudiante.sedeId === ejecucion.sedeId;
 }

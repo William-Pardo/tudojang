@@ -36,6 +36,63 @@ test('publishAsignacion rechaza maestro no asignado a la jornada', async () => {
   );
 });
 
+// Bug reportado por el usuario (verificacion manual 2026-07-11): un Admin no podia
+// publicar material en una jornada de OTRO instructor -- "Solo el maestro asignado a
+// la jornada puede publicar la asignacion", el mismo mensaje que ve un maestro no
+// asignado. validarJornada no tenia ningun bypass de rol (a diferencia del gating de
+// CLIENTE en MisClasesView.tsx::puedeEditarJornada, que si deja pasar a Admin/SuperAdmin).
+test('Admin puede publicar material en una jornada de OTRO instructor', async () => {
+  const writes = [];
+  const servicio = crearServicioPublishAsignacion({
+    firestore: crearFirestoreFake({
+      recurso: { id: 'recurso-1', tenantId: 'tenant-1', estado: 'aprobado' },
+      jornada: { id: 'jornada-1', tenantId: 'tenant-1', instructorId: 'otro-maestro' },
+      writes,
+    }),
+  });
+
+  const resultado = await servicio(
+    crearDataBase(),
+    { auth: { uid: 'admin-1', token: { tenantId: 'tenant-1', rol: 'Admin' } } }
+  );
+
+  assert.equal(resultado.ok, true);
+  assert.equal(writes[0].data.creadoPorUid, 'admin-1');
+});
+
+test('SuperAdmin puede publicar material en una jornada de OTRO instructor', async () => {
+  const servicio = crearServicioPublishAsignacion({
+    firestore: crearFirestoreFake({
+      recurso: { id: 'recurso-1', tenantId: 'tenant-1', estado: 'aprobado' },
+      jornada: { id: 'jornada-1', tenantId: 'tenant-1', instructorId: 'otro-maestro' },
+    }),
+  });
+
+  const resultado = await servicio(
+    crearDataBase(),
+    { auth: { uid: 'super-1', token: { tenantId: 'tenant-1', rol: 'SuperAdmin' } } }
+  );
+
+  assert.equal(resultado.ok, true);
+});
+
+test('Editor NO admin sigue rechazado si no es el maestro asignado (sin regresion)', async () => {
+  const servicio = crearServicioPublishAsignacion({
+    firestore: crearFirestoreFake({
+      recurso: { id: 'recurso-1', tenantId: 'tenant-1', estado: 'aprobado' },
+      jornada: { id: 'jornada-1', tenantId: 'tenant-1', instructorId: 'otro-maestro' },
+    }),
+  });
+
+  await assert.rejects(
+    () => servicio(
+      crearDataBase(),
+      { auth: { uid: 'editor-1', token: { tenantId: 'tenant-1', rol: 'Editor' } } }
+    ),
+    /maestro asignado/i
+  );
+});
+
 test('publishAsignacion crea asignacion con tenant y maestro validos', async () => {
   const writes = [];
   const servicio = crearServicioPublishAsignacion({

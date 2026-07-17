@@ -15,6 +15,8 @@ const {
   getDocs,
   setDoc,
   updateDoc,
+  query,
+  where,
 } = require("firebase/firestore");
 
 const projectId = "demo-tudojang";
@@ -535,6 +537,274 @@ test("student cannot update a jornada", async () => {
   );
 });
 
+// 12.12 (seccion 22 del documento de mejora, caso "No se puede editar clase de otro
+// tenant"): la matriz de permisos de jornadas ya tenia cobertura de maestro asignado/no
+// asignado/admin/estudiante, todos dentro del MISMO tenant -- ningun test cruzaba el
+// limite de tenant para `jornadas` puntualmente (si existia para `asignaciones`,
+// `asistencias` e `inscripciones`, pero no para el documento de jornada en si).
+test("instructor from another tenant cannot update a jornada that belongs to a different tenant", async () => {
+  await seedJornadaAsignada();
+
+  const otroTenantDb = client("maestro-otro-tenant", "tenant-2", "Editor");
+
+  await assertFails(
+    updateDoc(doc(otroTenantDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+test("admin from another tenant cannot update a jornada that belongs to a different tenant", async () => {
+  await seedJornadaAsignada();
+
+  const otroTenantAdminDb = client("admin-otro-tenant", "tenant-2", "Admin");
+
+  await assertFails(
+    updateDoc(doc(otroTenantAdminDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+// =========================================================================
+// Extension posterior al cierre del modulo 12 (matriz de roles + iconos de la parrilla de
+// Agenda, ver CIERRE CENTRO DE ESTUDIOS.md): Estudiante ahora ve Agenda en modo solo
+// lectura, y Asistente/Editor pueden editar jornadas ajenas si el Admin les otorgo el flag
+// `permisoEdicionAgenda` (nuevo en Usuario, tipos.ts). `client()` solo setea CUSTOM CLAIMS
+// (rol/tenantId) -- `permisoEdicionAgenda` se lee del documento REAL `usuarios/{uid}` via
+// `currentUser()`, asi que estos tests seedean ese documento explicitamente (a diferencia
+// del resto de tests de esta seccion, que no necesitan un documento real porque rol/tenant
+// ya vienen resueltos por claims).
+// =========================================================================
+
+test("Estudiante can read a jornada in their tenant (Agenda en modo solo lectura)", async () => {
+  await seedJornadaAsignada();
+
+  const estudianteDb = client("est-agenda-1", "tenant-1", "Estudiante");
+
+  await assertSucceeds(
+    getDoc(doc(estudianteDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("Asistente with permisoEdicionAgenda=true can update a jornada they are not assigned to", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "asistente-con-permiso"), {
+      tenantId: "tenant-1",
+      email: "asistente-con-permiso@test.com",
+      rol: "Asistente",
+      permisoEdicionAgenda: true,
+    });
+  });
+
+  const asistenteDb = client("asistente-con-permiso", "tenant-1", "Asistente");
+
+  await assertSucceeds(
+    updateDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+test("Editor with permisoEdicionAgenda=true can update a jornada they are not assigned to (mismo criterio que Asistente)", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "editor-con-permiso"), {
+      tenantId: "tenant-1",
+      email: "editor-con-permiso@test.com",
+      rol: "Editor",
+      permisoEdicionAgenda: true,
+    });
+  });
+
+  const editorDb = client("editor-con-permiso", "tenant-1", "Editor");
+
+  await assertSucceeds(
+    updateDoc(doc(editorDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+test("Asistente WITHOUT permisoEdicionAgenda (flag=false) still cannot update a jornada they are not assigned to", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "asistente-sin-permiso"), {
+      tenantId: "tenant-1",
+      email: "asistente-sin-permiso@test.com",
+      rol: "Asistente",
+      permisoEdicionAgenda: false,
+    });
+  });
+
+  const asistenteDb = client("asistente-sin-permiso", "tenant-1", "Asistente");
+
+  await assertFails(
+    updateDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+test("Asistente without a usuarios/{uid} document at all still cannot update a jornada they are not assigned to (no revienta el get())", async () => {
+  await seedJornadaAsignada();
+
+  // A proposito, sin seedear usuarios/asistente-sin-doc: ejercita la guarda hasCurrentUser()
+  // agregada junto con el flag -- sin ella, currentUser().permisoEdicionAgenda revienta la
+  // regla entera para cualquier uid sin documento real (p.ej. datos de transicion).
+  const asistenteDb = client("asistente-sin-doc", "tenant-1", "Asistente");
+
+  await assertFails(
+    updateDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+test("Maestro with permisoEdicionAgenda=true (dato inesperado) still cannot update a jornada from another instructor -- el flag esta acotado a Asistente/Editor", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "maestro-con-flag-inesperado"), {
+      tenantId: "tenant-1",
+      email: "maestro-con-flag-inesperado@test.com",
+      rol: "Maestro",
+      permisoEdicionAgenda: true,
+    });
+  });
+
+  const maestroDb = client("maestro-con-flag-inesperado", "tenant-1", "Maestro");
+
+  await assertFails(
+    updateDoc(doc(maestroDb, "tenants", "tenant-1", "jornadas", "jornada-1"), {
+      estado: "en_curso",
+      actualizadoEn: "2026-07-06T08:05:00.000Z",
+    })
+  );
+});
+
+// =========================================================================
+// Ampliacion posterior al cierre inicial de la extension de matriz de roles (decision de
+// producto explicita del usuario, ver CIERRE CENTRO DE ESTUDIOS.md): "eliminar" ya NO es
+// exclusivo de Admin/SuperAdmin -- replica EXACTO el mismo criterio de tres OR que `update`
+// (maestro asignado via instructorId, Asistente/Editor via permisoEdicionAgenda). El test
+// "Asistente with permisoEdicionAgenda=true still cannot DELETE a jornada" que vivia aca
+// documentaba el comportamiento VIEJO (delete = isAdmin() unicamente) y se reemplaza por
+// esta seccion, que cubre la matriz completa igual que la seccion de `update` de arriba.
+// =========================================================================
+
+test("Admin can DELETE any jornada in their tenant regardless of instructorId", async () => {
+  await seedJornadaAsignada();
+
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  await assertSucceeds(
+    deleteDoc(doc(adminDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("assigned instructor (Maestro) can DELETE their own jornada", async () => {
+  await seedJornadaAsignada();
+
+  const asignadoDb = client("maestro-asignado", "tenant-1", "Maestro");
+
+  await assertSucceeds(
+    deleteDoc(doc(asignadoDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("non-assigned instructor (Maestro) cannot DELETE another instructor's jornada", async () => {
+  await seedJornadaAsignada();
+
+  const intrusoDb = client("maestro-otro", "tenant-1", "Maestro");
+
+  await assertFails(
+    deleteDoc(doc(intrusoDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("Asistente with permisoEdicionAgenda=true CAN now DELETE a jornada they are not assigned to (mismo criterio que update)", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "asistente-con-permiso-delete"), {
+      tenantId: "tenant-1",
+      email: "asistente-con-permiso-delete@test.com",
+      rol: "Asistente",
+      permisoEdicionAgenda: true,
+    });
+  });
+
+  const asistenteDb = client("asistente-con-permiso-delete", "tenant-1", "Asistente");
+
+  await assertSucceeds(
+    deleteDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("Editor with permisoEdicionAgenda=true CAN DELETE a jornada they are not assigned to (mismo criterio que Asistente)", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "editor-con-permiso-delete"), {
+      tenantId: "tenant-1",
+      email: "editor-con-permiso-delete@test.com",
+      rol: "Editor",
+      permisoEdicionAgenda: true,
+    });
+  });
+
+  const editorDb = client("editor-con-permiso-delete", "tenant-1", "Editor");
+
+  await assertSucceeds(
+    deleteDoc(doc(editorDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("Asistente WITHOUT permisoEdicionAgenda (flag=false) still cannot DELETE a jornada they are not assigned to", async () => {
+  await seedJornadaAsignada();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "asistente-sin-permiso-delete"), {
+      tenantId: "tenant-1",
+      email: "asistente-sin-permiso-delete@test.com",
+      rol: "Asistente",
+      permisoEdicionAgenda: false,
+    });
+  });
+
+  const asistenteDb = client("asistente-sin-permiso-delete", "tenant-1", "Asistente");
+
+  await assertFails(
+    deleteDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("Asistente without a usuarios/{uid} document at all still cannot DELETE a jornada they are not assigned to (no revienta el get())", async () => {
+  await seedJornadaAsignada();
+
+  // A proposito, sin seedear usuarios/asistente-sin-doc-delete: mismo chequeo que en
+  // `update` para confirmar que hasCurrentUser() sigue blindando el get() tambien en delete.
+  const asistenteDb = client("asistente-sin-doc-delete", "tenant-1", "Asistente");
+
+  await assertFails(
+    deleteDoc(doc(asistenteDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
+test("student cannot DELETE a jornada", async () => {
+  await seedJornadaAsignada();
+
+  const estudianteDb = client("est-delete-1", "tenant-1", "Estudiante");
+
+  await assertFails(
+    deleteDoc(doc(estudianteDb, "tenants", "tenant-1", "jornadas", "jornada-1"))
+  );
+});
+
 test("unlinked tutor cannot read student academic progress", async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(
@@ -739,5 +1009,232 @@ test("cross-tenant read of asistencias is denied", async () => {
 
   await assertFails(
     getDoc(asistenciaPath(otroTenantDb, "tenant-1", "jornada-1", "estudiante-1"))
+  );
+});
+
+// Fix tutor-role-end-to-end (2026-07-14): verificación REAL (contra firestore.rules,
+// no mocks) de que un Tutor puede leer al estudiante donde figura como acudiente
+// (estudiante.tutor.correo == su email de login) y NO puede leer a otros.
+test("tutor can read the student where they are the acudiente (tutor.correo == su email)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-hijo"), {
+      tenantId: "tenant-1",
+      nombres: "Alejandro",
+      apellidos: "Tester",
+      tutor: { correo: "papa@test.com", nombres: "Papa", apellidos: "Tester" },
+    });
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
+
+  // Query como lo hace el resolver real: filtra por tutor.correo == su email.
+  await assertSucceeds(
+    getDocs(query(collection(tutorDb, "estudiantes"), where("tutor.correo", "==", "papa@test.com")))
+  );
+});
+
+test("tutor cannot read a student where they are NOT the acudiente", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-ajeno"), {
+      tenantId: "tenant-1",
+      nombres: "Otro",
+      apellidos: "Nino",
+      tutor: { correo: "papa@test.com", nombres: "Papa", apellidos: "Tester" },
+    });
+  });
+
+  // Un tutor con OTRO email no debe poder leer al estudiante de papa@test.com.
+  const otroTutorDb = client("tutor-2", "tenant-1", "Tutor", { email: "distinto@test.com" });
+
+  await assertFails(getDoc(doc(otroTutorDb, "estudiantes", "est-ajeno")));
+
+  // Y tampoco puede burlar la regla consultando por el correo ajeno (el query no
+  // coincide con su token.email, la regla lo rechaza).
+  await assertFails(
+    getDocs(query(collection(otroTutorDb, "estudiantes"), where("tutor.correo", "==", "papa@test.com")))
+  );
+});
+
+// Fix 2026-07-16 (bug reportado: Estudiante no veía material ni clases): a diferencia de
+// Tutor (que ya tenía su caso desde el fix 2026-07-14), nunca se agregó el caso análogo
+// para que el propio Estudiante lea SU PROPIO doc por `correo == su email` -- la query real
+// de resolveStudentsForConsultor(tenantId, email, esTutor=false) siempre fallaba.
+test("student can read their own student record (correo == su email)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-propio"), {
+      tenantId: "tenant-1",
+      nombres: "Ale",
+      apellidos: "Estudiante",
+      correo: "ale@test.com",
+    });
+  });
+
+  const estudianteDb = client("est-user-1", "tenant-1", "Estudiante", { email: "ale@test.com" });
+
+  // Query como lo hace el resolver real: filtra por correo == su propio email.
+  await assertSucceeds(
+    getDocs(query(collection(estudianteDb, "estudiantes"), where("correo", "==", "ale@test.com")))
+  );
+});
+
+test("student cannot read another student's record", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-ajeno-2"), {
+      tenantId: "tenant-1",
+      nombres: "Otro",
+      apellidos: "Nino",
+      correo: "ale@test.com",
+    });
+  });
+
+  const otroEstudianteDb = client("est-user-2", "tenant-1", "Estudiante", { email: "distinto@test.com" });
+
+  await assertFails(getDoc(doc(otroEstudianteDb, "estudiantes", "est-ajeno-2")));
+  await assertFails(
+    getDocs(query(collection(otroEstudianteDb, "estudiantes"), where("correo", "==", "ale@test.com")))
+  );
+});
+
+// Fix tutor-role-end-to-end (2026-07-14): el Tutor puede LEER las jornadas de su tenant
+// (Agenda solo lectura; el cliente filtra a las clases del hijo).
+test("tutor can read jornadas in their tenant (read-only agenda)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "tenants", "tenant-1", "jornadas", "jor-tutor-1"), {
+      tenantId: "tenant-1",
+      grupoId: "grupo-infantil",
+      sedeId: "sede-1",
+      horaInicio: "17:00",
+      horaFin: "18:00",
+      estado: "confirmada",
+    });
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
+  await assertSucceeds(getDoc(doc(tutorDb, "tenants", "tenant-1", "jornadas", "jor-tutor-1")));
+});
+
+test("tutor from another tenant cannot read jornadas", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "tenants", "tenant-1", "jornadas", "jor-tutor-2"), {
+      tenantId: "tenant-1", grupoId: "grupo-infantil", sedeId: "sede-1", estado: "confirmada",
+    });
+  });
+  const otroTutorDb = client("tutor-9", "tenant-2", "Tutor", { email: "otro@test.com" });
+  await assertFails(getDoc(doc(otroTutorDb, "tenants", "tenant-1", "jornadas", "jor-tutor-2")));
+});
+
+// Fix tutor-role-end-to-end (2026-07-14): buzón de notificaciones scoped por estudiante.
+test("tutor can read notifications of their child, estudiante of their own, not others", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    // Estudiante hijo del tutor papa@test.com
+    await setDoc(doc(db, "estudiantes", "est-hijo"), {
+      tenantId: "tenant-1", nombres: "Ale", correo: "ale@test.com",
+      tutor: { correo: "papa@test.com" },
+    });
+    // Estudiante ajeno
+    await setDoc(doc(db, "estudiantes", "est-ajeno"), {
+      tenantId: "tenant-1", nombres: "Otro", correo: "otro-est@test.com",
+      tutor: { correo: "otropapa@test.com" },
+    });
+    await setDoc(doc(db, "historialNotificaciones", "notif-hijo"), {
+      estudianteId: "est-hijo", mensaje: "Pago al día", tipo: "RecordatorioPago", leida: false, fecha: "2026-07-14",
+    });
+    await setDoc(doc(db, "historialNotificaciones", "notif-ajeno"), {
+      estudianteId: "est-ajeno", mensaje: "Otra", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
+    });
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
+  // Lee la de su hijo (get)
+  await assertSucceeds(getDoc(doc(tutorDb, "historialNotificaciones", "notif-hijo")));
+  // Query de lista scoped a su hijo
+  await assertSucceeds(getDocs(query(collection(tutorDb, "historialNotificaciones"), where("estudianteId", "==", "est-hijo"))));
+  // NO la del estudiante ajeno
+  await assertFails(getDoc(doc(tutorDb, "historialNotificaciones", "notif-ajeno")));
+
+  // El estudiante lee la suya por correo propio
+  const estDb = client("est-user-1", "tenant-1", "Estudiante", { email: "ale@test.com" });
+  await assertSucceeds(getDoc(doc(estDb, "historialNotificaciones", "notif-hijo")));
+});
+
+test("tutor can mark notification as read (only 'leida' field)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "estudiantes", "est-hijo2"), {
+      tenantId: "tenant-1", nombres: "Ale2", correo: "ale2@test.com", tutor: { correo: "papa2@test.com" },
+    });
+    await setDoc(doc(db, "historialNotificaciones", "notif-2"), {
+      estudianteId: "est-hijo2", mensaje: "x", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
+    });
+  });
+  const tutorDb = client("tutor-2", "tenant-1", "Tutor", { email: "papa2@test.com" });
+  // Solo cambiar leida -> OK
+  await assertSucceeds(updateDoc(doc(tutorDb, "historialNotificaciones", "notif-2"), { leida: true }));
+  // Cambiar el mensaje -> rechazado
+  await assertFails(updateDoc(doc(tutorDb, "historialNotificaciones", "notif-2"), { mensaje: "hackeado" }));
+});
+
+// Banco de preguntas de quiz (fix del gap "no hay forma de editar preguntas reales de un
+// quiz" -- QuizView.tsx usaba siempre una pregunta hardcodeada porque no existía ninguna
+// colección de contenido pedagógico para quizzes).
+test("instructor (Maestro) can create and update the question bank for a quiz resource", async () => {
+  const maestroDb = client("maestro-quiz-1", "tenant-1", "Maestro");
+
+  await assertSucceeds(
+    setDoc(doc(maestroDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-1"), {
+      recursoId: "recurso-quiz-1",
+      tenantId: "tenant-1",
+      preguntas: [{ id: "p1", enunciado: "¿Qué es un poomsae?", opciones: ["Una forma", "Un arma"], respuestaCorrecta: "Una forma" }],
+      actualizadoPorUid: "maestro-quiz-1",
+      actualizadoEn: "2026-07-16T00:00:00.000Z",
+    })
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(maestroDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-1"), {
+      preguntas: [{ id: "p1", enunciado: "¿Qué es un poomsae? (editado)", opciones: ["Una forma", "Un arma"], respuestaCorrecta: "Una forma" }],
+    })
+  );
+});
+
+test("Estudiante/Tutor can read the question bank but cannot write it", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "tenants", "tenant-1", "quizzes", "recurso-quiz-2"), {
+      recursoId: "recurso-quiz-2",
+      tenantId: "tenant-1",
+      preguntas: [{ id: "p1", enunciado: "x", opciones: ["a", "b"], respuestaCorrecta: "a" }],
+      actualizadoPorUid: "maestro-1",
+      actualizadoEn: "2026-07-16T00:00:00.000Z",
+    });
+  });
+
+  const estudianteDb = client("est-quiz-1", "tenant-1", "Estudiante");
+  await assertSucceeds(getDoc(doc(estudianteDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-2")));
+  await assertFails(
+    updateDoc(doc(estudianteDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-2"), { preguntas: [] })
+  );
+
+  const tutorDb = client("tutor-quiz-1", "tenant-1", "Tutor");
+  await assertSucceeds(getDoc(doc(tutorDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-2")));
+  await assertFails(
+    updateDoc(doc(tutorDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-2"), { preguntas: [] })
+  );
+});
+
+test("instructor from another tenant cannot write the question bank", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "tenants", "tenant-1", "quizzes", "recurso-quiz-3"), {
+      recursoId: "recurso-quiz-3",
+      tenantId: "tenant-1",
+      preguntas: [],
+      actualizadoPorUid: "maestro-1",
+      actualizadoEn: "2026-07-16T00:00:00.000Z",
+    });
+  });
+
+  const otroTenantDb = client("maestro-otro-tenant", "tenant-2", "Editor");
+  await assertFails(
+    updateDoc(doc(otroTenantDb, "tenants", "tenant-1", "quizzes", "recurso-quiz-3"), { preguntas: [] })
   );
 });

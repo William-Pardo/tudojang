@@ -7,9 +7,11 @@
 const crearError = (code, message) => Object.assign(new Error(message), { code });
 
 // Mismo conjunto de roles que `isInstructor()` en firestore.rules (Admin, Editor,
-// Asistente, SuperAdmin) — Estudiante/Tutor MUST NOT escanear (spec: "Validación
-// de rol autorizado").
-const ROLES_AUTORIZADOS = new Set(['Admin', 'Editor', 'Asistente', 'SuperAdmin']);
+// Asistente, Maestro, SuperAdmin) — Estudiante/Tutor MUST NOT escanear (spec:
+// "Validación de rol autorizado"). 'Maestro' agregado: es el rol docente real
+// (14.9), este set nunca se actualizo cuando se separo de 'Editor' y bloqueaba a
+// un maestro real de registrar asistencia de su propia jornada.
+const ROLES_AUTORIZADOS = new Set(['Admin', 'Editor', 'Asistente', 'Maestro', 'SuperAdmin']);
 
 function requireAuth(context) {
   if (!context?.auth?.uid) {
@@ -32,15 +34,18 @@ function assertTenantAutorizado(tenantId, auth) {
 }
 
 // "Un maestro solo puede operar clases donde esté asignado" (Módulo Clase en
-// Vivo.txt §12). `Editor` es el rol que cumple la función de "maestro" en
-// este dominio (design.md, Bloque B, "Roles y permisos"; no existe un valor
-// de enum `Maestro` separado). Admin/Asistente/SuperAdmin sí pueden operar
-// cualquier jornada del tenant — mismo alcance que ya les da `isInstructor()`
-// para roster/asistencias en firestore.rules. Mismo patrón ya establecido en
-// `validarJornada` de asignaciones.js:50-57 ("Solo el maestro asignado a la
-// jornada puede publicar la asignacion").
+// Vivo.txt §12). `Editor` y `Maestro` son los roles docentes en este dominio
+// (14.9: 'Maestro' es el rol docente real, 'Editor' quedo como "Editor/Secretaria"
+// pero conserva acceso operativo legacy) — a ambos se les exige ser el instructor
+// asignado. Admin/Asistente/SuperAdmin sí pueden operar cualquier jornada del
+// tenant — mismo alcance que ya les da `isInstructor()` para roster/asistencias en
+// firestore.rules. Mismo patrón ya establecido en `validarJornada` de
+// asignaciones.js:50-62 ("Solo el maestro asignado a la jornada puede publicar la
+// asignacion").
+const ROLES_RESTRINGIDOS_A_JORNADA_PROPIA = new Set(['Editor', 'Maestro']);
+
 function assertInstructorAsignado(jornada, auth) {
-  if (auth.token?.rol === 'Editor' && jornada.instructorId !== auth.uid) {
+  if (ROLES_RESTRINGIDOS_A_JORNADA_PROPIA.has(auth.token?.rol) && jornada.instructorId !== auth.uid) {
     throw crearError(
       'permission-denied',
       'Solo el maestro asignado a la jornada puede registrar asistencia'
@@ -58,6 +63,49 @@ async function obtenerDocumento(ref, mensaje) {
     throw crearError('not-found', mensaje);
   }
   return snap.data();
+}
+
+// Misma slugificacion que produce EjecucionPrograma.grupoId en produccion
+// (vistas/admin/AsignacionesView.tsx: slugificar = valor => valor.toLowerCase()
+// .replace(/[^a-z0-9]+/g, '-')). NO es la misma funcion que grupoId() de
+// jornadaContextService.ts (esa antepone "grupo-" y es solo para armar options
+// de un <select>, sin relacion con EjecucionPrograma.grupoId real).
+const grupoASlug = (grupo) => String(grupo).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+// Matricula automatica (decision de arquitectura 2026-07-11, reemplaza el
+// roster 100% manual/fail-closed de Fase 0 — ver engram
+// centro-estudios/matricula-automatica). Un registro EXPLICITO de inscripcion
+// siempre manda: 'retirada' es una excepcion (excluye aunque coincida todo),
+// 'activa' es una inclusion manual (incluye aunque NO coincida nada, ej. clase
+// de prueba). Sin registro explicito, pertenece automaticamente si el
+// estudiante esta en el mismo grupo+sede que la ejecucion, su pago no esta
+// Vencido, y su grado no esta en gradosExcluidos de ESTA jornada puntual
+// (permite armar clases especificas para ciertos grados).
+async function perteneceAEjecucion({ firestore, tenant, tenantId, jornada, estudianteId }) {
+  const inscripcionSnap = await tenant
+    .collection('ejecucionesPrograma')
+    .doc(jornada.ejecucionProgramaId)
+    .collection('inscripciones')
+    .doc(estudianteId)
+    .get();
+
+  if (inscripcionSnap.exists) {
+    return inscripcionSnap.data().estado === 'activa';
+  }
+
+  const estudianteSnap = await firestore.collection('estudiantes').doc(estudianteId).get();
+  if (!estudianteSnap.exists) return false;
+  const estudiante = estudianteSnap.data();
+
+  if (estudiante.tenantId !== tenantId) return false;
+  if (estudiante.estadoPago === 'Vencido') return false;
+  if (jornada.gradosExcluidos?.includes(estudiante.grado)) return false;
+
+  const ejecucionSnap = await tenant.collection('ejecucionesPrograma').doc(jornada.ejecucionProgramaId).get();
+  if (!ejecucionSnap.exists) return false;
+  const ejecucion = ejecucionSnap.data();
+
+  return grupoASlug(estudiante.grupo) === ejecucion.grupoId && estudiante.sedeId === ejecucion.sedeId;
 }
 
 function crearServicioRegistrarAsistencia({ firestore }) {
@@ -91,17 +139,8 @@ function crearServicioRegistrarAsistencia({ firestore }) {
 
     assertInstructorAsignado(jornada, auth);
 
-    // Pertenencia via roster explicito (design.md, Decision 4): exists() sobre
-    // la inscripcion, nunca inferencia por grado/grupo. Fail-closed: una
-    // ejecucion sin roster matriculado rechaza a todos los estudiantes.
-    const inscripcionSnap = await tenant
-      .collection('ejecucionesPrograma')
-      .doc(jornada.ejecucionProgramaId)
-      .collection('inscripciones')
-      .doc(estudianteId)
-      .get();
-
-    if (!inscripcionSnap.exists) {
+    const pertenece = await perteneceAEjecucion({ firestore, tenant, tenantId, jornada, estudianteId });
+    if (!pertenece) {
       throw crearError(
         'permission-denied',
         'El estudiante no esta matriculado en la ejecucion de esta jornada'

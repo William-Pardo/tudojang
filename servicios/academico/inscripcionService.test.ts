@@ -1,7 +1,7 @@
 import { GradoTKD, GrupoEdad, type Estudiante } from '../../tipos';
 import type { EjecucionPrograma } from '../../models/academico/programa';
 import type { InscripcionEjecucionPrograma } from '../../models/academico/inscripcion';
-import { estaInscrito, sugerirEstudiantesPorAtributo } from './inscripcionService';
+import { estaInscrito, sugerirEstudiantesPorAtributo, perteneceAutomaticamente } from './inscripcionService';
 
 function crearEjecucion(overrides: Partial<EjecucionPrograma> = {}): EjecucionPrograma {
   return {
@@ -108,6 +108,41 @@ describe('inscripcionService', () => {
 
       expect(sugerirEstudiantesPorAtributo(ejecucionSeccionA, [estudiante]).map((e) => e.id)).toEqual(['est-cadete']);
       expect(sugerirEstudiantesPorAtributo(ejecucionSeccionB, [estudiante]).map((e) => e.id)).toEqual(['est-cadete']);
+    });
+  });
+
+  // Matricula automatica (decision 2026-07-11, ver engram
+  // centro-estudios/matricula-automatica): mismo criterio que el callable
+  // server-side registrarAsistenciaJornada (functions/academico/asistencia.js)
+  // -- se usa para pre-tildar el checklist del modal de asistencia y para saber
+  // si hace falta escribir una excepcion explicita al confirmar.
+  describe('perteneceAutomaticamente', () => {
+    it('pertenece cuando coincide grupo, sede y el pago no esta Vencido', () => {
+      const ejecucion = crearEjecucion({ grupoId: 'cadetes', sedeId: 'sede-principal' });
+      const estudiante = crearEstudiante({ grupo: GrupoEdad.Cadetes, sedeId: 'sede-principal', estadoPago: 'Al día' as any });
+
+      expect(perteneceAutomaticamente(estudiante, ejecucion)).toBe(true);
+    });
+
+    it('NO pertenece si el grupo no coincide', () => {
+      const ejecucion = crearEjecucion({ grupoId: 'cadetes' });
+      const estudiante = crearEstudiante({ grupo: GrupoEdad.Infantil });
+
+      expect(perteneceAutomaticamente(estudiante, ejecucion)).toBe(false);
+    });
+
+    it('NO pertenece si la sede no coincide', () => {
+      const ejecucion = crearEjecucion({ sedeId: 'sede-principal' });
+      const estudiante = crearEstudiante({ sedeId: 'sede-norte' });
+
+      expect(perteneceAutomaticamente(estudiante, ejecucion)).toBe(false);
+    });
+
+    it('NO pertenece si el pago esta Vencido, aunque coincida grupo y sede', () => {
+      const ejecucion = crearEjecucion();
+      const estudiante = crearEstudiante({ estadoPago: 'Vencido' as any });
+
+      expect(perteneceAutomaticamente(estudiante, ejecucion)).toBe(false);
     });
   });
 });
