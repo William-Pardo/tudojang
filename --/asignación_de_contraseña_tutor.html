@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tudojang - Recuperar Contraseña</title>
+    <title>¡Te damos la bienvenida a Tudojang!</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
         
@@ -56,10 +56,10 @@
         }
 
         .info-box {
-            background-color: #fff5f5;
+            background-color: #f0fdf4;
             border-radius: 6px;
             padding: 20px;
-            border: 1px solid #fee2e2;
+            border: 1px solid #bbf7d0;
             margin: 25px 0;
         }
     </style>
@@ -76,33 +76,37 @@
             </div>
 
             <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 24px;">
-                <span style="font-size: 24px; margin-right: 8px;">🔐</span>
+                <span style="font-size: 24px; margin-right: 8px;">👨‍👩‍👧‍👦</span>
                 <h1 class="title-font" style="font-size: 24px; font-weight: 900; font-style: italic; color: #003366; text-transform: uppercase; margin: 0; letter-spacing: -0.5px;">
-                    Restablecer Clave
+                    Acceso para Tutores
                 </h1>
             </div>
 
             <p style="color: #4b5563; font-size: 18px; line-height: 1.6; text-align: left; margin: 0;">
-                Estimado <span style="font-weight: bold; color: #003366; font-style: italic;">Sabonim {{nombre_usuario}}</span>,
+                Estimado/a <span style="font-weight: bold; color: #003366; font-style: italic;">{{nombre_tutor}}</span>,
             </p>
             
             <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 16px;">
-                Hemos recibido una solicitud para restablecer la contraseña de acceso a tu panel en **Tudojang.com**. Si no has sido tú, puedes ignorar este mensaje con total seguridad.
+                Le damos la bienvenida a **Tudojang.com**. Se ha creado su cuenta de tutor vinculada a su representado/a: <span style="font-weight: bold; color: #cc3333;">{{nombre_alumno}}</span>.
+            </p>
+
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 12px;">
+                A través de su panel de tutor, podrá realizar el seguimiento de la asistencia, los avances, la facturación y las comunicaciones importantes de la academia de forma sencilla.
             </p>
 
             <div class="info-box">
-                <p style="color: #b91c1c; font-size: 14px; margin: 0; text-align: left;">
-                    <strong>Nota de seguridad:</strong> Este enlace expirará en 2 horas y solo puede utilizarse una vez.
+                <p style="color: #15803d; font-size: 14px; margin: 0; text-align: left;">
+                    <strong>Nota de seguridad:</strong> Para ingresar por primera vez, debe configurar su contraseña de acceso usando el enlace de abajo. Este enlace es de un solo uso.
                 </p>
             </div>
 
             <div style="margin-top: 30px;">
-                <a href="{{enlace_recuperacion}}" class="btn-primary">Cambiar mi Contraseña</a>
+                <a href="{{enlace_asignacion_contrasena}}" class="btn-primary">Configurar mi Contraseña</a>
             </div>
             
             <p style="font-size: 11px; color: #9ca3af; margin-top: 40px; text-align: left; line-height: 1.4;">
-                Si tienes problemas con el botón, copia y pega este enlace en tu navegador:<br>
-                <span style="color: #003366; word-break: break-all;">{{enlace_recuperacion}}</span>
+                Si tiene problemas con el botón superior, copie y pegue la siguiente dirección en su navegador:<br>
+                <span style="color: #003366; word-break: break-all;">{{enlace_asignacion_contrasena}}</span>
             </p>
         </div>
 

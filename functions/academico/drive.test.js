@@ -34,6 +34,8 @@ const {
   crearServicioGetDriveConnection,
   crearServicioSetDriveFolder,
   crearServicioGetTemporaryFileUrl,
+  crearServicioGetTemporaryFileUrlRecurso,
+  crearServicioProxyDriveMedia,
   crearServicioSyncDriveMetadata
 } = require('./drive');
 
@@ -664,7 +666,12 @@ describe('crearServicioGetTemporaryFileUrl', () => {
   // Helper: construye el objeto asignación base
   const makeAsignacion = (overrides = {}) => ({
     tenantId: 'tenant-abc',
-    estado: 'activa',
+    // 'publicada' es el ÚNICO valor que crearServicioPublishAsignacion(esBatch) realmente
+    // escribe (functions/academico/asignaciones.js) -- ver EstadoAsignacionAcademica en
+    // models/academico/asignacion.ts. Antes este fixture usaba 'activa', un valor que el
+    // sistema real nunca persiste, lo que ocultaba que el chequeo de estado en
+    // crearServicioGetTemporaryFileUrl estaba roto para toda asignación publicada normal.
+    estado: 'publicada',
     recursoId: 'recurso-111',
     ...overrides
   });
@@ -763,16 +770,42 @@ describe('crearServicioGetTemporaryFileUrl', () => {
       .rejects.toThrow('tenantId, asignacionId y fileId son obligatorios');
   });
 
-  it('rechaza acceso si el rol es Tutor (403)', async () => {
+  it('rechaza acceso si el rol es anónimo/no reconocido (403)', async () => {
     const firestore = makeFirestore();
     const service = buildService(firestore);
-    const ctx = { auth: { uid: 'u1', token: { rol: 'Tutor', tenantId: 'tenant-abc' } } };
+    const ctx = { auth: { uid: 'u1', token: { rol: 'RolInexistente', tenantId: 'tenant-abc' } } };
     const err = await service(
       { tenantId: 'tenant-abc', asignacionId: 'asig-1', fileId: 'file-123' },
       ctx
     ).catch(e => e);
     expect(err.message).toMatch('No autorizado para acceder a recursos académicos');
     expect(err.code).toBe('permission-denied');
+  });
+
+  // Fix 2026-07-16 (bug reportado: Tutor veía el material listado pero al abrirlo recibía
+  // "Permisos insuficientes para abrir este recurso de Drive."): Tutor debe poder VER el
+  // contenido real (para confirmar que el material correcto fue asignado a su hijo), igual
+  // que ya podían Estudiante/Maestro/Admin. El registro de actividad/consumo sigue sin
+  // atribuirse al Tutor porque eso lo controla el llamador (CentroEstudios.tsx no pasa
+  // estudianteId cuando quien mira es un Tutor), no este chequeo de rol.
+  it('permite acceso al rol Tutor (antes rechazado con 403)', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const connectionData = { refreshToken: encryptedToken, status: 'active' };
+    const fetchFn = makeFetchFn();
+    const firestore = makeFirestore({ connectionData });
+    const service = crearServicioGetTemporaryFileUrl({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore
+    });
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Tutor', tenantId: 'tenant-abc' } } };
+
+    const result = await service(
+      { tenantId: 'tenant-abc', asignacionId: 'asig-1', fileId: 'file-123' },
+      ctx
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('file-123');
   });
 
   it('rechaza acceso si tenantId no coincide con el del token', async () => {
@@ -797,6 +830,18 @@ describe('crearServicioGetTemporaryFileUrl', () => {
     ).catch(e => e);
     expect(err.message).toMatch('La asignación especificada no existe');
     expect(err.code).toBe('not-found');
+  });
+
+  it('rechaza si la asignación está en borrador (aún no publicada) -- regresión del bug de estados inválidos', async () => {
+    const firestore = makeFirestore({ asignacion: makeAsignacion({ estado: 'borrador' }) });
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Estudiante', tenantId: 'tenant-abc' } } };
+    const err = await service(
+      { tenantId: 'tenant-abc', asignacionId: 'asig-1', fileId: 'file-123' },
+      ctx
+    ).catch(e => e);
+    expect(err.message).toMatch("la asignación está en estado 'borrador'");
+    expect(err.code).toBe('permission-denied');
   });
 
   it('rechaza si la asignación está vencida (estado vencida)', async () => {
@@ -873,8 +918,14 @@ describe('crearServicioGetTemporaryFileUrl', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(result.url).toContain('file-123');
-    expect(result.url).toContain('access-token-temporal-xyz');
+    // La URL apunta a NUESTRO proxy (no a googleapis.com directo -- Drive no manda CORS para
+    // alt=media) y no lleva ningún secreto embebido, solo identificadores. El navegador
+    // adjunta su propio ID token de Firebase al pedirla (ver driveService.ts).
+    expect(result.url).toContain('/proxyDriveMedia');
+    expect(result.url).toContain('fileId=file-123');
+    expect(result.url).toContain('tenantId=tenant-abc');
+    expect(result.url).toContain('asignacionId=asig-1');
+    expect(result.url).not.toContain('access_token');
     expect(result.fileName).toBe('material.pdf');
     expect(result.mimeType).toBe('application/pdf');
     expect(result.expiresAt).toBeDefined();
@@ -1815,6 +1866,590 @@ describe('crearServicioSyncDriveMetadata', () => {
         nombre: 'child-1-updated.pdf'
       })
     );
+  });
+});
+
+describe('crearServicioGetTemporaryFileUrlRecurso', () => {
+  const defaultConfig = {
+    clientId: 'google-client-id',
+    clientSecret: 'google-client-secret',
+    redirectUri: 'https://app.tudojang.com/oauth-callback'
+  };
+
+  const { cifrarToken } = require('./kms');
+
+  const makeRecurso = (overrides = {}) => ({
+    tenantId: 'tenant-abc',
+    externalFileId: 'file-123',
+    nombre: 'material.pdf',
+    estado: 'aprobado',
+    ...overrides
+  });
+
+  const makeRecursoRef = (recurso = makeRecurso()) => ({
+    get: jest.fn().mockResolvedValue({
+      exists: recurso !== null,
+      data: () => recurso
+    })
+  });
+
+  const makeFirestore = ({ recurso = makeRecurso(), connectionData = null, recursoRef = null } = {}) => {
+    const _recursoRef = recursoRef || makeRecursoRef(recurso);
+    const connectionSnap = connectionData !== null
+      ? { empty: false, docs: [{ data: () => connectionData }] }
+      : { empty: true, docs: [] };
+
+    return {
+      collection: jest.fn().mockImplementation(() => ({
+        doc: jest.fn().mockImplementation(() => ({
+          collection: jest.fn().mockImplementation((subCol) => ({
+            doc: jest.fn().mockImplementation(() => {
+              if (subCol === 'recursos') return _recursoRef;
+              return {};
+            }),
+            where: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            get: jest.fn().mockResolvedValue(connectionSnap)
+          }))
+        }))
+      })),
+      _recursoRef
+    };
+  };
+
+  const makeFetchFn = ({
+    status = 200,
+    body = { id: 'file-123', name: 'material.pdf', mimeType: 'application/pdf', trashed: false }
+  } = {}) => jest.fn().mockResolvedValue({
+    status,
+    ok: status >= 200 && status < 300,
+    json: jest.fn().mockResolvedValue(body)
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    google.auth.OAuth2.mockImplementation(() => ({
+      generateAuthUrl: mockGenerateAuthUrl,
+      getToken: mockGetToken,
+      refreshAccessToken: mockRefreshAccessToken,
+      setCredentials: mockSetCredentials,
+      getAccessToken: jest.fn().mockResolvedValue({ token: 'access-token-preview-xyz' })
+    }));
+  });
+
+  const buildService = (firestore, config = defaultConfig) =>
+    crearServicioGetTemporaryFileUrlRecurso({ googleDriveConfig: { ...config, _fetchFn: makeFetchFn() }, firestore });
+
+  it('lanza error si no hay autenticación', async () => {
+    const firestore = makeFirestore();
+    const service = crearServicioGetTemporaryFileUrlRecurso({ googleDriveConfig: defaultConfig, firestore });
+    await expect(
+      service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, { auth: null })
+    ).rejects.toThrow('No autenticado');
+  });
+
+  it('lanza error si faltan parámetros obligatorios', async () => {
+    const firestore = makeFirestore();
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'tenant-abc' } } };
+    await expect(service({ tenantId: 'tenant-abc' }, ctx)).rejects.toThrow('tenantId y recursoId son obligatorios');
+  });
+
+  it.each(['Admin', 'SuperAdmin', 'Editor', 'Asistente', 'Maestro'])(
+    'permite acceso al rol staff %s',
+    async (rol) => {
+      const encryptedToken = await cifrarToken('valid-refresh-token');
+      const firestore = makeFirestore({ connectionData: { refreshToken: encryptedToken, status: 'active' } });
+      const service = buildService(firestore);
+      const ctx = { auth: { uid: 'u1', token: { rol, tenantId: rol === 'SuperAdmin' ? 'otro-tenant' : 'tenant-abc' } } };
+
+      const result = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx);
+      expect(result.ok).toBe(true);
+      expect(result.url).toContain('file-123');
+    }
+  );
+
+  it.each(['Estudiante', 'Tutor'])('rechaza el rol %s (esto es Biblioteca, no consumo de asignación)', async (rol) => {
+    const firestore = makeFirestore();
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol, tenantId: 'tenant-abc' } } };
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('permission-denied');
+  });
+
+  it('rechaza si el tenantId no coincide con el del token (excepto SuperAdmin)', async () => {
+    const firestore = makeFirestore();
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'otro-tenant' } } };
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('permission-denied');
+  });
+
+  it('lanza not-found si el recurso no existe', async () => {
+    const firestore = makeFirestore({ recursoRef: makeRecursoRef(null) });
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'tenant-abc' } } };
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('not-found');
+  });
+
+  it('lanza failed-precondition si el recurso no tiene archivo de Drive asociado', async () => {
+    const firestore = makeFirestore({ recurso: makeRecurso({ externalFileId: undefined }) });
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'tenant-abc' } } };
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('failed-precondition');
+  });
+
+  it('genera la URL temporal correctamente cuando todo es válido', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedToken, status: 'active' } });
+    const service = buildService(firestore);
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Maestro', tenantId: 'tenant-abc' } } };
+
+    const result = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx);
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('/proxyDriveMedia');
+    expect(result.url).toContain('fileId=file-123');
+    expect(result.url).toContain('tenantId=tenant-abc');
+    expect(result.url).toContain('recursoId=recurso-1');
+    expect(result.url).not.toContain('access_token');
+    expect(result.fileName).toBe('material.pdf');
+    expect(result.mimeType).toBe('application/pdf');
+    expect(result.expiresAt).toBeDefined();
+  });
+
+  it('lanza not-found si el archivo fue eliminado de Drive (404), sin bloquear ninguna asignación', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedToken, status: 'active' } });
+    const service = crearServicioGetTemporaryFileUrlRecurso({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: makeFetchFn({ status: 404 }) },
+      firestore
+    });
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'tenant-abc' } } };
+
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('not-found');
+  });
+
+  it('lanza not-found si el archivo está en la papelera de Drive', async () => {
+    const encryptedToken = await cifrarToken('valid-refresh-token');
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedToken, status: 'active' } });
+    const service = crearServicioGetTemporaryFileUrlRecurso({
+      googleDriveConfig: {
+        ...defaultConfig,
+        _fetchFn: makeFetchFn({ body: { id: 'file-123', name: 'material.pdf', mimeType: 'application/pdf', trashed: true } })
+      },
+      firestore
+    });
+    const ctx = { auth: { uid: 'u1', token: { rol: 'Admin', tenantId: 'tenant-abc' } } };
+
+    const err = await service({ tenantId: 'tenant-abc', recursoId: 'recurso-1' }, ctx).catch((e) => e);
+    expect(err.code).toBe('not-found');
+  });
+});
+
+describe('crearServicioProxyDriveMedia', () => {
+  const defaultConfig = {
+    clientId: 'google-client-id',
+    clientSecret: 'google-client-secret',
+    redirectUri: 'https://app.tudojang.com/oauth-callback'
+  };
+
+  const { cifrarToken } = require('./kms');
+
+  const makeReq = ({ headers = {}, query = {}, method = 'GET' } = {}) => ({ headers, query, method });
+
+  const makeRes = () => {
+    const res = {
+      statusCode: null,
+      headers: {},
+      body: undefined,
+    };
+    res.set = jest.fn((k, v) => { res.headers[k] = v; return res; });
+    res.status = jest.fn((code) => { res.statusCode = code; return res; });
+    res.send = jest.fn((body) => { res.body = body; return res; });
+    return res;
+  };
+
+  const makeAuth = (decoded = { rol: 'Estudiante', tenantId: 'tenant-abc' }) => ({
+    verifyIdToken: jest.fn().mockResolvedValue(decoded),
+  });
+
+  const makeAsignacion = (overrides = {}) => ({
+    tenantId: 'tenant-abc',
+    estado: 'publicada',
+    recursoId: 'recurso-111',
+    ...overrides,
+  });
+
+  const makeFirestore = ({
+    asignacion = makeAsignacion(),
+    recurso = { tenantId: 'tenant-abc', externalFileId: 'file-123' },
+    connectionData = { refreshToken: null, status: 'active' },
+    asignacionExiste = true,
+    recursoExiste = true,
+  } = {}) => ({
+    collection: jest.fn().mockImplementation((colName) => ({
+      doc: jest.fn().mockImplementation(() => ({
+        collection: jest.fn().mockImplementation((subCol) => ({
+          doc: jest.fn().mockImplementation(() => ({
+            get: jest.fn().mockResolvedValue(
+              subCol === 'asignaciones'
+                ? { exists: asignacionExiste, data: () => asignacion }
+                : { exists: recursoExiste, data: () => recurso }
+            ),
+          })),
+          where: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          get: jest.fn().mockResolvedValue(
+            connectionData ? { empty: false, docs: [{ data: () => connectionData }] } : { empty: true, docs: [] }
+          ),
+        })),
+      })),
+    })),
+  });
+
+  // El handler ahora hace DOS llamadas a Drive por pedido: (1) `fields=mimeType` para saber si
+  // el archivo es nativo de Google (Docs/Slides/Sheets, que no tienen bytes propios y necesitan
+  // /export) y (2) la descarga real (alt=media o export). `metaStatus`/`mimeType` controlan la
+  // primera; `status`/`body`/`contentType` controlan la segunda.
+  const makeFetchFn = ({
+    status = 200,
+    body = 'contenido-binario-del-archivo',
+    contentType = 'video/mp4',
+    mimeType = 'application/octet-stream',
+    metaStatus = 200,
+  } = {}) => jest.fn().mockImplementation((url) => {
+    if (String(url).includes('fields=mimeType')) {
+      return Promise.resolve({
+        ok: metaStatus >= 200 && metaStatus < 300,
+        status: metaStatus,
+        json: async () => ({ mimeType }),
+      });
+    }
+    return Promise.resolve({
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: (h) => (h === 'content-type' ? contentType : null) },
+      arrayBuffer: async () => Buffer.from(body),
+    });
+  });
+
+  let encryptedRefreshToken;
+  beforeAll(async () => {
+    encryptedRefreshToken = await cifrarToken('valid-refresh-token');
+  });
+
+  beforeEach(() => {
+    google.auth.OAuth2.mockImplementation(() => ({
+      setCredentials: mockSetCredentials,
+      getAccessToken: jest.fn().mockResolvedValue({ token: 'access-token-server-side' }),
+    }));
+  });
+
+  it('responde 204 y no exige auth para preflight OPTIONS', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({ method: 'OPTIONS', headers: { origin: 'https://tudojang.com' } });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('https://tudojang.com');
+    expect(auth.verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it('no agrega Access-Control-Allow-Origin para un origen no permitido', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({ method: 'OPTIONS', headers: { origin: 'https://sitio-malicioso.test' } });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.headers['Access-Control-Allow-Origin']).toBeUndefined();
+  });
+
+  it('rechaza con 401 si falta el header Authorization', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({ query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' } });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(auth.verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 401 si el ID token de Firebase es inválido', async () => {
+    const firestore = makeFirestore();
+    const auth = { verifyIdToken: jest.fn().mockRejectedValue(new Error('token vencido')) };
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer token-invalido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it('rechaza con 400 si faltan parámetros (necesita asignacionId O recursoId)', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rechaza con 403 si el tenantId del token no coincide (Admin, no-SuperAdmin)', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth({ rol: 'Admin', tenantId: 'otro-tenant' });
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('rechaza con 403 el rol Tutor pidiendo la vista previa de Biblioteca (recursoId) -- solo staff', async () => {
+    const firestore = makeFirestore();
+    const auth = makeAuth({ rol: 'Tutor', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', recursoId: 'recurso-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('rechaza con 404 si la asignación no existe', async () => {
+    const firestore = makeFirestore({ asignacionExiste: false });
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('rechaza con 403 si la asignación no está publicada', async () => {
+    const firestore = makeFirestore({ asignacion: makeAsignacion({ estado: 'borrador' }) });
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('rechaza con 404 si el recurso de Biblioteca no existe (modo vista previa)', async () => {
+    const firestore = makeFirestore({ recursoExiste: false });
+    const auth = makeAuth({ rol: 'Admin', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', recursoId: 'recurso-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('sirve los bytes reales con el Content-Type correcto para una asignación válida (Estudiante)', async () => {
+    const fetchFn = makeFetchFn({ contentType: 'video/mp4', body: 'bytes-del-video' });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth({ rol: 'Estudiante', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido', origin: 'https://tudojang.com' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(auth.verifyIdToken).toHaveBeenCalledWith('id-token-valido');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.headers['Content-Type']).toBe('video/mp4');
+    expect(res.headers['Access-Control-Allow-Origin']).toBe('https://tudojang.com');
+    expect(Buffer.isBuffer(res.body) ? res.body.toString() : res.body).toContain('bytes-del-video');
+    // El fetch a Google usa el access_token generado SERVER-SIDE (Authorization header) --
+    // nunca un token que haya viajado desde el navegador.
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.stringContaining('file-123'),
+      expect.objectContaining({ headers: { Authorization: 'Bearer access-token-server-side' } })
+    );
+  });
+
+  it('sirve los bytes reales para una vista previa de Biblioteca válida (Admin, sin asignación)', async () => {
+    const fetchFn = makeFetchFn({ contentType: 'application/pdf', body: 'bytes-del-pdf' });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth({ rol: 'Admin', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', recursoId: 'recurso-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.headers['Content-Type']).toBe('application/pdf');
+  });
+
+  it('devuelve 500 si el tenant no tiene conexión de Drive activa', async () => {
+    const firestore = makeFirestore({ connectionData: null });
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({ googleDriveConfig: defaultConfig, firestore, auth });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  it('propaga el status de Google si Drive responde con error al pedir los bytes', async () => {
+    const fetchFn = makeFetchFn({ status: 404 });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('propaga el status si falla la verificación previa de mimeType', async () => {
+    const fetchFn = makeFetchFn({ metaStatus: 403 });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth();
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', asignacionId: 'asig-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  // Bug real reportado 2026-07-16: un instructor asignó como "PDF" un archivo que en Drive
+  // es en realidad un Google Doc nativo (no un .pdf subido). `alt=media` rechaza esos archivos
+  // con 403 -- el navegador mostraba "Permisos insuficientes" aunque el usuario SÍ tenía
+  // permiso, porque el verdadero problema era el endpoint usado, no el rol/tenant/asignación.
+  it('usa /export en vez de alt=media para un Google Doc nativo (Drive rechaza alt=media con 403 para estos archivos)', async () => {
+    const fetchFn = makeFetchFn({ mimeType: 'application/vnd.google-apps.document', body: 'bytes-del-pdf-exportado' });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth({ rol: 'Admin', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', recursoId: 'recurso-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.headers['Content-Type']).toBe('application/pdf');
+    expect(Buffer.isBuffer(res.body) ? res.body.toString() : res.body).toContain('bytes-del-pdf-exportado');
+
+    const urlsLlamadas = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(urlsLlamadas.some((u) => u.includes('/export') && u.includes('mimeType=application%2Fpdf'))).toBe(true);
+    expect(urlsLlamadas.some((u) => u.includes('alt=media'))).toBe(false);
+  });
+
+  it('sigue usando alt=media (sin /export) para un archivo binario normal, no nativo de Google', async () => {
+    const fetchFn = makeFetchFn({ mimeType: 'application/pdf', body: 'bytes-del-pdf-real' });
+    const firestore = makeFirestore({ connectionData: { refreshToken: encryptedRefreshToken, status: 'active' } });
+    const auth = makeAuth({ rol: 'Admin', tenantId: 'tenant-abc' });
+    const servicio = crearServicioProxyDriveMedia({
+      googleDriveConfig: { ...defaultConfig, _fetchFn: fetchFn },
+      firestore,
+      auth,
+    });
+    const req = makeReq({
+      headers: { authorization: 'Bearer id-token-valido' },
+      query: { tenantId: 'tenant-abc', fileId: 'file-123', recursoId: 'recurso-1' },
+    });
+    const res = makeRes();
+
+    await servicio(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const urlsLlamadas = fetchFn.mock.calls.map(([url]) => String(url));
+    expect(urlsLlamadas.some((u) => u.includes('alt=media'))).toBe(true);
+    expect(urlsLlamadas.some((u) => u.includes('/export'))).toBe(false);
   });
 });
 

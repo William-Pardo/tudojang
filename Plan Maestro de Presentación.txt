@@ -1,0 +1,1147 @@
+# Plan Maestro de Presentación — TuDojang para Padres de Familia
+
+**Formato sugerido:** videollamada dentro de una reunión general del club  
+**Duración objetivo:** 12 a 15 minutos sin preguntas / 15 a 18 minutos con preguntas  
+**Tipo de presentación:** inducción narrativa + demostración visual controlada  
+**Audiencia:** padres de familia, acudientes y responsables de estudiantes del club  
+**Propósito:** explicar por qué el club implementa TuDojang, qué cambia para las familias y cómo la plataforma mejora el orden, el seguimiento y la confianza en el proceso de los estudiantes.
+
+---
+
+## 1. Idea central de la presentación
+
+La presentación no debe sentirse como una venta de software ni como una capacitación técnica.
+
+Debe sentirse como una explicación clara de una mejora que el club está incorporando para acompañar mejor a las familias.
+
+### Mensaje principal
+
+> **TuDojang es una herramienta que ayuda al club a organizar mejor la información, el seguimiento, los documentos, los pagos, los eventos y la comunicación relacionada con el proceso de cada estudiante.**
+
+### Frase guía
+
+> **Más que presentar una aplicación, vamos a mostrar cómo el club quiere brindar una experiencia más organizada, clara y confiable para las familias.**
+
+### Enfoque correcto
+
+La presentación debe responder estas preguntas desde el punto de vista de los padres:
+
+- ¿Qué cambia para mí como padre o acudiente?
+- ¿Cómo me ayuda esto a tener más claridad?
+- ¿Qué información del proceso de mi hijo estará mejor organizada?
+- ¿Cómo se manejarán asistencia, pagos, documentos, eventos y seguimiento?
+- ¿Qué debo hacer después de la presentación?
+
+### Enfoque que se debe evitar
+
+No se debe presentar TuDojang como:
+
+- Un software administrativo complejo.
+- Un recorrido completo por todos los módulos.
+- Una explicación técnica del sistema.
+- Una venta comercial.
+- Una capacitación profunda de uso.
+
+---
+
+## 2. Narrativa general: storytelling
+
+La presentación debe seguir una historia sencilla:
+
+### Antes
+
+La información del club puede estar repartida entre mensajes, archivos, formularios, conversaciones y procesos manuales.
+
+### Decisión
+
+El club decide implementar TuDojang para organizar mejor la experiencia de estudiantes y familias.
+
+### Recorrido
+
+Se muestra el recorrido de una familia dentro del club: registro, información del estudiante, asistencia, seguimiento, pagos, eventos, documentos y soporte.
+
+### Resultado
+
+Los padres tienen más claridad, el club tiene más control y el estudiante cuenta con un proceso mejor acompañado.
+
+---
+
+## 3. Estructura recomendada de la presentación
+
+La presentación puede tener **9 o 10 diapositivas**.
+
+La duración ideal es de **13 a 14 minutos** de exposición, dejando espacio para preguntas.
+
+| Diapositiva | Tema | Tiempo estimado |
+|------------|------|----------------:|
+| 1 | Portada y apertura | 0:45 |
+| 2 | ¿Por qué el club implementa TuDojang? | 1:30 |
+| 3 | ¿Qué es TuDojang? | 1:00 |
+| 4 | Historia guía: el recorrido de una familia | 0:45 |
+| 5 | Información y documentos del estudiante | 1:30 |
+| 6 | Asistencia, clases y seguimiento | 2:00 |
+| 7 | Pagos, eventos y organización administrativa | 2:00 |
+| 8 | Comunicación, seguridad y confianza | 1:30 |
+| 9 | ¿Qué sigue para los padres? | 1:15 |
+| 10 | Cierre y preguntas | 0:45 + preguntas |
+
+**Total estimado sin preguntas:** 13 a 14 minutos  
+**Total estimado con preguntas:** 15 a 18 minutos
+
+---
+
+# 4. Desarrollo detallado por diapositiva
+
+---
+
+## Diapositiva 1 — Portada / apertura
+
+### Objetivo
+
+Abrir la presentación con claridad, ubicar a los padres y dejar claro que no será una explicación técnica.
+
+### Título sugerido
+
+**Presentación de TuDojang**
+
+### Subtítulo sugerido
+
+**Una herramienta para acompañar mejor el proceso de los estudiantes**
+
+### Elementos visuales
+
+- Logo de TuDojang.
+- Fondo limpio.
+- Colores de marca.
+- Una frase corta y fácil de leer.
+
+### Texto recomendado en pantalla
+
+> **TuDojang**  
+> Plataforma de apoyo para la gestión y seguimiento del club
+
+### Guion sugerido
+
+> “Buenas noches. Más que presentarles una aplicación, quiero mostrarles una herramienta que el club ha implementado para organizar mejor la información, el seguimiento y la comunicación con las familias.”
+
+> “La idea es que podamos ver, de forma sencilla, cómo esta plataforma va a apoyar el proceso de los estudiantes y facilitar algunos aspectos importantes para los padres y acudientes.”
+
+### Mensaje clave
+
+**No vienes a vender software; vienes a presentar una mejora para el club y para las familias.**
+
+---
+
+## Diapositiva 2 — ¿Por qué el club implementa TuDojang?
+
+### Objetivo
+
+Presentar el problema de forma simple, sin culpar al club ni a los padres.
+
+### Título sugerido
+
+**¿Por qué el club implementa TuDojang?**
+
+### Texto recomendado en pantalla
+
+Cuando un club crece, también crecen los retos:
+
+- Información en varios lugares.
+- Procesos manuales.
+- Seguimiento difícil de consultar.
+- Documentos, pagos y eventos con poca trazabilidad.
+- Necesidad de una experiencia más organizada para las familias.
+
+### Guion sugerido
+
+> “A medida que un club crece, también crecen los retos. La información de los estudiantes, la asistencia, los documentos, los pagos, los eventos y la comunicación pueden terminar repartidos entre mensajes, archivos y procesos manuales.”
+
+> “TuDojang nace para ayudar a organizar todo eso en un solo lugar y permitir que el club tenga una gestión más clara y más ordenada.”
+
+### Mensaje clave
+
+**El problema principal no es la falta de voluntad; es la dispersión de la información.**
+
+### Recomendación visual
+
+Usar una comparación simple:
+
+**Antes:** información dispersa  
+**Ahora:** información organizada
+
+---
+
+## Diapositiva 3 — ¿Qué es TuDojang?
+
+### Objetivo
+
+Definir la plataforma en lenguaje simple.
+
+### Título sugerido
+
+**¿Qué es TuDojang?**
+
+### Texto recomendado en pantalla
+
+**TuDojang es una plataforma que ayuda al club a organizar la gestión administrativa, el seguimiento del estudiante y la comunicación con las familias.**
+
+Bloques sugeridos:
+
+- Información del estudiante.
+- Asistencia y progreso.
+- Pagos y documentos.
+- Eventos, comunicación y soporte.
+
+### Guion sugerido
+
+> “TuDojang es una plataforma diseñada para apoyar la gestión del club. Centraliza la información más importante del proceso de cada estudiante y facilita que las familias tengan una experiencia más organizada, clara y confiable.”
+
+> “No reemplaza el trabajo humano del club. Lo que hace es ayudar a que ese trabajo esté mejor organizado y sea más fácil de consultar.”
+
+### Mensaje clave
+
+**TuDojang es una herramienta de apoyo al proceso del estudiante.**
+
+---
+
+## Diapositiva 4 — Historia guía: el recorrido de una familia
+
+### Objetivo
+
+Pasar de la explicación conceptual a una historia fácil de seguir.
+
+### Título sugerido
+
+**Veámoslo con un ejemplo**
+
+### Texto recomendado en pantalla
+
+**Imaginemos el recorrido de una familia dentro del club:**
+
+Registro → Documentos → Asistencia → Seguimiento → Pagos → Eventos → Soporte
+
+### Guion sugerido
+
+> “Para que sea más fácil de entender, vamos a verlo como el recorrido de una familia dentro del club.”
+
+> “Imaginemos a un estudiante que inicia o continúa su proceso. A partir de ahí, veremos cómo TuDojang acompaña diferentes momentos: su información, su asistencia, su seguimiento, sus pagos, sus eventos y la comunicación con el club.”
+
+### Mensaje clave
+
+**Desde este punto no se presentan módulos; se presenta una experiencia.**
+
+### Recomendación visual
+
+Mostrar una línea de tiempo horizontal con máximo 6 o 7 pasos.
+
+---
+
+## Diapositiva 5 — Información y documentos del estudiante
+
+### Objetivo
+
+Mostrar el primer valor concreto: tener los datos organizados.
+
+### Título sugerido
+
+**1. Información completa en un solo lugar**
+
+### Texto recomendado en pantalla
+
+La plataforma permite organizar:
+
+- Datos del estudiante.
+- Información del acudiente.
+- Contactos relevantes.
+- Documentos y autorizaciones.
+- Información importante para el proceso deportivo y administrativo.
+
+### Guion sugerido
+
+> “El primer valor de la plataforma es que el club puede tener organizada la información del estudiante y de su acudiente.”
+
+> “Esto incluye datos básicos, información relevante, autorizaciones y documentos del proceso. Tener esa información centralizada reduce reprocesos, evita confusiones y facilita la consulta cuando el club la necesita.”
+
+> “Para las familias, esto significa menos trámites repetidos y mayor claridad sobre la información registrada.”
+
+### Mensaje clave
+
+**Todo comienza con información bien organizada.**
+
+### Posible captura de app
+
+Mostrar una captura de la ficha del estudiante o perfil del estudiante, cuidando no exponer datos reales de menores.
+
+### Recomendación importante
+
+Usar datos ficticios o un estudiante de prueba.
+
+---
+
+## Diapositiva 6 — Asistencia, clases y seguimiento
+
+### Objetivo
+
+Mostrar un beneficio muy tangible para los padres.
+
+### Título sugerido
+
+**2. Seguimiento del proceso del estudiante**
+
+### Texto recomendado en pantalla
+
+TuDojang ayuda a gestionar:
+
+- Registro de asistencia.
+- Control de clases.
+- Seguimiento del proceso.
+- Materiales o recursos asignados, cuando aplique.
+- Mayor trazabilidad del avance del estudiante.
+
+### Guion sugerido
+
+> “Uno de los puntos más importantes para las familias es el seguimiento del proceso del estudiante.”
+
+> “La plataforma permite apoyar el registro de asistencia, el control de clases y, cuando corresponda, la asignación de materiales o recursos de apoyo.”
+
+> “Esto ayuda a que el club tenga una mejor trazabilidad y a que las familias puedan entender mejor cómo se acompaña el proceso de sus hijos.”
+
+### Mensaje clave
+
+**No se trata solo de administrar; se trata de acompañar mejor el proceso del estudiante.**
+
+### Posible captura de app
+
+Mostrar una vista relacionada con:
+
+- Clase en Vivo.
+- Asistencia.
+- Centro de Estudios.
+- Materiales asignados.
+- Mis clases.
+
+### Cómo mostrarla
+
+No navegar durante mucho tiempo. Mostrar la pantalla y explicar el beneficio en máximo 30 segundos.
+
+### Frase útil al mostrar la pantalla
+
+> “No voy a entrar en cada botón. Lo importante aquí es que el club tendrá una forma organizada de registrar y consultar el proceso de clase.”
+
+---
+
+## Diapositiva 7 — Pagos, eventos y organización administrativa
+
+### Objetivo
+
+Explicar la parte administrativa sin sonar fría ni comercial.
+
+### Título sugerido
+
+**3. Más claridad en procesos administrativos**
+
+### Texto recomendado en pantalla
+
+La plataforma ayuda a organizar:
+
+- Mensualidades.
+- Estado de pagos.
+- Eventos.
+- Solicitudes relacionadas con el club.
+- Historial y trazabilidad de movimientos.
+
+### Guion sugerido
+
+> “La plataforma también ayuda a organizar la parte administrativa del proceso.”
+
+> “Esto puede incluir mensualidades, eventos, solicitudes o compras relacionadas con la actividad del estudiante dentro del club.”
+
+> “La idea no es complicar a las familias. Todo lo contrario: se busca tener mayor orden, trazabilidad y claridad.”
+
+### Mensaje clave
+
+**Más transparencia, menos confusión y mejor organización.**
+
+### Posible captura de app
+
+Mostrar una vista de pagos, estado de cuenta, eventos o solicitudes, usando información ficticia.
+
+### Advertencia
+
+No convertir esta parte en una explicación financiera larga.
+
+---
+
+## Diapositiva 8 — Comunicación, seguridad y confianza
+
+### Objetivo
+
+Conectar emocionalmente con los padres.
+
+### Título sugerido
+
+**4. Más confianza para las familias**
+
+### Texto recomendado en pantalla
+
+Con TuDojang, el club fortalece:
+
+- Canales más claros.
+- Información más accesible.
+- Documentación organizada.
+- Seguimiento más confiable.
+- Mejor apoyo al proceso del estudiante.
+
+### Guion sugerido
+
+> “Al final, el valor más importante no es la tecnología en sí. Lo importante es la confianza que genera.”
+
+> “Cuando la información está mejor organizada, cuando los procesos son más claros y cuando la comunicación mejora, las familias sienten mayor tranquilidad y el club puede brindar una experiencia más sólida.”
+
+### Mensaje clave
+
+**La tecnología aquí sirve para generar confianza.**
+
+### Recomendación visual
+
+Usar una frase grande:
+
+> **Más orden. Más claridad. Más confianza.**
+
+---
+
+## Diapositiva 9 — ¿Qué sigue para los padres?
+
+### Objetivo
+
+Cerrar con acciones concretas.
+
+### Título sugerido
+
+**¿Qué deben hacer las familias?**
+
+### Texto recomendado en pantalla
+
+A partir de la implementación:
+
+- Estar atentos a las indicaciones del club.
+- Validar o actualizar información cuando se solicite.
+- Usar los canales oficiales.
+- Familiarizarse progresivamente con la plataforma.
+- Reportar dudas por los medios definidos por el club.
+
+### Guion sugerido
+
+> “A partir de esta implementación, lo más importante para las familias será estar atentas a la información que comparta el club.”
+
+> “También será importante validar sus datos cuando se les solicite y familiarizarse poco a poco con la plataforma.”
+
+> “La idea es que este proceso les facilite la experiencia, no que la complique.”
+
+### Mensaje clave
+
+**El siguiente paso es simple: conocerla y usarla progresivamente.**
+
+---
+
+## Diapositiva 10 — Cierre y preguntas
+
+### Objetivo
+
+Cerrar con una idea fuerte y abrir espacio a dudas.
+
+### Título sugerido
+
+**Gracias**
+
+### Subtítulo sugerido
+
+**TuDojang busca aportar más orden, claridad y acompañamiento al proceso de cada estudiante.**
+
+### Guion sugerido
+
+> “Para cerrar, quiero dejarles esta idea: TuDojang no reemplaza el trabajo del club, lo fortalece.”
+
+> “Es una herramienta para brindar más orden, más seguimiento y una mejor experiencia para las familias.”
+
+> “Muchas gracias por el espacio. Con gusto atendemos sus preguntas.”
+
+### Mensaje clave
+
+**Cierre institucional, claro y confiable.**
+
+---
+
+# 5. Cómo integrar la demostración de la app
+
+## Recomendación general
+
+Sí conviene mostrar partes reales de la aplicación, pero no como un recorrido libre.
+
+La demostración debe ser breve, controlada y orientada al beneficio.
+
+### No hacer
+
+No decir:
+
+> “Voy a hacer login, luego abro este menú, luego entro aquí, luego hago clic acá, luego este botón sirve para…”
+
+Eso se vuelve técnico, lento y puede perder la atención de los padres.
+
+### Sí hacer
+
+Mostrar pantallas puntuales y explicar el beneficio de cada una.
+
+La regla es:
+
+> **Cada pantalla debe responder en menos de 10 segundos qué beneficio tiene para los padres.**
+
+---
+
+## Proporción recomendada
+
+### Opción ideal
+
+- 70% narrativa y diapositivas.
+- 30% evidencia visual de la app.
+
+### Opción más segura
+
+- 80% diapositivas.
+- 20% capturas de la app.
+
+---
+
+## Mejor formato
+
+La mejor opción para esta reunión es:
+
+### Presentación con capturas + mini demo opcional al final
+
+Esto evita problemas de internet, errores de navegación o tiempos muertos.
+
+---
+
+# 6. Pantallas recomendadas para capturar
+
+Usar máximo **4 pantallas**.
+
+## Captura 1 — Vista general de la plataforma
+
+### Dónde usarla
+
+Diapositiva 3 o 4.
+
+### Qué comunica
+
+La plataforma existe, está desarrollada y tiene una interfaz real.
+
+### Qué decir
+
+> “Esta es la plataforma que el club implementó para organizar la información y el seguimiento.”
+
+### Tiempo
+
+10 a 15 segundos.
+
+---
+
+## Captura 2 — Perfil o ficha del estudiante
+
+### Dónde usarla
+
+Diapositiva 5.
+
+### Qué comunica
+
+La información del estudiante y del acudiente se centraliza.
+
+### Qué decir
+
+> “Aquí se centraliza la información del estudiante y de su acudiente, para que el club tenga el proceso mejor organizado.”
+
+### Tiempo
+
+20 a 30 segundos.
+
+---
+
+## Captura 3 — Asistencia, clase en vivo o seguimiento
+
+### Dónde usarla
+
+Diapositiva 6.
+
+### Qué comunica
+
+El club puede hacer seguimiento al proceso del estudiante.
+
+### Qué decir
+
+> “Aquí el club puede gestionar el seguimiento de clases, asistencia y, cuando aplique, materiales o recursos del proceso.”
+
+### Tiempo
+
+30 a 40 segundos.
+
+---
+
+## Captura 4 — Pagos, eventos o solicitudes
+
+### Dónde usarla
+
+Diapositiva 7.
+
+### Qué comunica
+
+Los procesos administrativos se organizan con mayor claridad.
+
+### Qué decir
+
+> “También permite organizar procesos administrativos como pagos, eventos o solicitudes relacionadas con la actividad del estudiante.”
+
+### Tiempo
+
+30 segundos.
+
+---
+
+# 7. Pantallas que no conviene mostrar
+
+Evitar mostrar:
+
+- Configuración interna del club.
+- Administración técnica.
+- Infraestructura.
+- Formularios largos.
+- Tablas demasiado densas.
+- Pantallas vacías.
+- Módulos que todavía estén en desarrollo.
+- Vistas con errores.
+- Información real de menores.
+- Datos privados de padres, estudiantes o pagos.
+- Configuración de planes SaaS.
+- Información interna de Wompi, Firebase o herramientas técnicas.
+
+---
+
+# 8. Estrategia de exposición en videollamada
+
+Como la presentación será en medio de una reunión con más temas, debe ser directa.
+
+## Duración ideal
+
+**15 minutos máximo de exposición.**
+
+## Con preguntas
+
+**Hasta 18 minutos.**
+
+## Reglas de ritmo
+
+- No hablar más de 2 minutos seguidos sin cambiar de diapositiva o idea.
+- No explicar cada botón.
+- No hacer navegación improvisada.
+- No usar tecnicismos.
+- No leer texto largo de las diapositivas.
+- Usar frases cortas.
+- Repetir el mensaje central varias veces con palabras distintas.
+
+---
+
+# 9. Tono recomendado
+
+El tono debe ser:
+
+- Claro.
+- Cercano.
+- Institucional.
+- Tranquilo.
+- Seguro.
+- Orientado a beneficios.
+
+No debe sonar:
+
+- Vendedor.
+- Técnico.
+- Defensivo.
+- Improvisado.
+- Demasiado informal.
+- Como capacitación obligatoria.
+
+---
+
+# 10. Palabras que conviene usar
+
+Usar palabras como:
+
+- Organización.
+- Claridad.
+- Seguimiento.
+- Confianza.
+- Familias.
+- Estudiantes.
+- Proceso.
+- Acompañamiento.
+- Información.
+- Trazabilidad.
+- Canales oficiales.
+- Seguridad.
+- Documentación.
+
+---
+
+# 11. Palabras que conviene evitar
+
+Evitar términos como:
+
+- SaaS.
+- Tenant.
+- Backoffice.
+- Módulo, si se puede reemplazar por sección o herramienta.
+- Firebase.
+- Firestore.
+- Cloud Functions.
+- Wompi, salvo que sea necesario.
+- Integración.
+- Producción.
+- Deploy.
+- Sprint.
+- Stack tecnológico.
+- MVP, salvo que se hable internamente con el club, no con padres.
+
+---
+
+# 12. Frases clave para usar durante la presentación
+
+## Apertura
+
+> “Más que presentarles una aplicación, quiero mostrarles cómo el club va a acompañar mejor el proceso de sus hijos.”
+
+## Transición al problema
+
+> “Cuando un club crece, también crece la necesidad de organizar mejor la información.”
+
+## Definición simple
+
+> “TuDojang es una herramienta que ayuda al club a centralizar información, seguimiento y procesos importantes.”
+
+## Al mostrar la app
+
+> “No vamos a revisar cada botón. Lo importante es entender qué beneficio aporta esta pantalla para las familias.”
+
+## Sobre asistencia
+
+> “Esto permite que el proceso del estudiante tenga mayor trazabilidad.”
+
+## Sobre pagos
+
+> “La idea no es complicar los procesos, sino darles más orden y claridad.”
+
+## Sobre documentos
+
+> “Tener la información centralizada ayuda a evitar reprocesos y confusiones.”
+
+## Sobre confianza
+
+> “La tecnología no es el fin; es el medio para brindar una experiencia más clara y confiable.”
+
+## Cierre
+
+> “TuDojang no reemplaza el trabajo del club; lo fortalece.”
+
+---
+
+# 13. Mini guion completo para decir en la exposición
+
+Este guion puede usarse como base. No debe leerse palabra por palabra, pero sí sirve para preparar el discurso.
+
+---
+
+## Inicio
+
+Buenas noches.
+
+Más que presentarles una aplicación, quiero mostrarles una herramienta que el club ha implementado para organizar mejor la información, el seguimiento y la comunicación con las familias.
+
+La idea de esta presentación es que podamos entender, de forma sencilla, qué es TuDojang, por qué el club lo incorpora y cómo esto puede facilitar la experiencia de los estudiantes y sus acudientes.
+
+---
+
+## Problema actual
+
+A medida que un club crece, también crecen los retos.
+
+La información de los estudiantes, los documentos, las asistencias, los pagos, los eventos y las comunicaciones pueden terminar repartidos entre mensajes, archivos y procesos manuales.
+
+Eso no significa que las cosas se estén haciendo mal. Significa que el club está dando un paso para organizar mejor su operación y brindar una experiencia más clara a las familias.
+
+---
+
+## Presentación de TuDojang
+
+TuDojang es una plataforma diseñada para apoyar la gestión del club.
+
+Permite centralizar información importante del estudiante, organizar documentos, apoyar el seguimiento de clases, llevar trazabilidad de procesos administrativos y facilitar la comunicación.
+
+Lo importante es entender que TuDojang no reemplaza al club ni al trabajo de los instructores. Lo que hace es fortalecer ese trabajo, ayudando a que la información esté más ordenada y sea más fácil de consultar.
+
+---
+
+## Historia guía
+
+Para hacerlo más fácil, imaginemos el recorrido de una familia dentro del club.
+
+Un estudiante inicia o continúa su proceso. El club necesita tener su información organizada, contar con sus documentos, llevar asistencia, hacer seguimiento, administrar pagos o eventos y resolver dudas cuando sea necesario.
+
+Ese recorrido es el que TuDojang busca acompañar.
+
+---
+
+## Información del estudiante
+
+El primer punto importante es la información del estudiante.
+
+En la plataforma se puede centralizar la información básica del estudiante, los datos del acudiente, documentos, autorizaciones y datos relevantes para el proceso.
+
+Esto ayuda a que el club tenga información más clara, disminuya reprocesos y pueda consultar lo necesario de forma más ordenada.
+
+Para las familias, esto significa menos confusión y una mejor experiencia en los procesos administrativos.
+
+---
+
+## Asistencia y seguimiento
+
+Otro punto clave es el seguimiento del proceso.
+
+La plataforma permite apoyar el registro de asistencia, el control de clases y, cuando aplique, la asignación de materiales o recursos de apoyo.
+
+Esto permite que el proceso del estudiante tenga mayor trazabilidad.
+
+El objetivo no es llenar a las familias de información innecesaria, sino que el club pueda acompañar mejor el avance de cada estudiante.
+
+---
+
+## Pagos, eventos y procesos administrativos
+
+TuDojang también ayuda a organizar procesos administrativos relacionados con la actividad del estudiante.
+
+Esto puede incluir mensualidades, eventos, solicitudes o compras relacionadas con el club.
+
+La idea no es complicar la experiencia. Todo lo contrario: se busca tener más claridad, más orden y menos confusión.
+
+---
+
+## Confianza
+
+Al final, el valor principal no está en la tecnología por sí sola.
+
+El valor está en que la información esté mejor organizada, los procesos sean más claros y las familias tengan mayor tranquilidad sobre el acompañamiento que reciben sus hijos.
+
+La tecnología aquí funciona como una herramienta para generar confianza.
+
+---
+
+## Qué sigue
+
+A partir de esta implementación, lo más importante para las familias será estar atentas a las indicaciones del club.
+
+Cuando se solicite, deberán validar o actualizar información, conocer los canales oficiales y familiarizarse poco a poco con la plataforma.
+
+La idea es que este proceso facilite la experiencia, no que la complique.
+
+---
+
+## Cierre
+
+Para cerrar, quiero dejarles esta idea:
+
+TuDojang no reemplaza el trabajo del club; lo fortalece.
+
+Es una herramienta para brindar más orden, más seguimiento y una mejor experiencia para las familias.
+
+Muchas gracias por el espacio. Con gusto atendemos sus preguntas.
+
+---
+
+# 14. Estructura de una diapositiva tipo
+
+Para mantener el diseño limpio, cada diapositiva debería tener:
+
+1. Título corto.
+2. Una frase principal.
+3. Máximo 3 a 5 puntos.
+4. Un elemento visual: ícono, línea de tiempo o captura.
+5. Poco texto.
+
+## Ejemplo
+
+### Título
+
+**Más claridad para las familias**
+
+### Frase
+
+**La información del proceso del estudiante estará mejor organizada.**
+
+### Puntos
+
+- Datos actualizados.
+- Documentos centralizados.
+- Seguimiento más claro.
+- Canales oficiales.
+
+---
+
+# 15. Diseño visual sugerido
+
+## Formato
+
+16:9.
+
+## Estilo
+
+- Limpio.
+- Sencillo.
+- Fácil de leer.
+- Profesional.
+- Con aire suficiente.
+- Sin exceso de texto.
+
+## Colores
+
+Usar los colores de marca de TuDojang:
+
+- Azul principal.
+- Rojo de acento.
+- Blanco o fondo claro.
+- Grises suaves para texto secundario.
+
+## Logo
+
+Ubicar el logo de TuDojang en:
+
+- Portada.
+- Cierre.
+- Opcionalmente en una esquina pequeña de las demás diapositivas.
+
+## Tipografía
+
+Usar una fuente clara, moderna y legible.
+
+Recomendación:
+
+- Títulos grandes.
+- Texto corto.
+- Buen contraste.
+- Nada de párrafos largos.
+
+---
+
+# 16. Estructura recomendada del diseño 16:9 de agenda
+
+Esta pieza puede usarse como diapositiva inicial o como agenda visual.
+
+## Título
+
+**Recorrido de la presentación**
+
+## Subtítulo
+
+**Una mirada rápida a cómo TuDojang acompaña a las familias**
+
+## Bloques sugeridos
+
+| Tema | Tiempo |
+|------|-------:|
+| Contexto y propósito | 2 min |
+| Qué es TuDojang | 2 min |
+| Recorrido de una familia | 4 min |
+| Información, asistencia y seguimiento | 4 min |
+| Pagos, eventos y comunicación | 3 min |
+| Qué sigue y preguntas | 3 min |
+
+## Mensaje inferior
+
+> **Objetivo: entender cómo la plataforma aporta más orden, claridad y confianza al proceso de cada estudiante.**
+
+---
+
+# 17. Preguntas frecuentes posibles y respuestas sugeridas
+
+## ¿Los padres tendrán que usar la plataforma todos los días?
+
+Respuesta sugerida:
+
+> “No necesariamente. La idea es que la plataforma sea un apoyo. El club irá indicando en qué momentos será necesario ingresar, validar información o consultar algún proceso.”
+
+---
+
+## ¿Esto reemplaza la comunicación por WhatsApp?
+
+Respuesta sugerida:
+
+> “No se trata de eliminar todos los canales actuales de un día para otro. La idea es que la comunicación sea cada vez más organizada y que la información importante tenga un lugar claro.”
+
+---
+
+## ¿La información de los estudiantes estará protegida?
+
+Respuesta sugerida:
+
+> “La plataforma está pensada para organizar la información del club y manejarla de forma controlada. Además, cada usuario accede según su rol, por lo que no todos ven la misma información.”
+
+---
+
+## ¿Qué pasa si un padre no sabe usar bien la plataforma?
+
+Respuesta sugerida:
+
+> “El proceso será progresivo. La idea es acompañar a las familias para que puedan familiarizarse con la herramienta poco a poco.”
+
+---
+
+## ¿Los pagos serán obligatoriamente por la plataforma?
+
+Respuesta sugerida:
+
+> “Eso dependerá de las indicaciones del club. La plataforma permite organizar y registrar procesos de pago, pero el club informará claramente cómo se manejará cada caso.”
+
+---
+
+## ¿Qué pasa si mis datos están mal?
+
+Respuesta sugerida:
+
+> “El club indicará el proceso para actualizar o validar información. Justamente uno de los objetivos de TuDojang es tener datos más claros y actualizados.”
+
+---
+
+## ¿Puedo ver todo lo que hace el club en la plataforma?
+
+Respuesta sugerida:
+
+> “No. Cada usuario tiene un acceso según su rol. Los padres ven lo relacionado con su proceso y no las áreas internas de administración del club.”
+
+---
+
+# 18. Checklist antes de presentar
+
+## Contenido
+
+- [ ] Revisar que las diapositivas tengan poco texto.
+- [ ] Confirmar que el mensaje central esté claro.
+- [ ] Evitar tecnicismos.
+- [ ] Preparar respuestas a preguntas frecuentes.
+- [ ] Validar con el club qué funciones quiere mencionar y cuáles no.
+
+## Visuales
+
+- [ ] Usar logo correcto de TuDojang.
+- [ ] Usar colores de marca.
+- [ ] Usar capturas limpias.
+- [ ] Ocultar datos reales de menores.
+- [ ] Usar nombres ficticios.
+- [ ] Revisar que todo se lea bien en videollamada.
+
+## Demostración
+
+- [ ] Tener la plataforma abierta antes de la reunión.
+- [ ] Usar un usuario de prueba.
+- [ ] Tener capturas como respaldo.
+- [ ] No depender solamente de navegación en vivo.
+- [ ] Tener cerradas pestañas innecesarias.
+- [ ] No mostrar datos privados.
+
+## Técnica
+
+- [ ] Probar compartir pantalla.
+- [ ] Revisar conexión.
+- [ ] Revisar micrófono.
+- [ ] Tener presentación en pantalla completa.
+- [ ] Tener respaldo en PDF o imágenes.
+- [ ] Tener la URL lista si se hará mini demo.
+
+---
+
+# 19. Errores que se deben evitar
+
+- Hacer una demo larga.
+- Explicar cada botón.
+- Mostrar funciones que no son relevantes para padres.
+- Mostrar datos reales.
+- Usar lenguaje técnico.
+- Defender demasiado la herramienta.
+- Hablar más de la plataforma que del beneficio.
+- Superar los 20 minutos.
+- Improvisar la navegación.
+- Abrir módulos que no estén listos o que puedan generar dudas innecesarias.
+
+---
+
+# 20. Orden de trabajo para construir la presentación
+
+## Paso 1
+
+Crear las 10 diapositivas base.
+
+## Paso 2
+
+Definir el texto corto de cada diapositiva.
+
+## Paso 3
+
+Tomar las 4 capturas recomendadas de la app.
+
+## Paso 4
+
+Reemplazar cualquier dato real por datos ficticios.
+
+## Paso 5
+
+Insertar capturas en las diapositivas correspondientes.
+
+## Paso 6
+
+Practicar el guion completo con cronómetro.
+
+## Paso 7
+
+Reducir si dura más de 15 minutos.
+
+## Paso 8
+
+Presentar una versión preliminar al responsable del club para aprobación.
+
+---
+
+# 21. Versión corta de la presentación para enviar al club
+
+Esta versión puede enviarse al responsable del club para validar el enfoque.
+
+> La presentación de TuDojang para padres se plantea como una inducción breve, de aproximadamente 15 minutos, enfocada en explicar cómo la plataforma ayuda al club a organizar mejor la información, el seguimiento y la comunicación con las familias.
+>
+> No será una capacitación técnica ni un recorrido completo por todos los módulos. Se presentará como el recorrido de una familia dentro del club: información del estudiante, documentos, asistencia, seguimiento, pagos, eventos y canales de apoyo.
+>
+> Se recomienda usar diapositivas limpias con algunas capturas puntuales de la plataforma, evitando mostrar datos reales o pantallas internas de administración.
+>
+> El mensaje central será: TuDojang no reemplaza el trabajo del club; lo fortalece, aportando más orden, claridad y confianza al proceso de cada estudiante.
+
+---
+
+# 22. Conclusión estratégica
+
+La presentación debe hacer que los padres piensen:
+
+> “Esto no es una app más. Esto puede ayudar a que el proceso de mi hijo esté mejor organizado.”
+
+Ese es el objetivo.
+
+No hay que impresionar con cantidad de funciones.
+
+Hay que generar confianza con claridad, orden y una historia bien contada.
+'''
+
+path = Path("/mnt/data/plan_maestro_presentacion_tudojang_padres.md")
+path.write_text(content, encoding="utf-8")
+print(path.as_posix())

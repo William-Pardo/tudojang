@@ -2,7 +2,7 @@
 // Este archivo es el Service Worker para la Progressive Web App (PWA).
 // Se encarga de gestionar el caché para permitir el funcionamiento offline.
 
-const CACHE_NAME = 'taekwondogajog-gestion-cache-v4-feb16-2026';
+const CACHE_NAME = 'taekwondogajog-gestion-cache-v5-jul15-2026';
 
 // Lista de los recursos fundamentales de la aplicación (el "app shell").
 const APP_SHELL_URLS = [
@@ -59,18 +59,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Fix ruido de consola (2026-07-15): Cache.put() no acepta respuestas "opacas" (cross-origin
+  // sin CORS, p.ej. Firestore/Cloud Functions/fuentes externas) -- intentar cachearlas tiraba
+  // "NetworkError" en cada llamada a la API, sin afectar la respuesta real (que sí se devolvía
+  // bien), pero ensuciando la consola. Ahora solo se cachea same-origin (el app shell).
+  const esMismoOrigen = new URL(request.url).origin === self.location.origin;
+
   // ESTRATEGIA: "Network First" (Red primero, luego caché)
   // Esto asegura que si hay internet, siempre se vea la ULTIMA VERSIÓN.
   // Si falla la red, se usa lo que esté en caché (modo offline).
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        // Si la red responde bien, actualizamos el caché y devolvemos la respuesta.
-        if (networkResponse && networkResponse.status === 200) {
+        // Si la red responde bien y es same-origin, actualizamos el caché.
+        if (esMismoOrigen && networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
+          caches.open(CACHE_NAME)
+            .then((cache) => cache.put(request, responseToCache))
+            .catch(() => { /* no bloquea la respuesta real, solo se salta el cacheo */ });
         }
         return networkResponse;
       })

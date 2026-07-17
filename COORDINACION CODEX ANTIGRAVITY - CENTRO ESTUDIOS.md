@@ -105,11 +105,16 @@ El usuario quiere trabajar en paralelo con tres IA sobre este repo. El bloque Dr
 
 **Zona de Codex (Configuracion / Alertas / Eventos / Administracion) — Claude y Antigravity no deben tocar sin checkpoint explicito de Codex:**
 
-- `vistas/Configuracion.tsx` (confirmado, ya tiene cambios sin commitear).
-- `vistas/EventoPublico.tsx`, `servicios/eventosApi.ts` (candidatos para "Eventos").
-- `vistas/Notificaciones.tsx`, `components/GestionNotificacionesPush.tsx` (candidatos para "Alertas" — no existe ningun archivo llamado literalmente `Alertas.tsx`; Notificaciones es el candidato semantico mas fuerte encontrado por grep el 2026-07-09).
-- `vistas/Administracion.tsx` (confirmado para "Administracion").
-- **Codex debe confirmar o corregir esta lista** en este documento antes de refactorizar, sobre todo si "Alertas" se refiere a otra cosa que no sean las notificaciones push. Este mapa tambien vive en `bitacora.json` -> `coordinacion.mapa_archivos_candidatos_codex`, mantener ambos consistentes.
+| Frente | Archivos | Descripción |
+|---|---|---|
+| **Configuración** | `vistas/Configuracion.tsx` | Gestión de usuarios, sedes, planes SaaS, capacidad del club, notificaciones push. Ya contiene cambios sin commitear. |
+| **Alertas** | `vistas/Notificaciones.tsx`, `components/GestionNotificacionesPush.tsx` | Notificaciones.tsx: historial de notificaciones enviadas, marca leídas. GestionNotificacionesPush: permisos de push, solicitud de tokens. |
+| **Eventos** | `vistas/EventoPublico.tsx`, `servicios/eventosApi.ts` | EventoPublico: vista pública de detalle de evento (sin autenticación, optimizada para conversión). eventosApi: CRUD de eventos, validación de fechas, búsqueda. |
+| **Administración** | `vistas/Administracion.tsx` | Panel principal con tabs: Resumen, Tesorería, Validar Pagos, Agenda, Análisis. |
+
+**Tabla confirmada por Claude el 2026-07-10 tras validar contra código real. Este mapa tambien vive en `bitacora.json` -> `coordinacion.mapa_archivos_candidatos_codex`, ambos mantenidos consistentes.**
+
+**PEDIDO EXPLICITO para Codex (2026-07-12, Claude):** el usuario agrego un campo nuevo `Usuario.permisoEdicionAgenda?: boolean` (`tipos.ts`) que un Admin le otorga a un Asistente/Editor puntual para que pueda editar jornadas de Agenda ajenas (no solo las suyas). El campo y toda la logica de permiso YA estan implementados (frontend: `puedeEditarJornada` en `vistas/admin/MisClasesView.tsx`; backend: `firestore.rules`, regla `update` de `tenants/{tenantId}/jornadas/{jornadaId}`), pero **falta construir el control visual (toggle) en `vistas/Configuracion.tsx`** para que un Admin lo active/desactive desde la gestion de usuarios — esa pantalla es zona exclusiva de Codex, no se toco. Sin ese toggle, el campo solo se puede setear manualmente en Firestore; Asistente/Editor quedan en modo solo-consulta hasta que exista. Ver detalle completo en `CIERRE CENTRO DE ESTUDIOS.md`, seccion 12, registro "Extension posterior al cierre: matriz de roles completa + iconos editar/eliminar en la parrilla" (2026-07-12).
 
 ### Actualizacion 2026-07-09: sandbox de Codex resuelto
 
@@ -654,3 +659,31 @@ Formato:
 - Siguiente responsable:
   - Codex completa la tabla de limites de archivos (Alertas/Administracion) y reporta el error de sandbox textual.
   - Claude continua con 12.8-12.12 de Agenda.
+
+### 2026-07-12 - Claude - Extension posterior al cierre del modulo 12: matriz de roles completa + iconos editar/eliminar en la parrilla de Agenda
+
+- Estado: COMPLETA
+- Archivos modificados (dentro de zona de Claude, ninguno de zona Codex):
+  - `tipos.ts` (campo nuevo `Usuario.permisoEdicionAgenda?: boolean`) — archivo de "alto riesgo compartido", avisado aca segun la tabla de arriba.
+  - `firestore.rules` (regla `update` de `tenants/{tenantId}/jornadas/{jornadaId}` extendida) — idem, archivo de alto riesgo compartido.
+  - `App.tsx` (una linea: gate de ruta `/agenda` +`RolUsuario.Estudiante`) — idem, archivo de alto riesgo compartido.
+  - `vistas/admin/MisClasesView.tsx`, `vistas/admin/AsignacionesView.tsx`, `components/academico/ModalEdicionJornada.tsx`, `vistas/admin/AgendaView.tsx` (+`.test.tsx` de cada uno).
+  - `hooks/academico/useEliminacionJornadaSegura.ts` (nuevo) + `.test.ts` (nuevo).
+  - `functions/test/firestore-rules.behavior.test.js` (+7 tests).
+  - `CIERRE CENTRO DE ESTUDIOS.md`, este documento.
+- Tests ejecutados:
+  - `npx jest` sobre los 5 archivos de test tocados: **153/153 pass**.
+  - `npm run test:firestore-rules`: **47/47 pass**.
+  - `npx tsc --noEmit` filtrado a archivos tocados: sin errores nuevos atribuibles (detalle completo en `CIERRE CENTRO DE ESTUDIOS.md`).
+- Resultado:
+  - Estudiante ahora ve Agenda en modo solo lectura (antes no tenia acceso a la ruta).
+  - Asistente/Editor pueden editar jornadas ajenas SI tienen `permisoEdicionAgenda === true` (nuevo campo en `Usuario`) — logica de permiso y regla de Firestore YA implementadas, falta el toggle de UI (ver **PEDIDO EXPLICITO para Codex** en la seccion "Zona de Codex" de este documento, arriba).
+  - Iconos de editar (lapiz) y eliminar (caneca) agregados al bloque de clase de la parrilla semanal, condicionados a permiso. El icono de eliminar reutiliza el mismo flujo de confirmacion+auditoria que ya tenia el modal (extraido a un hook compartido), pero mantiene la condicion de visibilidad original (`esAdmin`) — no se extendio a Maestro/Asistente-Editor, ver "Decision de alcance" en `CIERRE CENTRO DE ESTUDIOS.md` para el detalle completo de por que.
+- Dependencias desbloqueadas:
+  - Ninguna para Codex/Antigravity directamente, pero el campo `permisoEdicionAgenda` ya esta disponible en `Usuario` para que Codex construya el toggle cuando le sea posible.
+- Dependencias que siguen bloqueadas:
+  - Toggle de `permisoEdicionAgenda` en `Configuracion.tsx`: pendiente de Codex (ver pedido explicito arriba).
+- Riesgos:
+  - Ver "Decision de alcance" y "Riesgos o deuda tecnica" en el registro completo de `CIERRE CENTRO DE ESTUDIOS.md` (seccion 12) — resumen: el icono de eliminar de la parrilla no sigue la matriz completa de edicion a proposito (solo Admin/SuperAdmin), decision conservadora tomada para no contradecir la regla de backend `delete` (sin tocar) ni el test ya cerrado de 12.9 que restringe eliminar a Admin/SuperAdmin.
+- Siguiente responsable:
+  - Codex: construir el toggle de `permisoEdicionAgenda` en `Configuracion.tsx` cuando le sea posible.
