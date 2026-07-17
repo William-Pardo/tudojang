@@ -155,6 +155,9 @@ export interface ConfiguracionClub {
     features?: {
         centroEstudios?: boolean; // Módulo de estudio académico — activación por tenant
     };
+    wompiPaymentSourceId?: number | null;
+    cobroAutomaticoActivo?: boolean;
+    cobroAutomaticoIntentosFallidos?: number; // se resetea a 0 tras un cobro exitoso
 }
 
 export interface Estudiante {
@@ -187,6 +190,7 @@ export interface Estudiante {
     rh?: string;
     direccion?: string;
     barrio?: string;
+    authUid?: string;
     tutor?: {
         nombres: string;
         apellidos: string;
@@ -310,7 +314,11 @@ export enum TipoNotificacion {
     AvisoVencimiento = 'AvisoVencimiento',
     ConfirmacionCompra = 'ConfirmacionCompra',
     ConfirmacionInscripcionEvento = 'ConfirmacionInscripcionEvento',
-    SolicitudCompraAdmin = 'SolicitudCompraAdmin'
+    SolicitudCompraAdmin = 'SolicitudCompraAdmin',
+    // Plan B #2 (fix tutor-role-end-to-end): avance académico (material completado).
+    AvanceAcademico = 'AvanceAcademico',
+    // Plan B #3 (fix tutor-role-end-to-end): evento nuevo con inscripción abierta.
+    EventoNuevo = 'EventoNuevo'
 }
 
 export enum EstadoEntrega {
@@ -391,6 +399,17 @@ export interface Usuario {
         firmado: boolean;
     };
     deletedAt?: string; // Soft delete: fecha de eliminación (ISO string)
+    // Matriz de roles de Agenda (extension posterior al cierre del modulo 12, ver
+    // CIERRE CENTRO DE ESTUDIOS.md): permiso de EDICION de Agenda otorgado por un Admin a
+    // un usuario Asistente/Editor puntual (Admin/SuperAdmin siempre editan todo; Maestro
+    // edita solo su propia clase asignada via instructorId -- ninguno de esos dos casos
+    // necesita este flag). Por defecto false/undefined: Asistente/Editor pueden CONSULTAR
+    // Agenda pero no editar hasta que un Admin active este flag. El control visual/toggle
+    // para que un Admin lo active desde `vistas/Configuracion.tsx` queda PENDIENTE (zona
+    // exclusiva de Codex, ver nota en COORDINACION CODEX ANTIGRAVITY - CENTRO ESTUDIOS.md) --
+    // este campo solo define el dato; la logica de permiso vive en
+    // `puedeEditarJornada` (vistas/admin/MisClasesView.tsx) y en `firestore.rules`.
+    permisoEdicionAgenda?: boolean;
 }
 
 export enum TipoVinculacionColaborador {
@@ -513,101 +532,3 @@ export interface ReportePagoEstudiante {
     fechaValidacion?: string;
 }
 
-// ============================================================================
-// ETAPA 1: AGENDA, PROGRAMA ACADÉMICO Y CLASE EN VIVO
-// Contratos Base (Ref: PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md)
-// ============================================================================
-
-/**
- * Define el contenido reutilizable. No debe representar por sí solo una clase específica.
- */
-export interface ProgramaAcademico {
-    id: string;
-    tenantId: string;
-    nombre: string;
-    descripcion?: string;
-    grupoObjetivo: 'Infantil' | 'Precadetes' | 'Cadetes' | 'Adultos' | 'Todos';
-    gradosIncluidos: string[];
-    fechaInicio: string;
-    fechaFin: string;
-    estado: 'borrador' | 'activo' | 'pausado' | 'cerrado';
-    objetivos: string[];
-    tags: string[];
-    creadoPorUid: string;
-    creadoEn: string;
-    actualizadoEn: string;
-}
-
-export interface HorarioRecurrente {
-    diaSemana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
-    horaInicio: string;
-    horaFin: string;
-}
-
-/**
- * Nueva variable central. Representa la ejecución real de un programa en una sede, horario y maestro.
- */
-export interface CohorteAcademica {
-    id: string;
-    tenantId: string;
-    programaId: string;
-    nombre: string;
-    sedeId: string;
-    espacioId?: string;
-    maestroTitularId: string;
-    grupoOperativo: string;
-    gradosIncluidos: string[];
-    horario: HorarioRecurrente[];
-    fechaInicio: string;
-    fechaFin: string;
-    estado: 'sin_agenda' | 'agenda_generada' | 'en_curso' | 'finalizada' | 'pausada';
-    estudiantesIds?: string[];
-    creadoPorUid: string;
-    creadoEn: string;
-    actualizadoEn: string;
-}
-
-/**
- * Clase específica generada por una cohorte o creada manualmente desde Agenda.
- */
-export interface JornadaAcademica {
-    id: string;
-    tenantId: string;
-    programaId?: string;
-    cohorteId?: string;
-    sedeId: string;
-    espacioId?: string;
-    maestroTitularId: string;
-    maestroEjecutorId: string;
-    grupoOperativo: string;
-    gradosIncluidos: string[];
-    fecha: string;
-    horaInicio: string;
-    horaFin: string;
-    estado: 'programada' | 'confirmada' | 'iniciada' | 'cerrada' | 'cancelada' | 'reprogramada';
-    origen: 'programa' | 'agenda_manual' | 'excepcion';
-    motivoExcepcion?: string;
-    creadoPorUid: string;
-    creadoEn: string;
-    actualizadoEn: string;
-}
-
-/**
- * Registro consolidado de asistencia por alumno por jornada.
- * (Nota Fase 5 de `clase-en-vivo-checkin-trigger-agenda`: `ClaseEnVivo`/`EventoAsistenciaQr`
- * y sus únicos consumidores, `claseEnVivoApi.ts`/`asistenciaQrApi.ts` ["Sistema B", nunca
- * persistió en Firestore], fueron archivados/borrados por quedar reemplazados por el flujo
- * real sobre `JornadaInstruccion` (ver `models/academico/asistencia.ts`). Este tipo
- * permanece porque lo sigue usando `progresoClaseApi.ts`, fuera de alcance de esa fase.)
- */
-export interface AsistenciaJornada {
-    id: string;
-    tenantId: string;
-    jornadaId: string;
-    estudianteId: string;
-    primeraEntradaAt?: string;
-    ultimaSalidaAt?: string;
-    minutosAsistidos: number;
-    estado: 'presente' | 'tarde' | 'parcial' | 'ausente' | 'justificado';
-    actualizadoEn: string;
-}
