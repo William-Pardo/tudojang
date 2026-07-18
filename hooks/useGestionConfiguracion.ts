@@ -7,6 +7,7 @@ import { useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { obtenerLimiteEquipoTecnico } from '../utils/limitesSaas';
+import { DOMINIOS_PASARELAS_PAGO_PERMITIDOS } from '../constantes';
 
 export const useGestionConfiguracion = () => {
     const {
@@ -186,6 +187,27 @@ export const useGestionConfiguracion = () => {
             mostrarNotificacion("Error: Configuración del club no disponible.", "error");
             return;
         }
+
+        // Fix (2026-07-18): el link de pago en línea de la academia es un dato externo
+        // (Payment Link de Wompi/PayU/ePayco de la CUENTA de la academia, no de Tudojang),
+        // por lo que se valida contra la whitelist de pasarelas conocidas antes de persistir.
+        // Tudojang no procesa ese dinero, solo evita guardar/mostrar un link a un dominio
+        // arbitrario. Defensa en profundidad adicional en firestore.rules.
+        const linkPago = localConfigClub.linkPagoMensualidad?.trim();
+        if (linkPago) {
+            let hostnameValido = false;
+            try {
+                const hostname = new URL(linkPago).hostname;
+                hostnameValido = DOMINIOS_PASARELAS_PAGO_PERMITIDOS.includes(hostname);
+            } catch {
+                hostnameValido = false;
+            }
+            if (!hostnameValido) {
+                mostrarNotificacion("El link debe ser de Wompi, PayU o ePayco. Si usás otra pasarela, contactá soporte para agregarla.", "error");
+                return;
+            }
+        }
+
         setCargandoAccion(true);
         try {
             const configNormalizada = {

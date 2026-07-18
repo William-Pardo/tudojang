@@ -215,7 +215,12 @@ const DATOS_TARJETA_INICIAL: DatosTarjetaCobroAutomatico = {
 
 const SeccionCobroAutomatico: React.FC<{
     tenant: ConfiguracionClub,
-    onActivado: (wompiPaymentSourceId: number | null) => void
+    // wompiPaymentSourceId ya no se propaga a ConfiguracionClub (fix seguridad 2026-07-18:
+    // ese campo se movió al subdocumento privado tenants/{tenantId}/privado/facturacion,
+    // fuera del doc principal del tenant que sincroniza el listener de Firestore). El
+    // callable crearFuentePagoWompi lo sigue devolviendo -- es la respuesta directa al mismo
+    // Admin que lo acaba de crear -- pero ya no hay razón para guardarlo en el estado local.
+    onActivado: () => void
 }> = ({ tenant, onActivado }) => {
     const { mostrarNotificacion } = useNotificacion();
     const [formularioAbierto, setFormularioAbierto] = useState(false);
@@ -275,12 +280,12 @@ const SeccionCobroAutomatico: React.FC<{
 
             const token = cuerpoTokenizacion.data.id as string;
 
-            const wompiPaymentSourceId = await crearFuentePagoWompi({ tenantId: tenant.tenantId, token });
+            await crearFuentePagoWompi({ tenantId: tenant.tenantId, token });
 
             setDatosTarjeta(DATOS_TARJETA_INICIAL);
             setFormularioAbierto(false);
             mostrarNotificacion("Cobro automático activado exitosamente.", "success");
-            onActivado(wompiPaymentSourceId);
+            onActivado();
         } catch (error) {
             mostrarNotificacion(
                 error instanceof Error ? error.message : "No se pudo activar el cobro automático.",
@@ -662,6 +667,20 @@ const VistaConfiguracion: React.FC = () => {
                                         <label className="text-[9px] font-black uppercase text-tkd-red block mb-2 ml-1 tracking-widest">Mora Mensual (%)</label>
                                         <input type="number" min="0" name="moraPorcentaje" value={localConfigClub.moraPorcentaje || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="0" />
                                     </div>
+                                </div>
+                                <div className="p-6 bg-sky-50 dark:bg-sky-900/10 rounded-3xl border border-sky-100 dark:border-sky-800/20 space-y-3">
+                                    <label className="text-[10px] font-black uppercase text-sky-700 dark:text-sky-400 tracking-widest">Link de Pago en Línea (Opcional)</label>
+                                    <input
+                                        type="text"
+                                        name="linkPagoMensualidad"
+                                        value={localConfigClub.linkPagoMensualidad || ''}
+                                        onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)}
+                                        className={inputClasses}
+                                        placeholder="https://checkout.wompi.co/l/..."
+                                    />
+                                    <p className="text-[9px] text-gray-400 font-bold italic">
+                                        Pegá acá el link de pago de tu cuenta en Wompi, PayU o ePayco para que tus alumnos puedan pagar en línea. Tudojang no gestiona ni recibe este dinero — ver Términos de Servicio.
+                                    </p>
                                 </div>
                                 <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-800/20 space-y-4">
                                     <div className="flex justify-between items-center">
@@ -1103,12 +1122,11 @@ const VistaConfiguracion: React.FC = () => {
 
                         <SeccionCobroAutomatico
                             tenant={localConfigClub}
-                            onActivado={(wompiPaymentSourceId) => {
+                            onActivado={() => {
                                 setLocalConfigClub(prev => prev ? {
                                     ...prev,
                                     cobroAutomaticoActivo: true,
                                     cobroAutomaticoIntentosFallidos: 0,
-                                    ...(wompiPaymentSourceId != null ? { wompiPaymentSourceId } : {}),
                                 } : prev);
                             }}
                         />

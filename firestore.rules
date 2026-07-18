@@ -85,6 +85,19 @@ service cloud.firestore {
         && isEstudiante();
     }
 
+    // Defensa en profundidad (2026-07-18): linkPagoMensualidad es el Payment Link externo
+    // (Wompi/PayU/ePayco) de la CUENTA de la academia -- Tudojang no procesa ese dinero, pero
+    // igual valida que el dominio pertenezca a una pasarela conocida antes de persistirlo, por
+    // si el frontend fuera bypaseado. La validación real y la whitelist "fuente de verdad"
+    // viven en constantes.ts (DOMINIOS_PASARELAS_PAGO_PERMITIDOS) -- si se agrega/quita una
+    // pasarela ahí, esta regex debe actualizarse manualmente en paralelo (no hay forma de
+    // compartir la lista entre el bundle de frontend y las reglas de Firestore).
+    function linkPagoMensualidadValido() {
+      let link = request.resource.data.get('linkPagoMensualidad', '');
+      return link == ''
+        || link.matches('https://(checkout\\.wompi\\.co|checkout\\.payulatam\\.com|checkout\\.epayco\\.co|secure\\.payco\\.co)/.*');
+    }
+
     // =========================================================================
     // Colecciones existentes
     // =========================================================================
@@ -115,11 +128,25 @@ service cloud.firestore {
         && (currentTenantId() == tenantId || isSuperAdmin());
       allow list: if authenticated();
       allow create, update: if isAdmin()
-        && currentTenantId() == tenantId;
+        && currentTenantId() == tenantId
+        && linkPagoMensualidadValido();
       allow delete: if false;
     }
 
     match /notificaciones_config/{tenantId} {
+      allow read, write: if isAdmin()
+        && currentTenantId() == tenantId;
+    }
+
+    // Datos privados de facturación del tenant (fix seguridad 2026-07-18: wompiPaymentSourceId
+    // vivía en tenants/{tenantId} raíz, donde `allow get` permite a CUALQUIER usuario
+    // autenticado del tenant leerlo -- Instructor/Editor/Asistente/Maestro no tienen por qué
+    // ver el identificador de la fuente de pago Wompi del tenant. Se movió a este subdocumento
+    // con el mismo patrón restrictivo que notificaciones_config/driveConnections: solo
+    // Admin/SuperAdmin del propio tenant. cobroAutomaticoActivo/cobroAutomaticoIntentosFallidos
+    // NO se movieron -- siguen en tenants/{tenantId} porque no son sensibles por sí solos y el
+    // cron diario los necesita en una query directa sobre esa colección.
+    match /tenants/{tenantId}/privado/{docId} {
       allow read, write: if isAdmin()
         && currentTenantId() == tenantId;
     }

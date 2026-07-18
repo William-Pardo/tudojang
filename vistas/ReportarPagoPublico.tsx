@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
 import { obtenerEstudiantePorNumIdentificacion } from '../servicios/estudiantesApi';
 import { reportarPagoEstudiante } from '../servicios/pagosEstudiantesApi';
-import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAprobar, IconoLogoOficial } from '../components/Iconos';
+import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAprobar, IconoLogoOficial, IconoBillete } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
@@ -146,6 +146,23 @@ const ReportarPagoPublico: React.FC = () => {
                                             className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl py-4 px-6 font-black text-2xl text-tkd-blue focus:border-tkd-blue transition-all dark:text-white"
                                         />
                                     </div>
+
+                                    {/* Link de Pago en Línea (Opcional, lo configura la academia) */}
+                                    {tenant?.linkPagoMensualidad && (
+                                        <div className="space-y-2">
+                                            <button
+                                                onClick={() => window.open(tenant.linkPagoMensualidad, '_blank', 'noopener,noreferrer')}
+                                                className="w-full py-6 bg-tkd-blue text-white rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+                                            >
+                                                <IconoBillete className="w-5 h-5" />
+                                                <span>Pagar en Línea</span>
+                                            </button>
+                                            <p className="text-[9px] font-bold text-gray-400 text-center flex items-center justify-center gap-1">
+                                                <IconoInformacion className="w-3 h-3 flex-shrink-0" />
+                                                Después de pagar, subí tu comprobante abajo para que se registre tu pago
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Zona de adjuntar SCREENSHOT (Gran área de clic) */}
                                     <div className="space-y-2">

@@ -155,9 +155,19 @@ export interface ConfiguracionClub {
     features?: {
         centroEstudios?: boolean; // Módulo de estudio académico — activación por tenant
     };
-    wompiPaymentSourceId?: number | null;
     cobroAutomaticoActivo?: boolean;
     cobroAutomaticoIntentosFallidos?: number; // se resetea a 0 tras un cobro exitoso
+    linkPagoMensualidad?: string; // URL de Payment Link externo (Wompi/PayU/ePayco) de la CUENTA de la academia, para que sus alumnos paguen mensualidad en línea. Tudojang no procesa ni recibe este dinero -- ver Términos de Servicio. Debe pertenecer a un dominio de DOMINIOS_PASARELAS_PAGO_PERMITIDOS (constantes.ts).
+}
+
+// Fix seguridad 2026-07-18: wompiPaymentSourceId vivía en ConfiguracionClub (documento
+// tenants/{tenantId} raíz), legible por `allow get` a CUALQUIER usuario autenticado del
+// tenant (Instructor/Editor/Asistente/Maestro incluidos) según firestore.rules. Se movió al
+// subdocumento tenants/{tenantId}/privado/facturacion, acotado a Admin/SuperAdmin. Los otros
+// dos campos de cobro automático (cobroAutomaticoActivo/cobroAutomaticoIntentosFallidos) NO
+// se movieron -- se quedan en ConfiguracionClub porque no son sensibles por sí solos.
+export interface FacturacionPrivadaTenant {
+    wompiPaymentSourceId?: number | null;
 }
 
 export interface Estudiante {

@@ -7,6 +7,7 @@ const {
   crearServicioCrearFuentePagoWompi,
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
+  crearLectorWompiPaymentSourceIdFirestore,
   crearTransaccionRecurrenteWompi,
   calcularMontoMensualPesos,
   calcularMontoMensualCentavos,
@@ -87,15 +88,27 @@ test('construirReferenciaCobroAutomatico: formato compatible con el parsing de w
 
 function crearFirestoreFake(tenantData) {
   const actualizaciones = [];
+  // escriturasPrivado registra los `set` sobre tenants/{tenantId}/privado/facturacion --
+  // fix seguridad 2026-07-18: wompiPaymentSourceId ya no se `update`ea en el doc principal
+  // del tenant, se escribe en este subdocumento restringido a Admin/SuperAdmin.
+  const escriturasPrivado = [];
+  const facturacionDocRef = {
+    set: async (datos, opciones) => escriturasPrivado.push({ datos, opciones }),
+  };
   const tenantRef = {
     get: async () => ({
       exists: tenantData !== null,
       data: () => tenantData,
     }),
     update: async (datos) => actualizaciones.push(datos),
+    collection: (nombre) => {
+      assert.equal(nombre, 'privado');
+      return { doc: (id) => { assert.equal(id, 'facturacion'); return facturacionDocRef; } };
+    },
   };
   return {
     actualizaciones,
+    escriturasPrivado,
     firestore: {
       collection: (nombre) => {
         assert.equal(nombre, 'tenants');
@@ -107,8 +120,8 @@ function crearFirestoreFake(tenantData) {
 
 const AUTH_ADMIN_TNT1 = { uid: 'u1', token: { rol: 'Admin', tenantId: 'tnt-1' } };
 
-test('crearFuentePagoWompi: crea el payment_source y activa el cobro automático del tenant', async (t) => {
-  const { actualizaciones, firestore } = crearFirestoreFake({ emailClub: 'club@test.com' });
+test('crearFuentePagoWompi: crea el payment_source, guarda wompiPaymentSourceId en el subdocumento privado y activa el cobro automático en el doc principal', async (t) => {
+  const { actualizaciones, escriturasPrivado, firestore } = crearFirestoreFake({ emailClub: 'club@test.com' });
 
   t.mock.method(axios, 'get', async (url) => {
     assert.equal(url, 'https://production.wompi.co/v1/merchants/pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB');
@@ -143,8 +156,14 @@ test('crearFuentePagoWompi: crea el payment_source y activa el cobro automático
   );
 
   assert.deepEqual(resultado, { ok: true, wompiPaymentSourceId: 987 });
+  // wompiPaymentSourceId va al subdocumento privado (merge: true porque puede no existir
+  // todavía), y solo cobroAutomaticoActivo/cobroAutomaticoIntentosFallidos van al doc
+  // principal -- ver firestore.rules `match /tenants/{tenantId}/privado/{docId}`.
+  assert.deepEqual(escriturasPrivado, [
+    { datos: { wompiPaymentSourceId: 987 }, opciones: { merge: true } },
+  ]);
   assert.deepEqual(actualizaciones, [
-    { wompiPaymentSourceId: 987, cobroAutomaticoActivo: true, cobroAutomaticoIntentosFallidos: 0 },
+    { cobroAutomaticoActivo: true, cobroAutomaticoIntentosFallidos: 0 },
   ]);
 });
 
@@ -187,7 +206,7 @@ test('crearFuentePagoWompi: rechaza a un usuario del tenant correcto que no es A
 });
 
 test('crearFuentePagoWompi: permite a un SuperAdmin operar sobre cualquier tenant', async (t) => {
-  const { actualizaciones, firestore } = crearFirestoreFake({ emailClub: 'club@test.com' });
+  const { actualizaciones, escriturasPrivado, firestore } = crearFirestoreFake({ emailClub: 'club@test.com' });
 
   t.mock.method(axios, 'get', async () => ({
     data: {
@@ -208,6 +227,9 @@ test('crearFuentePagoWompi: permite a un SuperAdmin operar sobre cualquier tenan
 
   assert.deepEqual(resultado, { ok: true, wompiPaymentSourceId: 555 });
   assert.equal(actualizaciones.length, 1);
+  assert.deepEqual(escriturasPrivado, [
+    { datos: { wompiPaymentSourceId: 555 }, opciones: { merge: true } },
+  ]);
 });
 
 test('crearFuentePagoWompi: rechaza si falta el token de tarjeta', async () => {
@@ -351,16 +373,31 @@ test('crearTransaccionRecurrenteWompi: DECLINED se devuelve tal cual (no es un e
 // crearServicioCobroAutomaticoMensual
 // ---------------------------------------------------------------------------
 
-function crearDepsScheduler({ tenants, resultadoCobro }) {
+function crearDepsScheduler({ tenants, resultadoCobro, wompiPaymentSourceIds }) {
   const actualizaciones = [];
   const correosEnviados = [];
+  const llamadasObtenerPaymentSourceId = [];
   const docs = tenants.map((tenant) => ({
     id: tenant.id,
     data: () => tenant,
   }));
 
+  // Fix seguridad 2026-07-18: wompiPaymentSourceId ya no vive en el doc principal del
+  // tenant, así que el servicio lo obtiene vía una función inyectada aparte (simula el
+  // subdocumento tenants/{tenantId}/privado/facturacion). Por defecto, estos tests siguen
+  // usando `tenant.wompiPaymentSourceId` del fixture como la fuente de ese mapa -- es solo
+  // el dato de prueba, no una lectura real del doc principal -- salvo que el test pase
+  // `wompiPaymentSourceIds` explícito para simular un subdocumento distinto o faltante.
+  const mapaPaymentSourceIds =
+    wompiPaymentSourceIds ||
+    Object.fromEntries(tenants.map((t) => [t.id, t.wompiPaymentSourceId ?? null]));
+
   const deps = {
     listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async (tenantId) => {
+      llamadasObtenerPaymentSourceId.push(tenantId);
+      return mapaPaymentSourceIds[tenantId] ?? null;
+    },
     crearTransaccionWompi:
       typeof resultadoCobro === 'function' ? resultadoCobro : async () => resultadoCobro,
     actualizarTenant: async (tenantId, datos) => actualizaciones.push({ tenantId, datos }),
@@ -368,7 +405,7 @@ function crearDepsScheduler({ tenants, resultadoCobro }) {
     enviarCorreoFalloPago: async (tenant) => correosEnviados.push(tenant.id),
   };
 
-  return { deps, actualizaciones, correosEnviados };
+  return { deps, actualizaciones, correosEnviados, llamadasObtenerPaymentSourceId };
 }
 
 test('cobroAutomaticoMensual: un cobro APPROVED no toca Firestore (lo reconcilia el webhook)', async () => {
@@ -465,6 +502,8 @@ test('cobroAutomaticoMensual: si crearTransaccionWompi lanza en vez de resolver,
 
   const servicio = crearServicioCobroAutomaticoMensual({
     listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async (tenantId) =>
+      tenants.find((t) => t.id === tenantId)?.wompiPaymentSourceId ?? null,
     crearTransaccionWompi: async ({ paymentSourceId }) => {
       if (paymentSourceId === 1) throw new Error('fallo inesperado de red');
       return { estado: 'DECLINED', mensaje: 'fondos insuficientes' };
@@ -493,6 +532,8 @@ test('cobroAutomaticoMensual: si actualizarTenant rechaza inesperadamente para u
 
   const servicio = crearServicioCobroAutomaticoMensual({
     listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async (tenantId) =>
+      tenants.find((t) => t.id === tenantId)?.wompiPaymentSourceId ?? null,
     crearTransaccionWompi: async () => ({ estado: 'DECLINED', mensaje: 'fondos insuficientes' }),
     actualizarTenant: async (tenantId, datos) => {
       if (tenantId === 'tnt-1') throw new Error('Firestore no disponible');
@@ -509,6 +550,60 @@ test('cobroAutomaticoMensual: si actualizarTenant rechaza inesperadamente para u
   // tnt-2 llegó a escribir en Firestore -- tnt-1 se reintenta mañana sin que el proceso truene.
   assert.equal(resultado.fallidos, 2);
   assert.deepEqual(actualizaciones.map((a) => a.tenantId), ['tnt-2']);
+});
+
+test('cobroAutomaticoMensual: lee wompiPaymentSourceId del subdocumento privado inyectado, no del doc principal del tenant', async () => {
+  // El fixture del tenant deliberadamente NO trae wompiPaymentSourceId -- si el servicio
+  // intentara leerlo de `tenant.wompiPaymentSourceId` (doc principal, como hacía antes del
+  // fix de seguridad 2026-07-18), fallaría con undefined y el tenant se omitiría. Este test
+  // prueba que en cambio se usa exclusivamente `obtenerWompiPaymentSourceId`.
+  const tenants = [
+    { id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
+  ];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+  const llamadasPaymentSourceId = [];
+  let paymentSourceIdUsado = null;
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async (tenantId) => {
+      llamadasPaymentSourceId.push(tenantId);
+      return 42; // simula tenants/{tenantId}/privado/facturacion.wompiPaymentSourceId
+    },
+    crearTransaccionWompi: async ({ paymentSourceId }) => {
+      paymentSourceIdUsado = paymentSourceId;
+      return { estado: 'APPROVED', transactionId: 'txn-1' };
+    },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  const resultado = await servicio(new Date());
+
+  assert.deepEqual(llamadasPaymentSourceId, ['tnt-1']);
+  assert.equal(paymentSourceIdUsado, 42);
+  assert.deepEqual(resultado, { procesados: 1, exitosos: 1, fallidos: 0, suspendidos: 0 });
+});
+
+test('cobroAutomaticoMensual: si el subdocumento privado no existe o no tiene wompiPaymentSourceId, se omite igual que un tenant sin fuente de pago', async () => {
+  let llamadas = 0;
+  const tenants = [{ id: 'tnt-1', plan: 'starter', emailClub: 'a@a.com' }];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async () => null, // subdocumento inexistente o sin el campo
+    crearTransaccionWompi: async () => { llamadas += 1; return { estado: 'APPROVED' }; },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  const resultado = await servicio(new Date());
+
+  assert.equal(llamadas, 0);
+  assert.deepEqual(resultado, { procesados: 1, exitosos: 0, fallidos: 0, suspendidos: 0 });
 });
 
 // ---------------------------------------------------------------------------
@@ -583,4 +678,71 @@ test('crearListadoTenantsPendientesDeCobroFirestore: incluye tenants vencidos co
   const resultado = await listar(ahora);
 
   assert.deepEqual(resultado.map((d) => d.id).sort(), ['vencido-string', 'vencido-timestamp']);
+});
+
+// ---------------------------------------------------------------------------
+// crearLectorWompiPaymentSourceIdFirestore
+//
+// Fix seguridad 2026-07-18: wompiPaymentSourceId se movió de tenants/{tenantId} raíz a
+// tenants/{tenantId}/privado/facturacion (ver firestore.rules), porque el doc principal es
+// legible por `allow get` para cualquier usuario autenticado del tenant.
+// ---------------------------------------------------------------------------
+
+test('crearLectorWompiPaymentSourceIdFirestore: lee wompiPaymentSourceId de tenants/{tenantId}/privado/facturacion', async () => {
+  const rutasConsultadas = [];
+  const firestoreFake = {
+    collection: (nombre) => {
+      assert.equal(nombre, 'tenants');
+      return {
+        doc: (tenantId) => ({
+          collection: (sub) => {
+            assert.equal(sub, 'privado');
+            return {
+              doc: (docId) => {
+                assert.equal(docId, 'facturacion');
+                rutasConsultadas.push(`${tenantId}/privado/${docId}`);
+                return { get: async () => ({ exists: true, data: () => ({ wompiPaymentSourceId: 987 }) }) };
+              },
+            };
+          },
+        }),
+      };
+    },
+  };
+
+  const obtener = crearLectorWompiPaymentSourceIdFirestore(firestoreFake);
+  const resultado = await obtener('tnt-1');
+
+  assert.equal(resultado, 987);
+  assert.deepEqual(rutasConsultadas, ['tnt-1/privado/facturacion']);
+});
+
+test('crearLectorWompiPaymentSourceIdFirestore: devuelve null si el subdocumento no existe', async () => {
+  const firestoreFake = {
+    collection: () => ({
+      doc: () => ({
+        collection: () => ({
+          doc: () => ({ get: async () => ({ exists: false, data: () => undefined }) }),
+        }),
+      }),
+    }),
+  };
+
+  const obtener = crearLectorWompiPaymentSourceIdFirestore(firestoreFake);
+  assert.equal(await obtener('tnt-1'), null);
+});
+
+test('crearLectorWompiPaymentSourceIdFirestore: devuelve null si el subdocumento existe pero no tiene el campo', async () => {
+  const firestoreFake = {
+    collection: () => ({
+      doc: () => ({
+        collection: () => ({
+          doc: () => ({ get: async () => ({ exists: true, data: () => ({}) }) }),
+        }),
+      }),
+    }),
+  };
+
+  const obtener = crearLectorWompiPaymentSourceIdFirestore(firestoreFake);
+  assert.equal(await obtener('tnt-1'), null);
 });

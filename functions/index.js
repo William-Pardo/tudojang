@@ -12,6 +12,7 @@ const {
   crearServicioCrearFuentePagoWompi,
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
+  crearLectorWompiPaymentSourceIdFirestore,
   crearTransaccionRecurrenteWompi,
 } = require("./wompiCobroAutomatico");
 const {
@@ -943,12 +944,18 @@ const construirHtmlFalloCobroAutomatico = (nombreClub) => `
 const listarTenantsPendientesDeCobroFirestore = crearListadoTenantsPendientesDeCobroFirestore(
   admin.firestore()
 );
+const obtenerWompiPaymentSourceIdFirestore = crearLectorWompiPaymentSourceIdFirestore(
+  admin.firestore()
+);
 const servicioCobroAutomaticoMensual = crearServicioCobroAutomaticoMensual({
   // listarTenantsPendientesDeCobroFirestore ya filtra en memoria por fechaVencimiento
   // (normalizarFecha soporta tanto Timestamp -- como la escribe webhookWompi -- como
   // string 'YYYY-MM-DD' -- como la escribe el frontend al crear el tenant -- así que le
   // pasamos `ahora` tal cual, sin envolverlo en Timestamp).
   listarTenantsPendientesDeCobro: (ahora) => listarTenantsPendientesDeCobroFirestore(ahora),
+  // wompiPaymentSourceId ya no vive en tenants/{tenantId} raíz (fix seguridad 2026-07-18) --
+  // se lee del subdocumento privado tenants/{tenantId}/privado/facturacion.
+  obtenerWompiPaymentSourceId: (tenantId) => obtenerWompiPaymentSourceIdFirestore(tenantId),
   crearTransaccionWompi: (args) =>
     crearTransaccionRecurrenteWompi({ ...args, wompiPrivateKey: process.env.WOMPI_PRIVATE_KEY }),
   actualizarTenant: (tenantId, datos) =>

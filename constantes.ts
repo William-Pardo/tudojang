@@ -136,3 +136,18 @@ export const CONFIGURACION_WOMPI = {
     webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
 };
 
+// Whitelist deliberadamente acotada a las pasarelas de pago colombianas más comunes.
+// Se usa para validar el Payment Link externo que cada academia configura para que sus
+// alumnos paguen mensualidad (ver ConfiguracionClub.linkPagoMensualidad en tipos.ts).
+// Tudojang NO procesa ni recibe ese dinero -- solo valida que el link apunte a una
+// pasarela conocida antes de mostrarlo al alumno. Para sumar una pasarela nueva alcanza
+// con agregar su dominio de checkout acá, sin tocar el resto del código.
+// IMPORTANTE: si se modifica esta lista, sincronizar también la regex de firestore.rules
+// (match /tenants/{tenantId}, validación de linkPagoMensualidad).
+export const DOMINIOS_PASARELAS_PAGO_PERMITIDOS = [
+    'checkout.wompi.co',
+    'checkout.payulatam.com',
+    'checkout.epayco.co',
+    'secure.payco.co',
+];
+

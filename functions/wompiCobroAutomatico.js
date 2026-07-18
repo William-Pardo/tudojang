@@ -208,8 +208,17 @@ function crearServicioCrearFuentePagoWompi({ firestore, wompiPrivateKey }) {
       throw crearError('internal', 'Wompi no devolvió un identificador de fuente de pago válido');
     }
 
+    // wompiPaymentSourceId vive en el subdocumento privado (no en tenants/{tenantId} raíz)
+    // porque ese doc principal es legible por `allow get` a cualquier usuario autenticado del
+    // tenant (Instructor/Editor/Asistente/Maestro incluidos) -- ver firestore.rules
+    // `match /tenants/{tenantId}/privado/{docId}`, acotado a Admin/SuperAdmin. `merge: true`
+    // porque el subdocumento puede no existir todavía (primera vez que este tenant activa
+    // cobro automático).
+    await tenantRef.collection('privado').doc('facturacion').set(
+      { wompiPaymentSourceId: paymentSourceId },
+      { merge: true }
+    );
     await tenantRef.update({
-      wompiPaymentSourceId: paymentSourceId,
       cobroAutomaticoActivo: true,
       cobroAutomaticoIntentosFallidos: 0,
     });
@@ -263,6 +272,7 @@ async function crearTransaccionRecurrenteWompi({
  */
 function crearServicioCobroAutomaticoMensual({
   listarTenantsPendientesDeCobro,
+  obtenerWompiPaymentSourceId,
   crearTransaccionWompi,
   actualizarTenant,
   incrementarUno,
@@ -281,7 +291,12 @@ function crearServicioCobroAutomaticoMensual({
       const tenant = doc.data();
 
       try {
-        if (!tenant?.wompiPaymentSourceId) {
+        // wompiPaymentSourceId ya no vive en el doc principal del tenant (fix seguridad
+        // 2026-07-18, ver firestore.rules) -- se lee del subdocumento privado
+        // tenants/{tenantId}/privado/facturacion. Un tenant sin subdocumento/campo se trata
+        // igual que antes: se omite con el mismo log de advertencia.
+        const wompiPaymentSourceId = await obtenerWompiPaymentSourceId(tenantId);
+        if (!wompiPaymentSourceId) {
           console.error(
             `[cobroAutomaticoMensual] Tenant ${tenantId} tiene cobroAutomaticoActivo pero no tiene wompiPaymentSourceId; se omite.`
           );
@@ -301,7 +316,7 @@ function crearServicioCobroAutomaticoMensual({
             amountInCents,
             reference,
             customerEmail: tenant.emailClub,
-            paymentSourceId: tenant.wompiPaymentSourceId,
+            paymentSourceId: wompiPaymentSourceId,
           });
         } catch (error) {
           resultado = { estado: 'ERROR', mensaje: error?.message };
@@ -380,10 +395,28 @@ function crearListadoTenantsPendientesDeCobroFirestore(firestore) {
   };
 }
 
+// Lee wompiPaymentSourceId del subdocumento privado (fix seguridad 2026-07-18: ver
+// firestore.rules `match /tenants/{tenantId}/privado/{docId}`). Devuelve null tanto si el
+// subdocumento no existe como si existe pero no tiene el campo -- ambos casos los trata
+// cobroAutomaticoMensual igual que un tenant sin fuente de pago configurada.
+function crearLectorWompiPaymentSourceIdFirestore(firestore) {
+  return async function obtenerWompiPaymentSourceId(tenantId) {
+    const snapshot = await firestore
+      .collection('tenants')
+      .doc(tenantId)
+      .collection('privado')
+      .doc('facturacion')
+      .get();
+
+    return snapshot.exists ? snapshot.data()?.wompiPaymentSourceId ?? null : null;
+  };
+}
+
 module.exports = {
   crearServicioCrearFuentePagoWompi,
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
+  crearLectorWompiPaymentSourceIdFirestore,
   crearTransaccionRecurrenteWompi,
   calcularMontoMensualPesos,
   calcularMontoMensualCentavos,
