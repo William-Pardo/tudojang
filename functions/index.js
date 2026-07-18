@@ -90,6 +90,10 @@ const {
   crearServicioRecordatoriosPago,
 } = require("./academico/recordatoriosPago");
 const {
+  crearServicioRecordatoriosEstudio,
+} = require("./academico/recordatoriosEstudio");
+const { aplicaAlEstudiante } = require("./academico/destinatarioAsignacion");
+const {
   crearServicioNotificarEventoNuevo,
 } = require("./academico/notificarEvento");
 const {
@@ -394,8 +398,11 @@ const servicioIniciarJornadasPorHorario = crearServicioIniciarJornadasPorHorario
   listarJornadasConfirmadas: crearListadoJornadasConfirmadasFirestore(admin.firestore())
 });
 
+// Compartida entre vencerAsignaciones y recordatoriosEstudio (mismo collectionGroup query).
+const listarAsignacionesPublicadasFirestore = crearListadoAsignacionesFirestore(admin.firestore());
+
 const servicioVencerAsignaciones = crearServicioVencerAsignaciones({
-  listarAsignacionesPublicadas: crearListadoAsignacionesFirestore(admin.firestore())
+  listarAsignacionesPublicadas: listarAsignacionesPublicadasFirestore,
 });
 
 const servicioCrearFuentePagoWompi = crearServicioCrearFuentePagoWompi({
@@ -419,6 +426,60 @@ const servicioRecordatoriosPago = crearServicioRecordatoriosPago({
   crearNotificacion: async (n) => {
     await admin.firestore().collection("historialNotificaciones").add(n);
   },
+});
+
+// Recordatorios de estudio: nudges a estudiantes/tutores cuando una asignacion esta por
+// vencer sin terminar, recien se publico, o el estudiante lleva mucho sin actividad (ver
+// functions/academico/recordatoriosEstudio.js). Reusa listarAsignacionesPublicadasFirestore
+// (mismo collectionGroup('asignaciones') que ya usa vencerAsignaciones mas abajo) en vez de
+// inventar una query nueva. Historial de recordatorios previos: una sola query por
+// estudiante (single-field, auto-indexado), filtrando tipo/situacion/asignacion en memoria
+// -- mismo criterio que el resto de este archivo, para no depender de indices compuestos.
+async function buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion) {
+  const snap = await admin.firestore()
+    .collection("historialNotificaciones")
+    .where("estudianteId", "==", estudianteId)
+    .get();
+
+  let masReciente = null;
+  for (const doc of snap.docs) {
+    const n = doc.data();
+    if (n.tipo !== "RecordatorioEstudio") continue;
+    if (n.situacion !== situacion) continue;
+    if ((n.asignacionId || null) !== (asignacionId || null)) continue;
+    if (!masReciente || n.fecha > masReciente.fecha) masReciente = n;
+  }
+  return masReciente;
+}
+
+const servicioRecordatoriosEstudio = crearServicioRecordatoriosEstudio({
+  listarAsignacionesVigentes: async () => {
+    const snaps = await listarAsignacionesPublicadasFirestore();
+    return snaps.map((s) => ({ id: s.id, ...s.data() }));
+  },
+  listarEstudiantesActivos: async () => {
+    const snap = await admin.firestore().collection("estudiantes").get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+  obtenerAvancePorAsignacion: async (tenantId, estudianteId) => {
+    const doc = await admin.firestore()
+      .collection("tenants").doc(tenantId)
+      .collection("metricasEstudiante").doc(estudianteId)
+      .get();
+    return doc.exists ? (doc.data().avancePorAsignacion || []) : [];
+  },
+  obtenerFechaUltimoRecordatorio: async (estudianteId, asignacionId, situacion) => {
+    const n = await buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion);
+    return n ? n.fecha : undefined;
+  },
+  obtenerUltimoComentario: async (situacion, estudianteId, asignacionId) => {
+    const n = await buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion);
+    return n ? n.mensaje : undefined;
+  },
+  crearNotificacion: async (n) => {
+    await admin.firestore().collection("historialNotificaciones").add(n);
+  },
+  aplicaAlEstudiante,
 });
 
 // Plan B #3: al crear un evento, notificar a los estudiantes del tenant (fix tutor-role-end-to-end).
@@ -603,6 +664,14 @@ exports.recordatoriosPagoDiarios = functionsV1.pubsub
   .schedule("every day 08:00")
   .timeZone("America/Bogota")
   .onRun(async () => servicioRecordatoriosPago(new Date()));
+
+// Recordatorios de estudio diarios al buzón de estudiantes/tutores (ver
+// functions/academico/recordatoriosEstudio.js). Misma cadencia que recordatoriosPagoDiarios;
+// el cooldown por situacion (24h/una vez/7 dias) evita que se repita el mismo aviso a diario.
+exports.recordatoriosEstudioDiarios = functionsV1.pubsub
+  .schedule("every day 08:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioRecordatoriosEstudio(new Date()));
 
 // Plan B #3 (fix tutor-role-end-to-end): trigger al crear un evento -> notifica al buzón de los
 // estudiantes del tenant (con inscripción abierta). Try/catch para no fallar la creación del evento.

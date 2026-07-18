@@ -1,14 +1,12 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
+import type { PreguntaQuiz } from '../../models/academico/quiz';
 import { progresoRepository, type FirestoreProgressRepository, type ProgresoRepository } from '../../servicios/academico/progresoRepository';
 import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
-export interface PreguntaQuiz {
-  id: string;
-  enunciado: string;
-  opciones: string[];
-  respuestaCorrecta: string;
-}
+// Re-exportado por compatibilidad -- la definición canónica vive en models/academico/quiz.ts
+// (QuizEditorModal y quizService también la usan y no pueden depender de components/).
+export type { PreguntaQuiz };
 
 export interface ResultadoQuiz {
   puntaje: number;

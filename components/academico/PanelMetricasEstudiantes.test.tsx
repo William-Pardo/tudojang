@@ -2,7 +2,7 @@
 // Tests del componente PanelMetricasEstudiantes.
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import PanelMetricasEstudiantes from './PanelMetricasEstudiantes';
 import * as actividadServiceModule from '../../servicios/academico/actividadService';
 import type { MetricasEstudiante } from '../../models/academico/actividad';
@@ -63,10 +63,50 @@ jest.mock('firebase/functions', () => ({
   httpsCallable: jest.fn(() => mockCallableDemo),
 }));
 
+jest.mock('../../context/DataContext', () => ({
+  useEstudiantes: () => ({
+    estudiantes: [
+      { id: 'est-A', grado: 'Amarillo' },
+      { id: 'est-B', grado: 'Blanco' },
+    ],
+  }),
+}));
+
+// a1 (Video 1) es de "Programa Infantil" y la comparten ambos estudiantes; a2 (Quiz 1)
+// es de "Programa Competencia" y solo la tiene Ana; a3 (PDF) no tiene jornadaId (material
+// asignado directo, sin programa resoluble) -- caso real documentado en
+// analisisProgresoService.ts.
+jest.mock('../../servicios/academico/asignacionService', () => ({
+  listarAsignacionesPorTenant: jest.fn().mockResolvedValue([
+    { id: 'a1', jornadaId: 'j1', fechaApertura: '2026-07-01T08:00:00Z' },
+    { id: 'a2', jornadaId: 'j2', fechaApertura: '2026-07-02T08:00:00Z' },
+    { id: 'a3', fechaApertura: '2026-07-03T08:00:00Z' },
+  ]),
+}));
+jest.mock('../../servicios/academico/jornadaRepository', () => ({
+  jornadaRepository: {
+    listarJornadasPorTenant: jest.fn().mockResolvedValue([
+      { id: 'j1', programaId: 'prog-infantil' },
+      { id: 'j2', programaId: 'prog-competencia' },
+    ]),
+  },
+}));
+jest.mock('../../servicios/academico/programaRepository', () => ({
+  programaRepository: {
+    listarProgramasPorTenant: jest.fn().mockResolvedValue([
+      { id: 'prog-infantil', nombre: 'Programa Infantil' },
+      { id: 'prog-competencia', nombre: 'Programa Competencia' },
+    ]),
+  },
+}));
+
 beforeEach(() => {
   jest.clearAllMocks();
   (actividadServiceModule.actividadService.obtenerMetricas as jest.Mock).mockResolvedValue({
     metricas: metricasDemo,
+  });
+  (actividadServiceModule.actividadService.obtenerActividades as jest.Mock).mockResolvedValue({
+    logs: [],
   });
 });
 
@@ -84,12 +124,21 @@ describe('PanelMetricasEstudiantes', () => {
     });
   });
 
-  it('muestra KPIs de resumen correctos', async () => {
+  it('muestra los 5 KPIs de resumen correctos', async () => {
     render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
-    await waitFor(() => {
-      // 2 estudiantes total
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
+    await waitFor(() => screen.getByText('Ana García'));
+
+    const resumen = screen.getByLabelText('Resumen de métricas');
+    // Total: 2 estudiantes (Ana + Bruno)
+    expect(within(resumen).getByText('2')).toBeInTheDocument();
+    // Al día (>=80%): solo Ana (90%)
+    expect(within(resumen).getByText('1')).toBeInTheDocument();
+    // Sin iniciar: ninguno (ambas ya iniciaron al menos una asignación)
+    expect(within(resumen).getByText('0')).toBeInTheDocument();
+    // Atraso: Bruno inició (1 asignación) pero su consumo global (20%) es < 40% -> 1 de 2 = 50%
+    expect(within(resumen).getByText('50%')).toBeInTheDocument();
+    // Avance de estudio: promedio de consumo global (90 + 20) / 2 = 55%
+    expect(within(resumen).getByText('55%')).toBeInTheDocument();
   });
 
   it('filtra estudiantes por búsqueda de nombre', async () => {
@@ -107,7 +156,8 @@ describe('PanelMetricasEstudiantes', () => {
     render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
     await waitFor(() => screen.getByText('Ana García'));
 
-    const select = screen.getByRole('combobox');
+    // Ahora hay 2 selects (estado y programa) -- se escopea por label para no ambiguar.
+    const select = screen.getByLabelText('Filtrar por estado de progreso');
     fireEvent.change(select, { target: { value: 'al_dia' } });
 
     expect(screen.getByText('Ana García')).toBeInTheDocument();
@@ -144,6 +194,52 @@ describe('PanelMetricasEstudiantes', () => {
     });
   });
 
+  describe('filtro por programa', () => {
+    it('muestra el selector de programa con los programas que tienen asignaciones reales', async () => {
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+
+      const select = await screen.findByLabelText('Filtrar por programa');
+      expect(within(select).getByText('Programa Infantil')).toBeInTheDocument();
+      expect(within(select).getByText('Programa Competencia')).toBeInTheDocument();
+    });
+
+    it('al filtrar por un programa, recalcula los números del estudiante solo con esas asignaciones', async () => {
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+
+      const select = await screen.findByLabelText('Filtrar por programa');
+      fireEvent.change(select, { target: { value: 'prog-infantil' } });
+
+      // Ambos estudiantes tienen a1 (Video 1, Programa Infantil) -> ambos siguen apareciendo.
+      await waitFor(() => {
+        expect(screen.getByText('Ana García')).toBeInTheDocument();
+        expect(screen.getByText('Bruno López')).toBeInTheDocument();
+      });
+
+      // Ana, recortada a Programa Infantil, pasa de 90% (promedio de sus 3 asignaciones)
+      // a 100% (solo cuenta su Video 1, que está al 100%) -- se verifica en SU fila, no
+      // en el resumen general del panel.
+      const filaAna = screen.getByLabelText('Progreso académico de Ana García');
+      expect(within(filaAna).getByText('100%')).toBeInTheDocument();
+    });
+
+    it('un programa sin asignaciones para un estudiante lo excluye de la lista filtrada', async () => {
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+
+      const select = await screen.findByLabelText('Filtrar por programa');
+      fireEvent.change(select, { target: { value: 'prog-competencia' } });
+
+      // Solo Ana tiene a2 (Quiz 1, Programa Competencia); Bruno no tiene ninguna asignación
+      // de ese programa y debe desaparecer de la lista.
+      await waitFor(() => {
+        expect(screen.getByText('Ana García')).toBeInTheDocument();
+        expect(screen.queryByText('Bruno López')).not.toBeInTheDocument();
+      });
+    });
+  });
+
   it('muestra badge de estado "Al día" para estudiante con consumo >= 80%', async () => {
     render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
     await waitFor(() => screen.getByText('Ana García'));
@@ -156,6 +252,38 @@ describe('PanelMetricasEstudiantes', () => {
     await waitFor(() => screen.getByText('Bruno López'));
     // 'Atrasado' aparece en el badge Y en la opción del select
     expect(screen.getAllByText('Atrasado').length).toBeGreaterThanOrEqual(1);
+  });
+
+  describe('vista Por Horario', () => {
+    it('al hacer click en "Por Horario" carga los logs y muestra el panel de patrones', async () => {
+      (actividadServiceModule.actividadService.obtenerActividades as jest.Mock).mockResolvedValue({
+        logs: [
+          {
+            id: 'log-1',
+            tenantId: 'tenant-1',
+            estudianteId: 'est-A',
+            asignacionId: 'a1',
+            recursoId: 'r1',
+            tipo: 'video',
+            metadata: { porcentajeVisto: 100 },
+            registradoEn: '2026-07-20T18:00:00Z',
+          },
+        ],
+      });
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+
+      fireEvent.click(screen.getByText('Por Horario'));
+
+      await waitFor(() => expect(actividadServiceModule.actividadService.obtenerActividades).toHaveBeenCalledWith({ tenantId: 'tenant-1' }));
+      expect(await screen.findByLabelText('Resumen de patrones de horario')).toBeInTheDocument();
+    });
+
+    it('no llama a obtenerActividades hasta que se selecciona la pestaña "Por Horario"', async () => {
+      render(<PanelMetricasEstudiantes tenantId="tenant-1" />);
+      await waitFor(() => screen.getByText('Ana García'));
+      expect(actividadServiceModule.actividadService.obtenerActividades).not.toHaveBeenCalled();
+    });
   });
 
   describe('datos demo', () => {
