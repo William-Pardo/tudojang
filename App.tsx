@@ -40,6 +40,7 @@ import VistaMasterDashboard from './vistas/MasterDashboard';
 import LicenciaSuspendida from './vistas/LicenciaSuspendida';
 import { useEstadoLicencia } from './hooks/useEstadoLicencia';
 import { useVentanaClaseEnVivo } from './hooks/useVentanaClaseEnVivo';
+import { driveService } from './services/storage/driveService';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
@@ -288,10 +289,85 @@ const AppLayout: React.FC = () => {
     );
 };
 
+// Extraída como función pura exportada (antes vivía inline en el JSX de la ruta "/")
+// para que App.routing.test.ts pueda testearla sin renderizar todo el árbol de rutas.
+// Fix tutor-role-end-to-end (2026-07-14) + fix Estudiante (línea de uso más abajo):
+// Tutor/Estudiante (consultores) van a Centro de Estudios como inicio operativo en vez
+// de VistaAdministracion (pantalla de gestión de staff que no deberían ver).
+export function obtenerRutaInicioUsuario(usuario: { rol?: RolUsuario } | null | undefined): string {
+    if (usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante) {
+        return '/centro-estudios';
+    }
+    return '/';
+}
+
+// --- Callback OAuth de Google Drive -------------------------------------------------
+// Reconstruido 2026-07-21: el manejo del callback OAuth de Drive vivía en App.tsx en
+// junio (funciones construirUrlCallbackDrive/obtenerCodigoCallbackDrive, ver
+// docs/DEBUG_DRIVE_OAUTH_CENTRO_ESTUDIOS.md) pero se perdió sin commitear entre sesiones
+// concurrentes Claude/Codex. Efecto: BibliotecaView INICIA la conexión (iniciarConexionOAuth
+// -> redirect a Google) pero NADIE procesaba la vuelta con el `code`, así que la conexión
+// nunca se completaba y quedaba en silencio. Este es el único responsable del callback:
+// BibliotecaView ya NO lo procesa localmente (solo lee el resultado en localStorage), para
+// no consumir dos veces el `code` (los códigos OAuth de Google son de un solo uso).
+export const DRIVE_OAUTH_RETURN_PATH_KEY = 'tudojang:driveOAuthReturnPath';
+
+export interface CallbackDriveParams {
+    code: string | null;
+    error: string | null;
+    /** `state` de OAuth: connectDrive lo setea al tenantId (ver functions/academico/drive.js). */
+    state: string;
+}
+
+// Extrae los parámetros del callback OAuth de Drive tanto del query string real
+// (`https://tudojang.com/?state=..&code=..`, que es donde aterriza Google porque el
+// redirect_uri registrado es la raíz) como de un query embebido en el hash
+// (`#/centro-estudios?state=..&code=..`). Devuelve null si no es un callback de Drive.
+// Un callback válido siempre trae `state` (tenantId) + `code` (éxito) o `error` (rechazo).
+export function extraerCallbackDrive(search: string, hash: string): CallbackDriveParams | null {
+    const fuentes: string[] = [];
+    if (search && search.includes('=')) fuentes.push(search);
+    if (hash) {
+        const indicePregunta = hash.indexOf('?');
+        if (indicePregunta >= 0) fuentes.push(hash.slice(indicePregunta));
+    }
+
+    for (const fuente of fuentes) {
+        const query = fuente.startsWith('?') ? fuente : `?${fuente}`;
+        const params = new URLSearchParams(query);
+        const state = params.get('state');
+        const code = params.get('code');
+        const error = params.get('error');
+        if (state && (code || error)) {
+            return { code: code ?? null, error: error ?? null, state };
+        }
+    }
+    return null;
+}
+
+export function mensajeErrorCallbackDrive(error: string | null): string {
+    if (error === 'access_denied') {
+        return 'No autorizaste el acceso a Google Drive. Vuelve a conectar y acepta el permiso de lectura para poder importar materiales.';
+    }
+    return 'Google no completó la autorización de Drive. Vuelve a intentar la conexión desde Centro de Estudios.';
+}
+
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
     const [appDebug, setAppDebug] = React.useState('App Iniciada');
+
+    // Detección SÍNCRONA del callback OAuth de Drive (antes de cualquier return condicional,
+    // para no romper el orden de hooks -> minified React error #310, ya sufrido antes en este
+    // mismo flujo, ver DEBUG_DRIVE_OAUTH_CENTRO_ESTUDIOS.md §5). Se lee window.location una
+    // sola vez al montar: aunque el efecto de abajo recargue la página, en ese ciclo el valor
+    // es estable.
+    const callbackDrive = React.useMemo(
+        () => extraerCallbackDrive(window.location.search, window.location.hash),
+        [],
+    );
+    const [procesandoDrive] = React.useState(() => !!callbackDrive);
+    const callbackDriveProcesadoRef = React.useRef(false);
 
     React.useEffect(() => {
         if ((window as any).Cypress) {
@@ -301,11 +377,72 @@ const AppRoutes: React.FC = () => {
         }
     }, []);
 
+    // Único responsable de completar el callback OAuth de Drive: intercambia el `code` por la
+    // conexión (Cloud Function driveOAuthCallback), persiste el resultado en las MISMAS claves
+    // de localStorage que BibliotecaView ya lee, y recarga a una URL hash limpia (sin `?code=`).
+    React.useEffect(() => {
+        if (!callbackDrive || callbackDriveProcesadoRef.current) return;
+        // driveOAuthCallback exige sesión autenticada; esperar a que Firebase la restaure.
+        if (cargandoSesion) return;
+        callbackDriveProcesadoRef.current = true;
+
+        const tenantId = callbackDrive.state;
+        const claveConexion = `tudojang:driveConnection:${tenantId}`;
+        const claveError = `tudojang:driveConnectionError:${tenantId}`;
+        const returnPath = window.localStorage.getItem(DRIVE_OAUTH_RETURN_PATH_KEY) || '/centro-estudios';
+
+        const finalizar = () => {
+            window.localStorage.removeItem(DRIVE_OAUTH_RETURN_PATH_KEY);
+            // Recarga completa a hash limpio: garantiza que el `code` (de un solo uso) no se
+            // reprocese en un refresh y que BibliotecaView monte leyendo el resultado ya escrito.
+            window.location.replace(`${window.location.origin}${window.location.pathname}#${returnPath}`);
+        };
+
+        if (callbackDrive.error || !callbackDrive.code) {
+            window.localStorage.setItem(claveError, mensajeErrorCallbackDrive(callbackDrive.error));
+            finalizar();
+            return;
+        }
+
+        if (!usuario) {
+            window.localStorage.setItem(claveError, 'Tu sesión expiró durante la conexión con Google Drive. Inicia sesión de nuevo y vuelve a conectar.');
+            finalizar();
+            return;
+        }
+
+        // redirectUri debe coincidir EXACTAMENTE con el que usó connectDrive (BibliotecaView
+        // envía `${origin}${pathname}`); acá el pathname es el mismo de la raíz de la app.
+        const redirectUri = `${window.location.origin}${window.location.pathname}`;
+        driveService.procesarCallbackOAuth(tenantId, callbackDrive.code, redirectUri)
+            .then((resultado) => {
+                window.localStorage.setItem(claveConexion, resultado.connectionId);
+                window.localStorage.removeItem(claveError);
+            })
+            .catch((err) => {
+                const mensaje = err instanceof Error && err.message
+                    ? err.message
+                    : 'No se pudo completar la conexión con Google Drive.';
+                window.localStorage.setItem(claveError, mensaje);
+            })
+            .finally(finalizar);
+    }, [callbackDrive, usuario, cargandoSesion]);
+
     const debugDiv = (window as any).Cypress ? (
         <div id="debug-log-onboarding" className="fixed bottom-0 left-0 bg-black/80 text-white text-[10px] p-2 z-[10000] min-w-full">
             {appDebug} | Host: {window.location.hostname} | FB: {String(isFirebaseConfigured)} | Hash: {window.location.hash} | User: {usuario ? usuario.email : 'No'} | Loading: {cargandoSesion ? 'Yes' : 'No'}
         </div>
     ) : null;
+
+    // Mientras se procesa el callback OAuth de Drive mostramos un estado dedicado (la vista se
+    // recarga a /centro-estudios apenas termina): evita un parpadeo de VistaAdministracion con
+    // el `?code=` todavía en la URL.
+    if (procesandoDrive) return (
+        <div className="flex flex-col items-center justify-center h-screen bg-tkd-dark text-white gap-4">
+            <div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-xs font-black uppercase tracking-widest">Conectando Google Drive...</p>
+            {debugDiv}
+        </div>
+    );
 
     if (cargandoSesion) return (
         <div className="flex items-center justify-center h-screen bg-tkd-dark text-white">
@@ -391,7 +528,7 @@ const AppRoutes: React.FC = () => {
                         que este bug le impedía ver -- consistente con la intención de diseño ya
                         documentada en App.routing.test.ts ("Centro de Estudios como inicio
                         operativo" para ambos roles consultor). */}
-                    <ReactRouterDOM.Route path="/" element={(usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante) ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
+                    <ReactRouterDOM.Route path="/" element={obtenerRutaInicioUsuario(usuario) === '/centro-estudios' ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
