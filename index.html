@@ -17,15 +17,27 @@
       document.documentElement.classList.remove('dark');
     }
 
-    // Registro del Service Worker
+    // Registro del Service Worker — SOLO en producción.
+    // Fix 2026-07-21: en localhost el SW cachea de forma agresiva y, si el dev server se cae o
+    // reinicia, intercepta la navegación y la rompe con un error críptico ("Failed to convert
+    // value to 'Response'"), impidiendo que la app arranque -- justo lo que pasaba con la vuelta
+    // del OAuth de Drive. En desarrollo NO lo queremos (además estorba el HMR): no lo registramos
+    // y, de paso, desregistramos cualquier SW que haya quedado instalado de una sesión anterior.
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(reg => {
-          console.log('SW registrado', reg);
-        }).catch(err => {
-          console.log('Error SW', err);
+      const esLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+      if (esLocalhost) {
+        navigator.serviceWorker.getRegistrations()
+          .then(regs => regs.forEach(reg => reg.unregister()))
+          .catch(() => { /* nada que limpiar */ });
+      } else {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW registrado', reg);
+          }).catch(err => {
+            console.log('Error SW', err);
+          });
         });
-      });
+      }
     }
   </script>
 
