@@ -961,17 +961,87 @@ Con Biblioteca cerrada, el inventario de cadenas queda así:
 | Publicación de material | ✅ | `servicios/academico/publicarMaterial.integracion.test.ts` |
 | Generación de jornadas | ✅ | `servicios/academico/generacionJornadas.integracion.test.ts` |
 | **Biblioteca** | ✅ | `servicios/academico/biblioteca.integracion.test.ts` |
-| **Quizzes** (crear → responder → progreso) | ❌ | — |
+| **Quizzes** (crear → responder → métrica) | ✅ | `servicios/academico/quiz.integracion.test.ts` |
 | **Progreso / métricas** (visualización → analítica) | ❌ | — |
 | **Agenda** (`AgendaView`, `ModalEdicionJornada`) | ❌ | — |
 | **Vínculos e invitaciones** | ❌ | — |
 
-Total actual de integración: **8 suites, 89 pruebas.**
+Total actual de integración: **9 suites, 103 pruebas.**
 
-Las cuatro que faltan, por riesgo descendente: **Quizzes** (es la que escribe progreso, y el
-progreso es lo que ve el acudiente), **Vínculos e invitaciones** (toca identidad, y ahí ya
-apareció un bug de identidad antes — ver "Tutor role broken end-to-end"), **Agenda**,
-**Progreso**.
+Las tres que faltan, por riesgo descendente: **Vínculos e invitaciones** (toca identidad, y
+ahí ya apareció un bug antes — ver "Tutor role broken end-to-end"), **Agenda**, **Progreso**.
+
+### 4-sexies. ✅ CUBIERTA — cadena de Quiz (configurar → responder → métrica del acudiente)
+
+**Hecho el 2026-07-22.** `servicios/academico/quiz.integracion.test.ts`, 14 pruebas.
+
+```
+QuizEditorModal → quizService.guardarQuiz(tenantId, recursoId, …)
+                     → tenants/{t}/quizzes/{recursoId}
+MaterialPreviewModal → quizService.obtenerQuiz(tenantId, asignacion.recursoId)
+                     → QuizView.enviar() → evaluarQuiz()
+                            ├→ progresoRepository.guardarQuiz()   (reanudar intento)
+                            └→ actividadService.registrarActividad()
+                                 → actividadLogs + metricasEstudiante → panel del acudiente
+```
+
+Verificado por mutación: escritura real de `quizService` ignorando el tenant (2 tests rojos)
+y recálculo de métricas sin filtro por estudiante (1 test rojo).
+
+#### 🐞 BUG ENCONTRADO Y CORREGIDO — `scoreUltimaEvaluacion` devolvía el PRIMER intento
+
+`calcularScoreUltimoQuiz` (`servicios/academico/actividadService.ts`) hacía:
+
+```ts
+.sort((a, b) => b.registradoEn.localeCompare(a.registradoEn))[0]
+```
+
+`registradoEn` es un ISO con precisión de **milisegundos** y `Array.sort` es **estable**: ante
+dos logs con el mismo timestamp el comparador devuelve 0, se conserva el orden de entrada, y
+quedaba elegido el **primer** intento. Una función llamada "último quiz" devolviendo el primero.
+
+**Cómo se encontró:** la prueba pasó 13/13 al primer intento, lo cual dio desconfianza. Cinco
+corridas seguidas → 1 en rojo. El empate de milisegundos era el culpable.
+
+**Por qué importa en producción y no es sólo un test flaky:** `registradoEn` se sella con el
+reloj del **dispositivo**. Un atraso de hora entre dos intentos (sincronización NTP, cambio
+manual, cambio de zona) basta para invertir el orden y dejar al acudiente viendo congelado un
+score viejo. Además `analisisProgresoService.ts:91` promedia `scoreUltimaEvaluacion` para las
+métricas por programa, así que el error se propagaba hacia arriba.
+
+**Arreglo:** recorrido con `>=` que deja ganar al último de la lista ante empate (orden de
+llegada, tanto en el store en memoria como en la query ordenada por `registradoEn`). Prueba de
+regresión con reloj congelado: `con timestamps EMPATADOS, la ultima evaluacion sigue siendo la
+ultima registrada`. 5 corridas consecutivas en verde.
+
+#### 🟡 SIN DECIDIR — "asignación completada" no distingue aprobar de reprobar
+
+`calcularPorcentajeConsumo` devuelve **100** apenas existe un log de tipo quiz ("intentarlo
+cuenta como consumir el material"), y `asignacionesCompletadas` cuenta todo lo que tenga
+consumo `>= 80`. Resultado: **un estudiante que saca 0% aparece con la asignación COMPLETADA.**
+
+El dato del score sí queda registrado (`promedioScoreEvaluaciones`), así que la información no
+se pierde — pero el rótulo "completadas" mezcla "abrió el material" con "lo aprobó", y es justo
+el número que el acudiente lee primero. Fijado como prueba de **caracterización** (documenta el
+comportamiento actual, no lo bendice). **Requiere decisión de producto, no de código.**
+
+#### 🟡 SIN RESOLVER — fallo de Firestore indistinguible de "quiz sin configurar"
+
+`MaterialPreviewModal.tsx:166-169`: el `catch` de `obtenerQuiz` hace `console.warn` y setea
+`preguntasQuiz = null`, que es **el mismo valor** que "nunca se configuraron preguntas". La UI
+entonces muestra *"Este quiz todavía no tiene preguntas configuradas — un Admin o Maestro puede
+cargarlas desde la Biblioteca"* aunque el admin sí las haya cargado y lo que falló sea la red.
+
+Menos grave de lo que parecía a primera vista: **no** cae a la pregunta demo hardcodeada, así
+que no se registra un score contra un quiz falso. Pero es la **sexta** aparición del patrón del
+proyecto: fallo real disfrazado de estado benigno.
+
+#### Nota de método
+
+Una mutación que hice primero (`claveMock` ignorando el tenant) tocó la rama **mock** del
+servicio, que la suite de integración no ejecuta (corre con `isFirebaseConfigured: true`). Dio
+1 test rojo — pero de `quizService.test.ts`, no de la suite nueva. **Una mutación que rompe
+otra suite no valida la tuya.** Hay que mutar la rama que el test realmente recorre.
 
 ### 13-bis. ✅ RESUELTO — script `typecheck` + causa raíz de los 3076 errores
 
