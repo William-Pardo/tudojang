@@ -3,21 +3,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { FilaEstudiante } from './FilaEstudiante';
 import { EstadoPago, GradoTKD, GrupoEdad, RolUsuario, type Estudiante } from '../tipos';
-import { anularUltimoPagoEfectivo } from '../servicios/pagosApi';
 
 let mockUsuario: any = { id: 'admin-1', rol: RolUsuario.Admin };
-const mockMostrarNotificacion = jest.fn();
 
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({ usuario: mockUsuario }),
-}));
-
-jest.mock('../context/NotificacionContext', () => ({
-  useNotificacion: () => ({ mostrarNotificacion: mockMostrarNotificacion }),
-}));
-
-jest.mock('../servicios/pagosApi', () => ({
-  anularUltimoPagoEfectivo: jest.fn(),
 }));
 
 jest.mock('framer-motion', () => ({
@@ -36,23 +26,9 @@ jest.mock('./ModalRegistrarPago', () => (props: any) => (
   ) : null
 ));
 
-jest.mock('./ModalConfirmacion', () => (props: any) => (
-  props.abierto ? (
-    <div data-testid="modal-confirmacion">
-      <span>{props.titulo}</span>
-      <span>{props.mensaje}</span>
-      <span>{props.cargando ? 'cargando' : 'listo'}</span>
-      <button onClick={props.onConfirmar}>Confirmar anulación</button>
-      <button onClick={props.onCerrar}>Cerrar confirmación</button>
-    </div>
-  ) : null
-));
-
 jest.mock('./GeneradorQR', () => ({ estudiante }: any) => (
   <div data-testid="generador-qr">{estudiante.id}</div>
 ));
-
-const anularMock = anularUltimoPagoEfectivo as jest.MockedFunction<typeof anularUltimoPagoEfectivo>;
 
 const crearEstudiante = (overrides: Partial<Estudiante> = {}): Estudiante => ({
   id: 'est-1',
@@ -186,7 +162,10 @@ describe('FilaEstudiante', () => {
     const user = userEvent.setup();
     renderFila();
 
-    await user.click(screen.getByTitle('Registrar Pago en Efectivo'));
+    // Fix 2026-07-22: el title paso de 'Registrar Pago en Efectivo' a 'Gestión Financiera'
+    // en b0ed3c5 (unificacion de acciones de pago en el modal). Mismo boton, mismo
+    // onClick (setModalPagoAbierto) -- solo cambio la etiqueta.
+    await user.click(screen.getByTitle('Gestión Financiera'));
     expect(screen.getByTestId('modal-pago')).toBeInTheDocument();
     await user.click(screen.getByText('Pago exitoso'));
     await user.click(screen.getByText('Cerrar pago'));
@@ -212,61 +191,13 @@ describe('FilaEstudiante', () => {
     renderFila();
 
     expect(screen.queryByTitle('Eliminar')).not.toBeInTheDocument();
-    expect(screen.queryByTitle(/Deshacer/)).not.toBeInTheDocument();
     expect(screen.getByTitle('Editar')).toBeInTheDocument();
   });
 
-  it('permite cerrar la confirmación de anulación', async () => {
-    const user = userEvent.setup();
-    renderFila();
-
-    await user.click(screen.getByTitle(/Deshacer/));
-    expect(screen.getByTestId('modal-confirmacion')).toHaveTextContent('Ana');
-    await user.click(screen.getByText('Cerrar confirmación'));
-    expect(screen.queryByTestId('modal-confirmacion')).not.toBeInTheDocument();
-  });
-
-  it('notifica y cierra cuando la anulación es exitosa', async () => {
-    const user = userEvent.setup();
-    let resolver!: (value: any) => void;
-    anularMock.mockReturnValue(new Promise(resolve => { resolver = resolve; }) as any);
-    renderFila();
-
-    await user.click(screen.getByTitle(/Deshacer/));
-    await user.click(screen.getByText('Confirmar anulación'));
-
-    expect(screen.getByTestId('modal-confirmacion')).toHaveTextContent('cargando');
-    resolver({ exito: true, mensaje: 'ok' });
-    await waitFor(() => expect(mockMostrarNotificacion).toHaveBeenCalledWith('Último pago anulado correctamente', 'success'));
-    expect(anularMock).toHaveBeenCalledWith('est-1', 'admin-1');
-    expect(screen.queryByTestId('modal-confirmacion')).not.toBeInTheDocument();
-  });
-
-  it.each([
-    [{ exito: false, mensaje: 'No hay pagos' }, 'No hay pagos'],
-    [{ exito: false }, 'Error al anular pago'],
-  ])('notifica un resultado fallido sin cerrar la confirmación', async (resultado, mensaje) => {
-    const user = userEvent.setup();
-    anularMock.mockResolvedValue(resultado as any);
-    renderFila();
-
-    await user.click(screen.getByTitle(/Deshacer/));
-    await user.click(screen.getByText('Confirmar anulación'));
-
-    await waitFor(() => expect(mockMostrarNotificacion).toHaveBeenCalledWith(mensaje, 'error'));
-    expect(screen.getByTestId('modal-confirmacion')).toBeInTheDocument();
-  });
-
-  it('captura excepciones al anular incluso sin usuario autenticado', async () => {
-    const user = userEvent.setup();
-    mockUsuario = { rol: RolUsuario.Admin };
-    anularMock.mockRejectedValue(new Error('Fallo de red'));
-    renderFila();
-
-    await user.click(screen.getByTitle(/Deshacer/));
-    await user.click(screen.getByText('Confirmar anulación'));
-
-    await waitFor(() => expect(mockMostrarNotificacion).toHaveBeenCalledWith('Fallo de red', 'error'));
-    expect(anularMock).toHaveBeenCalledWith('est-1', undefined);
-  });
+  // Nota 2026-07-22: aca vivian 4 casos mas, sobre la anulacion del ultimo pago. El commit
+  // b0ed3c5 ("feat(finance): unify payment actions in modal") movio esa funcionalidad de la
+  // fila al modal, pero los tests quedaron aca apuntando a un boton `/Deshacer/` que ya no
+  // existe en este componente -- eran 5 de los 6 fallos historicos de esta suite. Se
+  // trasladaron a components/ModalRegistrarPago.test.tsx (describe "anulación del último
+  // pago"), que es donde la funcionalidad vive ahora. NO se borro cobertura.
 });
