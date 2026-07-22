@@ -199,7 +199,13 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
         setPaso('procesando');
         
         let exitos = 0;
-        for (const row of datosRaw) {
+        // Fix 2026-07-22: antes las filas rechazadas se descartaban con un `console.error`
+        // suelto y siempre se mostraba "Importación Exitosa" en verde. Importar 200 alumnos
+        // con un plan de 50 dejaba al operador creyendo que los 200 habian entrado. Se
+        // acumulan los fallos para poder reportarlos, y se guarda la fila del Excel (la 1 es
+        // el encabezado, asi que la primera de datos es la 2) para que sean ubicables.
+        const fallos: { fila: number; error: any }[] = [];
+        for (const [indice, row] of datosRaw.entries()) {
             try {
                 let fNac = row["Fecha_Nacimiento_AAAA_MM_DD"];
                 if (fNac instanceof Date) fNac = fNac.toISOString().split('T')[0];
@@ -228,10 +234,34 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
                 };
                 await agregarEstudiante(payload as any);
                 exitos++;
-            } catch (e) { console.error("Error en fila:", e); }
+            } catch (e: any) {
+                fallos.push({ fila: indice + 2, error: e });
+                console.error("Error en fila:", indice + 2, e);
+            }
         }
 
-        mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
+        if (fallos.length === 0) {
+            mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
+        } else {
+            // El limite del plan es el unico motivo ACCIONABLE para el operador (subir de
+            // plan o comprar un addon), asi que si aparece se muestra su mensaje textual en
+            // vez del conteo generico. Lo lanza el callable `crearEstudiante` con code
+            // 'resource-exhausted' (functions/academico/estudiantes.js), que httpsCallable
+            // entrega prefijado como 'functions/resource-exhausted'.
+            const porLimiteDePlan = fallos.find((f) =>
+                String(f.error?.code ?? '').includes('resource-exhausted')
+            );
+            const detalle = porLimiteDePlan
+                ? porLimiteDePlan.error.message
+                : fallos.length === 1
+                    ? '1 fila no se pudo importar.'
+                    : `${fallos.length} filas no se pudieron importar.`;
+
+            mostrarNotificacion(
+                `Se registraron ${exitos} de ${datosRaw.length} alumnos. ${detalle}`,
+                "error"
+            );
+        }
         onExito();
     };
 

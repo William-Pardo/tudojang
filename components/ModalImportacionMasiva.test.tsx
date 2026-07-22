@@ -391,10 +391,13 @@ describe('ModalImportacionMasiva', () => {
 
     await user.click(screen.getByRole('button', { name: /Confirmar e Inyectar/i }));
 
+    // Fix 2026-07-22: este caso afirmaba 'Importación Exitosa ... success' MIENTRAS una de
+    // las dos filas fallaba -- codificaba el defecto: el operador veia verde y no se
+    // enteraba de la fila perdida. Ahora se reporta el conteo real con severidad de error.
     await waitFor(() => {
       expect(mockMostrarNotificacion).toHaveBeenCalledWith(
-        'Importación Exitosa: 1 alumnos registrados.',
-        'success'
+        'Se registraron 1 de 2 alumnos. 1 fila no se pudo importar.',
+        'error'
       );
     });
 
@@ -547,5 +550,90 @@ describe('ModalImportacionMasiva', () => {
     expect(screen.getByText('Auditor de Carga Masiva')).toBeInTheDocument();
     unmount();
     expect(screen.queryByText('Auditor de Carga Masiva')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------------
+  // Reporte de filas rechazadas.
+  //
+  // Antes del enforcement server-side de `limiteEstudiantes`, TODAS las filas entraban:
+  // el limite del plan solo se validaba en el boton de la UI. Ese era un bug, pero ruidoso.
+  // Al arreglarlo (commit 70865de) las filas de mas empezaron a rechazarse correctamente...
+  // y este componente las descartaba con un `console.error` por fila para despues mostrar
+  // SIEMPRE "Importación Exitosa" en verde. Importar 200 alumnos con un plan de 50 dejaba al
+  // operador creyendo que los 200 habian entrado. El fix del backend habia convertido un bug
+  // visible en uno silencioso.
+  // ---------------------------------------------------------------------------------
+  describe('reporte de filas rechazadas', () => {
+    const importarDosFilas = async (
+      user: ReturnType<typeof userEvent.setup>,
+      container: HTMLElement
+    ) => {
+      await simularCargaExcel(container, [
+        { ...filaBase },
+        { ...filaBase, Nombres: 'SOFIA', Identificacion: '77665544' },
+      ]);
+      await user.click(screen.getByRole('button', { name: /Confirmar e Inyectar/i }));
+    };
+
+    it('avisa cuántas filas se rechazaron en vez de reportar éxito total', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+      mockAgregarEstudiante
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Falla de red'));
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          'Se registraron 1 de 2 alumnos. 1 fila no se pudo importar.',
+          'error'
+        );
+      });
+      expect(mockMostrarNotificacion).not.toHaveBeenCalledWith(
+        expect.stringContaining('Importación Exitosa'),
+        'success'
+      );
+    });
+
+    it('cuando el rechazo es por límite del plan, muestra ese motivo accionable', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+      const limite: any = new Error(
+        'Límite del plan superado (50 alumnos). Por favor, suba de plan o agregue un addon para agregar más estudiantes.'
+      );
+      limite.code = 'functions/resource-exhausted';
+      mockAgregarEstudiante
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(limite);
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          expect.stringContaining('Límite del plan superado (50 alumnos)'),
+          'error'
+        );
+      });
+      // El conteo real tambien viaja, para que el operador sepa que SI entro.
+      expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+        expect.stringContaining('Se registraron 1 de 2 alumnos'),
+        'error'
+      );
+    });
+
+    it('mantiene el mensaje de éxito cuando no se rechaza ninguna fila', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          'Importación Exitosa: 2 alumnos registrados.',
+          'success'
+        );
+      });
+    });
   });
 });

@@ -49,7 +49,32 @@ pero **no se pasa a ningún hijo**, así que `recursosParaLote` nunca se puebla 
 `recursoIdsParaLote` que recibe `AsignacionesView` siempre llega vacío. Decidir si se retira
 el resto del cableado o si el flujo vuelve.
 
-### 0-C. La importación masiva dice "Importación Exitosa" aunque el plan haya rechazado filas
+### 0-C. ✅ RESUELTO — la importación masiva ya reporta las filas rechazadas
+
+**Cerrado el 2026-07-22**, con ciclo RED → GREEN real (comportamiento nuevo, no
+caracterización): 3 tests escritos primero, 2 en rojo, luego el fix.
+
+Comportamiento nuevo en `components/ModalImportacionMasiva.tsx`:
+
+| Caso | Mensaje | Severidad |
+|---|---|---|
+| Ninguna fila rechazada | `Importación Exitosa: N alumnos registrados.` | `success` |
+| Rechazos genéricos | `Se registraron X de N alumnos. K filas no se pudieron importar.` | `error` |
+| Rechazo por límite de plan | `Se registraron X de N alumnos.` + el mensaje textual del límite | `error` |
+
+El límite del plan se distingue por `code` conteniendo `resource-exhausted` (lo lanza el
+callable `crearEstudiante`; `httpsCallable` lo entrega como `functions/resource-exhausted`).
+Es el único motivo **accionable** para el operador —subir de plan o comprar un addon—, así
+que su mensaje textual reemplaza al conteo genérico. Además se registra el número de fila del
+Excel en cada fallo (la 1 es el encabezado, la primera de datos es la 2) para que sean
+ubicables en el archivo.
+
+> **Hallazgo del camino:** el test `continúa la importación aunque una fila falle` afirmaba
+> `'Importación Exitosa: 1 alumnos registrados.'` con severidad `success` **mientras una de
+> las dos filas fallaba**. No estaba roto: estaba **codificando el defecto**. Se corrigió la
+> expectativa junto con el código.
+
+### 0-C-bis. Detalle original del hallazgo (histórico)
 
 **Encontrado el 2026-07-22** verificando el punto 3 del ítem 0-A. Es una consecuencia
 directa del fix del límite que acabamos de shipear, y hace falta atenderlo con él.
@@ -88,6 +113,9 @@ elegir el tipo de notificación según el resultado (`success` solo si no hubo f
 > suites que ya están en rojo** en la línea base. Cualquier cambio en ese componente implica
 > entrar a esa suite; conviene arreglarla primero o al menos entender por qué falla, para no
 > confundir fallos nuevos con los preexistentes.
+
+> **Resuelto tal cual se sugirió.** La advertencia se cumplió al pie: primero se repararon
+> las 5 suites de la línea base, y recién con el árbol en verde se tocó el componente.
 
 ### 0-B. La eliminación de `Login.tsx` quedó en el commit equivocado
 
