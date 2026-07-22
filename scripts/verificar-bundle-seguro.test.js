@@ -39,6 +39,23 @@ test("repository contains no Wompi private, event, or integrity credentials", ()
   );
 });
 
+// Agregado 2026-07-22 tras encontrar un Personal Access Token de GitHub embebido en texto
+// plano en la URL del remoto (`.git/config`).
+//
+// ALCANCE, para no crear falsa sensacion de seguridad: este test cubre los FUENTES DEL
+// REPOSITORIO, no `.git/config` -- ese archivo no esta versionado y varia por clone, asi que
+// un test de contenido no puede vigilarlo. O sea, NO habria detectado aquel hallazgo. Lo que
+// si evita es el modo de falla adyacente y mas grave: que un token quede commiteado en un
+// archivo del repo, donde vive para siempre en el historial aunque despues se borre.
+test("repository contains no GitHub personal access tokens", () => {
+  // Prefijos oficiales de GitHub: ghp_ (classic), gho_ (OAuth), ghu_/ghs_ (app),
+  // ghr_ (refresh), github_pat_ (fine-grained).
+  assert.doesNotMatch(
+    securitySensitiveSources,
+    /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})\b/
+  );
+});
+
 test("operational scripts do not hardcode Firebase web API keys", () => {
   const scripts = path.join(root, "scripts");
   const scriptSources = fs

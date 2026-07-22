@@ -7,6 +7,55 @@ del usuario.
 
 ---
 
+## 🚨 P0 — SEGURIDAD, acción inmediata
+
+### 0-Z. Token de GitHub en texto plano en la URL del remoto
+
+**Encontrado el 2026-07-22** al preparar el push. `.git/config` tiene el remoto `origin`
+configurado como:
+
+```
+https://William-Pardo:<TOKEN_ghp_...>@github.com/William-Pardo/tudojang.git
+```
+
+Un **Personal Access Token de GitHub con permisos de escritura**, embebido en texto plano.
+Cualquiera con acceso al disco, a un backup, o a la salida de un `git remote -v` lo tiene.
+
+**Agravante:** el token quedó impreso en la transcripción de la sesión al ejecutar
+`git remote -v`. Debe considerarse **comprometido**, no solo mal guardado.
+
+**Qué SÍ se verificó (buenas noticias):**
+- ❌ No aparece en ningún archivo trackeado (`git grep ghp_`).
+- ❌ No aparece en el historial de commits (`git log --all -S ghp_`).
+- Es decir: la exposición es local + transcripción, **no está en el repositorio**.
+
+**Remediación, en este orden:**
+
+1. **Revocar el token** en `github.com/settings/tokens`. Primero esto; todo lo demás espera.
+2. Sacar la credencial del remoto:
+   ```
+   git remote set-url origin https://github.com/William-Pardo/tudojang.git
+   ```
+3. Autenticar sin credenciales embebidas: `gh auth login`, Git Credential Manager, o SSH
+   (`git@github.com:William-Pardo/tudojang.git`).
+4. Recién entonces pushear.
+
+**Decisión tomada:** no se hizo push. Los 39 commits de esta sesión quedan **solo en la
+máquina local** hasta que el token esté rotado. Es un riesgo asumido a conciencia: pushear
+con un token comprometido para "salvar el trabajo" habría sido cambiar un problema por otro.
+
+**Mitigación parcial agregada:** `scripts/verificar-bundle-seguro.test.js` gana un test que
+detecta patrones de token de GitHub (`ghp_`/`gho_`/`ghu_`/`ghs_`/`ghr_`/`github_pat_`) en las
+fuentes del repositorio. Verificado por mutación (con un token falso: falla; sin él: pasa).
+
+> **Alcance honesto de ese test, para no crear falsa sensación de seguridad:** cubre los
+> ARCHIVOS DEL REPOSITORIO, no `.git/config` — ese archivo no está versionado y varía por
+> clone, así que ningún test de contenido puede vigilarlo. **NO habría detectado este
+> hallazgo.** Lo que sí evita es el modo de falla adyacente y más grave: que un token quede
+> commiteado, donde vive para siempre en el historial aunque después se borre el archivo.
+
+---
+
 ## 🔴 P0 — Sin verificar contra entorno real
 
 ### 0-A. ✅ VERIFICADO — `limiteEstudiantes` contra el emulador real (2 de 3 puntos OK)
@@ -79,7 +128,16 @@ Los cinco comandos del job se verificaron **uno por uno localmente** antes de wi
 > Si el primer run falla en el paso del emulador y hay urgencia de deployar, la salida
 > mínima es quitar ese último paso del job — los otros cuatro ya dan un gate real.
 
-**No se hizo push.** El commit queda en `claude/dev-modulos`, rama local sin upstream.
+**No se hizo push, y ahora hay un motivo mas fuerte:** ver el ítem 0-Z (token de GitHub
+comprometido). La rama `claude/dev-modulos` sigue local, con 39 commits sin respaldar en
+ningún remoto.
+
+> **Consecuencia para este gate:** aunque se pushee la rama, el workflow **no va a
+> ejecutarse**. `deploy.yml` solo dispara en `push` a `main` y en `workflow_dispatch`; no
+> tiene trigger de `pull_request` ni de otras ramas. Para validar el gate sin deployar a
+> producción hay que agregarle un disparador al job `pruebas` (por ejemplo `pull_request`
+> y `push` a ramas no-main). **Sin eso, la única forma de verlo correr es mergear a `main`
+> — que deploya.** Decidir antes de pushear.
 
 ### 0-D. Restos del flujo de "publicación en lote", ya retirado del producto
 
