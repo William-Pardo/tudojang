@@ -179,6 +179,34 @@ el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`) en
 > función que convenga no poder actualizar.
 >
 > **Otorgar el permiso igual, aunque hoy el pipeline esté verde.**
+>
+> ### ✅ PERMISO OTORGADO (2026-07-22) — pendiente de verificación real
+>
+> Se agregó el rol **Administrador de Cloud Scheduler** a
+> `firebase-adminsdk-fbsvc@tudojang.iam.gserviceaccount.com`, que es la cuenta que usa CI
+> para desplegar (se identificó por sus roles: Firebase Admin, Cloud Functions Admin,
+> Storage Admin, Secret Manager Admin — y por NO tener ningún rol de Cloud Scheduler, que
+> es exactamente lo que explicaba el 403).
+>
+> **Estado honesto: otorgado, NO verificado.** Como el código de esas 5 funciones no cambió,
+> Firebase va a seguir sin tocar sus horarios y un *Re-run* daría verde por la misma razón
+> que el #116 — no porque el permiso funcione. La confirmación real llega sola la próxima
+> vez que se modifique alguna de las 5 y el deploy pase sin el 403.
+>
+> Es una medida **preventiva**: se hizo ahora para que no explote después, no para verla
+> funcionar hoy.
+>
+> ### 🔵 Higiene de seguridad detectada de paso (NO urgente, no tocar sin analizar)
+>
+> La consola marca en rojo dos cuentas con rol **Editor**, un permiso enorme y heredado:
+>
+> | Cuenta | Aviso de Google |
+> |---|---|
+> | `545628702717-compute@developer.gserviceaccount.com` | 11742/11747 permisos excedidos |
+> | `tudojang@appspot.gserviceaccount.com` | 11746/11746 permisos excedidos |
+>
+> Bajarles el rol puede romper cosas si algún servicio depende de ellas. Analizar antes de
+> tocar; queda anotado como deuda, no como acción inmediata.
 
 ### 🔴 Hallazgo 2 — Las reglas NUNCA se desplegaban (el paso mentía)
 
