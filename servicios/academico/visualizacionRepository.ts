@@ -97,10 +97,13 @@ export interface VisualizacionRepository {
 export interface VisualizacionRepositoryDeps {
   db: unknown;
   doc: (...segments: any[]) => unknown;
-  getDoc: (reference: unknown) => Promise<{ exists: () => boolean; data: () => unknown }>;
-  setDoc: (reference: unknown, data: unknown, options: { merge: boolean }) => Promise<void>;
+  // Ver nota en progresoRepository.ts: parametros en `any` por contravarianza bajo
+  // `strictFunctionTypes` -- con `unknown` estas deps no aceptaban las funciones reales
+  // del SDK de Firestore, solo fakes.
+  getDoc: (reference: any) => Promise<{ exists: () => boolean; data: () => any }>;
+  setDoc: (reference: any, data: any, options: { merge: boolean }) => Promise<void>;
   collection: (...segments: any[]) => unknown;
-  getDocs: (coleccion: unknown) => Promise<{ docs: Array<{ id: string; data: () => unknown }> }>;
+  getDocs: (coleccion: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
 }
 
 export class FirestoreVisualizacionRepository implements VisualizacionRepository {

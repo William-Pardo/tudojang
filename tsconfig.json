@@ -16,6 +16,14 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
+    // Habilitado el 2026-07-21 al agregar `npm run typecheck`. Los 4 imports que terminan
+    // en `.ts` (utils/academico/centroEstudios.ts) NO son un descuido: son carga
+    // estructural. Existe un puente ESM `utils/academico/centroEstudios.js` y TANTO Vite
+    // como Jest resuelven `.js` ANTES que `.ts`, asi que un import sin extension cae en el
+    // puente (ver CIERRE CENTRO DE ESTUDIOS.md, lineas 107-118: causo un 404 real en dev y
+    // un export faltante en build). Sacarles la extension rompe 16 suites -- comprobado.
+    // Legal porque `noEmit: true`; no cambia una sola linea de runtime.
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
@@ -37,6 +45,7 @@
   "exclude": [
     "node_modules",
     "cypress",
+    "cypress.config.ts",
     "functions",
     "scripts/**/*.test.js"
   ]

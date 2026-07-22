@@ -154,9 +154,15 @@ const VistaRestablecerClave: React.FC = () => {
             </div>
           )}
 
+          {/* Fix 2026-07-21 (`npm run typecheck`, TS2367): del `disabled` se quitaron
+              `|| estado === 'loading' || estado === 'success'`. Eran REDUNDANTES, no un bug:
+              `puedeEnviar` (linea 51) ya exige `estado === 'listo'`, asi que en
+              'loading'/'success' el boton ya quedaba deshabilitado por la primera condicion.
+              TypeScript las marcaba como comparaciones imposibles por narrowing de alias
+              sobre `!puedeEnviar ||`. Comportamiento sin cambios. */}
           <button
             type="submit"
-            disabled={!puedeEnviar || estado === 'loading' || estado === 'success'}
+            disabled={!puedeEnviar}
             className="w-full py-3.5 sm:py-4 bg-tkd-red text-white rounded-xl font-black uppercase text-[10px] sm:text-xs tracking-widest shadow-xl hover:bg-red-700 active:scale-95 transition-all disabled:bg-gray-300 flex items-center justify-center gap-2"
           >
             <IconoLogin className="w-4 h-4 sm:w-5 sm:h-5" />

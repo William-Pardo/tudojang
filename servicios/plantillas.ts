@@ -100,7 +100,11 @@ export const generarTextoContratoColaborador = (usuario: Usuario, configClub: Co
     if (!c) return "Contrato no configurado.";
 
     const tipoFinal = c.tipoVinculacion === 'Otro' ? c.tipoVinculacionOtro : c.tipoVinculacion;
-    const valorP = formatearPrecio(c.valorPago);
+    // Fix 2026-07-21 (`npm run typecheck`): `valorPago` es OPCIONAL y esta marcado como
+    // legacy en tipos.ts ("reemplazado por sueldoBase"), asi que en cualquier contrato
+    // nuevo llegaba undefined a formatearPrecio, que espera un number. Se cae a
+    // `sueldoBase` (obligatorio) manteniendo `valorPago` cuando el contrato viejo lo trae.
+    const valorP = formatearPrecio(c.valorPago ?? c.sueldoBase);
     const rolContrato = obtenerEtiquetaRol(usuario.rol, 'equipoTecnico');
 
     // Encabezado Común

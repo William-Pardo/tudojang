@@ -118,6 +118,13 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         } : crearDefaultsEstudiante()
     });
 
+    // Fix 2026-07-21 (`npm run typecheck`): react-hook-form tipa un grupo ANIDADO como
+    // `FieldError | Merge<FieldError, FieldErrorsImpl<any>>` -- un union que no expone las
+    // claves hijas, asi que `errors.tutor?.nombres` no compilaba (los campos planos como
+    // `errors.nombres` si, por eso solo fallaban los 4 del tutor). Se acota una sola vez
+    // aca en vez de castear en cada uno de los 4 usos.
+    const erroresTutor = errors.tutor as Record<string, { message?: string } | undefined> | undefined;
+
     const watchedSedeId = watch('sedeId');
     const watchedProgramas = watch('programasInscritos') || [];
     const watchedFechaNacimiento = watch('fechaNacimiento');
@@ -309,24 +316,24 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombres Completos Tutor</label>
                                         <input {...register('tutor.nombres')} placeholder="NOMBRE DEL TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                        <FormInputError mensaje={errors.tutor?.nombres?.message as string} />
+                                        <FormInputError mensaje={erroresTutor?.nombres?.message} />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cédula Tutor</label>
                                         <input {...register('tutor.numeroIdentificacion')} placeholder="CÉDULA" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                        <FormInputError mensaje={errors.tutor?.numeroIdentificacion?.message as string} />
+                                        <FormInputError mensaje={erroresTutor?.numeroIdentificacion?.message} />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Correo Tutor</label>
                                         <input type="email" {...register('tutor.correo')} placeholder="EMAIL TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                        <FormInputError mensaje={errors.tutor?.correo?.message as string} />
+                                        <FormInputError mensaje={erroresTutor?.correo?.message} />
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono / WhatsApp</label>
                                         <input {...register('tutor.telefono')} placeholder="TELÉFONO TUTOR" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
-                                        <FormInputError mensaje={errors.tutor?.telefono?.message as string} />
+                                        <FormInputError mensaje={erroresTutor?.telefono?.message} />
                                     </div>
                                 </div>
                             </div>

@@ -16,19 +16,26 @@ import type { EstadoJornada } from '../../models/academico';
 import type { RolUsuario } from '../../tipos';
 
 interface FirestoreBatchLike {
-  set: (ref: unknown, data: unknown) => unknown;
-  delete: (ref: unknown) => unknown;
+  // Ver nota en progresoRepository.ts: parametros en `any` por contravarianza bajo
+  // `strictFunctionTypes`. Con `unknown` esta interfaz rechazaba los batch fakes de los
+  // tests, que tipan `ref` como `string[]` o no declaran parametros.
+  set: (ref?: any, data?: any) => unknown;
+  delete: (ref?: any) => unknown;
   commit: () => Promise<void>;
 }
 
 interface JornadaRepositoryDeps {
   collection?: (...path: any[]) => unknown;
   doc: (...path: any[]) => unknown;
-  getDoc?: (ref: unknown) => Promise<{ exists: () => boolean; data?: () => unknown }>;
-  getDocs?: (queryRef: unknown) => Promise<{ docs: Array<{ id: string; data: () => unknown }> }>;
-  query?: (...args: unknown[]) => unknown;
-  setDoc: (ref: unknown, data: unknown, options?: unknown) => Promise<void>;
-  where?: (...args: unknown[]) => unknown;
+  // Ver nota en progresoRepository.ts: parametros en `any`, no en `unknown`. Bajo
+  // `strictFunctionTypes` los parametros son CONTRAVARIANTES, asi que con `unknown` esta
+  // interfaz rechazaba TANTO las funciones reales del SDK como los fakes de los tests
+  // (que tipan `ref` como `string[]`/`unknown[]`) -- justo lo contrario de su proposito.
+  getDoc?: (ref: any) => Promise<{ exists: () => boolean; data?: () => any }>;
+  getDocs?: (queryRef: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
+  query?: (...args: any[]) => unknown;
+  setDoc: (ref: any, data: any, options?: any) => Promise<void>;
+  where?: (...args: any[]) => unknown;
   writeBatch?: (db: Firestore) => FirestoreBatchLike;
 }
 
@@ -65,7 +72,12 @@ export interface AuditoriaJornadaInput {
   // deuda tecnica anotada en el cierre de 12.6) porque un borrado fisico via
   // eliminarJornadaSegura es una accion distinta y mas fuerte que cancelar (soft, reversible
   // en los hechos via reprogramar/editar) -- la auditoria debe poder distinguir ambas.
-  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar' | 'eliminar';
+  // Fix 2026-07-21 (detectado por `npm run typecheck`): faltaba 'restaurar'. El rediseño
+  // del 2026-07-13 agrego la accion de restituir una clase cancelada (cancelada ->
+  // confirmada, ver accionesDisponibles en MisClasesView.tsx), y `transicionar()` ya la
+  // registraba como `accion: 'restaurar'` -- pero este union nunca se actualizo, asi que
+  // toda auditoria de restauracion escribia un valor fuera del contrato declarado.
+  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar' | 'eliminar' | 'restaurar';
   // Subtarea 12.5: diff por campo (valor anterior y nuevo). Antes era el estado resultante
   // plano (p.ej. `{ estado: 'confirmada' }`), sin el valor anterior -- ver diffCambiosJornada.
   cambios: CambioAuditoriaJornada[];

@@ -39,8 +39,13 @@ export interface FirestoreCentroEstudiosRepositoryDeps {
   getDoc: (reference: any) => Promise<{ exists: () => boolean; data: () => any }>;
   collection: (...segments: any[]) => any;
   query: (...args: any[]) => any;
-  where: (field: string, op: string, value: any) => any;
-  getDocs: (query: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
+  // Fix 2026-07-21 (`npm run typecheck`): `op` estaba tipado como `string`, pero el `where`
+  // real del SDK lo declara como el union `WhereFilterOp` -- `string` no es asignable a un
+  // union de literales, asi que la dep nunca aceptaba la funcion real.
+  where: (field: string, op: any, value: any) => any;
+  // Fix 2026-07-21: faltaba `empty` en el contrato, y sin embargo la linea 87 de este mismo
+  // archivo lo usa (`if (!querySnap.empty)`). El tipo mentia sobre lo que el codigo exige.
+  getDocs: (query: any) => Promise<{ empty: boolean; docs: Array<{ id: string; data: () => any }> }>;
 }
 
 export class FirestoreCentroEstudiosRepository implements CentroEstudiosRepository {

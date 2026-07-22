@@ -64,8 +64,13 @@ export interface FirestoreProgressRepositoryDeps {
   db: unknown;
   estudianteId: string;
   doc: (...segments: any[]) => unknown;
-  getDoc: (reference: unknown) => Promise<{ exists: () => boolean; data: () => unknown }>;
-  setDoc: (reference: unknown, data: unknown, options: { merge: boolean }) => Promise<void>;
+  // Fix 2026-07-21 (`npm run typecheck`): los parametros van en `any`, no en `unknown`.
+  // Bajo `strictFunctionTypes` los parametros son CONTRAVARIANTES: una funcion que espera
+  // `DocumentReference` (la real del SDK) NO es asignable a una declarada como
+  // `(reference: unknown)`. Con `unknown` estas deps solo aceptaban fakes, nunca el SDK
+  // real -- justo al reves de lo que se buscaba. `any` acepta ambos.
+  getDoc: (reference: any) => Promise<{ exists: () => boolean; data: () => any }>;
+  setDoc: (reference: any, data: any, options: { merge: boolean }) => Promise<void>;
 }
 
 export class FirestoreProgressRepository {

@@ -12,9 +12,10 @@ import type { ProgramaAcademico } from '../../models/academico/programa';
 interface ProgramaRepositoryDeps {
   collection?: (...path: any[]) => unknown;
   doc: (...path: any[]) => unknown;
-  deleteDoc?: (ref: unknown) => Promise<void>;
-  getDocs?: (queryRef: unknown) => Promise<{ docs: Array<{ id: string; data: () => unknown }> }>;
-  setDoc: (ref: unknown, data: unknown, options?: unknown) => Promise<void>;
+  // Ver nota en progresoRepository.ts: parametros en `any` por contravarianza.
+  deleteDoc?: (ref: any) => Promise<void>;
+  getDocs?: (queryRef: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
+  setDoc: (ref: any, data: any, options?: any) => Promise<void>;
 }
 
 export interface ProgramaRepository {

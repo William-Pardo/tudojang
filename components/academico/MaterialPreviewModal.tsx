@@ -332,11 +332,18 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               registrarSync={(input) => sincronizarVisualizacionYoutube(asignacion, input)}
             />
           ) : tipoMaterial === 'video' ? (
+            // Fix 2026-07-21 (`npm run typecheck`): en `url` se quito
+            // `asignacion.driveFileUrl`. Esa propiedad NO existe en AsignacionAcademica ni
+            // en AsignacionCentroEstudios, y aparecia UNA sola vez en todo el repo: aca, en
+            // el punto de lectura. Nadie la escribia nunca, asi que siempre valia undefined
+            // y el `??` caia directo a ''. Los campos reales son `externalFileId` (Drive,
+            // del que sale `blobUrl` via getTemporaryFileUrl) y `youtubeVideoId`. El
+            // <PdfViewer> de mas abajo, para el mismo material, ya usaba solo `blobUrl`.
             <VideoPlayer
               tenantId={asignacion.tenantId}
               asignacionId={asignacion.id}
               titulo={asignacion.titulo}
-              url={blobUrl ?? asignacion.driveFileUrl ?? ''}
+              url={blobUrl ?? ''}
               totalSegundos={asignacion.duracionSegundos ?? 120}
               sincronizar={sincronizarProgreso}
               cargarProgreso={() => repository.leerSync(asignacion.tenantId, asignacion.id)}

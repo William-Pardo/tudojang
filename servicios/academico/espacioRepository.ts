@@ -28,9 +28,10 @@ import type { EspacioFisico } from '../../models/academico/espacio';
 
 interface EspacioRepositoryDeps {
   collection?: (...path: any[]) => unknown;
-  getDocs?: (queryRef: unknown) => Promise<{ docs: Array<{ id: string; data: () => unknown }> }>;
+  // Ver nota en progresoRepository.ts: parametros en `any` por contravarianza.
+  getDocs?: (queryRef: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
   doc?: (...path: any[]) => unknown;
-  setDoc?: (ref: unknown, data: unknown, options?: unknown) => Promise<void>;
+  setDoc?: (ref: any, data: any, options?: any) => Promise<void>;
 }
 
 export interface EspacioRepository {
