@@ -90,7 +90,18 @@ describe('configuracionApi', () => {
 
   describe('guardarConfiguracionNotificaciones', () => {
     it('debería guardar la configuración en Firestore', async () => {
-      const mockConfig = { tenantId: 'tenant123', whatsapp: { solicitudInscripcion: { habilitado: false } } };
+      // Fix 2026-07-21 (`npm run typecheck`): el fixture inventaba `whatsapp.solicitudInscripcion`,
+      // estructura que NO EXISTE en ConfiguracionNotificaciones (el `whatsapp` de tipos.ts:395
+      // pertenece a `Usuario`), y omitia los 5 campos numericos obligatorios. Este test verifica
+      // el paso a Firestore tal cual, asi que se usa una configuracion valida del tipo real.
+      const mockConfig = {
+        tenantId: 'tenant123',
+        diaCobroMensual: 5,
+        diasAnticipoRecordatorio: 3,
+        diasGraciaSuspension: 10,
+        frecuenciaSyncHoras: 12,
+        frecuenciaQueryApiDias: 1,
+      };
       await guardarConfiguracionNotificaciones(mockConfig);
       expect(setDoc).toHaveBeenCalledWith(doc(db, 'notificaciones_config', 'tenant123'), mockConfig, { merge: true });
     });
@@ -102,7 +113,17 @@ describe('configuracionApi', () => {
 
     it('debería guardar en localStorage si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
-      const mockConfig = { tenantId: 'local', whatsapp: { solicitudInscripcion: { habilitado: true } } };
+      // Fix 2026-07-21 (`npm run typecheck`): mismo caso que el test de arriba -- el fixture
+      // usaba una forma inexistente en ConfiguracionNotificaciones. Este test verifica el
+      // fallback a localStorage, que serializa la config tal cual reciba.
+      const mockConfig = {
+        tenantId: 'local',
+        diaCobroMensual: 5,
+        diasAnticipoRecordatorio: 3,
+        diasGraciaSuspension: 10,
+        frecuenciaSyncHoras: 12,
+        frecuenciaQueryApiDias: 1,
+      };
       await guardarConfiguracionNotificaciones(mockConfig);
       expect(localStorage.setItem).toHaveBeenCalledWith('tkd_mock_conf_notif', JSON.stringify(mockConfig));
     });

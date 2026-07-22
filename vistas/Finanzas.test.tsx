@@ -156,7 +156,9 @@ describe('VistaFinanzas', () => {
   });
 
   it('oculta eliminar a no admin, maneja loading y subview', () => {
-    mockUsuario = { rol: RolUsuario.Instructor };
+    // Fix 2026-07-21 (`npm run typecheck`): RolUsuario.Instructor NO EXISTE (ver enum en
+    // tipos.ts). Evaluaba a `undefined` -- el test pasaba por accidente, no por rol real.
+    mockUsuario = { rol: RolUsuario.Maestro };
     const { container, rerender } = render(<VistaFinanzas isSubView />);
     expect(container.querySelectorAll('tbody tr')[0].querySelectorAll('button')).toHaveLength(1);
     mockCargando = true;

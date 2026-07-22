@@ -57,6 +57,11 @@ const anularMock = anularUltimoPagoEfectivo as jest.MockedFunction<typeof anular
 const crearEstudiante = (overrides: Partial<Estudiante> = {}): Estudiante => ({
   id: 'est-1',
   tenantId: 'tenant-1',
+  // Fix 2026-07-21 (`npm run typecheck`): faltaban `telefono` y `correo` a nivel
+  // Estudiante -- estaban solo dentro de `tutor`, que es otro campo. Ambos son
+  // obligatorios en el tipo.
+  telefono: '3001112233',
+  correo: 'ana@test.com',
   nombres: 'Ana',
   apellidos: 'García',
   numeroIdentificacion: '123456',
@@ -75,9 +80,13 @@ const crearEstudiante = (overrides: Partial<Estudiante> = {}): Estudiante => ({
   consentimientoFotosVideos: true,
   carnetGenerado: false,
   tutor: {
-    nombreCompleto: 'Tutor Uno',
+    // Fix 2026-07-21 (`npm run typecheck`): `nombreCompleto` y `parentesco` NO EXISTEN en
+    // el tipo `Estudiante['tutor']` (los campos reales son nombres/apellidos/
+    // numeroIdentificacion/telefono/correo). Ninguno se renderiza en FilaEstudiante -- el
+    // componente solo lee las firmas del tutor -- asi que corregirlos no altera ningun caso.
+    nombres: 'Tutor',
+    apellidos: 'Uno',
     numeroIdentificacion: '999',
-    parentesco: 'Madre',
     telefono: '3000000000',
     correo: 'tutor@test.com',
     firmaDigital: 'firma-riesgos',
@@ -196,7 +205,10 @@ describe('FilaEstudiante', () => {
   });
 
   it('oculta acciones administrativas para usuarios no administradores', () => {
-    mockUsuario = { id: 'user-1', rol: RolUsuario.Instructor };
+    // Fix 2026-07-21 (`npm run typecheck`): RolUsuario.Instructor NO EXISTE en el enum
+    // (el rol docente real es Maestro). Evaluaba a `undefined`, asi que este test verificaba
+    // "no es admin" contra un valor basura en vez de contra un rol real del sistema.
+    mockUsuario = { id: 'user-1', rol: RolUsuario.Maestro };
     renderFila();
 
     expect(screen.queryByTitle('Eliminar')).not.toBeInTheDocument();

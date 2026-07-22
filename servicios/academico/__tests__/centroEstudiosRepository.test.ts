@@ -1,6 +1,7 @@
 // RED tests for FirestoreCentroEstudiosRepository
 import { FirestoreCentroEstudiosRepository } from '../centroEstudiosRepository';
 import { prepararAsignacionesCentroEstudios } from '../centroEstudiosRepository';
+import type { ProgresoRepository } from '../progresoRepository';
 
 // Mock utilities
 jest.mock('../../../utils/academico/centroEstudios', () => ({
@@ -22,9 +23,14 @@ describe('FirestoreCentroEstudiosRepository - RED', () => {
   const mockWhere = jest.fn();
   const mockGetDocs = jest.fn();
 
+  // Fix 2026-07-21 (`npm run typecheck`): fake parcial deliberado. De todo
+  // ProgresoRepository, FirestoreCentroEstudiosRepository solo llama
+  // `aplicarAAsignaciones` (via prepararAsignacionesCentroEstudios, que hace
+  // `'aplicarAAsignaciones' in progreso`), asi que se acota en vez de implementar
+  // leerQuiz/guardarQuiz/leerSync/guardarSync sin uso en este test.
   const mockProgreso = {
     aplicarAAsignaciones: (asig: any) => asig,
-  };
+  } as unknown as ProgresoRepository;
 
   const deps = {
     db: mockDb,

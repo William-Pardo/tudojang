@@ -651,6 +651,10 @@ describe('jornadaRepository', () => {
               pendientes.push({ ref, data });
               sets.push({ ref, data });
             },
+            // Fix 2026-07-21 (`npm run typecheck`): faltaba `delete`, miembro obligatorio de
+            // FirestoreBatchLike. Este caso solo ejercita `set`+`commit` (guardado en lote),
+            // asi que el metodo queda como no-op.
+            delete: () => {},
             commit: async () => {
               commits.push(pendientes.length);
             },
@@ -897,6 +901,10 @@ describe('jornadaRepository', () => {
       db: 'db-mock' as any,
       deps: {
         doc: (...path: any[]) => path,
+        // Fix 2026-07-21 (`npm run typecheck`): faltaba `setDoc`, miembro OBLIGATORIO de
+        // JornadaRepositoryDeps. Este caso solo ejercita el borrado en lote, asi que se
+        // declara como no-op para cumplir el contrato sin cambiar lo que el test verifica.
+        setDoc: async () => {},
         writeBatch: () => {
           const pendientes: string[][] = [];
           return {

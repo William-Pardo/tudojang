@@ -44,7 +44,11 @@ const materialA: RecursoAcademico = {
   actualizadoEn: '2026-06-27T00:00:00.000Z',
 };
 
-const crearRepoJornadaFake = (): JornadaRepository => ({
+// Fix 2026-07-21 (`npm run typecheck`): estas factories declaran devolver el repositorio
+// COMPLETO pero implementan solo los metodos que la vista ejerce. Se cambia la anotacion
+// por un cast explicito: documenta que es un fake parcial deliberado, en vez de mentir
+// sobre cumplir la interfaz entera.
+const crearRepoJornadaFake = () => ({
   guardarJornada: jest.fn().mockResolvedValue(undefined),
   guardarEjecucion: jest.fn().mockResolvedValue(undefined),
   registrarAuditoria: jest.fn().mockResolvedValue(undefined),
@@ -52,7 +56,7 @@ const crearRepoJornadaFake = (): JornadaRepository => ({
   listarJornadasPorTenant: jest.fn().mockResolvedValue([]),
   guardarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
   actualizarTemaJornada: jest.fn().mockResolvedValue(undefined),
-});
+} as unknown as JornadaRepository);
 
 const crearRepoProgramaFake = (): ProgramaRepository => ({
   guardarPrograma: jest.fn().mockResolvedValue(undefined),

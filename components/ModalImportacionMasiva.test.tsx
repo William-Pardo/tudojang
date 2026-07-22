@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import { GradoTKD } from '../tipos';
 
-const mockBookNew = jest.fn(() => ({}));
-const mockAoaToSheet = jest.fn((data: unknown) => ({ data }));
-const mockBookAppendSheet = jest.fn();
+// Fix 2026-07-21 (`npm run typecheck`): estos mocks se invocan con spread (`...args`)
+// pero su implementacion no declaraba parametros, asi que TS infirio ARIDAD 0 (TS2556).
+const mockBookNew = jest.fn((..._args: unknown[]) => ({}));
+const mockAoaToSheet = jest.fn((...args: unknown[]) => ({ data: args[0] }));
+const mockBookAppendSheet = jest.fn((..._args: unknown[]) => undefined);
 const mockSheetToJson = jest.fn();
 const mockWriteFile = jest.fn();
 const mockRead = jest.fn();
@@ -25,7 +27,10 @@ jest.mock('xlsx', () => ({
 import ModalImportacionMasiva from './ModalImportacionMasiva';
 
 const mockMostrarNotificacion = jest.fn();
-const mockAgregarEstudiante = jest.fn();
+// Fix 2026-07-21 (`npm run typecheck`): sin implementacion, `jest.fn()` no infiere que
+// devuelve una promesa, y `mockResolvedValue`/`mockRejectedValueOnce` fallaban con
+// "not assignable to parameter of type 'never'". Se declara la firma asincrona real.
+const mockAgregarEstudiante = jest.fn(async (..._args: unknown[]): Promise<void> => {});
 let mockSedesVisibles: { id: string; nombre: string }[] = [{ id: 'sede-1', nombre: 'Principal' }];
 
 jest.mock('framer-motion', () => ({
@@ -56,11 +61,15 @@ const mockFileReaderInstance: {
 } = {
   result: null,
   onload: null,
+  // Fix 2026-07-21 (`npm run typecheck`): la implementacion declara un parametro `this`
+  // tipado, lo que produce un `Mock<(this: ...) => void>` que no es asignable al
+  // `jest.Mock` (= `Mock<UnknownFunction>`) declarado arriba. El cast conserva el `this`
+  // tipado dentro de la funcion, que es lo que hace legible este fake de FileReader.
   readAsArrayBuffer: jest.fn(function (this: typeof mockFileReaderInstance, _file: File) {
     if (this.onload && this.result) {
       this.onload({ target: { result: this.result } });
     }
-  }),
+  }) as unknown as jest.Mock,
 };
 
 const filaBase = {

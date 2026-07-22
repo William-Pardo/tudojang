@@ -29,7 +29,9 @@ const crearEstudiante = (
   grado: GradoTKD,
   estadoPago: EstadoPago,
 ): Estudiante => ({
+  // Fix 2026-07-21 (`npm run typecheck`): faltaban `telefono` y `correo`, obligatorios en Estudiante.
   id, tenantId: 'tenant-1', nombres, apellidos: `Apellido ${id}`, numeroIdentificacion: `DOC-${id}`,
+  telefono: '3000000000', correo: `${id}@test.com`,
   fechaNacimiento: '2010-01-01', grado, grupo, horasAcumuladasGrado: 0, sedeId,
   fechaIngreso: '2024-01-01', estadoPago, saldoDeudor: 0, historialPagos: [],
   consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false,

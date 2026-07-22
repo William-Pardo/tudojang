@@ -10,8 +10,9 @@ describe('FormularioMovimiento', () => {
   const onGuardarMock = jest.fn() as any;
 
   const mockSedes: Sede[] = [
-    { id: 'sede-1', nombre: 'Sede Principal', ciudad: 'Bogotá', direccion: 'Calle 1', telefono: '123' },
-    { id: 'sede-2', nombre: 'Sede Secundaria', ciudad: 'Medellín', direccion: 'Calle 2', telefono: '456' }
+    // Fix 2026-07-21 (`npm run typecheck`): faltaba `tenantId`, campo OBLIGATORIO de Sede.
+    { id: 'sede-1', tenantId: 'tenant-1', nombre: 'Sede Principal', ciudad: 'Bogotá', direccion: 'Calle 1', telefono: '123' },
+    { id: 'sede-2', tenantId: 'tenant-1', nombre: 'Sede Secundaria', ciudad: 'Medellín', direccion: 'Calle 2', telefono: '456' }
   ];
 
   const defaultProps = {

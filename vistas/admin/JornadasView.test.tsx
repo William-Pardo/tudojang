@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JornadasView from './JornadasView';
-import { ConflictoConcurrenciaError } from '../../servicios/academico/jornadaRepository';
+import { ConflictoConcurrenciaError, type JornadaRepository } from '../../servicios/academico/jornadaRepository';
 import type { RegistroAsistencia } from '../../models/academico/asistencia';
 
 jest.mock('../../servicios/academico/jornadaContextService', () => ({
@@ -250,12 +250,22 @@ describe('JornadasView', () => {
   });
 });
 
+// Fix 2026-07-21 (`npm run typecheck`): este fake implementa solo los 4 metodos que
+// JornadasView ejerce, no los ~10 de JornadaRepository, asi que los 8 `render()` de abajo
+// no compilaban (TS2740). Se acota en la factory, en un unico lugar, en vez de castear en
+// cada call site. El `as unknown as` es deliberado: mantiene los `jest.fn()` con su tipo de
+// Mock (para `toHaveBeenCalledWith`) sin obligar a implementar metodos que el test no usa.
 function crearRepositoryMock() {
   return {
     guardarJornada: jest.fn().mockResolvedValue(undefined),
     guardarEjecucion: jest.fn().mockResolvedValue(undefined),
     registrarAuditoria: jest.fn().mockResolvedValue(undefined),
     existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+  } as unknown as JornadaRepository & {
+    guardarJornada: jest.Mock;
+    guardarEjecucion: jest.Mock;
+    registrarAuditoria: jest.Mock;
+    existeConflictoHorario: jest.Mock;
   };
 }
 

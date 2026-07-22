@@ -126,7 +126,7 @@ const crearRepoJornadaFake = (overrides: Partial<JornadaRepository> = {}): Jorna
   guardarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
   actualizarTemaJornada: jest.fn().mockResolvedValue(undefined),
   ...overrides,
-});
+} as unknown as JornadaRepository);
 
 const crearRepoProgramaFake = (overrides: Partial<ProgramaRepository> = {}): ProgramaRepository => ({
   guardarPrograma: jest.fn().mockResolvedValue(undefined),

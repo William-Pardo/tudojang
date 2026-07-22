@@ -9,7 +9,9 @@ const mockGetDoc = jest.fn();
 const mockGetDocs = jest.fn();
 const mockBatchUpdate = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
-const mockWriteBatch = jest.fn(() => ({ update: mockBatchUpdate, commit: mockBatchCommit }));
+// Fix 2026-07-21 (`npm run typecheck`, TS2556): se invoca con spread (`mockWriteBatch(...args)`)
+// pero la implementacion no declaraba parametros -> TS infirio aridad 0.
+const mockWriteBatch = jest.fn((..._args: unknown[]) => ({ update: mockBatchUpdate, commit: mockBatchCommit }));
 
 jest.mock('firebase/firestore', () => ({
   doc: jest.fn((_db: unknown, ...path: unknown[]) => ({ __path: path.join('/') })),

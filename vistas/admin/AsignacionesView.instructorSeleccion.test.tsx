@@ -48,6 +48,10 @@ const instructoresReales = [
   { id: 'uid-otro-editor', nombre: 'Otro Maestro' },
 ];
 
+// Fix 2026-07-21 (`npm run typecheck`): estas factories declaran devolver el repositorio
+// COMPLETO pero implementan solo los metodos que la vista ejerce. Se cambia la anotacion
+// por un cast explicito: documenta que es un fake parcial deliberado, en vez de mentir
+// sobre cumplir la interfaz entera.
 function crearRepositorioJornadaFake(): JornadaRepository {
   return {
     guardarJornada: jest.fn().mockResolvedValue(undefined),
@@ -57,14 +61,14 @@ function crearRepositorioJornadaFake(): JornadaRepository {
     listarJornadasPorTenant: jest.fn().mockResolvedValue([]),
     guardarJornadasEnLote: jest.fn().mockResolvedValue(undefined),
     actualizarTemaJornada: jest.fn().mockResolvedValue(undefined),
-  };
+  } as unknown as JornadaRepository;
 }
 
 function crearRepositorioProgramaFake(): ProgramaRepository {
   return {
     guardarPrograma: jest.fn().mockResolvedValue(undefined),
     listarProgramasPorTenant: jest.fn().mockResolvedValue([]),
-  };
+  } as unknown as ProgramaRepository;
 }
 
 const mockUseAuth = (usuario: Record<string, unknown>) => {

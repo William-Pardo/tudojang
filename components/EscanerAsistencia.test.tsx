@@ -31,10 +31,14 @@ describe('EscanerAsistencia', () => {
     (window as any).BarcodeDetector = class {
       detect = detect;
     };
-    jest.spyOn(window, 'setInterval').mockImplementation((callback: TimerHandler, delay?: number) => {
+    // Fix 2026-07-21 (`npm run typecheck`): `window.setInterval` colisiona entre la firma
+    // del DOM (devuelve `number`) y la de @types/node (devuelve `Timeout`), ambas cargadas
+    // via `types: ["jest", "node"]` en tsconfig. Gana la de Node, que no admite este mock.
+    // El cast acota esa colision de entorno; no hay defecto de codigo que arreglar.
+    jest.spyOn(window, 'setInterval').mockImplementation(((callback: TimerHandler, delay?: number) => {
       if (delay === 500) scan = callback as () => Promise<void>;
       return 1;
-    });
+    }) as unknown as typeof window.setInterval);
     jest.spyOn(window, 'clearInterval').mockImplementation();
   });
 

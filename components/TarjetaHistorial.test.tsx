@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TarjetaHistorial from './TarjetaHistorial';
 import type { NotificacionHistorial } from '../tipos';
+import { TipoNotificacion } from '../tipos';
 
 jest.mock('./Iconos', () => ({
   IconoWhatsApp: ({ className }: { className?: string }) => (
@@ -23,6 +24,9 @@ const baseItem: NotificacionHistorial = {
   tutorNombre: 'Carlos Pérez',
   destinatario: '3001234567',
   canal: 'WhatsApp',
+  // Fix 2026-07-21 (`npm run typecheck`): faltaba `tipo`, campo OBLIGATORIO de
+  // NotificacionHistorial. El fixture se declaraba `: NotificacionHistorial` sin cumplirlo.
+  tipo: TipoNotificacion.Bienvenida,
   mensaje: 'Mensaje de prueba suficientemente descriptivo.',
   fecha: '2026-06-22T15:30:00.000Z',
   leida: false,

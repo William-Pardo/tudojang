@@ -5,7 +5,10 @@ import PdfViewer from './PdfViewer';
 
 const mockRegistrarPaginaPdf = jest.fn();
 const mockFlush = jest.fn();
-const mockUseProgressSync = jest.fn(() => ({
+// Fix 2026-07-21 (`npm run typecheck`): la implementacion no declaraba parametros, asi
+// que TS infirio un mock de ARIDAD 0 y la llamada `mockUseProgressSync(options)` de
+// abajo no compilaba. Se declara el parametro (sin usarlo) para fijar la aridad real.
+const mockUseProgressSync = jest.fn((_options?: unknown) => ({
   progreso: { paginasVistas: [], segundosUnicos: [] },
   registrarPaginaPdf: mockRegistrarPaginaPdf,
   flush: mockFlush,
