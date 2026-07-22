@@ -7,9 +7,73 @@ del usuario.
 
 ---
 
+## 🔴 P0 — Sin verificar contra entorno real
+
+### 0-A. `limiteEstudiantes`: commiteado, pero NUNCA corrido contra el emulador de Firestore
+
+**Estado:** el código está commiteado (`70865de`) y sus tests unitarios pasan (los 197
+tests de `functions/academico/estudiantes.test.js` corren dentro de los 263 de Functions).
+**Lo que NO se hizo:** correr `npm run test:firestore-rules`, que levanta el emulador real y
+valida las reglas de verdad.
+
+Se commiteó **confiando en el diff de otra sesión y en sus tests unitarios**, no en
+verificación propia contra reglas reales. Esa es exactamente la clase de confianza que esta
+misma sesión demostró que no hay que dar: el fixture de check-ins mentía sobre la forma del
+dato y los 9 tests pasaban igual; `RolUsuario.Instructor` no existía y el test pasaba igual.
+
+Concretamente falta confirmar:
+
+1. Que `firestore.rules` bloquee de verdad el `create` directo de cliente sobre
+   `estudiantes/{id}` (`allow create: if false`), contra el emulador — no leyendo el diff.
+2. Que `components/ModalImportacionMasiva.tsx` pase por la callable `crearEstudiante` y no
+   por el write directo. Es el camino que más fácil se saltea el límite: invoca el alta en
+   loop, una vez por fila del archivo importado.
+3. Que el mensaje de error del límite llegue a la UI de forma legible y no como un código
+   crudo de Firebase.
+
+Comando: `npm run test:firestore-rules` (necesita el emulador de Firestore corriendo).
+
+### 0-B. La eliminación de `Login.tsx` quedó en el commit equivocado
+
+Cosmético, pero registrado para que no aparezca como misterio en un `git blame`.
+
+`Login.tsx` (huérfano de febrero con import roto) se eliminó como parte del trabajo de
+typecheck, pero el `git rm` quedó en el índice antes de empezar a commitear por temas, así
+que la eliminación se arrastró al **primer** commit — `315b262 fix(deploy): planes-config…`,
+cuyo mensaje no la menciona. El motivo está anotado dentro del mensaje de `bcb908d`.
+
+La rama `claude/dev-modulos` es **local y sin upstream**, así que reescribir la historia es
+seguro si alguien quiere limpiarlo. Se dejó como está para no arriesgar 6 commits ya
+verificados por una cuestión estética.
+
+---
+
 ## 🔴 P0 — Bloqueante de deploy
 
-### 1. `planes-config.json` está gitignoreado y cuatro archivos dependen de él
+### 1. ✅ RESUELTO — `planes-config.json` (eran DOS bloqueantes, no uno)
+
+**Cerrado el 2026-07-22 en `315b262`.** El gitignore era solo la mitad del problema.
+
+| # | Bloqueante | Fix |
+|---|---|---|
+| 1 | La regla `*.json` lo dejaba **fuera de git**: existía solo en la máquina local, y en clone limpio/CI el build de Vite y las Functions reventaban | Excepción explícita en `.gitignore` |
+| 2 | Quedaba **fuera del paquete de Functions**: `firebase.json` declara `"source": "functions"`, así que el deploy sube ÚNICAMENTE esa carpeta. Los `require('../../planes-config.json')` resolvían a la raíz del repo → `MODULE_NOT_FOUND` en cold start → se caían `sedes`, `crearEstudiante` y el cobro automático de Wompi | Se movió el archivo a `functions/planes-config.json` |
+
+Se descartó el paso `predeploy` que copiara el archivo: un solo archivo físico, siempre
+empaquetado, no tiene un paso que alguien pueda saltearse en un deploy manual. El frontend lo
+importa hacia adentro (`./functions/planes-config.json`), que resuelve porque Vite construye
+desde la raíz.
+
+> **Trampa a recordar — localmente SIEMPRE funciona.** `node -e "require(...)"` daba OK
+> incluso con el archivo en la raíz, porque la raíz existe en la máquina de desarrollo. La
+> única verificación válida es **resolver la ruta y confirmar que cae dentro de
+> `<repo>/functions/`**. Repetir ante cualquier `require` nuevo dentro de `functions/`:
+> nada fuera de esa carpeta se sube.
+
+<details>
+<summary>Detalle original del hallazgo (histórico)</summary>
+
+### 1-bis. `planes-config.json` está gitignoreado y cuatro archivos dependen de él
 
 **Qué pasa:** la sesión anterior centralizó los límites de plan en `planes-config.json`
 (raíz del repo) para eliminar las tres copias hardcodeadas. La decisión es correcta. El
@@ -44,9 +108,23 @@ antes de commitear el WIP. Es una línea, pero sin ella el próximo deploy se ca
 que sube dos niveles (`../../planes-config.json`) hay que verificar que resuelva dentro
 del bundle desplegado — no solo que el archivo esté en git.
 
+> Esta "nota adicional" resultó ser el bloqueante grande, no una nota al pie. Ver el bloque
+> resuelto de arriba.
+
+</details>
+
 ---
 
 ## 🟠 P1 — WIP sin commitear, hay que cerrarlo
+
+> **✅ El WIP ya está commiteado (2026-07-22).** Los 30+ archivos que estaban sueltos se
+> repartieron en 9 commits temáticos sobre `claude/dev-modulos`, con el árbol limpio y
+> verificación completa: typecheck en 0, frontend 1460 pass / 22 fail (las mismas 5 suites
+> preexistentes), Functions 263 pass / 0 fail.
+>
+> Lo único que sobrevive de esta sección es la **verificación contra el emulador** del ítem
+> 2, que sigue sin hacerse — promovida a **P0 (ítem 0-A)** arriba, porque commitear no es
+> verificar.
 
 ### 2. Terminar de verificar el enforcement server-side de `limiteEstudiantes`
 
