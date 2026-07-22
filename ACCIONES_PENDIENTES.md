@@ -7,6 +7,56 @@ del usuario.
 
 ---
 
+## 🚨 P0 — INTEGRIDAD DEL REPOSITORIO
+
+### 0-Y. Dos objetos de git corruptos en `.git/objects` — reparados, causa NO identificada
+
+**Encontrado el 2026-07-22** al intentar el primer push. No era un problema de
+autenticación: la autenticación funcionó y el push murió al enviar los objetos.
+
+```
+error: inflate: data stream error (incorrect header check)
+fatal: loose object b27632001a88dc7d2920ab918bae63fa470b893a is corrupt
+error: unable to unpack header of .git/objects/0d/df00f...
+```
+
+Ambos objetos correspondían a archivos **intactos en el working tree**, así que la
+reparación fue sin pérdida:
+
+| Objeto corrupto | Archivo | Recuperado |
+|---|---|---|
+| `0ddf00f…` | `openspec/changes/clase-en-vivo-checkin-trigger-agenda/tasks.md` | ✅ |
+| `b27632…` | `vistas/admin/MisClasesView.tsx` | ✅ |
+
+**Método de reparación** (sirve para cualquier objeto suelto corrupto cuyo contenido siga
+existiendo en disco):
+
+1. Identificar qué archivo produce ese hash: `git hash-object <archivo>` y comparar.
+2. **Mover** el objeto corrupto a un respaldo (no borrarlo).
+3. `git hash-object -w <archivo>` — regenera el objeto con el mismo hash.
+4. `git fsck --full` para confirmar.
+
+Resultado: `git fsck` limpio, 41 commits intactos, push exitoso. Los archivos corruptos
+originales quedaron respaldados en el scratchpad de la sesión.
+
+> **LA CAUSA NO SE IDENTIFICÓ, y eso es lo preocupante.** Un objeto suelto corrupto no
+> aparece solo. Sospechosos, en orden de probabilidad para este entorno:
+> - **Varias sesiones de IA escribiendo sobre el MISMO working tree** (no worktrees
+>   separados). Ya está documentado en `HANDOVER.md` como condición de carrera real y como
+>   `DT-0015` en `bitacora.json`. Dos procesos escribiendo `.git/objects` a la vez es una
+>   causa clásica.
+> - Antivirus interceptando escrituras en `.git/`.
+> - Terminación abrupta de un proceso git a mitad de escritura.
+> - Problema de disco (menos probable: solo 2 objetos, ambos de archivos tocados en esta
+>   sesión).
+>
+> **Qué vigilar:** si vuelve a pasar, correr `git fsck --full` ANTES de asumir que es un
+> problema de red o de credenciales. Y si el paralelismo Claude/Codex sobre el mismo árbol
+> va a seguir, migrar a worktrees git separados por sesión deja de ser una recomendación
+> estética y pasa a ser una medida de integridad.
+
+---
+
 ## 🚨 P0 — SEGURIDAD, acción inmediata
 
 ### 0-Z. Token de GitHub en texto plano en la URL del remoto
@@ -40,7 +90,18 @@ Cualquiera con acceso al disco, a un backup, o a la salida de un `git remote -v`
    (`git@github.com:William-Pardo/tudojang.git`).
 4. Recién entonces pushear.
 
-**Decisión tomada:** no se hizo push. Los 39 commits de esta sesión quedan **solo en la
+**Push realizado el 2026-07-22**, ya con el token rotado y el remoto limpio. La rama
+`claude/dev-modulos` existe en `origin` con los 41 commits. Detalle de la remediacion
+efectiva: se ejecuto `git config --global credential.helper manager` y
+`git remote set-url origin https://github.com/William-Pardo/tudojang.git`. El primer
+intento fallo con *"Invalid username or token"* porque el Credential Manager tenia
+cacheada la credencial VIEJA (el token ya revocado) y la uso sin preguntar; se limpio con
+`printf "protocol=https
+host=github.com
+
+" | git credential reject`.
+
+**Decision original (superada):** no se hizo push. Los 39 commits de esta sesión quedan **solo en la
 máquina local** hasta que el token esté rotado. Es un riesgo asumido a conciencia: pushear
 con un token comprometido para "salvar el trabajo" habría sido cambiar un problema por otro.
 
