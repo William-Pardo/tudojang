@@ -122,6 +122,104 @@ const snapshotQuery = (paths: string[]) => {
   };
 };
 
+// --- API estilo Admin SDK (firebase-admin), para las Cloud Functions ----------------
+
+/**
+ * Adaptador con la forma del Admin SDK sobre EL MISMO store que usa la API de cliente.
+ *
+ * Sirve para probar la junta que nada verificaba: lo que una Cloud Function ESCRIBE con
+ * `firebase-admin` contra lo que el front LEE con `firebase/firestore`. Son dos SDK
+ * distintos sobre la misma coleccion, sin tipos compartidos, y hasta ahora ningun test
+ * cruzaba ambos lados.
+ *
+ * DIFERENCIA CRITICA entre los dos SDK, respetada aca a proposito:
+ *   - Admin SDK : `snap.exists` es una PROPIEDAD booleana
+ *   - Cliente   : `snap.exists()` es un METODO
+ * Un fake que las confundiera dejaria pasar codigo que revienta en produccion.
+ */
+export const crearFirestoreAdminFake = () => {
+  const referenciaDoc = (path: string): any => ({
+    path,
+    id: path.split('/').pop(),
+    get: async () => ({
+      // Propiedad, no metodo: asi lo expone firebase-admin.
+      exists: store.has(path),
+      id: path.split('/').pop(),
+      data: () => (store.has(path) ? { ...store.get(path) } : undefined),
+    }),
+    set: async (data: DocumentoFake, opciones?: { merge?: boolean }) => {
+      const previo = opciones?.merge ? (store.get(path) ?? {}) : {};
+      store.set(path, { ...previo, ...data });
+    },
+    update: async (data: DocumentoFake) => {
+      if (!store.has(path)) throw new Error(`fakeFirestore(admin): update sobre doc inexistente ${path}`);
+      store.set(path, { ...store.get(path), ...data });
+    },
+    delete: async () => { store.delete(path); },
+    collection: (nombre: string) => referenciaColeccion(`${path}/${nombre}`),
+  });
+
+  const referenciaColeccion = (path: string): any => {
+    const consulta = (filtros: Array<{ campo: string; operador: string; valor: any }>): any => ({
+      where: (campo: string, operador: string, valor: any) =>
+        consulta([...filtros, { campo, operador, valor }]),
+      get: async () => {
+        const paths = [...store.keys()]
+          .filter((p) => esHijoDirecto(p, path))
+          .filter((p) => filtros.every((f) => comparar(valorEnCampo(store.get(p)!, f.campo), f.operador, f.valor)))
+          .sort();
+        return {
+          docs: paths.map((p) => ({
+            id: p.split('/').pop() as string,
+            ref: referenciaDoc(p),
+            exists: true,
+            data: () => ({ ...store.get(p) }),
+          })),
+          empty: paths.length === 0,
+          size: paths.length,
+        };
+      },
+    });
+
+    return {
+      path,
+      doc: (id: string) => referenciaDoc(`${path}/${id}`),
+      ...consulta([]),
+    };
+  };
+
+  return {
+    collection: (nombre: string) => referenciaColeccion(nombre),
+    // `collectionGroup('jornadas')` recorre esa subcoleccion en todos los tenants.
+    collectionGroup: (nombre: string) => {
+      const paths = () => [...store.keys()].filter((p) => {
+        const partes = p.split('/');
+        return partes.length >= 2 && partes[partes.length - 2] === nombre;
+      });
+      const consultaGrupo = (filtros: Array<{ campo: string; operador: string; valor: any }>): any => ({
+        where: (campo: string, operador: string, valor: any) =>
+          consultaGrupo([...filtros, { campo, operador, valor }]),
+        get: async () => {
+          const encontrados = paths()
+            .filter((p) => filtros.every((f) => comparar(valorEnCampo(store.get(p)!, f.campo), f.operador, f.valor)))
+            .sort();
+          return {
+            docs: encontrados.map((p) => ({
+              id: p.split('/').pop() as string,
+              ref: referenciaDoc(p),
+              exists: true,
+              data: () => ({ ...store.get(p) }),
+            })),
+            empty: encontrados.length === 0,
+            size: encontrados.length,
+          };
+        },
+      });
+      return consultaGrupo([]);
+    },
+  };
+};
+
 // --- API que reemplaza a 'firebase/firestore' --------------------------------------
 
 export const crearApiFirestoreFake = () => {

@@ -262,6 +262,57 @@ con mocks no sustituyen a las de integración.
 Centralizarlos estaba planificado para la "Fase 7" del change y sigue sin hacerse — mismo
 patrón de drift que tenían los límites de plan antes de `planes-config.json`.
 
+### 4-bis-B. ✅ RESUELTO — las tres juntas de Clase en Vivo quedaron cubiertas
+
+**Cerrado el 2026-07-22.** 51 tests de integración en 5 suites, todas en verde.
+
+| Junta | Suite | Qué fija |
+|---|---|---|
+| #1 escáner → callable → repositorio | `servicios/academico/checkInQr.integracion.test.ts` (14) | Contrato entre los dos SDK + toggle + precondiciones |
+| #2 ventana → habilitación del escáner | `vistas/ClaseEnVivoView.integracion.test.tsx` (8) | Qué habilita realmente el escaneo |
+| #3 scheduler ↔ ventana horaria | `servicios/academico/claseEnVivo.integracion.test.ts` (8) | Coherencia de zona horaria — **encontró el bug de 5h** |
+
+**La junta #1 cierra el ítem 14 de este documento** (contrato escritor↔lector sin verificar).
+`test-utils/fakeFirestore.ts` gana un adaptador con forma de **Admin SDK** sobre el mismo
+store, así el callable real (`firebase-admin`, CommonJS) escribe y el repositorio real del
+front (`firebase/firestore`, TypeScript) lee el mismo documento. Se respeta a propósito la
+diferencia que más fácil se pasa por alto entre ambos SDK: en Admin `snap.exists` es una
+**propiedad**, en cliente `snap.exists()` es un **método**.
+
+Verificadas por mutación, no por estar en verde:
+- Renombrar `horaEntrada` → `entradaEn` en el callable → **mueren 3** (los del contrato).
+- Desactivar `assertInstructorAsignado` → **muere 1** (el de permisos).
+- Desactivar la guarda `estado === 'en_curso'` en `ClaseEnVivoView` → **mueren 2**.
+
+### 4-bis-C. 🟡 BRECHA ABIERTA — la ventana horaria es una ayuda de UI, no un límite real
+
+Encontrado al cubrir la junta #2. **Decisión pendiente, no defecto confirmado.**
+
+La ventana `[horaInicio-15, horaFin+15]` gatea el **botón de entrada** ("Iniciar Clase en
+Vivo" en `Horarios.tsx` / `App.tsx`). Pero:
+
+- `ClaseEnVivoView` habilita el escáner mirando **solo** `estado === 'en_curso'`.
+- El callable `registrarAsistenciaJornada` **tampoco** valida ventana: solo exige
+  `estado === 'en_curso'`.
+
+Y nada mueve automáticamente una jornada fuera de `en_curso`: el scheduler solo hace
+`confirmada → en_curso`, y la salida es el **cierre manual** desde `MisClasesView`. Entonces
+una jornada que el maestro nunca cerró queda **escaneable por URL directa** (bookmark, botón
+atrás, link compartido) días después.
+
+El comportamiento actual está fijado por un test marcado `BRECHA CONOCIDA` en
+`ClaseEnVivoView.integracion.test.tsx`. Si se decide cerrarla —validando ventana en la vista
+y/o en el callable— ese test va a fallar y hay que invertir la expectativa: es exactamente
+para lo que está.
+
+Antes de decidir conviene medir cuántas jornadas quedan en `en_curso` sin cerrar en
+producción. Si son muchas, el problema real puede ser el cierre manual, no la ventana.
+
+---
+
+<details>
+<summary>Estado original de esta sección (histórico, cuando faltaban #1 y #2)</summary>
+
 ### 4-bis. Clase en Vivo — pruebas de integración: junta #3 cubierta, faltan #1 y #2
 
 La sesión del 2026-07-21 cubrió dos cadenas de Centro de Estudios (identidad del consultor,
@@ -299,6 +350,10 @@ Juntas de mayor riesgo, en orden:
    efectivamente abra y cierre el escaneo.
 3. **Scheduler → ventana**: que la jornada que el cron pasa a `en_curso` sea la misma que la
    ventana considera abierta (mismo huso horario — el scheduler usa `fechaHoraBogota`).
+
+> Las tres se cubrieron. La #3 encontro el desfase de 5 horas.
+
+</details>
 
 ### 13-bis. ✅ RESUELTO — script `typecheck` + causa raíz de los 3076 errores
 
