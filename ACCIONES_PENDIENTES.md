@@ -9,29 +9,73 @@ del usuario.
 
 ## 🔴 P0 — Sin verificar contra entorno real
 
-### 0-A. `limiteEstudiantes`: commiteado, pero NUNCA corrido contra el emulador de Firestore
+### 0-A. ✅ VERIFICADO — `limiteEstudiantes` contra el emulador real (2 de 3 puntos OK)
 
-**Estado:** el código está commiteado (`70865de`) y sus tests unitarios pasan (los 197
-tests de `functions/academico/estudiantes.test.js` corren dentro de los 263 de Functions).
-**Lo que NO se hizo:** correr `npm run test:firestore-rules`, que levanta el emulador real y
-valida las reglas de verdad.
+**Cerrado el 2026-07-22.** `npm run test:firestore-rules` corrido contra el emulador de
+Firestore real: **78 tests, 78 pass, 0 fail** (Firebase CLI 15.22.1, Java 21).
 
-Se commiteó **confiando en el diff de otra sesión y en sus tests unitarios**, no en
-verificación propia contra reglas reales. Esa es exactamente la clase de confianza que esta
-misma sesión demostró que no hay que dar: el fixture de check-ins mentía sobre la forma del
-dato y los 9 tests pasaban igual; `RolUsuario.Instructor` no existía y el test pasaba igual.
+> Como la salida quedó truncada por un `tail` en la invocación, la cobertura se probó
+> contando: `firestore-rules.security.test.js` declara 4 tests y
+> `firestore-rules.behavior.test.js` declara 74 → 78 declarados = 78 corridos = 78 pasando,
+> con 0 fallos. No queda margen para que alguno se haya salteado.
 
-Concretamente falta confirmar:
+| # | Qué había que confirmar | Resultado |
+|---|---|---|
+| 1 | `firestore.rules` bloquea el `create` directo de cliente sobre `estudiantes/{id}` | ✅ Verificado contra el emulador: `assertFails(setDoc(...))` con rol Admin. `update`/`delete` siguen permitidos por `isInstructor()`, también verificado |
+| 2 | La importación masiva pasa por la callable y no por el write directo | ✅ Cadena verificada eslabón por eslabón: `ModalImportacionMasiva` → `useEstudiantes()` → `context/DataContext.tsx:290` → `estudiantesApi.agregarEstudiante` → callable `crearEstudiante` |
+| 3 | El error del límite llega a la UI de forma legible | ❌ **NO llega ningún mensaje** — ver ítem 0-C |
 
-1. Que `firestore.rules` bloquee de verdad el `create` directo de cliente sobre
-   `estudiantes/{id}` (`allow create: if false`), contra el emulador — no leyendo el diff.
-2. Que `components/ModalImportacionMasiva.tsx` pase por la callable `crearEstudiante` y no
-   por el write directo. Es el camino que más fácil se saltea el límite: invoca el alta en
-   loop, una vez por fila del archivo importado.
-3. Que el mensaje de error del límite llegue a la UI de forma legible y no como un código
-   crudo de Firebase.
+**Nota sobre la calidad de la cobertura:** de los dos tests que tocan este fix, uno es un
+`assert.match` de **regex sobre el texto de `firestore.rules`** (verifica que el archivo diga
+`allow create: if false`, no que se cumpla) y el otro es un test de comportamiento real
+contra el emulador. El que da garantía es el segundo. El primero sirve como candado contra
+ediciones accidentales del archivo, no como verificación de enforcement — conviene no
+confundirlos al leer el reporte.
 
-Comando: `npm run test:firestore-rules` (necesita el emulador de Firestore corriendo).
+**Residuo operativo:** tras la corrida quedó un `java.exe` escuchando en 8080/9150 (el
+emulador no cerró el JVM pese al SIGINT). Si una corrida posterior falla con
+`Could not start Firestore Emulator, port taken`, es eso. No se mató el proceso a propósito:
+podría ser un emulador levantado a mano para desarrollo.
+
+### 0-C. La importación masiva dice "Importación Exitosa" aunque el plan haya rechazado filas
+
+**Encontrado el 2026-07-22** verificando el punto 3 del ítem 0-A. Es una consecuencia
+directa del fix del límite que acabamos de shipear, y hace falta atenderlo con él.
+
+`components/ModalImportacionMasiva.tsx` (~línea 229):
+
+```js
+for (const row of datosRaw) {
+    try {
+        await agregarEstudiante(payload as any);
+        exitos++;
+    } catch (e) { console.error("Error en fila:", e); }   // <- se traga el error
+}
+mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
+```
+
+**Escenario:** un club importa 200 alumnos con un plan que permite 50. Resultado en pantalla:
+un cartel **verde** que dice *"Importación Exitosa: 50 alumnos registrados"*. Las 150 filas
+rechazadas desaparecen sin rastro visible — solo un `console.error` que nadie mira. El
+operador queda creyendo que los 200 están en el sistema.
+
+**Lo incómodo:** antes del enforcement server-side, los 200 entraban. Era un bug, pero
+ruidoso. Ahora el comportamiento correcto (rechazar por límite de plan) llega envuelto en un
+mensaje que dice "Exitosa". **El fix cambió un bug visible por uno silencioso.**
+
+La cadena de creación sí quedó bien — verificada eslabón por eslabón:
+`ModalImportacionMasiva` → `useEstudiantes()` → `context/DataContext.tsx:290` →
+`estudiantesApi.agregarEstudiante` → callable `crearEstudiante`. El límite **se aplica**. Lo
+que falla es exclusivamente el reporte al usuario.
+
+**Fix sugerido:** contar los fallos, distinguir el error de límite de plan del resto, y
+elegir el tipo de notificación según el resultado (`success` solo si no hubo fallos;
+`warning`/`error` si los hubo, con el detalle de cuántas filas y por qué).
+
+> **Cuidado al tocarlo:** `components/ModalImportacionMasiva.test.tsx` es **una de las 5
+> suites que ya están en rojo** en la línea base. Cualquier cambio en ese componente implica
+> entrar a esa suite; conviene arreglarla primero o al menos entender por qué falla, para no
+> confundir fallos nuevos con los preexistentes.
 
 ### 0-B. La eliminación de `Login.tsx` quedó en el commit equivocado
 
