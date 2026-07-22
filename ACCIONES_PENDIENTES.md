@@ -964,12 +964,97 @@ Con Biblioteca cerrada, el inventario de cadenas queda así:
 | **Quizzes** (crear → responder → métrica) | ✅ | `servicios/academico/quiz.integracion.test.ts` |
 | **Progreso / métricas** (visualización → analítica) | ❌ | — |
 | **Agenda** (`AgendaView`, `ModalEdicionJornada`) | ❌ | — |
-| **Vínculos e invitaciones** | ❌ | — |
+| **Identidad del acudiente** (vínculos) | ✅ | `servicios/academico/vinculoIdentidad.integracion.test.ts` |
 
-Total actual de integración: **9 suites, 103 pruebas.**
+Total actual de integración: **10 suites, 115 pruebas.**
 
-Las tres que faltan, por riesgo descendente: **Vínculos e invitaciones** (toca identidad, y
-ahí ya apareció un bug antes — ver "Tutor role broken end-to-end"), **Agenda**, **Progreso**.
+Faltan dos: **Agenda** y **Progreso / métricas**.
+
+### 4-septies. 🔴 BUG CRÍTICO ENCONTRADO Y CORREGIDO — el correo del acudiente no se normalizaba en la importación masiva
+
+**Encontrado el 2026-07-22** escribiendo `vinculoIdentidad.integracion.test.ts` (12 pruebas).
+Es la causa raíz, o al menos una causa raíz viva, del síntoma histórico *"el padre entra y no
+ve nada"* (memoria **Tutor role broken end-to-end**).
+
+#### La cadena
+
+```
+alta del estudiante  → estudiantes/{id}.tutor.correo   ← se guardaba TAL CUAL
+createInvitation()   → normaliza el email a MINÚSCULAS y crea la cuenta Auth
+login del acudiente  → usuario.email  (minúsculas, viene de Auth)
+resolveLinkedStudent → where('tutor.correo', '==', emailNormalizado)
+```
+
+La consulta de igualdad de Firestore es **exacta y sensible a mayúsculas**. Un documento
+guardado con `"Papa@Gajog.com"` **nunca** matchea `"papa@gajog.com"`. El padre recibe la
+invitación, activa la cuenta, entra… y ve una pantalla vacía. **Sin error, sin log, para
+siempre.** El sistema de invitaciones, al normalizar, *garantiza* el desencuentro.
+
+#### Ningún eslabón de escritura normalizaba
+
+| Eslabón | ¿Normalizaba `tutor.correo`? |
+|---|---|
+| `components/ModalImportacionMasiva.tsx:232` | ❌ — pero el correo del **alumno** sí, línea 219, **en el mismo objeto literal** |
+| `context/DataContext.tsx:288` → `api.agregarEstudiante` | ❌ |
+| `servicios/estudiantesApi.ts:124` → callable | ❌ |
+| `functions/academico/estudiantes.js` | ❌ — hacía spread textual del payload |
+| `hooks/useGestionEstudiantes.ts:112-120` (formulario de admin) | ✅ — **el único** |
+
+O sea: el alta por formulario quedaba bien y **la importación masiva quedaba rota** — que es
+justo como un club da de alta 100 alumnos de una.
+
+#### Un test verde certificaba lo contrario
+
+`servicios/academico/tutorStudentResolver.test.ts:78` se llama **"es case-insensitive en el
+email"**, siembra `'Papa@Test.com'`, y pasa en verde. Corre en **modo mock**
+(`isFirebaseConfigured = false`, línea 63), y el mock hace `.toLowerCase()` **de los dos
+lados**. La rama de Firestore no puede hacer eso. **El mock es más indulgente que producción,
+y el test certificaba una insensibilidad a mayúsculas que producción nunca tuvo.** Tercera
+aparición del patrón "test verde certificando el defecto".
+
+#### Arreglo aplicado
+
+- `functions/academico/estudiantes.js` — `normalizarCorreos()` sobre `correo` y `tutor.correo`.
+  Va acá porque el callable `crearEstudiante` es el **único punto** por el que pasan todas las
+  altas; normalizar sólo en el cliente deja el agujero abierto a cualquier otro llamador.
+  4 pruebas nuevas en `functions/academico/estudiantes.test.js`; mutación verificada.
+- `components/ModalImportacionMasiva.tsx:232` — `.toLowerCase().trim()`, por simetría con la
+  línea 219 y como defensa en profundidad.
+
+#### 🔴 PENDIENTE Y BLOQUEANTE — migración de los datos ya guardados
+
+**El arreglo NO toca los documentos existentes.** Todo estudiante ya creado con un
+`tutor.correo` en mayúsculas (o con espacios) **sigue invisible para su acudiente**. No hay
+forma de resolverlo desde la lectura: una consulta de igualdad de Firestore no puede ser
+case-insensitive sin un campo ya normalizado.
+
+Hace falta un script de migración que recorra `estudiantes` y normalice `correo` y
+`tutor.correo`. **Antes de cualquier demo a padres, hay que verificar cuántos documentos de
+producción están afectados** — es el bloqueante real, no el código.
+
+Fijado por caracterización en `vinculoIdentidad.integracion.test.ts` (bloque *"Caracterizacion:
+un correo GUARDADO con mayusculas deja al padre sin ver a su hijo"*): esas 3 pruebas dejan por
+escrito el silencio, para que nadie lo redescubra desde cero.
+
+#### La suposición de "todo en minúsculas" también está en las REGLAS
+
+No es sólo la consulta del cliente. `firestore.rules` compara los mismos correos como strings,
+y ahí también la igualdad es sensible a mayúsculas:
+
+| Línea | Comparación |
+|---|---|
+| `firestore.rules:182` | `isTutor() && resource.data.tutor.correo == request.auth.token.email` |
+| `firestore.rules:183` | `isEstudiante() && resource.data.correo == request.auth.token.email` |
+| `firestore.rules:489,496` | lo mismo, vía `get()` sobre el doc del estudiante, para notificaciones |
+| `firestore.rules:71-72` | `vinculos/$(request.auth.token.email + "_" + uid)` — el id del vínculo se arma concatenando el email crudo del token, mientras `vinculoService.linkTutorEstudiante` lo construye con el email **ya en minúsculas** |
+
+O sea que con un correo guardado en mayúsculas fallan **las dos capas por la misma razón**: la
+consulta no encuentra el documento y la regla tampoco lo autorizaría. Toda la cadena de
+identidad asume minúsculas, y hasta este fix un solo camino de alta lo garantizaba.
+
+**A verificar antes de la migración:** qué exactamente pone Firebase Auth en
+`request.auth.token.email` (¿respeta la capitalización del registro o normaliza?). La
+migración tiene que dejar los datos calzando con ese valor, no con una suposición.
 
 ### 4-sexies. ✅ CUBIERTA — cadena de Quiz (configurar → responder → métrica del acudiente)
 
