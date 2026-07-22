@@ -156,7 +156,57 @@ Cloud Scheduler. **Impacto: ninguno** — esas 5 siguen ejecutando su versión a
 confirma `Skipping deletes`.
 
 **Fix (manual, en Google Cloud):** otorgar a la service account de `FIREBASE_SERVICE_ACCOUNT`
-el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`). Después, *Re-run jobs*.
+el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`) en
+`https://console.cloud.google.com/iam-admin/iam?project=tudojang`.
+
+> ### ⚠️ SIGUE PENDIENTE — el verde del run #116 es engañoso
+>
+> El run #116 (merge del PR #3) salió **completamente verde, incluido el paso de functions**,
+> pero **el permiso NO se otorgó**. Confirmado con el usuario.
+>
+> Explicación más probable (inferencia, no verificada contra las tripas de Firebase): en el
+> run #113 el CÓDIGO de esas 5 funciones sí se actualizó; lo que falló fue el paso siguiente,
+> sincronizar sus horarios en Cloud Scheduler (`upsert schedule`). En el #116 el código de
+> esas funciones era **idéntico** al ya desplegado — entre ambos merges solo cambió el archivo
+> del workflow — así que Firebase no detectó cambios y **ni siquiera intentó tocar los
+> horarios**. Sin llamada a la API, sin 403.
+>
+> **Conclusión: el problema está dormido, no resuelto.** El 403 vuelve en cuanto se modifique
+> cualquiera de esas 5 funciones, se cambie un cron, o se toque `functions/index.js` de forma
+> que las alcance. Y volverá en el peor momento: desplegando un cambio real con apuro.
+>
+> Una de las cinco es **`cobroAutomaticoMensual`** — el cobro de mensualidades. No es una
+> función que convenga no poder actualizar.
+>
+> **Otorgar el permiso igual, aunque hoy el pipeline esté verde.**
+>
+> ### ✅ PERMISO OTORGADO (2026-07-22) — pendiente de verificación real
+>
+> Se agregó el rol **Administrador de Cloud Scheduler** a
+> `firebase-adminsdk-fbsvc@tudojang.iam.gserviceaccount.com`, que es la cuenta que usa CI
+> para desplegar (se identificó por sus roles: Firebase Admin, Cloud Functions Admin,
+> Storage Admin, Secret Manager Admin — y por NO tener ningún rol de Cloud Scheduler, que
+> es exactamente lo que explicaba el 403).
+>
+> **Estado honesto: otorgado, NO verificado.** Como el código de esas 5 funciones no cambió,
+> Firebase va a seguir sin tocar sus horarios y un *Re-run* daría verde por la misma razón
+> que el #116 — no porque el permiso funcione. La confirmación real llega sola la próxima
+> vez que se modifique alguna de las 5 y el deploy pase sin el 403.
+>
+> Es una medida **preventiva**: se hizo ahora para que no explote después, no para verla
+> funcionar hoy.
+>
+> ### 🔵 Higiene de seguridad detectada de paso (NO urgente, no tocar sin analizar)
+>
+> La consola marca en rojo dos cuentas con rol **Editor**, un permiso enorme y heredado:
+>
+> | Cuenta | Aviso de Google |
+> |---|---|
+> | `545628702717-compute@developer.gserviceaccount.com` | 11742/11747 permisos excedidos |
+> | `tudojang@appspot.gserviceaccount.com` | 11746/11746 permisos excedidos |
+>
+> Bajarles el rol puede romper cosas si algún servicio depende de ellas. Analizar antes de
+> tocar; queda anotado como deuda, no como acción inmediata.
 
 ### 🔴 Hallazgo 2 — Las reglas NUNCA se desplegaban (el paso mentía)
 
@@ -872,6 +922,314 @@ Juntas de mayor riesgo, en orden:
 > Las tres se cubrieron. La #3 encontro el desfase de 5 horas.
 
 </details>
+
+### 4-quater. ✅ CUBIERTA — cadena de Biblioteca (importar → clasificar → aprobar → publicar)
+
+**Hecho el 2026-07-22.** `servicios/academico/biblioteca.integracion.test.ts`, 13 pruebas.
+Es el paso 1 del Centro de Estudios y alimenta a todos los demás, así que cierra la junta
+con la publicación que ya estaba cubierta (`publicarMaterial.integracion.test.ts`).
+
+```
+importFromDrive() → updateFicha() → approveRecurso() → listarRecursosAprobados()
+                                                          ↓
+                            publishAsignacion() exige estado === 'aprobado'
+```
+
+Verificado por mutación: desactivar la guarda de ficha (1 test rojo) y desactivar la
+deduplicación de importación (2 tests rojos).
+
+**Dos hallazgos de contrato que la UI no transparenta:**
+
+| # | Hallazgo | Por qué importa |
+|---|---|---|
+| a | `archiveRecurso` **solo acepta recursos ya aprobados** — cualquier otro estado lanza "Transición inválida". El flujo real es importar → clasificar → aprobar → archivar. | No se puede archivar un recurso mal clasificado sin aprobarlo antes. Si eso no es lo deseado, es un bug de diseño del flujo, no del código. **Sin decidir.** |
+| b | `youtubeVideoId` **no va dentro de la ficha académica**: es el 5º parámetro de `updateFicha`, junto a `tituloVisible`. | Pasarlo dentro de la ficha no lanza error y no persiste nada. Falla silenciosa: el video queda sin id y el recurso se publica igual, con `youtubeVideoId: null`. Vale revisar si algún llamador de producción lo hace mal. **Sin auditar.** |
+
+**Arreglo de infraestructura:** `test-utils/fakeFirestore.ts` no soportaba `doc(collectionRef)`
+sin segmentos (id autogenerado, que es lo que hace `importFromDrive`). El path quedaba
+apuntando a la colección y el documento se escribía donde ninguna consulta lo encontraba.
+
+### 4-quinquies. 🟡 ABIERTO — cadenas de Centro de Estudios que siguen SIN integración
+
+Con Biblioteca cerrada, el inventario de cadenas queda así:
+
+| Cadena | Estado | Suite |
+|---|---|---|
+| Identidad del consultor | ✅ | `vistas/CentroEstudios.integracion.test.tsx` |
+| Cierre de jornada | ✅ | `vistas/admin/MisClasesView.integracion.test.tsx` |
+| Clase en Vivo (3 juntas) | ✅ | `claseEnVivo` + `checkInQr` + `ClaseEnVivoView` |
+| Publicación de material | ✅ | `servicios/academico/publicarMaterial.integracion.test.ts` |
+| Generación de jornadas | ✅ | `servicios/academico/generacionJornadas.integracion.test.ts` |
+| **Biblioteca** | ✅ | `servicios/academico/biblioteca.integracion.test.ts` |
+| **Quizzes** (crear → responder → métrica) | ✅ | `servicios/academico/quiz.integracion.test.ts` |
+| **Progreso / métricas** (visualización → analítica) | ❌ | — |
+| **Agenda** (edición de jornada) | ✅ | `servicios/academico/agendaJornada.integracion.test.ts` |
+| **Identidad del acudiente** (vínculos) | ✅ | `servicios/academico/vinculoIdentidad.integracion.test.ts` |
+
+Total actual de integración: **11 suites, 138 pruebas.**
+
+Falta una: **Progreso / métricas**.
+
+### 4-octies. ✅ CUBIERTA — cadena de Agenda (edición de jornada) + 🟡 un callejón sin salida en el fallback
+
+**Hecho el 2026-07-22.** `servicios/academico/agendaJornada.integracion.test.ts`, 23 pruebas.
+Cubre lo que un admin toca todos los días sobre una jornada ya existente — el medio del ciclo
+de vida, entre `generacionJornadas` (que la crea) y `MisClasesView` (que la cierra).
+
+Cuatro juntas: choque de horario, bloqueo optimista, eliminación segura, auditoría.
+
+Verificado por mutación (3, todas en rojo):
+- reintroducir el filtro por `sedeId` en la consulta de conflictos → revive el bug real de
+  2026-07-16 (mismo maestro agendado en dos sedes a la vez); lo caza el test dedicado
+- desactivar el bloqueo optimista → la segunda escritura pisa a la primera
+- ignorar `asistenciaRegistrada` → se borra una clase con historial
+
+#### 🟡 SIN DECIDIR — hay estados donde no se puede NI eliminar NI cancelar una clase
+
+`useEliminacionJornadaSegura` ofrece *"cancelar en lugar de eliminar"* ante **cualquier**
+`EliminacionNoPermitidaError`. Pero la máquina de estados de `jornadaService` no admite pasar a
+`cancelada` desde todos esos estados:
+
+| Estado (bloquea el borrado) | ¿`eliminarJornadaSegura`? | ¿`cancelarJornada`? |
+|---|---|---|
+| `en_curso` | ❌ | ✅ el fallback funciona |
+| `pendiente_cierre` | ❌ | ❌ **callejón sin salida** |
+| `cerrada` | ❌ | ❌ **callejón sin salida** |
+| `parcial` | ❌ | ❌ **callejón sin salida** |
+
+En 3 de los 4 estados "ya operada", el admin no puede eliminar la clase **y el fallback que la
+propia UI le ofrece tampoco funciona**. Y lo que ve es peor que un callejón:
+`cancelarEnLugarDeEliminar` captura el error y pone `err.message` en pantalla, así que al
+usuario le aparece el texto interno **`"Transicion invalida: cerrada -> cancelada"`** — ni
+explica ni sugiere nada.
+
+Qué debería pasar (permitir `cancelada` desde esos estados, o que la UI diga con todas las
+letras que una clase ya cerrada se conserva y no se toca, sin ofrecer un fallback que va a
+fallar) es **decisión de producto, no de código.** Fijado por caracterización en la suite
+(bloque *"Caracterizacion: hay estados donde no se puede NI eliminar NI cancelar"*).
+
+### 4-septies. 🔴 BUG CRÍTICO ENCONTRADO Y CORREGIDO — el correo del acudiente no se normalizaba en la importación masiva
+
+**Encontrado el 2026-07-22** escribiendo `vinculoIdentidad.integracion.test.ts` (12 pruebas).
+Es la causa raíz, o al menos una causa raíz viva, del síntoma histórico *"el padre entra y no
+ve nada"* (memoria **Tutor role broken end-to-end**).
+
+#### La cadena
+
+```
+alta del estudiante  → estudiantes/{id}.tutor.correo   ← se guardaba TAL CUAL
+createInvitation()   → normaliza el email a MINÚSCULAS y crea la cuenta Auth
+login del acudiente  → usuario.email  (minúsculas, viene de Auth)
+resolveLinkedStudent → where('tutor.correo', '==', emailNormalizado)
+```
+
+La consulta de igualdad de Firestore es **exacta y sensible a mayúsculas**. Un documento
+guardado con `"Papa@Gajog.com"` **nunca** matchea `"papa@gajog.com"`. El padre recibe la
+invitación, activa la cuenta, entra… y ve una pantalla vacía. **Sin error, sin log, para
+siempre.** El sistema de invitaciones, al normalizar, *garantiza* el desencuentro.
+
+#### Ningún eslabón de escritura normalizaba
+
+| Eslabón | ¿Normalizaba `tutor.correo`? |
+|---|---|
+| `components/ModalImportacionMasiva.tsx:232` | ❌ — pero el correo del **alumno** sí, línea 219, **en el mismo objeto literal** |
+| `context/DataContext.tsx:288` → `api.agregarEstudiante` | ❌ |
+| `servicios/estudiantesApi.ts:124` → callable | ❌ |
+| `functions/academico/estudiantes.js` | ❌ — hacía spread textual del payload |
+| `hooks/useGestionEstudiantes.ts:112-120` (formulario de admin) | ✅ — **el único** |
+
+O sea: el alta por formulario quedaba bien y **la importación masiva quedaba rota** — que es
+justo como un club da de alta 100 alumnos de una.
+
+#### Un test verde certificaba lo contrario
+
+`servicios/academico/tutorStudentResolver.test.ts:78` se llama **"es case-insensitive en el
+email"**, siembra `'Papa@Test.com'`, y pasa en verde. Corre en **modo mock**
+(`isFirebaseConfigured = false`, línea 63), y el mock hace `.toLowerCase()` **de los dos
+lados**. La rama de Firestore no puede hacer eso. **El mock es más indulgente que producción,
+y el test certificaba una insensibilidad a mayúsculas que producción nunca tuvo.** Tercera
+aparición del patrón "test verde certificando el defecto".
+
+#### Arreglo aplicado
+
+- `functions/academico/estudiantes.js` — `normalizarCorreos()` sobre `correo` y `tutor.correo`.
+  Va acá porque el callable `crearEstudiante` es el **único punto** por el que pasan todas las
+  altas; normalizar sólo en el cliente deja el agujero abierto a cualquier otro llamador.
+  4 pruebas nuevas en `functions/academico/estudiantes.test.js`; mutación verificada.
+- `components/ModalImportacionMasiva.tsx:232` — `.toLowerCase().trim()`, por simetría con la
+  línea 219 y como defensa en profundidad.
+
+#### 🟠 MIGRACIÓN DE DATOS — script listo, FALTA CORRERLO
+
+**El arreglo del alta NO toca los documentos existentes.** Todo estudiante ya creado con un
+`tutor.correo` en mayúsculas (o con espacios) **sigue invisible para su acudiente**. No hay
+forma de resolverlo desde la lectura: una consulta de igualdad de Firestore no puede ser
+case-insensitive sin un campo ya normalizado.
+
+**Script:** [`scripts/normalizar-correos.js`](scripts/normalizar-correos.js) — 15 pruebas en
+`scripts/normalizar-correos.test.js`, que corren solas en CI vía `npm run test:node`.
+
+```bash
+# 1) DIAGNÓSTICO — no escribe nada. Es el modo por defecto, a propósito.
+GOOGLE_APPLICATION_CREDENTIALS=/ruta/sa.json \
+  node scripts/normalizar-correos.js --proyecto tudojang
+
+# 2) APLICAR — recién después de leer el diagnóstico.
+GOOGLE_APPLICATION_CREDENTIALS=/ruta/sa.json \
+  node scripts/normalizar-correos.js --proyecto tudojang --aplicar
+```
+
+Garantías, todas cubiertas por pruebas:
+
+| Garantía | Prueba |
+|---|---|
+| Dry-run por defecto: sin `--aplicar` **cero** escrituras | `migrar: en DRY-RUN no escribe absolutamente nada` |
+| Idempotente: la segunda corrida no cambia nada | `migrar: es IDEMPOTENTE` |
+| `update` con field path anidado — no pisa `tutor.nombres`/`telefono` | `migrar: con --aplicar … deja el resto del tutor intacto` |
+| Sólo toca los documentos que hace falta | `migrar: no toca los documentos que ya estaban bien` |
+| `--tenant` acota a un solo club | `migrar: acotado por --tenant …` |
+| Reporta colisiones de correo de alumno sin resolverlas solo | `migrar: reporta las colisiones …` |
+
+**A verificar antes de aplicar:** si al normalizar dos alumnos distintos quedan con el mismo
+`correo`, el script lo reporta y **no** lo resuelve — hay que decidir a mano cuál registro
+vale. (Colisiones en `tutor.correo` son normales: un padre con dos hijos.)
+
+#### ✅ DIAGNÓSTICO CORRIDO CONTRA PRODUCCIÓN (2026-07-22) — no hay nada que migrar
+
+```
+Documentos leidos:      11
+Documentos a corregir:   0
+Colisiones:              0
+
+Cobertura:
+  con correo de alumno:    11
+  con tutor.correo usable:  9
+  SIN objeto tutor:         2
+  tutor SIN correo:         0
+  por tenant:  tnt-1770762462159 → 8 total / 8 con acudiente
+               escuela-gajog-001 → 3 total / 1 con acudiente
+```
+
+**Cero documentos afectados.** El bug era real en el camino de código, pero ningún dato de
+producción lo pisó: las altas se hicieron por el formulario de admin, que sí normalizaba. La
+importación masiva nunca se usó en serio.
+
+**El script se conserva igual** — hace falta el día que se use importación masiva, se restaure
+un backup viejo, o se migre data de otro sistema.
+
+Los 2 alumnos de `escuela-gajog-001` sin objeto `tutor` son **datos de demo** (confirmado por
+el usuario), no un hueco real de carga.
+
+#### Lección de método: "0 a corregir" no significa nada sin el denominador
+
+La primera corrida reportó únicamente `Documentos a corregir: 0`. Ese número es **ambiguo**:
+puede significar "todo está bien" o "el campo no existe en ningún documento" — y lo segundo es
+un problema peor, porque `resolveLinkedStudent` tampoco encontraría nada.
+
+Por eso el script ahora imprime **cobertura de campos antes que el conteo de correcciones**
+(`resumirCobertura()`, 2 pruebas). Y fue justamente ese desglose el que reveló el reparto por
+tenant de Gajog, invisible en el reporte original.
+
+Nota aparte: el intento de verificarlo con un `node -e` inline usando las credenciales de
+producción fue **bloqueado por el clasificador de permisos**, con razón. Esa fricción forzó la
+solución correcta — meter el diagnóstico dentro del script, con pruebas, en vez de un one-liner
+descartable.
+
+Fijado por caracterización en `vinculoIdentidad.integracion.test.ts` (bloque *"Caracterizacion:
+un correo GUARDADO con mayusculas deja al padre sin ver a su hijo"*): esas 3 pruebas dejan por
+escrito el silencio, para que nadie lo redescubra desde cero.
+
+#### La suposición de "todo en minúsculas" también está en las REGLAS
+
+No es sólo la consulta del cliente. `firestore.rules` compara los mismos correos como strings,
+y ahí también la igualdad es sensible a mayúsculas:
+
+| Línea | Comparación |
+|---|---|
+| `firestore.rules:182` | `isTutor() && resource.data.tutor.correo == request.auth.token.email` |
+| `firestore.rules:183` | `isEstudiante() && resource.data.correo == request.auth.token.email` |
+| `firestore.rules:489,496` | lo mismo, vía `get()` sobre el doc del estudiante, para notificaciones |
+| `firestore.rules:71-72` | `vinculos/$(request.auth.token.email + "_" + uid)` — el id del vínculo se arma concatenando el email crudo del token, mientras `vinculoService.linkTutorEstudiante` lo construye con el email **ya en minúsculas** |
+
+O sea que con un correo guardado en mayúsculas fallan **las dos capas por la misma razón**: la
+consulta no encuentra el documento y la regla tampoco lo autorizaría. Toda la cadena de
+identidad asume minúsculas, y hasta este fix un solo camino de alta lo garantizaba.
+
+**A verificar antes de la migración:** qué exactamente pone Firebase Auth en
+`request.auth.token.email` (¿respeta la capitalización del registro o normaliza?). La
+migración tiene que dejar los datos calzando con ese valor, no con una suposición.
+
+### 4-sexies. ✅ CUBIERTA — cadena de Quiz (configurar → responder → métrica del acudiente)
+
+**Hecho el 2026-07-22.** `servicios/academico/quiz.integracion.test.ts`, 14 pruebas.
+
+```
+QuizEditorModal → quizService.guardarQuiz(tenantId, recursoId, …)
+                     → tenants/{t}/quizzes/{recursoId}
+MaterialPreviewModal → quizService.obtenerQuiz(tenantId, asignacion.recursoId)
+                     → QuizView.enviar() → evaluarQuiz()
+                            ├→ progresoRepository.guardarQuiz()   (reanudar intento)
+                            └→ actividadService.registrarActividad()
+                                 → actividadLogs + metricasEstudiante → panel del acudiente
+```
+
+Verificado por mutación: escritura real de `quizService` ignorando el tenant (2 tests rojos)
+y recálculo de métricas sin filtro por estudiante (1 test rojo).
+
+#### 🐞 BUG ENCONTRADO Y CORREGIDO — `scoreUltimaEvaluacion` devolvía el PRIMER intento
+
+`calcularScoreUltimoQuiz` (`servicios/academico/actividadService.ts`) hacía:
+
+```ts
+.sort((a, b) => b.registradoEn.localeCompare(a.registradoEn))[0]
+```
+
+`registradoEn` es un ISO con precisión de **milisegundos** y `Array.sort` es **estable**: ante
+dos logs con el mismo timestamp el comparador devuelve 0, se conserva el orden de entrada, y
+quedaba elegido el **primer** intento. Una función llamada "último quiz" devolviendo el primero.
+
+**Cómo se encontró:** la prueba pasó 13/13 al primer intento, lo cual dio desconfianza. Cinco
+corridas seguidas → 1 en rojo. El empate de milisegundos era el culpable.
+
+**Por qué importa en producción y no es sólo un test flaky:** `registradoEn` se sella con el
+reloj del **dispositivo**. Un atraso de hora entre dos intentos (sincronización NTP, cambio
+manual, cambio de zona) basta para invertir el orden y dejar al acudiente viendo congelado un
+score viejo. Además `analisisProgresoService.ts:91` promedia `scoreUltimaEvaluacion` para las
+métricas por programa, así que el error se propagaba hacia arriba.
+
+**Arreglo:** recorrido con `>=` que deja ganar al último de la lista ante empate (orden de
+llegada, tanto en el store en memoria como en la query ordenada por `registradoEn`). Prueba de
+regresión con reloj congelado: `con timestamps EMPATADOS, la ultima evaluacion sigue siendo la
+ultima registrada`. 5 corridas consecutivas en verde.
+
+#### 🟡 SIN DECIDIR — "asignación completada" no distingue aprobar de reprobar
+
+`calcularPorcentajeConsumo` devuelve **100** apenas existe un log de tipo quiz ("intentarlo
+cuenta como consumir el material"), y `asignacionesCompletadas` cuenta todo lo que tenga
+consumo `>= 80`. Resultado: **un estudiante que saca 0% aparece con la asignación COMPLETADA.**
+
+El dato del score sí queda registrado (`promedioScoreEvaluaciones`), así que la información no
+se pierde — pero el rótulo "completadas" mezcla "abrió el material" con "lo aprobó", y es justo
+el número que el acudiente lee primero. Fijado como prueba de **caracterización** (documenta el
+comportamiento actual, no lo bendice). **Requiere decisión de producto, no de código.**
+
+#### 🟡 SIN RESOLVER — fallo de Firestore indistinguible de "quiz sin configurar"
+
+`MaterialPreviewModal.tsx:166-169`: el `catch` de `obtenerQuiz` hace `console.warn` y setea
+`preguntasQuiz = null`, que es **el mismo valor** que "nunca se configuraron preguntas". La UI
+entonces muestra *"Este quiz todavía no tiene preguntas configuradas — un Admin o Maestro puede
+cargarlas desde la Biblioteca"* aunque el admin sí las haya cargado y lo que falló sea la red.
+
+Menos grave de lo que parecía a primera vista: **no** cae a la pregunta demo hardcodeada, así
+que no se registra un score contra un quiz falso. Pero es la **sexta** aparición del patrón del
+proyecto: fallo real disfrazado de estado benigno.
+
+#### Nota de método
+
+Una mutación que hice primero (`claveMock` ignorando el tenant) tocó la rama **mock** del
+servicio, que la suite de integración no ejecuta (corre con `isFirebaseConfigured: true`). Dio
+1 test rojo — pero de `quizService.test.ts`, no de la suite nueva. **Una mutación que rompe
+otra suite no valida la tuya.** Hay que mutar la rama que el test realmente recorre.
 
 ### 13-bis. ✅ RESUELTO — script `typecheck` + causa raíz de los 3076 errores
 

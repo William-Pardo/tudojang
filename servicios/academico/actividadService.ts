@@ -127,11 +127,27 @@ function calcularPorcentajeConsumo(logs: ActividadLog[]): number {
  * Calcula el score de la última evaluación del estudiante en una asignación.
  */
 function calcularScoreUltimoQuiz(logs: ActividadLog[]): number | undefined {
-  const quizLogs = logs
-    .filter((l) => l.tipo === 'quiz')
-    .sort((a, b) => b.registradoEn.localeCompare(a.registradoEn));
+  const quizLogs = logs.filter((l) => l.tipo === 'quiz');
   if (quizLogs.length === 0) return undefined;
-  return (quizLogs[0].metadata as MetadatosQuiz).score ?? undefined;
+
+  // El desempate va al ULTIMO en llegar, no al primero.
+  //
+  // Antes esto era `.sort((a, b) => b.registradoEn.localeCompare(a.registradoEn))[0]`.
+  // `registradoEn` es un ISO con precision de MILISEGUNDOS y `Array.sort` es estable: ante
+  // dos logs con el mismo timestamp el comparador devuelve 0, se conserva el orden de
+  // entrada y quedaba seleccionado el PRIMER intento. Una funcion llamada
+  // "ultimoQuiz" devolviendo el primero, y el acudiente viendo congelado un score viejo.
+  //
+  // El empate exacto es la forma facil de reproducirlo, pero el caso real es peor:
+  // `registradoEn` se sella con el reloj del DISPOSITIVO, asi que un atraso de hora entre
+  // dos intentos (sincronizacion NTP, cambio manual) alcanza para invertir el orden.
+  // Recorrer con `>=` deja ganar siempre al ultimo de la lista ante empate, que es el orden
+  // de llegada tanto en el store en memoria como en la query ordenada por `registradoEn`.
+  const ultimo = quizLogs.reduce((mejor, actual) =>
+    actual.registradoEn >= mejor.registradoEn ? actual : mejor
+  );
+
+  return (ultimo.metadata as MetadatosQuiz).score ?? undefined;
 }
 
 /**

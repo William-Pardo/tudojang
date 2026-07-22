@@ -227,8 +227,18 @@ export const crearApiFirestoreFake = () => {
     // doc(db, 'coleccion', 'id', ...) — el primer argumento es `db` (o una ref de coleccion).
     const [primero, ...resto] = args;
     const base = primero && primero.__tipo === 'collection' ? primero.path : '';
+
+    // Forma `doc(collectionRef)` SIN segmentos: el SDK real devuelve una referencia a un
+    // documento NUEVO con id autogenerado. La usa bibliotecaService.importFromDrive para
+    // indexar recursos. Sin esta rama, el path quedaba apuntando a la coleccion y el
+    // documento se escribia en un lugar que ninguna consulta encontraba.
+    if (base && resto.length === 0) {
+      const idAutomatico = `auto-${Math.random().toString(36).slice(2, 12)}`;
+      return { __tipo: 'doc' as const, path: `${base}/${idAutomatico}`, id: idAutomatico };
+    }
+
     const path = normalizarPath([base, unirSegmentos(resto)].filter(Boolean).join('/'));
-    return { __tipo: 'doc' as const, path };
+    return { __tipo: 'doc' as const, path, id: path.split('/').pop() };
   };
 
   const collection = (...args: any[]) => {

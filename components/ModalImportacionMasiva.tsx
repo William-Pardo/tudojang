@@ -229,7 +229,14 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
                         apellidos: '',
                         numeroIdentificacion: String(row["Tutor_Identificacion"]),
                         telefono: String(row["Tutor_Telefono"]),
-                        correo: String(row["Tutor_Correo"] || '')
+                        // `.toLowerCase()` agregado 2026-07-22. Estaba en el correo del ALUMNO
+                        // (arriba) pero no en el del ACUDIENTE, en este mismo objeto. Con
+                        // mayusculas, `resolveLinkedStudent` -- que consulta con el email de
+                        // Auth ya en minusculas -- no encontraba nunca al alumno y el padre
+                        // entraba a una pantalla vacia. La Cloud Function `crearEstudiante`
+                        // tambien normaliza ahora (punto unico de estrangulamiento); esto es
+                        // defensa en profundidad y simetria con la linea de arriba.
+                        correo: String(row["Tutor_Correo"] || '').toLowerCase().trim()
                     } : undefined
                 };
                 await agregarEstudiante(payload as any);

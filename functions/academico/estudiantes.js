@@ -83,6 +83,42 @@ async function obtenerLimiteEstudiantes(firestore, tenantId) {
   return LIMITE_ESTUDIANTES_POR_PLAN[tenantData.plan] || 0;
 }
 
+// Normaliza a minusculas y sin espacios los DOS correos con los que despues se resuelve
+// identidad: el del alumno y el del acudiente.
+//
+// BUG QUE ARREGLA (2026-07-22, encontrado con las pruebas de integracion de identidad):
+// `servicios/academico/tutorStudentResolver.js::resolveLinkedStudent` resuelve los hijos de
+// un acudiente con `where('tutor.correo', '==', emailNormalizado)`, y ese email sale de
+// Auth ya en minusculas. La consulta de igualdad de Firestore es EXACTA y SENSIBLE A
+// MAYUSCULAS, asi que un doc guardado con "Papa@Gajog.com" NUNCA matchea: el padre entra y
+// ve una pantalla vacia, sin error, para siempre.
+//
+// Habia dos caminos de alta y solo uno normalizaba:
+//   - formulario de admin  -> hooks/useGestionEstudiantes.ts:112-120  SI normalizaba
+//   - importacion masiva   -> components/ModalImportacionMasiva.tsx   NO (linea 232; el
+//     correo del ALUMNO si, el del ACUDIENTE no, en el mismo objeto literal)
+// y la importacion masiva es justo como un club da de alta a 100 alumnos de una.
+//
+// Se centraliza aca porque esta Cloud Function es el UNICO punto por el que pasan todas las
+// altas (`estudiantesApi.agregarEstudiante` -> callable `crearEstudiante`); normalizar solo
+// en el cliente deja el agujero abierto para cualquier otro llamador.
+//
+// OJO: esto NO arregla los documentos YA guardados con mayusculas. Eso requiere una
+// migracion de datos. Ver ACCIONES_PENDIENTES.md.
+function normalizarCorreos(campos) {
+  const normalizado = {};
+
+  if (typeof campos.correo === 'string') {
+    normalizado.correo = campos.correo.toLowerCase().trim();
+  }
+
+  if (campos.tutor && typeof campos.tutor.correo === 'string') {
+    normalizado.tutor = { ...campos.tutor, correo: campos.tutor.correo.toLowerCase().trim() };
+  }
+
+  return normalizado;
+}
+
 /**
  * Crea un estudiante nuevo. Re-valida server-side lo que antes solo chequeaba el boton de
  * la UI (hooks/useGestionEstudiantes.ts::abrirFormulario): que no se supere
@@ -111,6 +147,7 @@ function crearServicioCrearEstudiante({ firestore }) {
     const { id: _idIgnorado, tenantId: _tenantIdIgnorado, ...camposEstudiante } = data || {};
     const payload = {
       ...camposEstudiante,
+      ...normalizarCorreos(camposEstudiante),
       historialPagos: Array.isArray(camposEstudiante.historialPagos) ? camposEstudiante.historialPagos : [],
       carnetGenerado: false,
       tenantId,
