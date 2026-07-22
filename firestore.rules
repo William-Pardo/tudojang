@@ -181,7 +181,18 @@ service cloud.firestore {
       allow read: if isInstructor()
         || (isTutor() && resource.data.tutor.correo == request.auth.token.email)
         || (isEstudiante() && resource.data.correo == request.auth.token.email);
-      allow create, update, delete: if isInstructor();
+      // Fix 2026-07-18 (bug real: puerta trasera del limite de estudiantes del plan -- el
+      // limite (`limiteEstudiantes`, plan base + addons) SOLO se validaba en el boton de
+      // la UI (hooks/useGestionEstudiantes.ts), nunca aca. Cualquier Instructor podia crear
+      // estudiantes ilimitados via un write directo -- incluida la importacion masiva, que
+      // llama al mismo punto de entrada en loop -- bypaseando el limite del plan por
+      // completo. `create` ahora pasa exclusivamente por la Cloud Function `crearEstudiante`
+      // (mismo criterio ya usado para `sedes/{id}`, ver academico/estudiantes.js).
+      // `update`/`delete` NO cambian: se usan con mucha mas frecuencia que en sedes (cambios
+      // de estado de pago, edicion de datos) y no tienen ningun hallazgo de limite asociado
+      // -- mover esos tambien a Cloud Functions es un cambio de alcance mayor al bug real.
+      allow create: if false;
+      allow update, delete: if isInstructor();
     }
 
     match /eventos/{docId} {

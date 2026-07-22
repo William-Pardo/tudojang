@@ -83,6 +83,9 @@ const {
   crearServicioDeleteSede,
 } = require("./academico/sedes");
 const {
+  crearServicioCrearEstudiante,
+} = require("./academico/estudiantes");
+const {
   crearServicioIniciarJornadasPorHorario,
   crearListadoJornadasConfirmadasFirestore,
 } = require("./academico/jornadasScheduler");
@@ -387,6 +390,10 @@ const servicioDeleteSede = crearServicioDeleteSede({
   firestore: admin.firestore()
 });
 
+const servicioCrearEstudiante = crearServicioCrearEstudiante({
+  firestore: admin.firestore()
+});
+
 const servicioGenerarDatosDemoProgreso = crearServicioGenerarDatosDemoProgreso({
   firestore: admin.firestore()
 });
@@ -631,6 +638,16 @@ exports.updateSede = functionsV1.https.onCall(
 );
 exports.deleteSede = functionsV1.https.onCall(
   crearHandlerCallable(servicioDeleteSede)
+);
+
+// Alta segura de estudiantes -- movido a Cloud Function (mismo patron de bug real que
+// sedes: el limite del plan, `tenant.limiteEstudiantes` -- que ya incluye plan base +
+// addons comprados -- solo se validaba en el boton de la UI, nunca en el servidor. Ver
+// academico/estudiantes.js para el detalle completo). `update`/`delete` de estudiantes NO
+// cambian: siguen gateados por isInstructor() en firestore.rules, sin pasar por Cloud
+// Function (uso mucho mas frecuente que sedes, fuera de alcance de este fix puntual).
+exports.crearEstudiante = functionsV1.https.onCall(
+  crearHandlerCallable(servicioCrearEstudiante)
 );
 
 // Sembrado/limpieza de datos DEMO para el panel "Progreso por Estudiante" (pedido
