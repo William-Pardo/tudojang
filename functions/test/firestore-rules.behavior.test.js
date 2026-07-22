@@ -106,6 +106,41 @@ test("student cannot list legacy admin collections", async () => {
   await assertFails(getDocs(collection(db, "estudiantes")));
 });
 
+// Fix 2026-07-18 (bug real, mismo patron ya resuelto para sedes): el limite del plan de
+// estudiantes (`tenant.limiteEstudiantes`) solo se validaba en el boton de la UI, nunca en
+// firestore.rules -- un write directo (o la importacion masiva, que llama a
+// agregarEstudiante en loop) creaba estudiantes sin limite. `create` ahora esta bloqueado
+// sin excepcion; solo la Cloud Function `crearEstudiante` puede dar de alta.
+test("admin cannot create a student directly (client write) -- must go through crearEstudiante Cloud Function", async () => {
+  const db = client("user-1", "tenant-1", "Admin");
+
+  await assertFails(
+    setDoc(doc(db, "estudiantes", "est-directo"), {
+      tenantId: "tenant-1",
+      nombres: "Intento",
+      apellidos: "Directo",
+    })
+  );
+});
+
+// update/delete de estudiantes NO cambian con este fix (a diferencia de sedes, que bloquea
+// las tres operaciones): siguen gateados por isInstructor(), sin pasar por Cloud Function.
+test("admin can still update and delete an existing student directly (unchanged by this fix)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-existente"), {
+      tenantId: "tenant-1",
+      nombres: "Ya Existe",
+    });
+  });
+
+  const db = client("user-1", "tenant-1", "Admin");
+
+  await assertSucceeds(
+    updateDoc(doc(db, "estudiantes", "est-existente"), { nombres: "Actualizado" })
+  );
+  await assertSucceeds(deleteDoc(doc(db, "estudiantes", "est-existente")));
+});
+
 test("ticket owner in the same tenant can read the ticket", async () => {
   const snapshot = await assertSucceeds(
     getDoc(doc(client("user-1", "tenant-1", "Admin"), "tickets_soporte", "ticket-1"))

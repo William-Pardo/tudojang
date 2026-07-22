@@ -2345,61 +2345,82 @@ El usuario decidio: primero depurar y unificar sobre una unica fuente de verdad 
 
 **Persistencia en Engram**: `mem_search(topic_key: 'sdd/clase-en-vivo-checkin-trigger-agenda/{proposal|spec|design|tasks}', project: 'tudojang')` — seguido de `mem_get_observation` para el contenido completo sin truncar. Esta referencia es nueva respecto al resto de este documento (los modulos 1-12 no citan Engram); se documenta aca porque el usuario pidio explicitamente conservar el guardado en Engram como caracteristica a mantener durante este trabajo.
 
-**Protocolo para continuar este trabajo** (identico al protocolo general de este archivo, ver arriba): cada fase sigue RED -> GREEN -> REFACTOR -> VERIFY -> TRACE. A diferencia de los modulos anteriores, este modulo todavia esta en estado PLANIFICADO: ninguna fase fue implementada, por eso cada sub-seccion cierra con una linea `Estado: PLANIFICADA, no iniciada` en vez del bloque completo "Registro de cierre" (que exige evidencia real de ejecucion). Cuando una fase se implemente de verdad, su sub-seccion debe reemplazar esa linea por el "Registro de cierre" estandar de este archivo.
+**Protocolo para continuar este trabajo** (identico al protocolo general de este archivo, ver arriba): cada fase sigue RED -> GREEN -> REFACTOR -> VERIFY -> TRACE. Cuando una fase se implementa de verdad, su sub-seccion reemplaza la linea `Estado: PLANIFICADA, no iniciada` por el bloque "Registro de cierre" estandar de este archivo, con evidencia real de ejecucion.
+
+> **Actualizacion (2026-07-19, auditoria de integracion Centro de Estudios/Agenda -- ver `KNOWN_ISSUES.md`).** Este documento quedo desactualizado: se construyo Bloque A (Fases 0-5) por un camino paralelo, sin pasar por este proceso SDD formal, y nadie volvio a actualizar estas sub-secciones. Verificado checkbox por checkbox contra el codigo real: **Fases 1, 2 y 4 estan COMPLETAS; Fases 0, 3 y 5 estan cumplidas en sustancia con desviaciones reales de mecanismo (documentadas en cada Registro de cierre); Fases 6 y 7 siguen NO INICIADAS de verdad** (confirmado, no es una omision). El `openspec/changes/clase-en-vivo-checkin-trigger-agenda/design.md` tampoco refleja estas desviaciones -- sigue describiendo el diseno original, no la implementacion real (por ejemplo, todavia menciona `MatricularEstudiantesModal.tsx` como si existiera).
 
 ### 13.0 Fase 0 — Roster explicito de matricula (bloqueante de todas las fases siguientes)
 
-- [ ] Modelo `InscripcionEjecucionPrograma` (`models/academico/inscripcion.ts`).
-- [ ] `inscripcionRepository.ts`/`inscripcionService.ts` con TDD (matricular/retirar/listar/estaInscrito, sugerencia por atributo sin validar pertenencia).
-- [ ] `MatricularEstudiantesModal.tsx` conectado a `AsignacionesView.tsx` (accion "Matricular estudiantes" por `EjecucionPrograma`).
-- [ ] Regla Firestore para `ejecucionesPrograma/{e}/inscripciones/{estudianteId}`, testeada contra emulador (alta/baja mismo tenant OK, cross-tenant y rol no autorizado denegado).
-- [ ] Suite en verde. **GATE — ninguna tarea de Fase 1-15 puede iniciar sin esto.**
+- [x] Modelo `InscripcionEjecucionPrograma` (`models/academico/inscripcion.ts:13-20`).
+- [x] `inscripcionRepository.ts`/`inscripcionService.ts` con TDD (matricular/retirar/listar/estaInscrito, sugerencia por atributo sin validar pertenencia).
+- [ ] ~~`MatricularEstudiantesModal.tsx` conectado a `AsignacionesView.tsx`~~ **DESCARTADO por decision de producto (2026-07-13)**, no pendiente.
+- [x] Regla Firestore para `ejecucionesPrograma/{e}/inscripciones/{estudianteId}` (`firestore.rules:293-306`), testeada contra emulador.
+- [x] Suite en verde (repo/service + reglas).
 
-Estado: PLANIFICADA, no iniciada
+Estado real (verificado 2026-07-19, ver auditoria de integracion en `KNOWN_ISSUES.md`): **PARCIAL, checklist original obsoleto en su tercer item.** El modelo/repositorio/servicio/regla de matricula EXISTEN y pasan tests reales -- pero no tienen ningun consumidor en produccion. La linea de tiempo real (cruzando `bitacora.json` DT-0023 y el commit `ada44a8`): (1) se construyo `MatricularEstudiantesModal.tsx` (roster 100% manual, el diseno original de este checklist); (2) 2026-07-11, decision de arquitectura: reemplazar por matricula automatica server-side por grupo+sede+estado de pago (`perteneceAutomaticamente`/`perteneceAEjecucion` en `functions/academico/asistencia.js:84-109`), el modal se reescribe para pre-tildar automaticamente; (3) 2026-07-13, dos dias despues, se elimina el boton/modal por completo (ver test explicito `vistas/admin/AsignacionesView.test.tsx:1207-1222`, describe `'Rediseño: se elimino Asistencia a Clase en Vivo'`) porque ni las excepciones manuales se justifican; (4) 2026-07-17, commit `ada44a8` borra el archivo fisico huerfano. **La matricula real hoy es 100% automatica, server-side, sin ninguna UI manual** -- el "roster explicito" que sigue vivo (repo/service/regla) queda como infraestructura sin caller de produccion, usada solo internamente por el callable de la Fase 1 para validar pertenencia.
 
 ### 13.1 Fase 1 — Callable de asistencia (bloqueada por Fase 0 verde)
 
-- [ ] Modelo `RegistroAsistencia` (`models/academico/asistencia.ts`).
-- [ ] Callable `asistencia.js`: rechazo por no-autenticado, rol no autorizado, tenant mismatch, `jornada.estado!=='en_curso'`, y por NO-pertenencia (estudiante existe pero sin inscripcion en `jornada.ejecucionProgramaId`, validado contra el roster de la Fase 0).
-- [ ] Toggle server-side: 1er escaneo = check-in (`horaEntrada`), 2do = check-out (`horaSalida`+`minutosAsistidos`), 3ro rechazado.
-- [ ] Registrar `exports.registrarAsistenciaJornada` en `functions/index.js`.
-- [ ] Regla Firestore `asistencias`: `allow write: if false` (solo callable), `allow read: authenticated+tenant`, testeada contra emulador.
+- [x] Modelo `RegistroAsistencia` (`models/academico/asistencia.ts:12-17`).
+- [x] Callable `asistencia.js`: rechazo por no-autenticado, rol no autorizado, tenant mismatch, `jornada.estado!=='en_curso'`, y por NO-pertenencia. Incluye un rechazo adicional no listado originalmente: `assertInstructorAsignado()` (un Editor/Maestro no asignado a la jornada no puede operarla).
+- [x] Toggle server-side: 1er escaneo = check-in, 2do = check-out, 3ro rechazado (`asistencia.js:161-180`).
+- [x] `exports.registrarAsistenciaJornada` en `functions/index.js:622`.
+- [x] Regla Firestore `asistencias`: `allow write: if false`, `allow read: authenticated+tenant` (`firestore.rules:394-398`), testeada contra emulador.
 
-Estado: PLANIFICADA, no iniciada
+### Registro de cierre — Fase 1, callable de asistencia
+
+- Fecha de verificacion: 2026-07-19 (implementacion previa, verificacion posterior en auditoria de integracion)
+- Comandos ejecutados: `node --test functions/academico/asistencia.test.js` (usar este runner directo, no Jest -- Jest reporta un falso "1 failed" al no interpretar la salida de `node:test`).
+- Resultado: 25/25 tests pasando (4+1 rechazos, matricula automatica, `gradosExcluidos`, toggle completo).
+- Reglas de `asistencias`: verdes dentro de la corrida completa de `npm run test:firestore-rules` (78/78).
+- Estado final: **COMPLETA.**
 
 ### 13.2 Fase 2 — Wiring cierre de jornada (bloqueada por Fase 1 verde)
 
-- [ ] `asistenciaRepository.ts`/`asistenciaService.ts` — `contarCheckIns()`/`calcularMinutosAsistidos()` puras.
-- [ ] `JornadasView.tsx`: `asistenciaRegistrada` deriva de `contarCheckIns()>0` en vez de checkbox manual; firma de `cerrarJornada()` sin cambios.
-- [ ] Test de regresion: cierre sin check-ins se comporta igual que hoy.
+- [x] `asistenciaRepository.ts`/`asistenciaService.ts` — `contarCheckIns()` (`asistenciaService.ts:12`) / `calcularMinutosAsistidos()` (`:18`) puras.
+- [x] `JornadasView.tsx`: `asistenciaRegistrada` deriva de `contarCheckIns()>0` (`JornadasView.tsx:134`), firma de `cerrarJornada()` sin cambios.
+- [x] Test de regresion presente y verde.
 
-Estado: PLANIFICADA, no iniciada
+### Registro de cierre — Fase 2, wiring cierre de jornada
+
+- Estado final: **COMPLETA.**
+- **Nota (2026-07-19):** el mismo gap que esta fase resolvia para `JornadasView.tsx` existia tambien, sin resolver, en `vistas/admin/MisClasesView.tsx` -- la pantalla que en produccion real cierra las jornadas disparadas desde Agenda (no `JornadasView.tsx`, que usa jornadas sinteticas en memoria). Esa vista seguia con un checkbox manual (`asistenciaPorJornadaId`) hasta que se corrigio con el mismo patron en la auditoria de integracion Centro de Estudios/Agenda (ver `KNOWN_ISSUES.md`, hallazgo #5). Este archivo no formaba parte del alcance original de la Fase 2.
 
 ### 13.3 Fase 3 — Rewire de escaneo (bloqueada por Fase 1 verde)
 
-- [ ] `EscanerAsistencia.tsx`: props `sedeId` -> `jornadaId,tenantId`; llama al callable `registrarAsistenciaJornada` en vez de `api.registrarEntrada`.
-- [ ] `ClaseEnVivoView.tsx` reescrita in-place: recibe `jornadaId` real por ruta, monta `EscanerAsistencia`, lista check-ins en vivo; maneja jornada inexistente/no `en_curso`.
+- [ ] ~~`EscanerAsistencia.tsx`: props `sedeId` -> `jornadaId,tenantId`~~ **NO se hizo asi -- desviacion real, ver nota abajo.**
+- [x] `ClaseEnVivoView.tsx` reescrita: recibe `jornadaId` real por ruta (`useParams`), monta el escaner nuevo, lista check-ins en vivo, maneja jornada inexistente/no `en_curso`.
 
-Estado: PLANIFICADA, no iniciada
+### Registro de cierre — Fase 3, rewire de escaneo
+
+- **Desviacion real (confirmada 2026-07-19):** `components/EscanerAsistencia.tsx` sigue con sus props originales (`sedeId`/`onClose`) sin ningun cambio -- es un componente vivo y activo hoy, usado por `vistas/GestionClase.tsx` (flujo de guarderia/entrega a tutores via `api.registrarEntrada`). Cambiarle las props lo habria roto. En su lugar se creo un componente **nuevo**, `components/academico/EscanerAsistenciaClase.tsx`, con las props `tenantId`/`jornadaId`/`onClose`/`onRegistrado` que el checklist original pedia, llamando al callable `registrarAsistenciaJornada` de la Fase 1 (via `servicios/academico/asistenciaClaseService.ts`). Es el que usa `ClaseEnVivoView.tsx` hoy. Ambos componentes son reales y activos, sirviendo features distintas -- ninguno es codigo muerto.
+- Estado final: **COMPLETA en sustancia** (el objetivo funcional -- escaneo real de Clase en Vivo sobre el callable de Fase 1 -- esta 100% logrado y probado), **con mecanismo distinto al descrito** (componente hermano nuevo en vez de modificar el existente).
 
 ### 13.4 Fase 4 — Ventana dinamica + trigger de Agenda (bloqueada por Fase 3 verde)
 
-- [ ] `ventanaClaseEnVivoService.ts` puro: `calcularVentanaClaseEnVivo(jornadas, ahoraIso)`, ventana `[horaInicio-15min, horaFin+15min]` (cierre anclado a `horaFin`, corrige el diseño previo que ancoraba a `horaInicio`).
-- [ ] `hooks/useVentanaClaseEnVivo.ts` con polling de 60s.
-- [ ] `App.tsx:29-30,68,73-89,334` — quitar el placeholder `showClaseEnVivo=true` y usar el hook real; ruta `/clase-en-vivo/:jornadaId`.
-- [ ] `vistas/Horarios.tsx` — boton "Iniciar Clase en Vivo" navega con `jornadaId` real (no `jornada-demo`).
-- [ ] Caso sin jornada activa: acceso impedido o estado vacio explicito.
+- [x] `ventanaClaseEnVivoService.ts` puro: `calcularVentanaClaseEnVivo(jornadas, ahoraIso)` (`:133-145`), ventana `[horaInicio-15min, horaFin+15min]` (constantes locales `:13-14`, cierre anclado a `horaFin` linea 36).
+- [x] `hooks/useVentanaClaseEnVivo.ts` con polling de 60s (`INTERVALO_RECALCULO_MS = 60_000`, `:24`).
+- [x] `App.tsx` sin el placeholder `showClaseEnVivo=true`, usando el hook real (`:42,73,101`); ruta `/clase-en-vivo/:jornadaId` (`:419-420`).
+- [x] `vistas/Horarios.tsx` — boton "Iniciar Clase en Vivo" navega con `jornadaId` real (`:268,272`).
+- [x] Caso sin jornada activa: manejado en `ClaseEnVivoView.tsx:124-142`.
 
-Estado: PLANIFICADA, no iniciada
+### Registro de cierre — Fase 4, ventana dinamica + trigger de Agenda
+
+- Comandos ejecutados: `npx jest ventanaClaseEnVivoService.test.ts useVentanaClaseEnVivo.test.ts` -- verdes.
+- Estado final: **COMPLETA.**
 
 ### 13.5 Fase 5 — Archivo del Sistema A/C viejo (bloqueada por Fases 3 y 4 verdes)
 
-- [ ] `git mv servicios/claseEnVivoApi.ts servicios/asistenciaQrApi.ts` y `ClaseEnVivoView.tsx` original hacia `_archive/sistema-b-clase-en-vivo/`.
-- [ ] Eliminar reglas huerfanas `clases_en_vivo`/`asistencias_jornada` (`firestore.rules:176-191`) y su suite aislada `firestore-rules.etapa8.test.js`.
-- [ ] Eliminar tests que prueban codigo archivado (`ClaseEnVivoIntegracion.test.tsx`, `claseEnVivoApi.test.ts`, `asistenciaQrApi.test.ts`) y los tipos `JornadaAcademica`/`ClaseEnVivo`/`EventoAsistenciaQr`/`AsistenciaJornada` de `tipos.ts:565-639`.
-- [ ] Grep de referencias residuales en todo el repo — 0 resultados; suite completa + build en verde.
+- [ ] ~~`git mv servicios/claseEnVivoApi.ts servicios/asistenciaQrApi.ts` y `ClaseEnVivoView.tsx` original hacia `_archive/`~~ **No aplicable, ver nota.**
+- [x] Reglas huerfanas `clases_en_vivo`/`asistencias_jornada` eliminadas de `firestore.rules` (confirmado: 0 coincidencias hoy).
+- [x] Tipos `JornadaAcademica`/`ClaseEnVivo`/`EventoAsistenciaQr`/`AsistenciaJornada` eliminados de `tipos.ts` (confirmado: 0 coincidencias hoy).
+- [x] Grep de referencias residuales: solo aparecen en `.md` de documentacion o comentarios historicos -- cero `import`/`require` vivo.
 
-Estado: PLANIFICADA, no iniciada
+### Registro de cierre — Fase 5, archivo del sistema viejo
+
+- **Desviacion real (confirmada 2026-07-19):** `servicios/claseEnVivoApi.ts`/`asistenciaQrApi.ts` **nunca estuvieron trackeados en git** en ningun commit de este repo (existian solo como archivos sin commitear en el arbol de trabajo) -- por lo tanto `git mv` a `_archive/` era literalmente imposible de ejecutar. Se borraron directo, sin historia que preservar. `ClaseEnVivoView.tsx` original tampoco se "archivo": la Fase 3 lo reescribio in-place, asi que para cuando llego la Fase 5 ya no habia nada que mover. No hay directorio `_archive/` en el repo.
+- No se pudo confirmar la existencia historica de los 3 archivos de test nombrados en el checklist original (`ClaseEnVivoIntegracion.test.tsx`, `claseEnVivoApi.test.ts`, `asistenciaQrApi.test.ts`) -- cero commits en `git log --all` para cualquiera de los tres. Es posible que nunca hayan existido como archivos trackeados, o que el checklist se haya escrito de forma prospectiva.
+- Estado final: **CUMPLIDA EN SUSTANCIA** (cero rastro funcional del sistema viejo: reglas fuera, tipos fuera, cero imports vivos), **con mecanismo distinto al descrito** (borrado directo, no archivado con historia).
 
 ### 13.6 Fase 6 — E2E y verificacion manual Bloque A (bloqueada por Fase 5 verde)
 
@@ -2408,7 +2429,7 @@ Estado: PLANIFICADA, no iniciada
 - [ ] Actualizar `design.md` con desviaciones encontradas durante el apply.
 - [ ] **GATE bloqueante Bloque A -> Bloque B**: correr `sdd-verify` de las Fases 0-6. El Bloque B (Fase 7 en adelante) no arranca hasta que ese `sdd-verify` confirme 0 regresiones — construir sobre un Bloque A no verificado reproduciria el problema original de conexiones rotas/multiples fuentes de verdad.
 
-Estado: PLANIFICADA, no iniciada
+Estado: PLANIFICADA, no iniciada (confirmado activamente 2026-07-19, no es una omision: el spec de Cypress sigue con el checkbox/ruta viejos, no existe `verify-report.md`, `design.md` no tiene las desviaciones documentadas. Detalle completo en `KNOWN_ISSUES.md`, hallazgo "E2E Cypress roto" -- pausado a pedido explicito del usuario).
 
 ### 13.7 Fase 7 — Constantes centralizadas cross-runtime (bloqueada por el GATE Bloque A -> B)
 
@@ -2418,7 +2439,7 @@ Estado: PLANIFICADA, no iniciada
 - [ ] `ventanaClaseEnVivoService.ts` consume las constantes centralizadas en vez de los valores locales de la Fase 4.
 - [ ] Callable `asistencia.js` rechaza check-in/check-out fuera de `[horaInicio-15,horaFin+15]` server-side, aunque el cliente oculte el boton.
 
-Estado: PLANIFICADA, no iniciada
+Estado: PLANIFICADA, no iniciada (confirmado activamente 2026-07-19: 0 de 5 checkboxes. Las constantes 15/15 siguen locales a `ventanaClaseEnVivoService.ts`, con un comentario propio del archivo que remite explícitamente a esta Fase 7 pendiente. El callable de asistencia no valida ventana horaria server-side todavía -- solo `jornada.estado`.)
 
 ### 13.8 Fase 8 — Check-in/check-out completos (bloqueada por Fase 7 verde)
 
