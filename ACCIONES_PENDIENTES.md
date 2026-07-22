@@ -1052,13 +1052,50 @@ Garantías, todas cubiertas por pruebas:
 | `--tenant` acota a un solo club | `migrar: acotado por --tenant …` |
 | Reporta colisiones de correo de alumno sin resolverlas solo | `migrar: reporta las colisiones …` |
 
-**Paso que falta y que es el bloqueante real:** correr el **diagnóstico** contra producción
-para saber cuántos documentos están afectados. Hasta que ese número no se conozca, no se sabe
-si la demo a padres funciona o no.
-
 **A verificar antes de aplicar:** si al normalizar dos alumnos distintos quedan con el mismo
 `correo`, el script lo reporta y **no** lo resuelve — hay que decidir a mano cuál registro
 vale. (Colisiones en `tutor.correo` son normales: un padre con dos hijos.)
+
+#### ✅ DIAGNÓSTICO CORRIDO CONTRA PRODUCCIÓN (2026-07-22) — no hay nada que migrar
+
+```
+Documentos leidos:      11
+Documentos a corregir:   0
+Colisiones:              0
+
+Cobertura:
+  con correo de alumno:    11
+  con tutor.correo usable:  9
+  SIN objeto tutor:         2
+  tutor SIN correo:         0
+  por tenant:  tnt-1770762462159 → 8 total / 8 con acudiente
+               escuela-gajog-001 → 3 total / 1 con acudiente
+```
+
+**Cero documentos afectados.** El bug era real en el camino de código, pero ningún dato de
+producción lo pisó: las altas se hicieron por el formulario de admin, que sí normalizaba. La
+importación masiva nunca se usó en serio.
+
+**El script se conserva igual** — hace falta el día que se use importación masiva, se restaure
+un backup viejo, o se migre data de otro sistema.
+
+Los 2 alumnos de `escuela-gajog-001` sin objeto `tutor` son **datos de demo** (confirmado por
+el usuario), no un hueco real de carga.
+
+#### Lección de método: "0 a corregir" no significa nada sin el denominador
+
+La primera corrida reportó únicamente `Documentos a corregir: 0`. Ese número es **ambiguo**:
+puede significar "todo está bien" o "el campo no existe en ningún documento" — y lo segundo es
+un problema peor, porque `resolveLinkedStudent` tampoco encontraría nada.
+
+Por eso el script ahora imprime **cobertura de campos antes que el conteo de correcciones**
+(`resumirCobertura()`, 2 pruebas). Y fue justamente ese desglose el que reveló el reparto por
+tenant de Gajog, invisible en el reporte original.
+
+Nota aparte: el intento de verificarlo con un `node -e` inline usando las credenciales de
+producción fue **bloqueado por el clasificador de permisos**, con razón. Esa fricción forzó la
+solución correcta — meter el diagnóstico dentro del script, con pruebas, en vez de un one-liner
+descartable.
 
 Fijado por caracterización en `vinculoIdentidad.integracion.test.ts` (bloque *"Caracterizacion:
 un correo GUARDADO con mayusculas deja al padre sin ver a su hijo"*): esas 3 pruebas dejan por

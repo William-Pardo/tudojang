@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   planificarNormalizacion,
+  resumirCobertura,
   detectarColisionesDeCorreo,
   parsearArgumentos,
   migrar,
@@ -204,4 +205,32 @@ test('migrar: reporta las colisiones de correo de alumno', async () => {
 
   assert.equal(res.colisiones.length, 1);
   assert.equal(res.colisiones[0].correo, 'juan@gajog.com');
+});
+
+// --- Cobertura de campos (el denominador del diagnostico) -------------------------------
+
+test('resumirCobertura: distingue "todo bien" de "el campo no existe"', () => {
+  const r = resumirCobertura([
+    { id: 'a', datos: { tenantId: 't1', correo: 'a@x.com', tutor: { correo: 'p@x.com' } } },
+    { id: 'b', datos: { tenantId: 't1', correo: 'b@x.com' } },                    // sin tutor
+    { id: 'c', datos: { tenantId: 't2', tutor: { nombres: 'MARIA' } } },          // tutor sin correo
+    { id: 'd', datos: { tenantId: 't2', tutor: { correo: '   ' } } },             // correo vacio
+  ]);
+
+  assert.equal(r.total, 4);
+  assert.equal(r.conCorreoAlumno, 2);
+  assert.equal(r.conCorreoTutor, 1);
+  assert.equal(r.sinObjetoTutor, 1);
+  assert.equal(r.tutorSinCorreo, 2);
+  assert.deepEqual(r.porTenant, {
+    t1: { total: 2, conTutorCorreo: 1 },
+    t2: { total: 2, conTutorCorreo: 0 },
+  });
+});
+
+test('resumirCobertura: 0 documentos no rompe', () => {
+  assert.deepEqual(resumirCobertura([]), {
+    total: 0, conCorreoAlumno: 0, sinObjetoTutor: 0, tutorSinCorreo: 0,
+    conCorreoTutor: 0, porTenant: {},
+  });
 });

@@ -107,6 +107,50 @@ function detectarColisionesDeCorreo(documentos) {
     .map(([correo, ids]) => ({ correo, ids }));
 }
 
+/**
+ * Cuenta cuantos documentos tienen SIQUIERA los campos que esta migracion normaliza.
+ *
+ * Por que hace falta: "0 documentos a corregir" es ambiguo. Puede significar que todo esta
+ * bien, o que el campo no existe en ningun lado -- y lo segundo es un problema peor, porque
+ * `resolveLinkedStudent` tampoco encontraria nada. Sin el denominador, el diagnostico no
+ * dice nada. (Se descubrio corriendo el diagnostico real contra produccion el 2026-07-22:
+ * dio "0 a corregir" sobre 11 documentos y no habia forma de saber cual de los dos casos era.)
+ */
+function resumirCobertura(documentos) {
+  const resumen = {
+    total: documentos.length,
+    conCorreoAlumno: 0,
+    sinObjetoTutor: 0,
+    tutorSinCorreo: 0,
+    conCorreoTutor: 0,
+    porTenant: {},
+  };
+
+  for (const { datos } of documentos) {
+    const tenant = (datos && datos.tenantId) || '(sin tenant)';
+    // Por tenant se lleva total Y cuantos tienen acudiente: un club donde la mayoria de los
+    // alumnos no tiene `tutor.correo` no puede mostrarle nada a ningun padre, aunque los
+    // correos que existan esten perfectamente normalizados.
+    const t = resumen.porTenant[tenant] || { total: 0, conTutorCorreo: 0 };
+    t.total += 1;
+    if (datos && datos.tutor && typeof datos.tutor.correo === 'string' && datos.tutor.correo.trim()) {
+      t.conTutorCorreo += 1;
+    }
+    resumen.porTenant[tenant] = t;
+
+    if (datos && typeof datos.correo === 'string' && datos.correo.trim()) {
+      resumen.conCorreoAlumno += 1;
+    }
+
+    if (!datos || !datos.tutor) resumen.sinObjetoTutor += 1;
+    else if (typeof datos.tutor.correo !== 'string' || !datos.tutor.correo.trim()) {
+      resumen.tutorSinCorreo += 1;
+    } else resumen.conCorreoTutor += 1;
+  }
+
+  return resumen;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -134,6 +178,17 @@ async function migrar({ firestore, tenant, aplicar, log = console.log }) {
   const documentos = snap.docs.map((d) => ({ id: d.id, datos: d.data() }));
 
   log(`Documentos leidos: ${documentos.length}${tenant ? ` (tenant ${tenant})` : ''}`);
+
+  // El denominador antes que el numerador: sin esto, "0 a corregir" es ambiguo.
+  const cobertura = resumirCobertura(documentos);
+  log('');
+  log('Cobertura de los campos que esta migracion normaliza:');
+  log(`  con correo de alumno:    ${cobertura.conCorreoAlumno}`);
+  log(`  con tutor.correo usable: ${cobertura.conCorreoTutor}`);
+  log(`  SIN objeto tutor:        ${cobertura.sinObjetoTutor}`);
+  log(`  tutor SIN correo:        ${cobertura.tutorSinCorreo}`);
+  log(`  por tenant:              ${JSON.stringify(cobertura.porTenant)}`);
+  log('');
 
   const pendientes = [];
   for (const doc of documentos) {
@@ -210,6 +265,7 @@ if (process.argv[1] && process.argv[1].endsWith('normalizar-correos.js')) {
 
 export {
   planificarNormalizacion,
+  resumirCobertura,
   detectarColisionesDeCorreo,
   parsearArgumentos,
   migrar,
