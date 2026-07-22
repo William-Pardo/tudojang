@@ -137,6 +137,31 @@ export interface AvanceAsignacion {
   ultimaActividadEn?: string;
 }
 
+/** Nota mínima (sobre 100) para que un quiz cuente como asignación aprobada/completada. */
+export const UMBRAL_APROBACION_QUIZ = 70;
+
+/** Consumo mínimo (0–100) para que un material NO-quiz cuente como completado. */
+export const UMBRAL_CONSUMO_COMPLETADO = 80;
+
+/**
+ * ¿El estudiante COMPLETÓ esta asignación?
+ *
+ * Fuente única de verdad para el rótulo "completada" que ve el acudiente. Decisión de
+ * producto (2026-07-22):
+ *   - quiz: contar como completada SOLO si aprobó (score >= 70). Intentar y reprobar NO es
+ *     completar -- antes bastaba con haberlo intentado y un 0% figuraba como completado.
+ *   - resto (video, pdf, etc.): consumió >= 80% del material, como hasta ahora.
+ *
+ * El consumo (`porcentajeConsumo`) y el score se siguen guardando aparte: esto solo cambia
+ * cómo se CUENTA una asignación como completada, no la información registrada.
+ */
+export function avanceAsignacionCompletado(avance: AvanceAsignacion): boolean {
+  if (avance.tipoRecurso === 'quiz') {
+    return (avance.scoreUltimaEvaluacion ?? 0) >= UMBRAL_APROBACION_QUIZ;
+  }
+  return avance.porcentajeConsumo >= UMBRAL_CONSUMO_COMPLETADO;
+}
+
 /**
  * Documento en Firestore con las métricas agregadas de un estudiante.
  * Colección: `tenants/{tenantId}/metricasEstudiante/{estudianteId}`

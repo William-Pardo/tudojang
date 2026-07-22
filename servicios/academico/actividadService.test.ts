@@ -206,6 +206,23 @@ describe('actividadService — modo local', () => {
       expect(metricas[0].asignacionesCompletadas).toBe(1);
     });
 
+    it('un quiz REPROBADO no cuenta como asignacion completada', async () => {
+      // Regla de producto (2026-07-22): completar un quiz es APROBARLO (>=70).
+      await service.registrarActividad({
+        tenantId: 'tenant-1',
+        estudianteId: 'est-1',
+        asignacionId: 'asig-quiz',
+        recursoId: 'rec-quiz',
+        tipo: 'quiz',
+        metadata: { totalPreguntas: 10, correctas: 4, incorrectas: 6, score: 40 },
+      });
+
+      const { metricas } = await service.obtenerMetricas({ tenantId: 'tenant-1', estudianteId: 'est-1' });
+      // Consumo 100 (lo intento) pero NO completada (reprobo).
+      expect(metricas[0].asignacionesIniciadas).toBe(1);
+      expect(metricas[0].asignacionesCompletadas).toBe(0);
+    });
+
     it('no mezcla métricas entre estudiantes', async () => {
       await service.registrarActividad({
         tenantId: 'tenant-1',

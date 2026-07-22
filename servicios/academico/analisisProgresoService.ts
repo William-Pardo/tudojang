@@ -9,6 +9,7 @@
 // -- no se agrega ninguna colección ni campo nuevo en Firestore).
 
 import type { MetricasEstudiante, AvanceAsignacion, TipoActividad } from '../../models/academico/actividad';
+import { avanceAsignacionCompletado } from '../../models/academico/actividad';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { JornadaInstruccion } from '../../models/academico/jornada';
 import type { ProgramaAcademico } from '../../models/academico/programa';
@@ -79,7 +80,7 @@ export function escalarMetricasAPrograma(
 
   const totalAsignaciones = avanceDelPrograma.length;
   const asignacionesIniciadas = avanceDelPrograma.filter((a) => a.porcentajeConsumo > 0).length;
-  const asignacionesCompletadas = avanceDelPrograma.filter((a) => a.porcentajeConsumo >= 80).length;
+  const asignacionesCompletadas = avanceDelPrograma.filter(avanceAsignacionCompletado).length;
   const porcentajeGlobalConsumo = Math.round(
     avanceDelPrograma.reduce((suma, a) => suma + a.porcentajeConsumo, 0) / totalAsignaciones
   );
@@ -178,7 +179,10 @@ export function calcularMetricasPorMaterial(
     );
     const tiempoReaccionPromedioHoras = horasReaccion.reduce((s, h) => s + h, 0) / horasReaccion.length;
 
-    const completados = iniciados.filter((a) => a.porcentajeConsumo >= PORCENTAJE_FINALIZACION_ALTA).length;
+    // Misma regla de "completado" que el resto del panel (avanceAsignacionCompletado): para un
+    // quiz, "finalizar" es APROBAR (>=70), no solo intentarlo. Asi un material donde todos
+    // entran pero reprueban cae en "engancha pero decepciona", que es la señal correcta.
+    const completados = iniciados.filter(avanceAsignacionCompletado).length;
     const porcentajeFinalizacion = Math.round((completados / iniciados.length) * 100);
 
     const reaccionRapida = tiempoReaccionPromedioHoras < HORAS_REACCION_RAPIDA;
