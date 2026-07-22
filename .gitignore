@@ -20,6 +20,17 @@ coverage/
 !package.json
 !package-lock.json
 !**/package.json
+# Fuente unica de verdad de precios y limites de plan. NO es un reporte generado: lo
+# consumen constantes.ts (frontend) y functions/{wompiCobroAutomatico,academico/sedes,
+# academico/estudiantes}.js (Cloud Functions). Sin esta excepcion la regla `*.json` de
+# arriba lo dejaba fuera de git y en un clone limpio / CI el build reventaba.
+#
+# VIVE DENTRO DE functions/ A PROPOSITO: firebase.json declara `"source": "functions"`, asi
+# que el deploy empaqueta y sube UNICAMENTE esa carpeta. Con el archivo en la raiz del repo,
+# los `require('../../planes-config.json')` resolvian fuera del paquete y las tres Functions
+# se caian con MODULE_NOT_FOUND en cold start. El frontend lo importa hacia adentro
+# (`./functions/planes-config.json`), que si funciona porque Vite construye desde la raiz.
+!functions/planes-config.json
 !**/package-lock.json
 !tsconfig.json
 !tsconfig.*.json

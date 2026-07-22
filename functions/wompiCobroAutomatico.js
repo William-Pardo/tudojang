@@ -14,22 +14,12 @@ const WOMPI_API_BASE = 'https://production.wompi.co/v1';
 // functions/ es JS puro y no puede importar ese archivo TS del frontend.
 const WOMPI_PUBLIC_KEY = 'pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB';
 
-// Duplicado de PLANES_SAAS / COSTOS_ADICIONALES en constantes.ts (raíz del repo).
-// functions/ es JS puro y no puede importar ese archivo TS del frontend -- MANTENER EN
-// SINCRONÍA manualmente si esos valores cambian ahí. `precio` está en pesos COP (no
+// Fuente única de verdad para los valores numéricos de planes/addons: planes-config.json
+// (raíz del repo), también consumido por constantes.ts (frontend) y por
+// academico/sedes.js / academico/estudiantes.js. `precio` está en pesos COP (no
 // centavos); la conversión a amount_in_cents (*100) espeja construirUrlCheckoutWompi en
 // servicios/wompiApi.ts.
-const PLANES_SAAS = {
-  starter: { precio: 200000, limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2 },
-  growth: { precio: 540000, limiteEstudiantes: 150, limiteUsuarios: 5, limiteSedes: 3 },
-  pro: { precio: 1200000, limiteEstudiantes: 350, limiteUsuarios: 10, limiteSedes: 6 },
-};
-
-const COSTOS_ADICIONALES = {
-  estudiantes: { cantidad: 10, precio: 36000 },
-  instructor: { cantidad: 1, precio: 36000 },
-  sede: { cantidad: 1, precio: 89900 },
-};
+const { planes: PLANES_SAAS, addons: COSTOS_ADICIONALES } = require('./planes-config.json');
 
 const MAX_INTENTOS_FALLIDOS = 3;
 

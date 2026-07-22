@@ -16,17 +16,17 @@
 
 'use strict';
 
+const { planes: PLANES_SAAS } = require('../planes-config.json');
+
 const crearError = (code, message) => Object.assign(new Error(message), { code });
 
-// Debe mantenerse en sync con PLANES_SAAS (constantes.ts, frontend) -- se replica aca
-// solo el campo `limiteSedes` porque es el unico que esta funcion necesita validar
-// server-side. El resto del plan (precio, caracteristicas, etc.) es informativo y vive
-// solo en el frontend.
-const LIMITE_SEDES_POR_PLAN = {
-  starter: 2,
-  growth: 3,
-  pro: 6,
-};
+// Derivado de planes-config.json (fuente unica de verdad, compartida con constantes.ts
+// del frontend y con wompiCobroAutomatico.js) -- se extrae solo el campo `limiteSedes`
+// porque es el unico que esta funcion necesita validar server-side. El resto del plan
+// (precio, caracteristicas, etc.) es informativo y vive solo en el frontend.
+const LIMITE_SEDES_POR_PLAN = Object.fromEntries(
+  Object.entries(PLANES_SAAS).map(([plan, datos]) => [plan, datos.limiteSedes])
+);
 
 const CAMPOS_PERMITIDOS = ['nombre', 'direccion', 'ciudad', 'telefono', 'valorMensualidad'];
 
