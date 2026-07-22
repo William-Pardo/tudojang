@@ -962,13 +962,46 @@ Con Biblioteca cerrada, el inventario de cadenas queda así:
 | Generación de jornadas | ✅ | `servicios/academico/generacionJornadas.integracion.test.ts` |
 | **Biblioteca** | ✅ | `servicios/academico/biblioteca.integracion.test.ts` |
 | **Quizzes** (crear → responder → métrica) | ✅ | `servicios/academico/quiz.integracion.test.ts` |
-| **Progreso / métricas** (visualización → analítica) | ❌ | — |
+| **Progreso / métricas** (visualización → analítica) | ✅ | `servicios/academico/progresoAnalitica.integracion.test.ts` |
 | **Agenda** (edición de jornada) | ✅ | `servicios/academico/agendaJornada.integracion.test.ts` |
 | **Identidad del acudiente** (vínculos) | ✅ | `servicios/academico/vinculoIdentidad.integracion.test.ts` |
 
-Total actual de integración: **11 suites, 138 pruebas.**
+Total actual de integración: **12 suites, 147 pruebas.**
 
-Falta una: **Progreso / métricas**.
+**Las 7 cadenas del Centro de Estudios quedan con cobertura de integración.** ✅
+
+### 4-nonies. ✅ CUBIERTA — cadena de Progreso / métricas (analítica del panel del acudiente)
+
+**Hecho el 2026-07-22.** `servicios/academico/progresoAnalitica.integracion.test.ts`, 9 pruebas.
+Es la última cadena y la que el acudiente **mira**: el panel de progreso.
+
+La escritura de métricas ya estaba cubierta por `quiz.integracion` (responder → log →
+`metricasEstudiante`). Lo que faltaba, y un unitario de `analisisProgresoService` **no puede**
+cubrir, es el cruce real a través de **tres repositorios distintos**:
+
+```
+metricasEstudiante.avancePorAsignacion[].asignacionId
+  → asignaciones/{id}.jornadaId
+     → jornadas/{id}.programaId
+        → programasAcademicos/{id}.nombre
+```
+
+El unitario arma ese mapa a mano con arrays literales, así que nunca verifica que los IDs
+**guardados** en cada colección encajen a través del camino de lectura real. Si una asignación
+apunta a una jornada borrada, o el `programaId` no matchea, el filtro por programa del panel
+queda vacío **en silencio** — la misma clase de falla muda que ya mordió en identidad. La suite
+siembra las cuatro colecciones y corre `obtenerMetricas` + `listarAsignacionesPorTenant` +
+`listarJornadasPorTenant` + `listarProgramasPorTenant` reales, y recién ahí arma el cruce.
+
+Cubre los tres eslabones rotos posibles (asignación sin `jornadaId` = material directo, jornada
+inexistente, programa inexistente): ninguno revienta el panel, todos dejan la asignación sin
+programa, que es el comportamiento correcto. Más aislamiento por tenant en la lectura y el
+dashboard "Por Material" (reacción + finalización) alimentado por `fechaApertura` real.
+
+Verificado por mutación (2, ambas en rojo): `listarAsignacionesPorTenant` leyendo un tenant
+fijo (4 tests rojos), y el cruce inventando un programa cuando la jornada no lo tiene (1 test).
+
+**No apareció ningún bug de fondo en esta cadena** — la analítica ya estaba bien construida.
 
 ### 4-octies. ✅ CUBIERTA — cadena de Agenda (edición de jornada) + 🟡 un callejón sin salida en el fallback
 
