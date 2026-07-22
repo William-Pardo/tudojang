@@ -1270,6 +1270,23 @@ se pierde — pero el rótulo "completadas" mezcla "abrió el material" con "lo 
 el número que el acudiente lee primero. Fijado como prueba de **caracterización** (documenta el
 comportamiento actual, no lo bendice). **Requiere decisión de producto, no de código.**
 
+#### ✅ RESUELTO (2026-07-22) — fallo de red vs quiz vacío ahora se distinguen
+
+Decisión del usuario. `MaterialPreviewModal` ahora tiene tres estados separados para el quiz:
+- **Cargando** → "Cargando preguntas…"
+- **Error** (el `catch` de `obtenerQuiz`) → "No se pudo cargar el material / Revisá tu conexión"
+  con botón **Reintentar** que efectivamente recarga (contador `reintentosQuiz` en las deps del
+  effect).
+- **Vacío** (carga OK, sin preguntas) → mensaje según contexto: en `modoVistaPrevia` (admin) el
+  aviso de staff "faltan preguntas por configurar"; para el estudiante, "Este material ya no
+  está disponible — es posible que tu maestro lo haya quitado".
+
+Antes el `catch` dejaba `preguntasQuiz = null`, el mismo valor que "sin preguntas", así que un
+fallo de red se mostraba como "este quiz no tiene preguntas". Verificado por mutación (volver a
+tratar el error como vacío → 1 test rojo).
+
+<details><summary>Detalle original (histórico)</summary>
+
 #### 🟡 SIN RESOLVER — fallo de Firestore indistinguible de "quiz sin configurar"
 
 `MaterialPreviewModal.tsx:166-169`: el `catch` de `obtenerQuiz` hace `console.warn` y setea
@@ -1280,6 +1297,8 @@ cargarlas desde la Biblioteca"* aunque el admin sí las haya cargado y lo que fa
 Menos grave de lo que parecía a primera vista: **no** cae a la pregunta demo hardcodeada, así
 que no se registra un score contra un quiz falso. Pero es la **sexta** aparición del patrón del
 proyecto: fallo real disfrazado de estado benigno.
+
+</details>
 
 #### Nota de método
 
