@@ -296,7 +296,9 @@ describe('ModalImportacionMasiva', () => {
     expect(screen.getByText('Inconsistencias').closest('div')?.parentElement).toHaveTextContent('3');
     expect(screen.getByText('Falta Nombre')).toBeInTheDocument();
     expect(screen.getByText('ID Inválido')).toBeInTheDocument();
-    expect(screen.getByText('Menor sin datos de Tutor')).toBeInTheDocument();
+    // Fix 2026-07-22: el mensaje del componente es "Menor sin datos COMPLETOS de Tutor"
+    // (ModalImportacionMasiva.tsx:129). El test quedo con la redaccion vieja.
+    expect(screen.getByText('Menor sin datos completos de Tutor')).toBeInTheDocument();
     expect(screen.getByText(/Grado 'Grado Inventado' no reconocido/)).toBeInTheDocument();
     expect(screen.getByText('Ficha médica vacía')).toBeInTheDocument();
     expect(screen.getByText('Adulto requiere Correo')).toBeInTheDocument();
@@ -328,6 +330,11 @@ describe('ModalImportacionMasiva', () => {
         Correo: '',
         Tutor_Nombre_Completo: 'LUIS GOMEZ',
         Tutor_Identificacion: '11223344',
+        // Fix 2026-07-22: la validacion de menores paso a exigir TAMBIEN `Tutor_Correo`
+        // (ModalImportacionMasiva.tsx:128). Como `filaBase` lo trae vacio, esta fila
+        // quedaba con error critico y el boton mostraba "Corregir Errores" en vez de
+        // "Confirmar e Inyectar".
+        Tutor_Correo: 'luis@email.com',
         Tutor_Telefono: '3009998877',
       },
     ]);
@@ -487,6 +494,10 @@ describe('ModalImportacionMasiva', () => {
         Grado_Actual: '',
         Tutor_Nombre_Completo: '',
         Tutor_Identificacion: '',
+        // Fix 2026-07-22: faltaba `Tutor_Correo`. El componente exige las 14 columnas
+        // oficiales en la primera fila (`estructuraCorrecta`); sin ella abortaba con
+        // "Estructura inválida" y la vista previa nunca se renderizaba.
+        Tutor_Correo: '',
         Tutor_Telefono: '',
         Alergias: '',
         Lesiones: '',
