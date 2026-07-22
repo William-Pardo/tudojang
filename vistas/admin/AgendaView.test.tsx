@@ -751,14 +751,23 @@ describe('Subtarea 12.10: indicador de estado de Clase en Vivo en el bloque de l
   });
 
   it('una jornada dentro de la ventana [horaInicio-15, horaFin+15] (y sin estado en_curso/cerrada/cancelada) muestra "Clase activa" (fusion de la vieja "Disponible para operación")', async () => {
+    // Fix 2026-07-22: `fecha`/`horaInicio`/`horaFin` son hora de pared del club
+    // (America/Bogota, UTC-5) -- asi los interpreta `ventanaClaseEnVivoService` desde el fix
+    // del desfase horario. Derivarlos de `toISOString()` (UTC) dejaba la jornada 5 horas
+    // corrida y el indicador nunca daba "Clase activa".
+    const enZonaClub = (fecha: Date, opciones: Intl.DateTimeFormatOptions) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', ...opciones }).format(fecha);
+    const soloFecha = (f: Date) => enZonaClub(f, { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const soloHora = (f: Date) => enZonaClub(f, { hour: '2-digit', minute: '2-digit', hour12: false });
+
     const ahora = new Date();
     const inicio = new Date(ahora.getTime() - 5 * 60 * 1000);
     const fin = new Date(ahora.getTime() + 30 * 60 * 1000);
     const jornada = crearJornada({
       id: 'jornada-1',
-      fecha: ahora.toISOString().slice(0, 10),
-      horaInicio: inicio.toISOString().slice(11, 16),
-      horaFin: fin.toISOString().slice(11, 16),
+      fecha: soloFecha(ahora),
+      horaInicio: soloHora(inicio),
+      horaFin: soloHora(fin),
       estado: 'confirmada',
     });
     const repository = { listarJornadasPorRangoFechas: jest.fn().mockResolvedValue([jornada]) };

@@ -19,20 +19,46 @@ interface VentanaJornadaInput {
   horaFin: string;
 }
 
-// `fecha` (YYYY-MM-DD) + `horaInicio`/`horaFin` (HH:MM) se combinan en UTC, mismo patron ya usado
-// en el repo para fechas de jornada (ver `servicios/academico/jornadaService.ts`, `new Date(`${fecha}T00:00:00.000Z`)`).
-function combinarFechaHoraUtc(fecha: string, hora: string): Date {
-  return new Date(`${fecha}T${hora}:00.000Z`);
+/**
+ * Zona horaria del club. Colombia NO tiene horario de verano, asi que el offset es fijo
+ * UTC-5 todo el año y se puede expresar directamente en el string ISO (sin necesidad de
+ * Intl ni de una libreria de zonas).
+ *
+ * Mismo criterio que `functions/academico/jornadasScheduler.js` (`ZONA_HORARIA =
+ * 'America/Bogota'`) y que `vencerAsignacionesAcademicas`.
+ */
+const OFFSET_ZONA_CLUB = '-05:00';
+
+/**
+ * FIX 2026-07-22 (detectado por `claseEnVivo.integracion.test.ts`, junta scheduler <-> ventana).
+ *
+ * ANTES esta funcion combinaba `fecha` + `hora` como si fueran UTC
+ * (`new Date(`${fecha}T${hora}:00.000Z`)`). Pero `fecha`/`horaInicio`/`horaFin` son texto
+ * plano que el usuario carga PENSANDO EN LA HORA DEL DOJANG -- asi lo documenta y lo trata
+ * `functions/academico/jornadasScheduler.js`, que compara contra America/Bogota para decidir
+ * la transicion automatica confirmada -> en_curso.
+ *
+ * Consecuencia del desfase (5 horas, UTC-5): para una clase cargada 10:00-11:00, la ventana
+ * se calculaba en [09:45, 11:15] UTC = [04:45, 06:15] hora de Colombia. El boton "Iniciar
+ * Clase en Vivo" (App.tsx / Horarios.tsx / AgendaView.tsx) aparecia de madrugada con el
+ * dojang cerrado y estaba AUSENTE durante la clase real, de modo que no se podia escanear
+ * ningun check-in QR en el unico momento en que hacia falta.
+ *
+ * No lo detectaba ningun unitario: cada modulo era internamente coherente y sus suites
+ * pasaban. El defecto vivia solo en el cruce de las dos interpretaciones sobre el mismo dato.
+ */
+function combinarFechaHoraEnZonaDelClub(fecha: string, hora: string): Date {
+  return new Date(`${fecha}T${hora}:00.000${OFFSET_ZONA_CLUB}`);
 }
 
 // Subtarea 12.10: extraido de `estaJornadaEnVentana` (sin cambiar su comportamiento/firma) para
 // que `calcularIndicadorClaseEnVivo` (abajo) reutilice el MISMO calculo de apertura/cierre en vez
 // de duplicarlo -- ambas funciones deben usar exactamente el mismo par de fechas.
 function calcularVentanaHoraria(input: VentanaJornadaInput): { apertura: Date; cierre: Date } {
-  const apertura = combinarFechaHoraUtc(input.fecha, input.horaInicio);
+  const apertura = combinarFechaHoraEnZonaDelClub(input.fecha, input.horaInicio);
   apertura.setUTCMinutes(apertura.getUTCMinutes() - LIVE_CLASS_OPEN_BEFORE_MINUTES);
 
-  const cierre = combinarFechaHoraUtc(input.fecha, input.horaFin);
+  const cierre = combinarFechaHoraEnZonaDelClub(input.fecha, input.horaFin);
   cierre.setUTCMinutes(cierre.getUTCMinutes() + LIVE_CLASS_CLOSE_AFTER_MINUTES);
 
   return { apertura, cierre };
@@ -119,7 +145,7 @@ export function calcularIndicadorClaseEnVivo(
 }
 
 function diferenciaAbsolutaMinutos(jornada: JornadaInstruccion, ahora: Date): number {
-  const inicio = combinarFechaHoraUtc(jornada.fecha, jornada.horaInicio);
+  const inicio = combinarFechaHoraEnZonaDelClub(jornada.fecha, jornada.horaInicio);
   return Math.abs(ahora.getTime() - inicio.getTime());
 }
 

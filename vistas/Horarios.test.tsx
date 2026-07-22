@@ -54,6 +54,32 @@ function formatoHoraUtc(fecha: Date): string {
   return `${pad(fecha.getUTCHours())}:${pad(fecha.getUTCMinutes())}`;
 }
 
+/**
+ * Fix 2026-07-22: `horaInicio`/`horaFin` de una jornada son hora de pared del club
+ * (America/Bogota, UTC-5) -- asi los interpreta `ventanaClaseEnVivoService` desde el fix del
+ * desfase horario, y asi los carga el usuario. Los fixtures de la ventana de Clase en Vivo
+ * deben derivarse en ESA zona, no en UTC: con `formatoHoraUtc` una clase construida como
+ * "ahora - 5 min" quedaba 5 horas corrida y el boton nunca aparecia.
+ */
+function formatoHoraClub(fecha: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(fecha);
+}
+
+/** Fecha calendario (YYYY-MM-DD) en la zona del club, por el mismo motivo que `formatoHoraClub`. */
+function formatoFechaClub(fecha: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha);
+}
+
 const hoy = new Date();
 const manana = new Date(hoy);
 manana.setUTCDate(hoy.getUTCDate() + 1);
@@ -225,12 +251,12 @@ describe('VistaHorarios', () => {
     // bug de rollover de medianoche descrito arriba. `jest.setSystemTime` hace que el
     // `new Date()` interno de `Horarios.tsx` (sin inyeccion de reloj) lea este mismo instante.
     const referenciaAhora = new Date('2026-06-06T12:00:00.000Z');
-    const fechaReferencia = formatoFechaIso(referenciaAhora);
-    const horaInicioEnVentanaFija = formatoHoraUtc(new Date(referenciaAhora.getTime() - 5 * 60_000));
-    const horaFinEnVentanaFija = formatoHoraUtc(new Date(referenciaAhora.getTime() + 30 * 60_000));
+    const fechaReferencia = formatoFechaClub(referenciaAhora);
+    const horaInicioEnVentanaFija = formatoHoraClub(new Date(referenciaAhora.getTime() - 5 * 60_000));
+    const horaFinEnVentanaFija = formatoHoraClub(new Date(referenciaAhora.getTime() + 30 * 60_000));
     // Fuera de ventana: una clase que ya cerro hace mucho (horaFin+15 < ahora).
-    const horaInicioFueraDeVentanaFija = formatoHoraUtc(new Date(referenciaAhora.getTime() - 5 * 60 * 60_000));
-    const horaFinFueraDeVentanaFija = formatoHoraUtc(new Date(referenciaAhora.getTime() - 4 * 60 * 60_000));
+    const horaInicioFueraDeVentanaFija = formatoHoraClub(new Date(referenciaAhora.getTime() - 5 * 60 * 60_000));
+    const horaFinFueraDeVentanaFija = formatoHoraClub(new Date(referenciaAhora.getTime() - 4 * 60 * 60_000));
 
     beforeEach(() => {
       jest.useFakeTimers();

@@ -1,3 +1,10 @@
+/**
+ * NOTA (2026-07-22): los instantes fijados con `jest.setSystemTime` estan en UTC pero
+ * representan hora de pared de AMERICA/BOGOTA (UTC-5) -- que es como el usuario carga
+ * `horaInicio`/`horaFin` y como los interpreta `ventanaClaseEnVivoService` desde el fix
+ * del desfase horario (ver `servicios/academico/claseEnVivo.integracion.test.ts`).
+ * Se corrieron +5h para seguir describiendo LOS MISMOS minutos de pared.
+ */
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { RolUsuario } from '../tipos';
 import type { JornadaInstruccion } from '../models/academico/jornada';
@@ -42,7 +49,7 @@ function crearRepositoryMock(jornadas: JornadaInstruccion[]): JornadaRepository 
   } as unknown as JornadaRepository;
 }
 
-const AHORA_DENTRO_DE_VENTANA = new Date('2026-06-06T10:30:00.000Z');
+const AHORA_DENTRO_DE_VENTANA = new Date('2026-06-06T15:30:00.000Z');
 
 describe('useVentanaClaseEnVivo', () => {
   beforeEach(() => {
@@ -114,7 +121,7 @@ describe('useVentanaClaseEnVivo', () => {
     // La jornada esta a punto de salir de ventana: cierre = horaFin(11:00)+15 = 11:15.
     const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
     const repository = crearRepositoryMock([jornada]);
-    jest.setSystemTime(new Date('2026-06-06T11:14:00.000Z'));
+    jest.setSystemTime(new Date('2026-06-06T16:14:00.000Z'));
 
     const { result } = renderHook(() => useVentanaClaseEnVivo(repository));
 
@@ -122,7 +129,7 @@ describe('useVentanaClaseEnVivo', () => {
     expect(result.current.jornadaActiva).toEqual(jornada);
 
     // Avanza el reloj del sistema mas alla del cierre de ventana, y dispara el polling de 60s.
-    jest.setSystemTime(new Date('2026-06-06T11:16:00.000Z'));
+    jest.setSystemTime(new Date('2026-06-06T16:16:00.000Z'));
     act(() => {
       jest.advanceTimersByTime(60_000);
     });
