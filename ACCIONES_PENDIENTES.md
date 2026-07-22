@@ -133,6 +133,59 @@ los runs verdes de `main` (#99, #100, #102, #103) ya usaban `npx firebase-tools 
 
 ---
 
+## 🚨 P0 — PRIMER DEPLOY A PRODUCCIÓN (2026-07-22): dos hallazgos
+
+Tras mergear el PR #2 (48 commits), el deploy corrió por primera vez con la configuración
+nueva. **Salió parcial**, y destapó dos problemas distintos.
+
+### ✅ Lo que SÍ quedó en producción
+- **Frontend completo**, incluido el fix del desfase horario de Clase en Vivo.
+- **~30 Cloud Functions**, entre ellas `crearEstudiante` (creada) y `registrarAsistenciaJornada`.
+
+### ❌ Hallazgo 1 — Permiso IAM faltante (5 funciones programadas)
+
+```
+HTTP Error: 403, The principal lacks IAM permission "cloudscheduler.jobs.update"
+```
+
+Fallaron: `cobroAutomaticoMensual`, `iniciarJornadasPorHorario`,
+`recordatoriosEstudioDiarios`, `recordatoriosPagoDiarios`, `vencerAsignacionesAcademicas`.
+
+**No es un defecto del código.** La cuenta de servicio de CI no puede actualizar trabajos de
+Cloud Scheduler. **Impacto: ninguno** — esas 5 siguen ejecutando su versión anterior y el log
+confirma `Skipping deletes`.
+
+**Fix (manual, en Google Cloud):** otorgar a la service account de `FIREBASE_SERVICE_ACCOUNT`
+el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`). Después, *Re-run jobs*.
+
+### 🔴 Hallazgo 2 — Las reglas NUNCA se desplegaban (el paso mentía)
+
+El paso se llamaba **"Deploy Functions and Rules"**, pero su comando era
+`firebase deploy --only functions`. **Las reglas nunca se publicaron desde CI.**
+
+Gravedad: se descubrió justo después de publicar `crearEstudiante`, la función que valida el
+límite de alumnos. La función quedó viva en producción, pero la regla que cierra la puerta
+trasera —`allow create: if false` sobre `estudiantes/{docId}`— **no**. Es decir: un write
+directo del cliente seguía creando estudiantes sin límite.
+
+**Es exactamente el agujero que verificamos contra el emulador con 78 tests en verde.**
+Verificamos la regla correcta; nunca llegaba al servidor. Un test puede estar impecable y aun
+así no proteger nada si el artefacto no se despliega.
+
+`firebase.json` declara además **índices de Firestore** y **reglas de Storage**, que tampoco
+se desplegaban nunca.
+
+**Fix aplicado:** paso nuevo `Deploy Firestore rules, indexes y Storage rules` con
+`--only firestore:rules,firestore:indexes,storage`, y el de functions renombrado a lo que
+realmente hace.
+
+> **Va ANTES que las functions a propósito:** hoy el paso de functions falla por el permiso de
+> Cloud Scheduler, y un paso posterior a uno fallido no se ejecuta. Poniéndolo antes, las
+> reglas se publican igual. No hay ventana de rotura por el orden: `crearEstudiante` ya está
+> en producción.
+
+---
+
 ## 🚨 P0 — INTEGRIDAD DEL REPOSITORIO
 
 ### 0-Y. Dos objetos de git corruptos en `.git/objects` — reparados, causa NO identificada
