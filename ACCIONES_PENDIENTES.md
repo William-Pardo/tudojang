@@ -55,6 +55,37 @@ Verificado en ambas condiciones antes de pushear:
 
 ---
 
+### CI run #106 — `firebase: not found`: los scripts del emulador asumían un CLI global
+
+**2026-07-22.** El fix del bundle funcionó y el job avanzó al paso siguiente, donde falló:
+
+```
+sh: 1: firebase: not found
+Error: Process completed with exit code 127
+```
+
+**Causa:** `firebase-tools` **no es dependencia del proyecto**. Dos scripts de `package.json`
+invocaban el binario pelado (`firebase emulators:exec …`), que solo resuelve si el CLI está
+instalado globalmente — como en la máquina del desarrollador, no en el runner.
+
+El detalle revelador estaba a la vista: el job de deploy **ya usaba `npx firebase-tools`**,
+no `firebase`. La inconsistencia entre ambos era el bug.
+
+**Fix:** `test:firestore-rules` y `test:functions:emulator` pasan a `npx --yes firebase-tools`.
+Se corrigieron **los dos**, aunque CI solo ejecuta el primero: el segundo tenía el mismo
+defecto latente esperando a que alguien lo corriera en un entorno limpio.
+
+Verificado local: 78/78, exit 0. Y hay evidencia fuerte de que funciona en el runner —
+los runs verdes de `main` (#99, #100, #102, #103) ya usaban `npx firebase-tools deploy` ahí.
+
+> **El patrón detrás de estos dos fallos consecutivos (#105 y #106):** ambos fueron
+> **suposiciones sobre el entorno** que en local eran ciertas y en un runner limpio no.
+> Primero un artefacto (`dist/`), después un binario global (`firebase`). Correr los
+> comandos localmente no valida nada de esto — el entorno de desarrollo tiene años de
+> sedimento encima. **La única prueba real es un runner limpio.**
+
+---
+
 ## 🚨 P0 — INTEGRIDAD DEL REPOSITORIO
 
 ### 0-Y. Dos objetos de git corruptos en `.git/objects` — reparados, causa NO identificada

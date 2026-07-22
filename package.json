@@ -19,8 +19,8 @@
     "test:infra": "node --test scripts/infraestructura-pruebas.test.js",
     "test:report": "jest --coverage --json --outputFile=reports/tdd-refactor-report.json",
     "test:coverage": "jest --coverage --json --outputFile=coverage/coverage-summary.json",
-    "test:functions:emulator": "firebase emulators:exec --project demo-tudojang --only firestore \"node --test functions/test/asistente.integration.test.js\"",
-    "test:firestore-rules": "firebase emulators:exec --project demo-tudojang --only firestore \"node --test functions/test/firestore-rules.security.test.js functions/test/firestore-rules.behavior.test.js\"",
+    "test:functions:emulator": "npx --yes firebase-tools emulators:exec --project demo-tudojang --only firestore \"node --test functions/test/asistente.integration.test.js\"",
+    "test:firestore-rules": "npx --yes firebase-tools emulators:exec --project demo-tudojang --only firestore \"node --test functions/test/firestore-rules.security.test.js functions/test/firestore-rules.behavior.test.js\"",
     "cypress:open": "cypress open"
   },
   "dependencies": {
