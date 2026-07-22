@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import MisClasesView, { puedeEditarJornada } from './MisClasesView';
 import type { JornadaInstruccion } from '../../models/academico/jornada';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
+import type { RegistroAsistencia } from '../../models/academico/asistencia';
 import { ConflictoConcurrenciaError } from '../../servicios/academico/jornadaRepository';
 import { RolUsuario } from '../../tipos';
 
@@ -54,6 +55,15 @@ function crearAsignacion(overrides: Partial<AsignacionAcademica> = {}): Asignaci
     creadoEn: ahora,
     actualizadoEn: ahora,
     ...overrides,
+  };
+}
+
+// Gap #5 (auditoria de integracion Centro de Estudios/Agenda, 2026-07-18): mismo helper
+// que JornadasView.test.tsx -- mockea el repositorio de solo lectura de check-ins reales,
+// para testear el wiring de asistencia derivada sin clickear un checkbox manual.
+function crearAsistenciaRepositoryMock(registros: RegistroAsistencia[] = []) {
+  return {
+    listarPorJornada: jest.fn().mockResolvedValue(registros),
   };
 }
 
@@ -127,15 +137,31 @@ describe('MisClasesView', () => {
       registrarAuditoria: jest.fn().mockResolvedValue(undefined),
       existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
     };
+    // Gap #5: la asistencia ya no es un checkbox manual -- se deriva de check-ins reales
+    // (mismo patron que JornadasView.tsx).
+    const asistenciaRepository = crearAsistenciaRepositoryMock([
+      { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+    ]);
 
-    render(<MisClasesView tenantId="tenant-1" programaId="programa-1" usuarioId="maestro-1" repository={repository as any} />);
+    render(
+      <MisClasesView
+        tenantId="tenant-1"
+        programaId="programa-1"
+        usuarioId="maestro-1"
+        repository={repository as any}
+        asistenciaRepository={asistenciaRepository as any}
+      />,
+    );
 
     // Fase 3.7: la tarjeta muestra un badge de estado legible ("En curso"), no el valor
     // crudo del enum ("en_curso"). Se conserva la intención original del test (esperar a
     // que la vista muestre esta jornada como en curso antes de interactuar con ella).
     await screen.findByText(/en curso/i);
 
-    await user.click(screen.getByRole('checkbox', { name: /asistencia registrada/i }));
+    // No hay checkbox manual: el conteo de check-ins reales (1) marca la asistencia.
+    expect(await screen.findByText(/asistencia registrada \(1 check-in\)/i)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /asistencia registrada/i })).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 
@@ -164,10 +190,22 @@ describe('MisClasesView', () => {
       registrarAuditoria: jest.fn().mockResolvedValue(undefined),
       existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
     };
+    // Gap #5: sin check-ins reales registrados, cerrarJornada() debe seguir rechazando el
+    // cierre -- misma regresion que ya cubre JornadasView.test.tsx.
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
 
-    render(<MisClasesView tenantId="tenant-1" programaId="programa-1" usuarioId="maestro-1" repository={repository as any} />);
+    render(
+      <MisClasesView
+        tenantId="tenant-1"
+        programaId="programa-1"
+        usuarioId="maestro-1"
+        repository={repository as any}
+        asistenciaRepository={asistenciaRepository as any}
+      />,
+    );
 
-    await user.click(await screen.findByRole('button', { name: /^cerrar$/i }));
+    expect(await screen.findByText(/sin check-ins registrados/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 
     expect(await screen.findByText(/no se puede cerrar una jornada sin asistencia registrada/i)).toBeInTheDocument();
     expect(repository.guardarJornada).not.toHaveBeenCalled();
@@ -641,11 +679,22 @@ describe('MisClasesView', () => {
       registrarAuditoria: jest.fn().mockResolvedValue(undefined),
       existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
     };
+    const asistenciaRepository = crearAsistenciaRepositoryMock([
+      { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+    ]);
 
-    render(<MisClasesView tenantId="tenant-1" programaId="programa-1" usuarioId="maestro-1" repository={repository as any} />);
+    render(
+      <MisClasesView
+        tenantId="tenant-1"
+        programaId="programa-1"
+        usuarioId="maestro-1"
+        repository={repository as any}
+        asistenciaRepository={asistenciaRepository as any}
+      />,
+    );
 
     await screen.findByText(/en curso/i);
-    await user.click(screen.getByRole('checkbox', { name: /asistencia registrada/i }));
+    await screen.findByText(/asistencia registrada \(1 check-in\)/i);
     await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 
@@ -671,6 +720,9 @@ describe('MisClasesView', () => {
       registrarAuditoria: jest.fn().mockResolvedValue(undefined),
       existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
     };
+    const asistenciaRepository = crearAsistenciaRepositoryMock([
+      { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+    ]);
 
     render(
       <MisClasesView
@@ -679,11 +731,12 @@ describe('MisClasesView', () => {
         usuarioId="maestro-1"
         rol={RolUsuario.Admin}
         repository={repository as any}
+        asistenciaRepository={asistenciaRepository as any}
       />,
     );
 
     await screen.findByText(/en curso/i);
-    await user.click(screen.getByRole('checkbox', { name: /asistencia registrada/i }));
+    await screen.findByText(/asistencia registrada \(1 check-in\)/i);
     await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 
@@ -706,11 +759,22 @@ describe('MisClasesView', () => {
       registrarAuditoria: jest.fn().mockRejectedValue(new Error('fallo de red')),
       existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
     };
+    const asistenciaRepository = crearAsistenciaRepositoryMock([
+      { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+    ]);
 
-    render(<MisClasesView tenantId="tenant-1" programaId="programa-1" usuarioId="maestro-1" repository={repository as any} />);
+    render(
+      <MisClasesView
+        tenantId="tenant-1"
+        programaId="programa-1"
+        usuarioId="maestro-1"
+        repository={repository as any}
+        asistenciaRepository={asistenciaRepository as any}
+      />,
+    );
 
     await screen.findByText(/en curso/i);
-    await user.click(screen.getByRole('checkbox', { name: /asistencia registrada/i }));
+    await screen.findByText(/asistencia registrada \(1 check-in\)/i);
     await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 

@@ -17,6 +17,11 @@ import {
   cancelarJornada,
   reprogramarJornada,
 } from '../../servicios/academico/jornadaService';
+import {
+  asistenciaRepository as asistenciaRepositoryPorDefecto,
+  type AsistenciaRepository,
+} from '../../servicios/academico/asistenciaRepository';
+import { contarCheckIns } from '../../servicios/academico/asistenciaService';
 import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar } from '../../components/Iconos';
 
 interface MisClasesViewProps {
@@ -39,6 +44,11 @@ interface MisClasesViewProps {
   // -- ver comentario extendido junto a `puedeEditarJornada` mas abajo.
   permisoEdicionAgenda?: boolean;
   repository?: JornadaRepository;
+  // Gap #5 (auditoria de integracion Centro de Estudios/Agenda, 2026-07-18): mismo patron
+  // que JornadasView.tsx -- `asistenciaRegistrada` se deriva de check-ins reales de la
+  // subcoleccion `asistencias`, en vez de un checkbox manual. Opcional con default en la
+  // destructuracion del componente (mismo patron que `repository`/`jornadaRepository`).
+  asistenciaRepository?: AsistenciaRepository;
   // Fix 4 (persistencia/seleccion de Programa academico): contador que el padre
   // (AsignacionesView) incrementa tras guardar/eliminar un programa para forzar la
   // recarga de jornadas sin remount. Mismo patron refreshTrigger que ya usa
@@ -197,15 +207,18 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   rol = RolUsuario.Editor,
   permisoEdicionAgenda,
   repository = jornadaRepository,
+  asistenciaRepository = asistenciaRepositoryPorDefecto,
   refreshTrigger = 0,
   onEditarMaterial,
 }) => {
   const [jornadas, setJornadas] = React.useState<JornadaInstruccion[]>([]);
   const [materialPorJornadaId, setMaterialPorJornadaId] = React.useState<Record<string, string[]>>({});
   const [error, setError] = React.useState('');
-  // Mismo patron que JornadasView.tsx: una jornada en_curso no se puede cerrar
-  // sin registrar antes asistencia y objetivos impartidos (cerrarJornada() los exige).
-  const [asistenciaPorJornadaId, setAsistenciaPorJornadaId] = React.useState<Record<string, boolean>>({});
+  // Gap #5 (auditoria de integracion Centro de Estudios/Agenda, 2026-07-18): mismo patron
+  // que JornadasView.tsx, adaptado a una LISTA de jornadas -- `asistenciaRegistrada` ya no
+  // es un checkbox manual, se deriva del conteo real de check-ins por jornada (mapa
+  // jornadaId -> cantidad, ver efecto de carga mas abajo).
+  const [cantidadCheckInsPorJornadaId, setCantidadCheckInsPorJornadaId] = React.useState<Record<string, number>>({});
   const [objetivosImpartidosPorJornadaId, setObjetivosImpartidosPorJornadaId] = React.useState<Record<string, boolean>>({});
   // Accion de cancelar/reprogramar expandida en linea, por fila (una a la vez por jornada).
   const [accionExpandidaPorJornadaId, setAccionExpandidaPorJornadaId] = React.useState<Record<string, ClaveAccion | null>>({});
@@ -260,6 +273,44 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
     cargar();
   }, [cargar]);
 
+  // Gap #5: solo las jornadas 'en_curso' necesitan el conteo de check-ins (son las unicas
+  // que se pueden cerrar, y cerrarJornada() exige asistenciaRegistrada) -- cargar check-ins
+  // de jornadas ya cerradas/programadas/canceladas seria trabajo innecesario. `jornadas`
+  // como array completo no sirve de dependencia estable (nueva referencia en cada
+  // setJornadas, incluso cuando el conjunto en_curso no cambio), asi que se deriva una key
+  // estable (ids en_curso unidos con coma) para evitar loops/pedidos redundantes.
+  const idsEnCursoKey = jornadas
+    .filter((jornada) => jornada.estado === 'en_curso')
+    .map((jornada) => jornada.id)
+    .join(',');
+
+  React.useEffect(() => {
+    const idsEnCurso = idsEnCursoKey ? idsEnCursoKey.split(',') : [];
+    if (idsEnCurso.length === 0) {
+      setCantidadCheckInsPorJornadaId({});
+      return;
+    }
+
+    let activo = true;
+    Promise.all(
+      idsEnCurso.map((jornadaId) =>
+        asistenciaRepository.listarPorJornada(tenantId, jornadaId)
+          .then((registros): [string, number] => [jornadaId, contarCheckIns(registros)])
+          // Un fallo puntual no debe impedir que las demas jornadas se pinten (mismo
+          // criterio que ya usa cargar() para el material, lineas de arriba): esa jornada
+          // queda en 0 check-ins en el mapa.
+          .catch((): [string, number] => [jornadaId, 0]),
+      ),
+    ).then((resultados) => {
+      if (!activo) return;
+      setCantidadCheckInsPorJornadaId(Object.fromEntries(resultados));
+    });
+
+    return () => {
+      activo = false;
+    };
+  }, [idsEnCursoKey, asistenciaRepository, tenantId]);
+
   const transicionar = async (jornada: JornadaInstruccion) => {
     if (guardando) return;
     setGuardando(true);
@@ -268,7 +319,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
       let actualizada: JornadaInstruccion;
       if (jornada.estado === 'en_curso') {
         const pendiente = marcarPendienteCierre(jornada, {
-          asistenciaRegistrada: Boolean(asistenciaPorJornadaId[jornada.id]),
+          asistenciaRegistrada: (cantidadCheckInsPorJornadaId[jornada.id] ?? 0) > 0,
           objetivosImpartidos: objetivosImpartidosPorJornadaId[jornada.id] ? jornada.objetivosPlaneados : [],
         });
         actualizada = cerrarJornada(pendiente);
@@ -450,6 +501,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {jornadasPagina.map((jornada) => {
               const material = materialPorJornadaId[jornada.id] ?? [];
+              const cantidadCheckIns = cantidadCheckInsPorJornadaId[jornada.id] ?? 0;
               const acciones = accionesDisponibles(jornada.estado);
               const accionExpandida = accionExpandidaPorJornadaId[jornada.id] ?? null;
               const cambiosReprogramacion = cambiosReprogramacionPorJornadaId[jornada.id] ?? {
@@ -602,17 +654,14 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                           ⚠️ Clase expirada. Podés cerrarla con asistencia o usar Forzar Cierre.
                         </p>
                       )}
-                      <label className="flex items-center gap-2 text-xs font-bold text-tkd-dark dark:text-white">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(asistenciaPorJornadaId[jornada.id])}
-                          onChange={(event) => setAsistenciaPorJornadaId((actual) => ({
-                            ...actual,
-                            [jornada.id]: event.target.checked,
-                          }))}
-                        />
-                        Asistencia registrada
-                      </label>
+                      {/* Gap #5: texto derivado del conteo real de check-ins (subcoleccion
+                          `asistencias`, escrita server-side por registrarAsistenciaJornada),
+                          mismo patron que JornadasView.tsx -- ya no es un checkbox manual. */}
+                      <p className="text-xs font-bold text-tkd-dark dark:text-white">
+                        {cantidadCheckIns > 0
+                          ? `Asistencia registrada (${cantidadCheckIns} check-in${cantidadCheckIns === 1 ? '' : 's'})`
+                          : 'Sin check-ins registrados aún'}
+                      </p>
                       <label className="flex items-center gap-2 text-xs font-bold text-tkd-dark dark:text-white">
                         <input
                           type="checkbox"
