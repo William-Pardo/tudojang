@@ -37,6 +37,18 @@ emulador no cerró el JVM pese al SIGINT). Si una corrida posterior falla con
 `Could not start Firestore Emulator, port taken`, es eso. No se mató el proceso a propósito:
 podría ser un emulador levantado a mano para desarrollo.
 
+### 0-D. Restos del flujo de "publicación en lote", ya retirado del producto
+
+Encontrado el 2026-07-22 al reparar `vistas/CentroEstudios.test.tsx`. El flujo de publicación
+en lote (grupo "Recursos aprobados" en Biblioteca → "Agregar seleccionados al lote" →
+región "Publicación en lote" → botón "Publicar todo") **no existe en ninguna parte del repo**
+— verificado por búsqueda en toda la app. Se eliminó en el rediseño de Centro de Estudios.
+
+Quedó código muerto: `agregarRecursoParaLote` sigue definido en `vistas/CentroEstudios.tsx`
+pero **no se pasa a ningún hijo**, así que `recursosParaLote` nunca se puebla y el prop
+`recursoIdsParaLote` que recibe `AsignacionesView` siempre llega vacío. Decidir si se retira
+el resto del cableado o si el flujo vuelve.
+
 ### 0-C. La importación masiva dice "Importación Exitosa" aunque el plan haya rechazado filas
 
 **Encontrado el 2026-07-22** verificando el punto 3 del ítem 0-A. Es una consecuencia

@@ -17,6 +17,30 @@ jest.mock('../context/NotificacionContext', () => ({
   }),
 }));
 
+// Fix 2026-07-22: la pestaña "Progreso estudiantes" monta PanelMetricasEstudiantes, que usa
+// `useEstudiantes()` de DataContext. Sin este mock el test del switcher moria con
+// "useEstudiantes debe usarse dentro de DataProvider" al cambiar de pestaña.
+jest.mock('../context/DataContext', () => ({
+  useEstudiantes: () => ({ estudiantes: [], cargando: false, error: null }),
+  useSedes: () => ({ sedesVisibles: [] }),
+  useProgramas: () => ({ programas: [], agendaCompleta: [] }),
+  useConfiguracion: () => ({ configClub: {}, usuarios: [] }),
+}));
+
+// Fix 2026-07-22: MaterialPreviewModal paso a cargar el banco de preguntas REAL del recurso
+// via quizService (antes QuizView caia siempre a su pregunta demo hardcodeada). Sin mockear
+// el servicio, el quiz no renderiza ninguna opcion y el test del progreso no encuentra su
+// label.
+jest.mock('../servicios/academico/quizService', () => {
+  const { preguntasDemoQuiz } = jest.requireActual('../components/academico/QuizView');
+  return {
+    quizService: {
+      obtenerQuiz: jest.fn().mockResolvedValue(preguntasDemoQuiz),
+      guardarQuiz: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
+
 jest.mock('../servicios/academico/centroEstudiosRepository', () => ({
   centroEstudiosRepository: {
     obtenerAsignaciones: jest.fn(),
@@ -198,7 +222,6 @@ describe('CentroEstudios', () => {
   });
 
   it('integra plan y cierre de clase para admin dentro del Centro de Estudios', async () => {
-    const user = userEvent.setup();
     mockUseAuth.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin } });
 
     render(<CentroEstudios />);
@@ -210,34 +233,26 @@ describe('CentroEstudios', () => {
     expect(screen.queryByRole('button', { name: /confirmar jornada/i })).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /^programa/i })).toBeInTheDocument();
 
-    // El grid de "Recursos aprobados" y su seleccion multiple viven en Biblioteca
-    // (Centro de recursos); confirmar el lote ahi lo bridgea a Asignaciones via callback.
-    const grupoRecursosAprobados = await screen.findByRole('group', { name: /^recursos aprobados$/i });
-    await user.click(within(grupoRecursosAprobados).getByRole('checkbox', { name: /material aprobado para jornada/i }));
-    await user.click(screen.getByRole('button', { name: /agregar seleccionados al lote/i }));
-
-    const seccionLote = screen.getByRole('region', { name: /publicacion en lote/i });
-    expect(await within(seccionLote).findByRole('checkbox', { name: /material aprobado para jornada/i })).toBeChecked();
-    expect(screen.getByRole('button', { name: /^publicar todo$/i })).toBeInTheDocument();
-
     await waitFor(() => expect(mockObtenerAsignaciones).toHaveBeenCalled());
   });
 
-  it('habilita publicar todo cuando hay material y clase seleccionados', async () => {
-    const user = userEvent.setup();
-    mockUseAuth.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin } });
-
-    render(<CentroEstudios />);
-
-    expect(screen.getByRole('button', { name: /^publicar todo$/i })).toBeDisabled();
-
-    const grupoRecursosAprobados = await screen.findByRole('group', { name: /^recursos aprobados$/i });
-    await user.click(within(grupoRecursosAprobados).getByRole('checkbox', { name: /material aprobado para jornada/i }));
-    await user.click(screen.getByRole('button', { name: /agregar seleccionados al lote/i }));
-    await user.click(await screen.findByRole('checkbox', { name: /clase 1/i }));
-
-    expect(screen.getByRole('button', { name: /^publicar todo$/i })).not.toBeDisabled();
-  });
+  // Nota 2026-07-22: este caso perdio su segunda mitad, y el que le seguia
+  // ("habilita publicar todo cuando hay material y clase seleccionados") se retiro completo.
+  // Ambos ejercitaban el flujo de PUBLICACION EN LOTE: un `role="group"` "Recursos aprobados"
+  // en Biblioteca, un boton "Agregar seleccionados al lote", una `role="region"` "Publicacion
+  // en lote" y un boton "Publicar todo". Ninguno de esos elementos existe hoy en el repo
+  // (verificado por busqueda en toda la app, no solo en estos componentes): el flujo se
+  // elimino del producto en el rediseno de Centro de Estudios, y esta suite -- congelada en
+  // el checkpoint f2d16b5 -- quedo probando una UI que ya no se construye.
+  //
+  // A diferencia de los casos de anulacion de pago (que se trasladaron a
+  // ModalRegistrarPago.test.tsx porque la funcionalidad se mudo), aca NO hay destino: la
+  // funcionalidad no existe. Si el flujo de lote vuelve, estos casos se reescriben contra
+  // la UI nueva; resucitarlos tal cual seria probar un fantasma.
+  //
+  // Resto vivo de aquel flujo: `agregarRecursoParaLote` sigue definido en CentroEstudios.tsx
+  // pero no se pasa a ningun hijo, asi que `recursosParaLote` nunca se puebla. Anotado en
+  // ACCIONES_PENDIENTES.md.
 
   it('ubica el switcher de pestañas antes del stepper y oculta el stepper fuera de la pestaña "flujo"', async () => {
     const user = userEvent.setup();
