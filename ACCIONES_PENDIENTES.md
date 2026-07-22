@@ -165,21 +165,69 @@ existiendo en disco):
 Resultado: `git fsck` limpio, 41 commits intactos, push exitoso. Los archivos corruptos
 originales quedaron respaldados en el scratchpad de la sesión.
 
-> **LA CAUSA NO SE IDENTIFICÓ, y eso es lo preocupante.** Un objeto suelto corrupto no
-> aparece solo. Sospechosos, en orden de probabilidad para este entorno:
-> - **Varias sesiones de IA escribiendo sobre el MISMO working tree** (no worktrees
->   separados). Ya está documentado en `HANDOVER.md` como condición de carrera real y como
->   `DT-0015` en `bitacora.json`. Dos procesos escribiendo `.git/objects` a la vez es una
->   causa clásica.
-> - Antivirus interceptando escrituras en `.git/`.
-> - Terminación abrupta de un proceso git a mitad de escritura.
-> - Problema de disco (menos probable: solo 2 objetos, ambos de archivos tocados en esta
->   sesión).
+> ## 🔴 CAUSA IDENTIFICADA (2026-07-22): EL DISCO ESTÁ FALLANDO
 >
-> **Qué vigilar:** si vuelve a pasar, correr `git fsck --full` ANTES de asumir que es un
-> problema de red o de credenciales. Y si el paralelismo Claude/Codex sobre el mismo árbol
-> va a seguir, migrar a worktrees git separados por sesión deja de ser una recomendación
-> estética y pasa a ser una medida de integridad.
+> **La hipótesis inicial —sesiones de IA en paralelo— era INCORRECTA.** Se descartó con
+> evidencia directa.
+>
+> **Prueba irrefutable:** el objeto `0ddf00f` no contenía un stream zlib truncado (que es lo
+> que dejaría un git interrumpido). Sus primeros bytes eran **texto plano ASCII**:
+>
+> ```
+> 20 20 20 20 7d 20 3d 20    →    "    } = "
+> ```
+>
+> El contenido resultó ser código de **`node_modules/pdfjs-dist/.../pdf_viewer.mjs`**
+> (`this.pageView.viewport`, `MOVEMENT_THRESHOLD`, `paddingLeftSize`).
+>
+> **Un fragmento de un archivo se escribió dentro de otro archivo.** Git no puede hacer eso.
+> Dos procesos git en paralelo tampoco: dejarían objetos válidos o archivos de lock. Meter el
+> contenido del archivo A dentro del archivo B es **corrupción a nivel de sistema de
+> archivos**.
+>
+> **Confirmado en el registro de eventos de Windows (últimos 14 días):**
+>
+> | Fecha | Evento | Significado |
+> |---|---|---|
+> | 13/07 15:13 | `Ntfs` 55 en **E:** | Daño en la estructura del sistema de archivos |
+> | 13/07 15:13 | `Ntfs` 55 en **G:** | Ídem |
+> | 13/07 15:20 | `Ntfs` 130 en **E:** | Windows lo "reparó" |
+> | **14/07 06:47** | `disk` 7 ×2 en `\Device\Harddisk2` | **Bloques defectuosos** |
+> | 21/07 10:32 | `Ntfs` 55 en **D:** | Daño otra vez |
+>
+> **Y las tres unidades son el MISMO disco físico:**
+>
+> ```
+> D:, E:, G:  ->  DiskNumber 2  ->  Hitachi HDS721050CLA362 (HDD mecánico)
+> \Device\Harddisk2 (el de los bloques defectuosos)  ->  ese mismo disco
+> ```
+>
+> El repositorio vive en **E:**. La corrupción de los objetos de git es un **síntoma de un
+> disco que se está degradando**, no un problema de git ni de flujo de trabajo.
+>
+> Windows reporta `HealthStatus: Healthy` porque SMART no cruzó un umbral, pero bloques
+> defectuosos + corrupción NTFS repetida en las tres particiones dicen otra cosa.
+>
+> ### Qué hacer, por orden de urgencia
+>
+> 1. **Respaldar todo lo que viva en D:, E: y G:.** El repo ya está en GitHub (`origin`), pero
+>    cualquier otra cosa en ese disco no tiene respaldo.
+> 2. **Mover el proyecto a un SSD.** Hay dos disponibles: `KINGSTON SA400S37240G` (C:) y
+>    `CT240BX500SSD1`. Trabajar sobre un disco con bloques defectuosos es garantía de que esto
+>    vuelva a pasar.
+> 3. `chkdsk E: /f /r` con permisos de administrador (requiere acceso exclusivo; con `/r` en
+>    un HDD puede tardar horas).
+> 4. Revisar SMART con permisos de administrador:
+>    `Get-PhysicalDisk -DeviceNumber 2 | Get-StorageReliabilityCounter` — mirar sectores
+>    reasignados y errores no corregidos.
+> 5. **Planificar el reemplazo del Hitachi.** Es un disco mecánico que ya perdió bloques.
+>
+> ### Consecuencia para el repositorio
+>
+> Los dos objetos dañados se recuperaron porque su contenido seguía en el working tree. **Eso
+> fue suerte, no diseño.** Si la corrupción hubiera tocado un objeto de un commit viejo sin
+> copia en disco, se habría perdido. Correr `git fsck --full` periódicamente mientras el
+> proyecto siga en ese disco.
 
 ---
 
