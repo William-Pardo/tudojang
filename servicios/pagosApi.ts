@@ -396,8 +396,18 @@ export const obtenerUltimoPagoEfectivo = async (
         
         return transacciones[0];
     } catch (error: any) {
+        // Fix 2026-07-22: antes esto devolvia `null` al fallar la consulta, exactamente el
+        // mismo valor que cuando NO HAY pagos. El llamador no podia distinguir un caso del
+        // otro, asi que `anularUltimoPagoEfectivo` respondia "No hay pagos recientes para
+        // anular" ante una caida de Firestore: el operador quedaba creyendo que no habia
+        // nada que anular cuando en realidad la consulta habia reventado.
+        //
+        // Ahora el error se propaga. El unico consumidor directo
+        // (components/ModalRegistrarPago.tsx:94, `cargarUltimoPago`) ya envuelve la llamada
+        // en su propio try/catch, asi que sigue degradando igual de bien; la diferencia es
+        // que el mensaje real llega a quien lo necesita.
         console.error("Error al buscar último pago:", error);
-        return null;
+        throw error;
     }
 };
 
