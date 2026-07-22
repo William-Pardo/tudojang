@@ -165,6 +165,36 @@ existiendo en disco):
 Resultado: `git fsck` limpio, 41 commits intactos, push exitoso. Los archivos corruptos
 originales quedaron respaldados en el scratchpad de la sesión.
 
+> ### ✅ URGENTE RESUELTO — todo el trabajo salió del disco que falla (2026-07-22)
+>
+> Antes de cualquier otra cosa se midió qué se perdería si el disco muriera hoy: **14 commits
+> existían únicamente en `E:`**, sin copia en ningún otro lado.
+>
+> | Rama | Commits únicos | Respaldo |
+> |---|---|---|
+> | `backup-wompi-hoy` | 8 | ✅ pusheada a `origin` |
+> | `stable-wompi-patched` | 1 | ✅ pusheada a `origin` |
+> | `codex/asistente-hibrido-catalogo` | 5 | ✅ bundle en **C:** (otro disco físico) |
+>
+> Las otras cuatro ramas locales (`claude/dev`, `fix-wompi-stable`, `worktree-clase-en-vivo`,
+> `main`) tenían **0 commits únicos** — ya estaban enteras en el remoto. Sin stashes.
+>
+> **Por qué `codex/asistente-hibrido-catalogo` no pudo ir a GitHub:** contiene `Tudojang.rar`
+> de **230,73 MB** commiteado, y el límite de GitHub por archivo es 100 MB. Se respaldó como
+> bundle verificado (`git bundle verify` → *"records a complete history"*) en:
+>
+> ```
+> C:\Users\William Pardo\Respaldo-Tudojang\codex-asistente-hibrido-catalogo.bundle
+> ```
+>
+> Restaurar con: `git fetch <bundle> codex/asistente-hibrido-catalogo:<rama-local>`.
+>
+> > **Deuda anotada:** ese `.rar` en el historial vuelve esa rama impusheable para siempre
+> > salvo reescritura de historia (`git filter-repo`) o Git LFS. Decidir junto con el destino
+> > de esos 5 commits.
+>
+> ---
+>
 > ## 🔴 CAUSA IDENTIFICADA (2026-07-22): EL DISCO ESTÁ FALLANDO
 >
 > **La hipótesis inicial —sesiones de IA en paralelo— era INCORRECTA.** Se descartó con
