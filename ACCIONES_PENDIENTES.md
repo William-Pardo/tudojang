@@ -1021,16 +1021,44 @@ aparición del patrón "test verde certificando el defecto".
 - `components/ModalImportacionMasiva.tsx:232` — `.toLowerCase().trim()`, por simetría con la
   línea 219 y como defensa en profundidad.
 
-#### 🔴 PENDIENTE Y BLOQUEANTE — migración de los datos ya guardados
+#### 🟠 MIGRACIÓN DE DATOS — script listo, FALTA CORRERLO
 
-**El arreglo NO toca los documentos existentes.** Todo estudiante ya creado con un
+**El arreglo del alta NO toca los documentos existentes.** Todo estudiante ya creado con un
 `tutor.correo` en mayúsculas (o con espacios) **sigue invisible para su acudiente**. No hay
 forma de resolverlo desde la lectura: una consulta de igualdad de Firestore no puede ser
 case-insensitive sin un campo ya normalizado.
 
-Hace falta un script de migración que recorra `estudiantes` y normalice `correo` y
-`tutor.correo`. **Antes de cualquier demo a padres, hay que verificar cuántos documentos de
-producción están afectados** — es el bloqueante real, no el código.
+**Script:** [`scripts/normalizar-correos.js`](scripts/normalizar-correos.js) — 15 pruebas en
+`scripts/normalizar-correos.test.js`, que corren solas en CI vía `npm run test:node`.
+
+```bash
+# 1) DIAGNÓSTICO — no escribe nada. Es el modo por defecto, a propósito.
+GOOGLE_APPLICATION_CREDENTIALS=/ruta/sa.json \
+  node scripts/normalizar-correos.js --proyecto tudojang
+
+# 2) APLICAR — recién después de leer el diagnóstico.
+GOOGLE_APPLICATION_CREDENTIALS=/ruta/sa.json \
+  node scripts/normalizar-correos.js --proyecto tudojang --aplicar
+```
+
+Garantías, todas cubiertas por pruebas:
+
+| Garantía | Prueba |
+|---|---|
+| Dry-run por defecto: sin `--aplicar` **cero** escrituras | `migrar: en DRY-RUN no escribe absolutamente nada` |
+| Idempotente: la segunda corrida no cambia nada | `migrar: es IDEMPOTENTE` |
+| `update` con field path anidado — no pisa `tutor.nombres`/`telefono` | `migrar: con --aplicar … deja el resto del tutor intacto` |
+| Sólo toca los documentos que hace falta | `migrar: no toca los documentos que ya estaban bien` |
+| `--tenant` acota a un solo club | `migrar: acotado por --tenant …` |
+| Reporta colisiones de correo de alumno sin resolverlas solo | `migrar: reporta las colisiones …` |
+
+**Paso que falta y que es el bloqueante real:** correr el **diagnóstico** contra producción
+para saber cuántos documentos están afectados. Hasta que ese número no se conozca, no se sabe
+si la demo a padres funciona o no.
+
+**A verificar antes de aplicar:** si al normalizar dos alumnos distintos quedan con el mismo
+`correo`, el script lo reporta y **no** lo resuelve — hay que decidir a mano cuál registro
+vale. (Colisiones en `tutor.correo` son normales: un padre con dos hijos.)
 
 Fijado por caracterización en `vinculoIdentidad.integracion.test.ts` (bloque *"Caracterizacion:
 un correo GUARDADO con mayusculas deja al padre sin ver a su hijo"*): esas 3 pruebas dejan por
