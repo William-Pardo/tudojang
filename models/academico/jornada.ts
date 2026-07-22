@@ -27,6 +27,14 @@ export interface JornadaInstruccion {
    * romper la regla general de que todos los grados tienen su clase regular.
    */
   gradosExcluidos?: GradoTKD[];
+  /**
+   * Oculta esta jornada de la parrilla de Agenda SIN borrarla ni cambiar su estado
+   * (2026-07-22). Salida para clases ya operadas (cerrada/parcial/pendiente_cierre) que no se
+   * pueden eliminar —tienen historial— ni cancelar —la máquina de estados no lo permite—.
+   * Ausente o `false` = visible (default: ninguna jornada existente se ve afectada). El
+   * historial, la asistencia y los reportes siguen viéndola: es solo visibilidad de Agenda.
+   */
+  archivada?: boolean;
   creadoEn: string;
   actualizadoEn: string;
 }

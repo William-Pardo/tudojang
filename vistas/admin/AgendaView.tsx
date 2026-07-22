@@ -173,7 +173,12 @@ const AgendaView: React.FC<AgendaViewProps> = ({ repository = jornadaRepository 
   // Subtarea 12.8 (rendimiento, seccion 21 del documento de mejora): se carga SOLO la
   // semana visible (rango.inicioIso/finIso), no todo el tenant.
   const cargarJornadas = React.useCallback(() => {
-    repository.listarJornadasPorRangoFechas(tenantId, rango.inicioIso, rango.finIso).then((datos) => {
+    repository.listarJornadasPorRangoFechas(tenantId, rango.inicioIso, rango.finIso).then((todas) => {
+      // Las jornadas archivadas (2026-07-22) se ocultan de la parrilla sin borrarse: son
+      // clases ya operadas que no se pueden eliminar ni cancelar y el admin decidio quitarlas
+      // de la vista. El historial/reportes las siguen leyendo -- por eso el filtro va aca, en
+      // la vista, y NO en el repositorio (que otros consumidores usan para leer todo).
+      const datos = todas.filter((jornada) => !jornada.archivada);
       setJornadas(datos);
 
       // Mismo patron que MisClasesView.tsx: la carga de material es independiente de la
@@ -543,6 +548,19 @@ const AgendaView: React.FC<AgendaViewProps> = ({ repository = jornadaRepository 
                       className="rounded-xl bg-tkd-red px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Cancelar la clase en su lugar
+                    </button>
+                  )}
+                  {/* Salida universal: si la clase ya se opero (cerrada/parcial) no se puede
+                      eliminar ni cancelar. Archivar la oculta de la parrilla sin borrarla ni
+                      tocar su historial. Sigue disponible aunque cancelar tambien falle. */}
+                  {eliminacion.error.ofrecerArchivar && (
+                    <button
+                      type="button"
+                      onClick={() => eliminacion.archivar()}
+                      disabled={eliminacion.eliminando}
+                      className="rounded-xl bg-tkd-dark px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/10"
+                    >
+                      Quitar de la agenda
                     </button>
                   )}
                   <button

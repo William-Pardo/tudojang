@@ -1017,6 +1017,28 @@ Verificado por mutación (3, todas en rojo):
 - desactivar el bloqueo optimista → la segunda escritura pisa a la primera
 - ignorar `asistenciaRegistrada` → se borra una clase con historial
 
+#### ✅ RESUELTO (2026-07-22) — "Quitar de la agenda" (archivar) es la salida del callejón
+
+Decisión del usuario: **archivar** (ocultar de Agenda) sin tocar la máquina de estados.
+Implementado:
+- `JornadaInstruccion.archivada?: boolean` (opcional → ninguna jornada existente se afecta).
+- `jornadaRepository.archivarJornada()` — prende el flag, no borra ni cambia estado, siempre
+  funciona. Idempotente.
+- `useEliminacionJornadaSegura.archivar()` — acción universal; `error.ofrecerArchivar` se
+  mantiene en `true` mientras el borrado siga bloqueado, incluso si cancelar también falla
+  (así el admin nunca se queda sin escape).
+- `AgendaView` — la parrilla filtra `archivada` (en la vista, no en el repo: reportes/historial
+  la siguen leyendo) y ofrece el botón **"Quitar de la agenda"**.
+- Auditoría: nueva acción `'archivar'`, distinta de `eliminar`/`cancelar`.
+
+Verificado por mutación (rama Firestore de `archivarJornada`): 7 tests en rojo. La máquina de
+estados NO se relajó: cancelar sigue (correctamente) rechazando `cancelada` desde esos estados.
+
+El texto interno "Transicion invalida" ya no llega al usuario en el flujo normal: si el borrado
+está bloqueado, la UI ofrece cancelar (si aplica) y siempre archivar.
+
+<details><summary>Detalle original del hallazgo (histórico)</summary>
+
 #### 🟡 SIN DECIDIR — hay estados donde no se puede NI eliminar NI cancelar una clase
 
 `useEliminacionJornadaSegura` ofrece *"cancelar en lugar de eliminar"* ante **cualquier**
@@ -1040,6 +1062,8 @@ Qué debería pasar (permitir `cancelada` desde esos estados, o que la UI diga c
 letras que una clase ya cerrada se conserva y no se toca, sin ofrecer un fallback que va a
 fallar) es **decisión de producto, no de código.** Fijado por caracterización en la suite
 (bloque *"Caracterizacion: hay estados donde no se puede NI eliminar NI cancelar"*).
+
+</details>
 
 ### 4-septies. 🔴 BUG CRÍTICO ENCONTRADO Y CORREGIDO — el correo del acudiente no se normalizaba en la importación masiva
 
