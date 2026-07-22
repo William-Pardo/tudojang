@@ -963,12 +963,50 @@ Con Biblioteca cerrada, el inventario de cadenas queda así:
 | **Biblioteca** | ✅ | `servicios/academico/biblioteca.integracion.test.ts` |
 | **Quizzes** (crear → responder → métrica) | ✅ | `servicios/academico/quiz.integracion.test.ts` |
 | **Progreso / métricas** (visualización → analítica) | ❌ | — |
-| **Agenda** (`AgendaView`, `ModalEdicionJornada`) | ❌ | — |
+| **Agenda** (edición de jornada) | ✅ | `servicios/academico/agendaJornada.integracion.test.ts` |
 | **Identidad del acudiente** (vínculos) | ✅ | `servicios/academico/vinculoIdentidad.integracion.test.ts` |
 
-Total actual de integración: **10 suites, 115 pruebas.**
+Total actual de integración: **11 suites, 138 pruebas.**
 
-Faltan dos: **Agenda** y **Progreso / métricas**.
+Falta una: **Progreso / métricas**.
+
+### 4-octies. ✅ CUBIERTA — cadena de Agenda (edición de jornada) + 🟡 un callejón sin salida en el fallback
+
+**Hecho el 2026-07-22.** `servicios/academico/agendaJornada.integracion.test.ts`, 23 pruebas.
+Cubre lo que un admin toca todos los días sobre una jornada ya existente — el medio del ciclo
+de vida, entre `generacionJornadas` (que la crea) y `MisClasesView` (que la cierra).
+
+Cuatro juntas: choque de horario, bloqueo optimista, eliminación segura, auditoría.
+
+Verificado por mutación (3, todas en rojo):
+- reintroducir el filtro por `sedeId` en la consulta de conflictos → revive el bug real de
+  2026-07-16 (mismo maestro agendado en dos sedes a la vez); lo caza el test dedicado
+- desactivar el bloqueo optimista → la segunda escritura pisa a la primera
+- ignorar `asistenciaRegistrada` → se borra una clase con historial
+
+#### 🟡 SIN DECIDIR — hay estados donde no se puede NI eliminar NI cancelar una clase
+
+`useEliminacionJornadaSegura` ofrece *"cancelar en lugar de eliminar"* ante **cualquier**
+`EliminacionNoPermitidaError`. Pero la máquina de estados de `jornadaService` no admite pasar a
+`cancelada` desde todos esos estados:
+
+| Estado (bloquea el borrado) | ¿`eliminarJornadaSegura`? | ¿`cancelarJornada`? |
+|---|---|---|
+| `en_curso` | ❌ | ✅ el fallback funciona |
+| `pendiente_cierre` | ❌ | ❌ **callejón sin salida** |
+| `cerrada` | ❌ | ❌ **callejón sin salida** |
+| `parcial` | ❌ | ❌ **callejón sin salida** |
+
+En 3 de los 4 estados "ya operada", el admin no puede eliminar la clase **y el fallback que la
+propia UI le ofrece tampoco funciona**. Y lo que ve es peor que un callejón:
+`cancelarEnLugarDeEliminar` captura el error y pone `err.message` en pantalla, así que al
+usuario le aparece el texto interno **`"Transicion invalida: cerrada -> cancelada"`** — ni
+explica ni sugiere nada.
+
+Qué debería pasar (permitir `cancelada` desde esos estados, o que la UI diga con todas las
+letras que una clase ya cerrada se conserva y no se toca, sin ofrecer un fallback que va a
+fallar) es **decisión de producto, no de código.** Fijado por caracterización en la suite
+(bloque *"Caracterizacion: hay estados donde no se puede NI eliminar NI cancelar"*).
 
 ### 4-septies. 🔴 BUG CRÍTICO ENCONTRADO Y CORREGIDO — el correo del acudiente no se normalizaba en la importación masiva
 
