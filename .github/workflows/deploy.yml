@@ -1,9 +1,28 @@
 name: Deploy to Firebase
+
+# Disparadores ampliados el 2026-07-22 para poder VALIDAR el gate de pruebas sin deployar.
+#
+# Antes solo disparaba en push a `main`, asi que la unica forma de ver correr el job
+# `pruebas` era mergear a main... que deploya a produccion. Pesimo lugar para descubrir que
+# el workflow tiene un error de sintaxis o que el emulador no levanta en el runner.
+#
+# Ahora corre en cualquier rama y en pull requests. OJO: el trigger es a nivel de workflow,
+# asi que alcanza a AMBOS jobs -- por eso `build_and_deploy` lleva un `if:` explicito que lo
+# restringe a push sobre `main` y a ejecuciones manuales. Sin ese `if`, abrir un PR
+# deployaria a produccion.
 'on':
   push:
     branches:
-      - main
+      - '**'
+  pull_request:
   workflow_dispatch:
+
+# Evita quemar minutos de Actions en corridas que ya quedaron obsoletas por un push nuevo.
+# En `main` NO se cancela: interrumpir un deploy a mitad de camino es peor que gastar unos
+# minutos de mas.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NODE_VERSION: '20'
@@ -66,6 +85,12 @@ jobs:
 
   build_and_deploy:
     needs: pruebas
+    # GUARDA CRITICA: el workflow ahora dispara en cualquier rama y en pull requests para
+    # poder validar el job `pruebas`. Sin esta condicion, cada uno de esos eventos deployaria
+    # a produccion. Solo se deploya en push a `main` o cuando alguien lo lanza a mano.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

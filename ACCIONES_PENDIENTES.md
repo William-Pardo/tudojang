@@ -132,12 +132,26 @@ Los cinco comandos del job se verificaron **uno por uno localmente** antes de wi
 comprometido). La rama `claude/dev-modulos` sigue local, con 39 commits sin respaldar en
 ningún remoto.
 
-> **Consecuencia para este gate:** aunque se pushee la rama, el workflow **no va a
-> ejecutarse**. `deploy.yml` solo dispara en `push` a `main` y en `workflow_dispatch`; no
-> tiene trigger de `pull_request` ni de otras ramas. Para validar el gate sin deployar a
-> producción hay que agregarle un disparador al job `pruebas` (por ejemplo `pull_request`
-> y `push` a ramas no-main). **Sin eso, la única forma de verlo correr es mergear a `main`
-> — que deploya.** Decidir antes de pushear.
+> **✅ Disparadores ampliados (2026-07-22).** El workflow ahora corre en cualquier rama y
+> en pull requests, no solo en `main`. Como el trigger es a nivel de workflow y alcanza a
+> AMBOS jobs, `build_and_deploy` lleva un `if:` explícito que lo restringe a push sobre
+> `main` y a ejecuciones manuales. **Sin ese `if`, abrir un PR deployaría a producción.**
+>
+> Matriz verificada simulando la condición contra cada tipo de evento:
+>
+> | Evento | `pruebas` | `build_and_deploy` |
+> |---|---|---|
+> | push a `main` | ✅ | ✅ |
+> | push a otra rama | ✅ | no |
+> | pull request | ✅ | no |
+> | ejecución manual | ✅ | ✅ |
+>
+> Se agregó además un bloque `concurrency` que cancela corridas obsoletas en ramas de
+> trabajo pero **nunca en `main`**: interrumpir un deploy a mitad de camino es peor que
+> gastar unos minutos de Actions.
+>
+> Con esto, pushear `claude/dev-modulos` (una vez rotado el token, ítem 0-Z) ya alcanza
+> para ver correr el gate completo sin tocar producción.
 
 ### 0-D. Restos del flujo de "publicación en lote", ya retirado del producto
 
