@@ -9,7 +9,63 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # Gate de calidad previo al deploy (agregado 2026-07-22).
+  #
+  # Hasta ahora el pipeline hacia `npm run build` y deployaba directo: ni un solo test
+  # corria antes de publicar a produccion, aunque el repo tiene ~1900 pruebas entre app,
+  # Cloud Functions, scripts y reglas de Firestore. Se conecta recien ahora porque hasta
+  # este commit habia 5 suites en rojo de forma permanente; un gate que nace fallando solo
+  # entrena al equipo a ignorarlo.
+  #
+  # Los cinco comandos se verificaron localmente antes de wirearlos (typecheck 0 errores,
+  # app 1506 pass, functions 263+96 pass, scripts 7 pass, reglas 78 pass contra emulador).
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # El emulador de Firestore corre sobre la JVM. Se instala antes que nada para que un
+      # fallo de setup salga temprano y no despues de cuatro minutos de tests.
+      - name: Setup Java (requerido por el emulador de Firestore)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Functions dependencies
+        run: npm --prefix functions install
+
+      # No requiere secretos: firebase/config.ts cae a modo simulado sin variables de
+      # entorno, que es justo lo que las pruebas esperan.
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Pruebas de la app
+        run: npm run test:app
+
+      - name: Pruebas de Cloud Functions
+        run: npm run test:functions:full
+
+      - name: Pruebas de scripts operativos
+        run: npm run test:node
+
+      # Unica capa que valida de verdad el enforcement de firestore.rules -- entre otras
+      # cosas, que un cliente no pueda saltarse el limite de estudiantes del plan
+      # escribiendo directo. Levanta el emulador real contra un proyecto demo.
+      - name: Reglas de Firestore contra el emulador
+        run: npm run test:firestore-rules
+
   build_and_deploy:
+    needs: pruebas
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

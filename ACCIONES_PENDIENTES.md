@@ -32,10 +32,54 @@ contra el emulador. El que da garantía es el segundo. El primero sirve como can
 ediciones accidentales del archivo, no como verificación de enforcement — conviene no
 confundirlos al leer el reporte.
 
-**Residuo operativo:** tras la corrida quedó un `java.exe` escuchando en 8080/9150 (el
-emulador no cerró el JVM pese al SIGINT). Si una corrida posterior falla con
-`Could not start Firestore Emulator, port taken`, es eso. No se mató el proceso a propósito:
-podría ser un emulador levantado a mano para desarrollo.
+**Residuo operativo (REPRODUCIBLE, no fue casualidad):** cada corrida de
+`npm run test:firestore-rules` deja un `java.exe` escuchando en 8080/9150. El log dice
+`Firestore Emulator has exited upon receiving signal: SIGINT` y sin embargo la JVM
+sobrevive. Se confirmó en **dos corridas seguidas** (PIDs 16072 y 20684).
+
+Consecuencia: la corrida siguiente falla con `Could not start Firestore Emulator, port taken`
+y parece un fallo de tests cuando es basura de la anterior.
+
+Cómo distinguir un emulador de pruebas de uno de desarrollo antes de matarlo (Windows):
+
+```powershell
+(Get-CimInstance Win32_Process -Filter 'ProcessId=<PID>').CommandLine
+```
+
+Si trae `--project_id demo-tudojang` es de las pruebas y se puede matar sin riesgo; un
+emulador de desarrollo usaría el proyecto real. En CI da igual (el runner es efímero), pero
+en local conviene chequear el puerto antes de correr la suite completa.
+
+### 0-E. ⚠️ El gate de CI está escrito pero NUNCA se ejecutó en GitHub Actions
+
+**Agregado el 2026-07-22.** `.github/workflows/deploy.yml` gana un job `pruebas` del que
+`build_and_deploy` depende (`needs: pruebas`). Antes el pipeline hacía `npm run build` y
+deployaba directo: **ni un solo test corría antes de publicar a producción.**
+
+Los cinco comandos del job se verificaron **uno por uno localmente** antes de wirearlos:
+
+| Comando | Resultado local |
+|---|---|
+| `npm run typecheck` | 0 errores |
+| `npm run test:app` | 1506 pass |
+| `npm run test:functions:full` | 263 + 96 pass |
+| `npm run test:node` | 7 pass |
+| `npm run test:firestore-rules` | 78 pass (emulador real) |
+
+> **Lo que NO se pudo verificar:** GitHub Actions no se puede ejecutar desde acá. El YAML
+> es válido y el grafo de dependencias es correcto (comprobado parseándolo), pero **la
+> primera corrida real es la prueba de fuego**. Riesgos concretos a vigilar en ese primer
+> run:
+> - `actions/setup-java@v4` + descarga del emulador de Firestore en el runner (paso más
+>   frágil; nunca corrió en CI).
+> - Tiempo total: localmente la cadena tarda ~7 min. Si el runner es más lento, evaluar
+>   partir el job o cachear el emulador.
+> - `npm install` (no `npm ci`) se mantuvo por consistencia con el job de deploy existente.
+>
+> Si el primer run falla en el paso del emulador y hay urgencia de deployar, la salida
+> mínima es quitar ese último paso del job — los otros cuatro ya dan un gate real.
+
+**No se hizo push.** El commit queda en `claude/dev-modulos`, rama local sin upstream.
 
 ### 0-D. Restos del flujo de "publicación en lote", ya retirado del producto
 
