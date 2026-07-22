@@ -923,6 +923,56 @@ Juntas de mayor riesgo, en orden:
 
 </details>
 
+### 4-quater. ✅ CUBIERTA — cadena de Biblioteca (importar → clasificar → aprobar → publicar)
+
+**Hecho el 2026-07-22.** `servicios/academico/biblioteca.integracion.test.ts`, 13 pruebas.
+Es el paso 1 del Centro de Estudios y alimenta a todos los demás, así que cierra la junta
+con la publicación que ya estaba cubierta (`publicarMaterial.integracion.test.ts`).
+
+```
+importFromDrive() → updateFicha() → approveRecurso() → listarRecursosAprobados()
+                                                          ↓
+                            publishAsignacion() exige estado === 'aprobado'
+```
+
+Verificado por mutación: desactivar la guarda de ficha (1 test rojo) y desactivar la
+deduplicación de importación (2 tests rojos).
+
+**Dos hallazgos de contrato que la UI no transparenta:**
+
+| # | Hallazgo | Por qué importa |
+|---|---|---|
+| a | `archiveRecurso` **solo acepta recursos ya aprobados** — cualquier otro estado lanza "Transición inválida". El flujo real es importar → clasificar → aprobar → archivar. | No se puede archivar un recurso mal clasificado sin aprobarlo antes. Si eso no es lo deseado, es un bug de diseño del flujo, no del código. **Sin decidir.** |
+| b | `youtubeVideoId` **no va dentro de la ficha académica**: es el 5º parámetro de `updateFicha`, junto a `tituloVisible`. | Pasarlo dentro de la ficha no lanza error y no persiste nada. Falla silenciosa: el video queda sin id y el recurso se publica igual, con `youtubeVideoId: null`. Vale revisar si algún llamador de producción lo hace mal. **Sin auditar.** |
+
+**Arreglo de infraestructura:** `test-utils/fakeFirestore.ts` no soportaba `doc(collectionRef)`
+sin segmentos (id autogenerado, que es lo que hace `importFromDrive`). El path quedaba
+apuntando a la colección y el documento se escribía donde ninguna consulta lo encontraba.
+
+### 4-quinquies. 🟡 ABIERTO — cadenas de Centro de Estudios que siguen SIN integración
+
+Con Biblioteca cerrada, el inventario de cadenas queda así:
+
+| Cadena | Estado | Suite |
+|---|---|---|
+| Identidad del consultor | ✅ | `vistas/CentroEstudios.integracion.test.tsx` |
+| Cierre de jornada | ✅ | `vistas/admin/MisClasesView.integracion.test.tsx` |
+| Clase en Vivo (3 juntas) | ✅ | `claseEnVivo` + `checkInQr` + `ClaseEnVivoView` |
+| Publicación de material | ✅ | `servicios/academico/publicarMaterial.integracion.test.ts` |
+| Generación de jornadas | ✅ | `servicios/academico/generacionJornadas.integracion.test.ts` |
+| **Biblioteca** | ✅ | `servicios/academico/biblioteca.integracion.test.ts` |
+| **Quizzes** (crear → responder → progreso) | ❌ | — |
+| **Progreso / métricas** (visualización → analítica) | ❌ | — |
+| **Agenda** (`AgendaView`, `ModalEdicionJornada`) | ❌ | — |
+| **Vínculos e invitaciones** | ❌ | — |
+
+Total actual de integración: **8 suites, 89 pruebas.**
+
+Las cuatro que faltan, por riesgo descendente: **Quizzes** (es la que escribe progreso, y el
+progreso es lo que ve el acudiente), **Vínculos e invitaciones** (toca identidad, y ahí ya
+apareció un bug de identidad antes — ver "Tutor role broken end-to-end"), **Agenda**,
+**Progreso**.
+
 ### 13-bis. ✅ RESUELTO — script `typecheck` + causa raíz de los 3076 errores
 
 **Hecho el 2026-07-21:**
