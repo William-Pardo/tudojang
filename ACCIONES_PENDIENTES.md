@@ -55,6 +55,53 @@ Verificado en ambas condiciones antes de pushear:
 
 ---
 
+## ✅ CI — GATE OPERATIVO (run #107 en verde)
+
+**2026-07-22.** Tras tres iteraciones, el pipeline pasa completo sobre
+`claude/dev-modulos`. Por primera vez en la vida del proyecto, **el codigo se valida antes
+de poder llegar a produccion.**
+
+Camino recorrido, cada fallo un defecto real:
+
+| Run | Falló en | Defecto que destapó |
+|---|---|---|
+| #104 | — | El workflow todavía no tenía gate |
+| #105 | `test:node` | Test del bundle con dependencia oculta en `dist/` |
+| #106 | `test:firestore-rules` | `firebase-tools` invocado como binario global inexistente |
+| **#107** | **—** | **✅ verde** |
+
+Lo que ahora corre en cada push y cada pull request, sin tocar producción:
+
+```
+typecheck              0 errores
+test:app               1506 tests
+test:functions:full    263 + 96 tests
+test:node              7 tests (+1 skip del bundle, por diseño)
+test:firestore-rules   78 tests contra el emulador real
+```
+
+### ⚠️ Lo que TODAVÍA no se validó: el camino de deploy
+
+**`build_and_deploy` nunca se ejecutó con la configuración nueva.** En los runs #105–#107 la
+rama no era `main`, así que el job quedó correctamente omitido — que es justo lo que
+queríamos probar, pero implica que su contenido sigue sin ejercitarse.
+
+Concretamente, el paso **`Verificar que el bundle no filtre secretos`** (agregado en
+`97bd782`) **nunca corrió en CI**. Solo se probó en local.
+
+Riesgos del primer merge a `main`:
+- Ese paso corre entre el build y el deploy. Si falla, **el deploy no ocurre** — que es el
+  comportamiento deseado, pero conviene saberlo de antemano y no descubrirlo con una release
+  urgente encima.
+- El bundle en CI se compila **con los secretos reales** (a diferencia del local). Es la
+  primera vez que ese test se ejecuta sobre un bundle así: si detecta algo, será un hallazgo
+  legítimo, no un falso positivo.
+
+**Recomendación:** hacer el primer merge a `main` en un momento tranquilo, no con una
+urgencia de por medio.
+
+---
+
 ### CI run #106 — `firebase: not found`: los scripts del emulador asumían un CLI global
 
 **2026-07-22.** El fix del bundle funcionó y el job avanzó al paso siguiente, donde falló:
