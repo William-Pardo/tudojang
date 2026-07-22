@@ -67,9 +67,23 @@ test("operational scripts do not hardcode Firebase web API keys", () => {
   assert.doesNotMatch(scriptSources, /AIza[0-9A-Za-z_-]{20,}/);
 });
 
-test("production bundle contains no backend AI secrets or quota constants", () => {
+// Este es el UNICO test del archivo que necesita `dist/`; los cuatro de arriba escanean el
+// codigo fuente y corren siempre.
+//
+// Antes hacia `assert.equal(fs.existsSync(dist), true)` y por lo tanto FALLABA en cualquier
+// entorno limpio. En local pasaba solo porque quedaba un `dist/` de un build anterior --
+// dependencia oculta en un artefacto, invisible hasta que corrio en CI (run #105).
+//
+// Ahora se saltea cuando no hay bundle, y el job de deploy lo ejecuta EXPLICITAMENTE despues
+// del build (`npm run test:bundle-security`), que es su unico lugar util: ahi el bundle esta
+// compilado CON los secretos reales. Compilarlo sin secretos en el job de pruebas lo haria
+// pasar trivialmente -- un test que se aprueba a si mismo.
+test("production bundle contains no backend AI secrets or quota constants", (t) => {
   const dist = path.join(root, "dist");
-  assert.equal(fs.existsSync(dist), true, "run npm run build before this test");
+  if (!fs.existsSync(dist)) {
+    t.skip("sin dist/: corre despues del build via `npm run test:bundle-security`");
+    return;
+  }
 
   const files = fs
     .readdirSync(dist, { recursive: true })

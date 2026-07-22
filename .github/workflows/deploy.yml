@@ -117,6 +117,13 @@ jobs:
           VITE_WOMPI_PUBLIC_KEY: ${{ secrets.VITE_WOMPI_PUBLIC_KEY }}
           VITE_WOMPI_INTEGRITY_SECRET: ${{ secrets.VITE_WOMPI_INTEGRITY_SECRET }}
 
+      # El bundle recien existe aca, y compilado CON los secretos reales -- que es la unica
+      # condicion en la que este chequeo significa algo. En el job `pruebas` no hay `dist/`
+      # (se saltea) y compilarlo sin secretos lo haria pasar trivialmente.
+      # Corre ANTES de publicar: si el bundle filtra una credencial, el deploy no ocurre.
+      - name: Verificar que el bundle no filtre secretos
+        run: npm run test:bundle-security
+
       - name: Install Functions dependencies
         run: npm --prefix functions install
 

@@ -7,6 +7,54 @@ del usuario.
 
 ---
 
+## ✅ CI — primer run real (#105): el gate funciona
+
+**2026-07-22.** Primer `push` de `claude/dev-modulos` a `origin` → el workflow corrió por
+primera vez en GitHub Actions.
+
+**Lo que quedó VALIDADO (no se podía saber sin este run):**
+
+| Comprobación | Resultado |
+|---|---|
+| El job `pruebas` dispara en una rama que no es `main` | ✅ |
+| `build_and_deploy` queda **omitido** (la guarda `if:` funciona) | ✅ — **no hubo deploy** |
+| `actions/setup-java@v4` + emulador de Firestore en el runner | ✅ (era el paso más frágil) |
+| Typecheck | ✅ 12s |
+| Pruebas de la app | ✅ 1m19s |
+| Pruebas de Cloud Functions | ✅ |
+
+**Lo que falló, y era un defecto genuino:** `npm run test:node` → el test
+`production bundle contains no backend AI secrets` abortaba con *"run npm run build before
+this test"*.
+
+Causa: ese test necesita `dist/`, pero el job `pruebas` **no compila** — el build vive en el
+otro job, con su propio sistema de archivos. **En local pasaba solo porque quedaba un `dist/`
+de un build anterior.** Dependencia oculta en un artefacto, del tipo que únicamente se
+manifiesta en un entorno limpio.
+
+**Fix aplicado — el test se movió a donde significa algo:**
+- De los 5 tests de `verificar-bundle-seguro.test.js`, **4 escanean el código fuente** (entre
+  ellos el de tokens de GitHub) y siguen corriendo en cada rama y PR. Mover el archivo entero
+  al job de deploy los habría sacado de ahí: peor el remedio.
+- El único que necesita `dist/` ahora **se saltea** si no hay bundle, y el job de deploy lo
+  ejecuta explícitamente con `npm run test:bundle-security` **después del build y antes de
+  publicar**.
+
+Ese es su único lugar útil: ahí el bundle está compilado **con los secretos reales**.
+Compilarlo sin secretos en el job de pruebas lo haría pasar trivialmente — un test que se
+aprueba a sí mismo.
+
+Verificado en ambas condiciones antes de pushear:
+- sin `dist/` → 7 pass, 1 skip, **0 fail** (lo que necesita CI)
+- con `dist/` → 5 pass, **0 skip** (el chequeo se ejecuta de verdad; el skip no es permanente)
+- orden de pasos confirmado parseando el YAML: build → verificación → deploy
+
+> **Lección de método:** correr los comandos localmente no alcanza si el entorno local tiene
+> artefactos que el runner no tiene. Para replicar CI hay que **quitar** esos artefactos
+> (acá: mover `dist/` fuera) y recién ahí correr.
+
+---
+
 ## 🚨 P0 — INTEGRIDAD DEL REPOSITORIO
 
 ### 0-Y. Dos objetos de git corruptos en `.git/objects` — reparados, causa NO identificada
