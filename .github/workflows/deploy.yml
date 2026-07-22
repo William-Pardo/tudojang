@@ -135,7 +135,30 @@ jobs:
           channelId: live
           projectId: tudojang
 
-      - name: Deploy Functions and Rules
+      # AGREGADO 2026-07-22. El paso de abajo se llamaba "Deploy Functions and Rules" pero su
+      # comando era `--only functions`: las reglas NUNCA se desplegaban. El nombre mentia.
+      #
+      # Se descubrio justo despues de publicar `crearEstudiante`, la Cloud Function que valida
+      # el limite de alumnos del plan: la funcion quedo en produccion, pero la regla que cierra
+      # la puerta trasera (`allow create: if false` sobre estudiantes/{id}) no. O sea, un write
+      # directo desde el cliente seguia creando estudiantes sin limite -- justo el agujero que
+      # habiamos verificado contra el emulador con 78 tests en verde. Verificamos la regla
+      # correcta; nunca llegaba al servidor.
+      #
+      # `firebase.json` declara ademas indices de Firestore y reglas de Storage, que tampoco
+      # se desplegaban nunca. Se incluyen los tres.
+      #
+      # VA ANTES QUE LAS FUNCTIONS a proposito: hoy el paso de functions falla por un permiso
+      # de Cloud Scheduler (ver ACCIONES_PENDIENTES.md), y un paso posterior a uno fallido no
+      # se ejecuta. Poniendolo antes, las reglas se publican aunque las functions fallen. No
+      # hay ventana de rotura por el orden: `crearEstudiante` ya esta en produccion.
+      - name: Deploy Firestore rules, indexes y Storage rules
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$HOME/gcp_key.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp_key.json"
+          npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage --force --project tudojang
+
+      - name: Deploy Functions
         run: |
           echo "WOMPI_EVENTS_SECRET=${{ secrets.WOMPI_EVENTS_SECRET }}" > functions/.env
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$HOME/gcp_key.json"
