@@ -156,7 +156,29 @@ Cloud Scheduler. **Impacto: ninguno** — esas 5 siguen ejecutando su versión a
 confirma `Skipping deletes`.
 
 **Fix (manual, en Google Cloud):** otorgar a la service account de `FIREBASE_SERVICE_ACCOUNT`
-el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`). Después, *Re-run jobs*.
+el rol **Cloud Scheduler Admin** (`roles/cloudscheduler.admin`) en
+`https://console.cloud.google.com/iam-admin/iam?project=tudojang`.
+
+> ### ⚠️ SIGUE PENDIENTE — el verde del run #116 es engañoso
+>
+> El run #116 (merge del PR #3) salió **completamente verde, incluido el paso de functions**,
+> pero **el permiso NO se otorgó**. Confirmado con el usuario.
+>
+> Explicación más probable (inferencia, no verificada contra las tripas de Firebase): en el
+> run #113 el CÓDIGO de esas 5 funciones sí se actualizó; lo que falló fue el paso siguiente,
+> sincronizar sus horarios en Cloud Scheduler (`upsert schedule`). En el #116 el código de
+> esas funciones era **idéntico** al ya desplegado — entre ambos merges solo cambió el archivo
+> del workflow — así que Firebase no detectó cambios y **ni siquiera intentó tocar los
+> horarios**. Sin llamada a la API, sin 403.
+>
+> **Conclusión: el problema está dormido, no resuelto.** El 403 vuelve en cuanto se modifique
+> cualquiera de esas 5 funciones, se cambie un cron, o se toque `functions/index.js` de forma
+> que las alcance. Y volverá en el peor momento: desplegando un cambio real con apuro.
+>
+> Una de las cinco es **`cobroAutomaticoMensual`** — el cobro de mensualidades. No es una
+> función que convenga no poder actualizar.
+>
+> **Otorgar el permiso igual, aunque hoy el pipeline esté verde.**
 
 ### 🔴 Hallazgo 2 — Las reglas NUNCA se desplegaban (el paso mentía)
 
