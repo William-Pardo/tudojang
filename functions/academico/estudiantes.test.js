@@ -195,3 +195,72 @@ test('crearEstudiante: SuperAdmin puede crear estudiantes en cualquier tenant', 
   assert.equal(creado.nombres, 'Juan');
   assert.equal(creado.tenantId, 'tenant-1');
 });
+
+// --- Normalizacion de correos (fix identidad del acudiente, 2026-07-22) -----------------
+//
+// `resolveLinkedStudent` resuelve los hijos de un acudiente con
+// `where('tutor.correo', '==', <email de Auth, ya en minusculas>)`. Firestore compara por
+// igualdad EXACTA y SENSIBLE A MAYUSCULAS, asi que un doc guardado con "Papa@Gajog.com"
+// no matchea nunca y el padre entra a una pantalla vacia, sin error.
+//
+// La importacion masiva guardaba el correo del acudiente tal cual venia de la planilla
+// (normalizaba el del alumno, en el mismo objeto, pero no el del tutor). Esta funcion es el
+// unico punto por el que pasan TODAS las altas, asi que la normalizacion vive aca.
+
+test('crearEstudiante: normaliza a minusculas el correo del ACUDIENTE', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    {
+      tenantId: 'tenant-1',
+      nombres: 'Juan',
+      tutor: { nombres: 'MARIA', correo: '  Papa@Gajog.COM  ' },
+    },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.tutor.correo, 'papa@gajog.com');
+  // El resto de los campos del tutor no se toca.
+  assert.equal(creado.tutor.nombres, 'MARIA');
+});
+
+test('crearEstudiante: normaliza a minusculas el correo del ALUMNO', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    { tenantId: 'tenant-1', nombres: 'Juan', correo: 'Juan@Gajog.com ' },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.correo, 'juan@gajog.com');
+});
+
+test('crearEstudiante: sin tutor ni correo no rompe ni inventa campos', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    { tenantId: 'tenant-1', nombres: 'Juan' },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.nombres, 'Juan');
+  assert.equal(creado.correo, undefined);
+  assert.equal(creado.tutor, undefined);
+});
+
+test('crearEstudiante: un tutor sin correo conserva sus demas datos', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    { tenantId: 'tenant-1', nombres: 'Juan', tutor: { nombres: 'MARIA', telefono: '300' } },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.tutor.nombres, 'MARIA');
+  assert.equal(creado.tutor.telefono, '300');
+  assert.equal(creado.tutor.correo, undefined);
+});
