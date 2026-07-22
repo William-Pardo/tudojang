@@ -9,10 +9,15 @@ export default {
     '<rootDir>/scripts/.*\\.test\\.js$',
     '<rootDir>/cypress/',
     '<rootDir>/node_modules/',
+    // Fix 2026-07-18: worktree de otra sesión vive dentro del working tree y contiene
+    // una copia casi completa del repo -- sin esto, cada suite corre 2 veces (una acá,
+    // otra desde ahí), con warnings de jest-haste-map por mocks manuales duplicados.
+    '<rootDir>/.claude/',
   ],
   moduleNameMapper: {
     'framer-motion': '<rootDir>/__mocks__/framer-motion.tsx',
     '^d3-(.*)$': '<rootDir>/node_modules/d3-$1',
+    '^\\./pdfWorkerConfig$': '<rootDir>/components/academico/pdfWorkerConfig.mock.ts',
   },
   transform: {
     '^.+\\.tsx?$': 'ts-jest',

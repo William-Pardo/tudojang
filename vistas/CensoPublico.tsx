@@ -179,6 +179,10 @@ const CensoPublico: React.FC = () => {
                                     <input name="tutorCedula" type="text" required className={inputClass} onChange={handleInputChange} />
                                 </div>
                                 <div>
+                                    <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Correo Tutor</label>
+                                    <input name="tutorEmail" type="email" required className={inputClass} onChange={handleInputChange} />
+                                </div>
+                                <div>
                                     <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp Tutor</label>
                                     <input name="tutorTelefono" type="tel" required className={inputClass} onChange={handleInputChange} />
                                 </div>

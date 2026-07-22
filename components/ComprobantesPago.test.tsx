@@ -2,6 +2,11 @@ import React from 'react';
 import { act, render, renderHook, screen } from '@testing-library/react';
 import html2canvas from 'html2canvas';
 import type { DatosComprobante } from './ComprobantesPago';
+// Fix 2026-07-21 (`npm run typecheck`): el `config={{}}` de mas abajo es INTENCIONAL -- ese
+// test ejercita los valores visuales por defecto cuando no hay configuracion de club. Se
+// castea explicitamente en vez de completar los 29 campos de ConfiguracionClub, que
+// contradiria el proposito del caso.
+import type { ConfiguracionClub } from '../tipos';
 
 jest.mock('html2canvas', () => jest.fn());
 
@@ -31,7 +36,7 @@ describe('ComprobantesPago', () => {
   });
 
   it('usa valores visuales por defecto y omite tutor/teléfono', () => {
-    render(<PlantillaComprobante datos={{ ...datos, nombreTutor: undefined, telefonoTutor: undefined }} config={{}} compRef={{ current: null }} />);
+    render(<PlantillaComprobante datos={{ ...datos, nombreTutor: undefined, telefonoTutor: undefined }} config={{} as ConfiguracionClub} compRef={{ current: null }} />);
     expect(screen.getByText('Mi Academia')).toBeInTheDocument();
     expect(screen.queryByText(/Tutor:/)).not.toBeInTheDocument();
     expect(screen.getByAltText('Logo')).toHaveAttribute('src', '/Logo_TuDojang.png');

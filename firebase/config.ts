@@ -58,6 +58,7 @@ const appCheck = isFirebaseConfigured ? inicializarAppCheck(app) : null;
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
+
 const messaging = isFirebaseConfigured ? getMessaging(app) : null;
 
 export { app, appCheck, db, auth, storage, messaging };

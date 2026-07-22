@@ -1,0 +1,175 @@
+'use strict';
+
+// Plantilla de email de "pago exitoso" (2026-07-15): reemplaza el armado inline con
+// HEADER_HTML/FOOTER_HTML que vivía dentro del webhookWompi. Sigue el mismo patrón que
+// functions/academico/passwordReset.js -- una constante PLANTILLA_HTML con el HTML completo
+// (copia de --/pago_exitoso.html) y una función construirHtmlPagoExitoso({...}) que hace
+// .replace(/\{\{campo\}\}/g, valor) por cada placeholder. Cloud Functions solo empaqueta
+// functions/, no el resto del repo, así que se embebe acá en vez de leerla por path relativo.
+const PLANTILLA_HTML = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tudojang - Bienvenidos al Camino</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,900;1,700;1,900&family=Roboto:wght@300;400;500;700&display=swap');
+
+        body {
+            font-family: 'Roboto', Helvetica, Arial, sans-serif;
+            background-color: #f4f7f9;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .title-font {
+            font-family: 'Montserrat', Helvetica, Arial, sans-serif;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 51, 102, 0.1);
+        }
+
+        .header-accent {
+            height: 6px;
+            background: linear-gradient(90deg, #003366 0%, #cc3333 100%);
+        }
+
+        .btn-primary {
+            display: inline-block;
+            padding: 14px 30px;
+            background-color: #003366;
+            color: #ffffff !important;
+            text-decoration: none;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-style: italic;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 14px;
+        }
+
+        .footer {
+            background-color: #001a33;
+            color: #94a3b8;
+            padding: 40px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .honor-box {
+            background-color: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: left;
+        }
+
+        .receipt-box {
+            background-color: #f8fafc;
+            border-radius: 6px;
+            padding: 25px;
+            border: 1px solid #e2e8f0;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .brush-stroke {
+            border-left: 4px solid #cc3333;
+            padding-left: 20px;
+            margin: 25px 0;
+            font-style: italic;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="email-container">
+        <div class="header-accent"></div>
+
+        <!-- LOGO -->
+        <div style="padding: 40px; text-align: center;">
+            <div style="margin-bottom: 32px;">
+                <img src="https://gist.githubusercontent.com/William-Pardo/87c1222a61e7e257cb576be90625d23a/raw/5b914bc5e82e1b24f373501d325e6284dbe5ba13/Logo%2520TuDoJang.svg" alt="Tudojang" style="max-width: 180px; margin: 0 auto; display: block;">
+            </div>
+
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 24px;">
+                <span style="font-size: 24px; margin-right: 12px;">🥋</span>
+                <h1 class="title-font" style="font-size: 24px; font-weight: 900; font-style: italic; color: #003366; text-transform: uppercase; margin: 0; letter-spacing: -0.5px;">
+                    Pago Confirmado
+                </h1>
+            </div>
+
+            <p style="color: #4b5563; font-size: 18px; line-height: 1.6; text-align: left; margin: 0;">
+                Saludos, <span style="font-weight: bold; color: #003366; font-style: italic;">Sabonim {{nombre_usuario}}</span>,
+            </p>
+
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left; margin-top: 16px;">
+                Recibimos con gratitud tu pago. Desde este momento, tu academia <span style="font-weight: bold; color: #cc3333;">{{nombre_academia}}</span> cuenta con la plataforma líder diseñada para respaldar tu autoridad técnica y simplificar la gestión de tus alumnos.
+            </p>
+
+            <div class="receipt-box">
+                <p style="color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;">Comprobante de pago</p>
+                <h2 style="color: #003366; font-size: 28px; font-weight: 900; margin: 0;">{{monto_pagado}}</h2>
+                <p style="color: #94a3b8; font-size: 12px; margin-top: 5px;">Fecha: {{fecha_pago}}</p>
+            </div>
+
+            <div class="brush-stroke" style="text-align: left;">
+                "Un viaje de mil millas comienza con el primer paso."
+            </div>
+
+            <div class="honor-box">
+                <p style="color: #003366; font-family: 'Montserrat', sans-serif; font-weight: 700; font-style: italic; font-size: 14px; text-transform: uppercase; margin-top: 0; margin-bottom: 12px;">Primeros Pasos en tu Panel:</p>
+                <ul style="color: #4b5563; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                    <li>Completa el perfil oficial de tu academia.</li>
+                    <li>Registra a tus instructores y cintas negras.</li>
+                    <li>Comienza a registrar a tus alumnos para el seguimiento de sus kychos.</li>
+                </ul>
+            </div>
+
+            <p style="color: #4b5563; font-size: 16px; line-height: 1.6; text-align: left;">
+                Gracias por permitirnos ser parte de tu camino. Tu enfoque en la enseñanza es lo más importante, de la gestión técnica nos encargamos nosotros.
+            </p>
+
+            <div style="margin-top: 40px; text-align: center;">
+                <a href="https://tudojang.com/login" class="btn-primary">Iniciar Sesión en mi Panel</a>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <div style="margin-bottom: 16px;">
+                <span class="title-font" style="font-weight: 900; font-style: italic; font-size: 18px; color: #ffffff;">Tudo<span style="color: #cc3333;">jang</span></span>
+            </div>
+            <p style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 24px;">Fortaleciendo la Autoridad Técnica</p>
+
+            <p style="color: #64748b; font-size: 10px; margin: 0;">
+                © 2026 Tudojang.com. Todos los derechos reservados.<br>
+                Protocolo Kicho • Disciplina • Gratitud
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>`;
+
+function construirHtmlPagoExitoso({ nombreUsuario, nombreAcademia, montoPagado, fechaPago }) {
+  return PLANTILLA_HTML
+    .replace(/\{\{nombre_usuario\}\}/g, nombreUsuario)
+    .replace(/\{\{nombre_academia\}\}/g, nombreAcademia)
+    .replace(/\{\{monto_pagado\}\}/g, montoPagado)
+    .replace(/\{\{fecha_pago\}\}/g, fechaPago);
+}
+
+module.exports = {
+  construirHtmlPagoExitoso,
+};

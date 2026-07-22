@@ -9,6 +9,13 @@ const { enviarCorreo } = require("./email");
 const { verificarFirmaEventoWompi } = require("./wompi");
 const { crearServicioFirmaCheckoutWompi } = require("./wompiIntegrity");
 const {
+  crearServicioCrearFuentePagoWompi,
+  crearServicioCobroAutomaticoMensual,
+  crearListadoTenantsPendientesDeCobroFirestore,
+  crearLectorWompiPaymentSourceIdFirestore,
+  crearTransaccionRecurrenteWompi,
+} = require("./wompiCobroAutomatico");
+const {
   validarTenantParaProvision,
   validarEvidenciaPagoParaActivacion,
 } = require("./onboardingSecurity");
@@ -43,11 +50,22 @@ const {
 const {
   crearServicioConnectDrive,
   crearServicioDriveOAuthCallback,
+  crearServicioListDriveFolder,
+  crearServicioDisconnectDrive,
+  crearServicioGetDriveConnection,
+  crearServicioSetDriveFolder,
+  crearServicioGetTemporaryFileUrl,
+  crearServicioGetTemporaryFileUrlRecurso,
+  crearServicioProxyDriveMedia,
   crearServicioSyncDriveMetadata,
 } = require("./academico/drive");
 const {
   crearServicioPublishAsignacion,
+  crearServicioPublishAsignacionesBatch,
 } = require("./academico/asignaciones");
+const {
+  crearServicioRegistrarAsistencia,
+} = require("./academico/asistencia");
 const {
   crearServicioVencerAsignaciones,
   crearListadoAsignacionesFirestore,
@@ -56,12 +74,50 @@ const {
   crearServicioConsolidateProgress,
   crearAdaptadorConsolidateProgressFirestore,
 } = require("./academico/progreso");
+const {
+  crearServicioActualizarUsuarioStaff,
+} = require("./academico/usuarios");
+const {
+  crearServicioCreateSede,
+  crearServicioUpdateSede,
+  crearServicioDeleteSede,
+} = require("./academico/sedes");
+const {
+  crearServicioCrearEstudiante,
+} = require("./academico/estudiantes");
+const {
+  crearServicioIniciarJornadasPorHorario,
+  crearListadoJornadasConfirmadasFirestore,
+} = require("./academico/jornadasScheduler");
+const {
+  crearServicioRecordatoriosPago,
+} = require("./academico/recordatoriosPago");
+const {
+  crearServicioRecordatoriosEstudio,
+} = require("./academico/recordatoriosEstudio");
+const { aplicaAlEstudiante } = require("./academico/destinatarioAsignacion");
+const {
+  crearServicioNotificarEventoNuevo,
+} = require("./academico/notificarEvento");
+const {
+  crearServicioSendPasswordReset,
+} = require("./academico/passwordReset");
+const {
+  crearServicioGenerarDatosDemoProgreso,
+  crearServicioLimpiarDatosDemoProgreso,
+} = require("./academico/datosDemoProgreso");
+const { construirHtmlPagoExitoso } = require("./academico/pagoExitosoEmail");
 
 admin.initializeApp();
 
 const emailFunctions = functionsV1.runWith({ secrets: ["RESEND_API_KEY"] });
 const paymentFunctions = functionsV1.runWith({
-  secrets: ["RESEND_API_KEY", "WOMPI_EVENTS_SECRET", "WOMPI_INTEGRITY_SECRET"],
+  secrets: [
+    "RESEND_API_KEY",
+    "WOMPI_EVENTS_SECRET",
+    "WOMPI_INTEGRITY_SECRET",
+    "WOMPI_PRIVATE_KEY",
+  ],
 });
 const assistantFunctions = functionsV1.runWith({
   secrets: ["GEMINI_API_KEY"],
@@ -69,6 +125,9 @@ const assistantFunctions = functionsV1.runWith({
 });
 const geminiFunctions = functionsV1.runWith({
   secrets: ["GEMINI_API_KEY"],
+});
+const driveFunctions = functionsV1.runWith({
+  secrets: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"],
 });
 const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
@@ -201,12 +260,52 @@ const servicioInviteUser = crearServicioInviteUser({
   firestore: admin.firestore(),
   enviarCorreo,
   resend: getResend,
-  appUrl: process.env.APP_URL || "https://app.tudojang.com"
+  appUrl: process.env.APP_URL || "https://tudojang.com"
 });
 
 const servicioAcceptInvitation = crearServicioAcceptInvitation({
   auth: admin.auth(),
   firestore: admin.firestore()
+});
+
+// Fix UX de restablecimiento de clave (2026-07-15): reemplaza sendPasswordResetEmail() del
+// SDK cliente (correo/paginas genericas de Firebase) por un flujo propio con la plantilla
+// HTML del proyecto y redirect a /restablecer-clave en el dominio real.
+const servicioSendPasswordReset = crearServicioSendPasswordReset({
+  auth: admin.auth(),
+  enviarCorreo,
+  resend: getResend,
+  appUrl: process.env.APP_URL || "https://tudojang.com",
+  // Fix 2026-07-15: el nombre real vive en Firestore (estudiante/tutor), no en
+  // displayName de Auth (casi nunca seteado -- el correo salía con el prefijo del email).
+  // Orden: 1) Estudiante por su propio correo, 2) Tutor vinculado por su correo,
+  // 3) usuarios/{uid} para staff (Admin/Editor/Asistente/Maestro).
+  resolverNombreReal: async (email, uid) => {
+    const fs = admin.firestore();
+
+    let snap = await fs.collection("estudiantes").where("correo", "==", email).limit(1).get();
+    if (!snap.empty) {
+      const d = snap.docs[0].data();
+      const nombre = [d.nombres, d.apellidos].filter(Boolean).join(" ").trim();
+      if (nombre) return nombre;
+    }
+
+    snap = await fs.collection("estudiantes").where("tutor.correo", "==", email).limit(1).get();
+    if (!snap.empty) {
+      const t = snap.docs[0].data().tutor || {};
+      const nombre = [t.nombres, t.apellidos].filter(Boolean).join(" ").trim();
+      if (nombre) return nombre;
+    }
+
+    const usuarioDoc = await fs.collection("usuarios").doc(uid).get();
+    if (usuarioDoc.exists) {
+      const u = usuarioDoc.data();
+      const nombre = (u.nombreUsuario || [u.nombres, u.apellidos].filter(Boolean).join(" ")).trim();
+      if (nombre) return nombre;
+    }
+
+    return null;
+  },
 });
 
 const googleDriveConfig = {
@@ -224,6 +323,40 @@ const servicioDriveOAuthCallback = crearServicioDriveOAuthCallback({
   firestore: admin.firestore()
 });
 
+const servicioListDriveFolder = crearServicioListDriveFolder({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioDisconnectDrive = crearServicioDisconnectDrive({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioGetDriveConnection = crearServicioGetDriveConnection({
+  firestore: admin.firestore()
+});
+
+const servicioSetDriveFolder = crearServicioSetDriveFolder({
+  firestore: admin.firestore()
+});
+
+const servicioGetTemporaryFileUrl = crearServicioGetTemporaryFileUrl({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioGetTemporaryFileUrlRecurso = crearServicioGetTemporaryFileUrlRecurso({
+  googleDriveConfig,
+  firestore: admin.firestore()
+});
+
+const servicioProxyDriveMedia = crearServicioProxyDriveMedia({
+  googleDriveConfig,
+  firestore: admin.firestore(),
+  auth: admin.auth()
+});
+
 const servicioSyncDriveMetadata = crearServicioSyncDriveMetadata({
   googleDriveConfig,
   firestore: admin.firestore()
@@ -233,13 +366,191 @@ const servicioPublishAsignacion = crearServicioPublishAsignacion({
   firestore: admin.firestore()
 });
 
-const servicioVencerAsignaciones = crearServicioVencerAsignaciones({
-  listarAsignacionesPublicadas: crearListadoAsignacionesFirestore(admin.firestore())
+const servicioPublishAsignacionesBatch = crearServicioPublishAsignacionesBatch({
+  firestore: admin.firestore()
 });
 
-const servicioConsolidateProgress = crearServicioConsolidateProgress(
-  crearAdaptadorConsolidateProgressFirestore(admin.firestore())
-);
+const servicioRegistrarAsistencia = crearServicioRegistrarAsistencia({
+  firestore: admin.firestore()
+});
+
+const servicioActualizarUsuarioStaff = crearServicioActualizarUsuarioStaff({
+  firestore: admin.firestore()
+});
+
+const servicioCreateSede = crearServicioCreateSede({
+  firestore: admin.firestore()
+});
+
+const servicioUpdateSede = crearServicioUpdateSede({
+  firestore: admin.firestore()
+});
+
+const servicioDeleteSede = crearServicioDeleteSede({
+  firestore: admin.firestore()
+});
+
+const servicioCrearEstudiante = crearServicioCrearEstudiante({
+  firestore: admin.firestore()
+});
+
+const servicioGenerarDatosDemoProgreso = crearServicioGenerarDatosDemoProgreso({
+  firestore: admin.firestore()
+});
+const servicioLimpiarDatosDemoProgreso = crearServicioLimpiarDatosDemoProgreso({
+  firestore: admin.firestore()
+});
+
+const servicioIniciarJornadasPorHorario = crearServicioIniciarJornadasPorHorario({
+  listarJornadasConfirmadas: crearListadoJornadasConfirmadasFirestore(admin.firestore())
+});
+
+// Compartida entre vencerAsignaciones y recordatoriosEstudio (mismo collectionGroup query).
+const listarAsignacionesPublicadasFirestore = crearListadoAsignacionesFirestore(admin.firestore());
+
+const servicioVencerAsignaciones = crearServicioVencerAsignaciones({
+  listarAsignacionesPublicadas: listarAsignacionesPublicadasFirestore,
+});
+
+const servicioCrearFuentePagoWompi = crearServicioCrearFuentePagoWompi({
+  firestore: admin.firestore(),
+  wompiPrivateKey: () => process.env.WOMPI_PRIVATE_KEY,
+});
+
+// Plan B #1: recordatorios de pago automáticos al buzón (fix tutor-role-end-to-end).
+const servicioRecordatoriosPago = crearServicioRecordatoriosPago({
+  // Estudiantes con saldo pendiente (single-field range query, auto-indexado).
+  listarEstudiantesConSaldo: async () => {
+    const snap = await admin.firestore().collection("estudiantes").where("saldoDeudor", ">", 0).get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+  // Dedup mensual: los recordatorios creados por este cron llevan `periodo` YYYY-MM
+  // (single-field, auto-indexado). Devolvemos el set de estudianteId ya notificados.
+  estudiantesYaNotificadosEnPeriodo: async (periodo) => {
+    const snap = await admin.firestore().collection("historialNotificaciones").where("periodo", "==", periodo).get();
+    return new Set(snap.docs.map((d) => d.data().estudianteId).filter(Boolean));
+  },
+  crearNotificacion: async (n) => {
+    await admin.firestore().collection("historialNotificaciones").add(n);
+  },
+});
+
+// Recordatorios de estudio: nudges a estudiantes/tutores cuando una asignacion esta por
+// vencer sin terminar, recien se publico, o el estudiante lleva mucho sin actividad (ver
+// functions/academico/recordatoriosEstudio.js). Reusa listarAsignacionesPublicadasFirestore
+// (mismo collectionGroup('asignaciones') que ya usa vencerAsignaciones mas abajo) en vez de
+// inventar una query nueva. Historial de recordatorios previos: una sola query por
+// estudiante (single-field, auto-indexado), filtrando tipo/situacion/asignacion en memoria
+// -- mismo criterio que el resto de este archivo, para no depender de indices compuestos.
+async function buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion) {
+  const snap = await admin.firestore()
+    .collection("historialNotificaciones")
+    .where("estudianteId", "==", estudianteId)
+    .get();
+
+  let masReciente = null;
+  for (const doc of snap.docs) {
+    const n = doc.data();
+    if (n.tipo !== "RecordatorioEstudio") continue;
+    if (n.situacion !== situacion) continue;
+    if ((n.asignacionId || null) !== (asignacionId || null)) continue;
+    if (!masReciente || n.fecha > masReciente.fecha) masReciente = n;
+  }
+  return masReciente;
+}
+
+const servicioRecordatoriosEstudio = crearServicioRecordatoriosEstudio({
+  listarAsignacionesVigentes: async () => {
+    const snaps = await listarAsignacionesPublicadasFirestore();
+    return snaps.map((s) => ({ id: s.id, ...s.data() }));
+  },
+  listarEstudiantesActivos: async () => {
+    const snap = await admin.firestore().collection("estudiantes").get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+  obtenerAvancePorAsignacion: async (tenantId, estudianteId) => {
+    const doc = await admin.firestore()
+      .collection("tenants").doc(tenantId)
+      .collection("metricasEstudiante").doc(estudianteId)
+      .get();
+    return doc.exists ? (doc.data().avancePorAsignacion || []) : [];
+  },
+  obtenerFechaUltimoRecordatorio: async (estudianteId, asignacionId, situacion) => {
+    const n = await buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion);
+    return n ? n.fecha : undefined;
+  },
+  obtenerUltimoComentario: async (situacion, estudianteId, asignacionId) => {
+    const n = await buscarUltimoRecordatorioEstudio(estudianteId, asignacionId, situacion);
+    return n ? n.mensaje : undefined;
+  },
+  crearNotificacion: async (n) => {
+    await admin.firestore().collection("historialNotificaciones").add(n);
+  },
+  aplicaAlEstudiante,
+});
+
+// Plan B #3: al crear un evento, notificar a los estudiantes del tenant (fix tutor-role-end-to-end).
+const servicioNotificarEventoNuevo = crearServicioNotificarEventoNuevo({
+  listarEstudiantesDelTenant: async (tenantId) => {
+    const snap = await admin.firestore().collection("estudiantes").where("tenantId", "==", tenantId).get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+  // Dedup por evento: las notificaciones de este cron llevan `eventoId` (single-field,
+  // auto-indexado). Set de estudianteId ya avisados de ese evento.
+  estudiantesYaNotificadosDelEvento: async (eventoId) => {
+    const snap = await admin.firestore().collection("historialNotificaciones").where("eventoId", "==", eventoId).get();
+    return new Set(snap.docs.map((d) => d.data().estudianteId).filter(Boolean));
+  },
+  crearNotificacion: async (n) => {
+    await admin.firestore().collection("historialNotificaciones").add(n);
+  },
+});
+
+const servicioConsolidateProgress = crearServicioConsolidateProgress({
+  ...crearAdaptadorConsolidateProgressFirestore(admin.firestore()),
+  // Plan B #2 (fix tutor-role-end-to-end): al completar un material, notificar al buzón.
+  // El progreso se llavea por el Auth UID del visor; lo mapeamos a su estudiante por email
+  // (correo del estudiante si él vio; tutor.correo si vio el padre). Dedup por material.
+  notificarAvance: async ({ tenantId, uid, asignacion, asignacionId }) => {
+    try {
+      const fs = admin.firestore();
+      const user = await admin.auth().getUser(uid).catch(() => null);
+      const email = (user && user.email ? user.email : "").toLowerCase().trim();
+      if (!email) return;
+
+      let snap = await fs.collection("estudiantes").where("correo", "==", email).get();
+      if (snap.empty) snap = await fs.collection("estudiantes").where("tutor.correo", "==", email).get();
+      if (snap.empty) return;
+
+      const titulo = asignacion && asignacion.titulo ? asignacion.titulo : "un material";
+      // Notificaciones de avance ya creadas para este material (asignacionId es exclusivo de
+      // estas; single-field auto-indexado). Dedup por estudianteId en cliente.
+      const previas = await fs.collection("historialNotificaciones").where("asignacionId", "==", asignacionId).get();
+      const yaNotificados = new Set(previas.docs.map((d) => d.data().estudianteId));
+
+      for (const estDoc of snap.docs) {
+        const est = estDoc.data();
+        const estudianteId = estDoc.id;
+        if (est.tenantId && est.tenantId !== tenantId) continue;
+        if (yaNotificados.has(estudianteId)) continue;
+        await fs.collection("historialNotificaciones").add({
+          estudianteId,
+          estudianteNombre: [est.nombres, est.apellidos].filter(Boolean).join(" "),
+          tutorNombre: est.tutor ? [est.tutor.nombres, est.tutor.apellidos].filter(Boolean).join(" ") : "",
+          destinatario: (est.tutor && est.tutor.correo) || est.correo || "",
+          canal: "Email",
+          tipo: "AvanceAcademico",
+          asignacionId,
+          mensaje: `Avance académico: ${est.nombres || "el estudiante"} completó "${titulo}".`,
+          leida: false,
+          fecha: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error("[notificarAvance] no se pudo crear la notificación de avance:", err);
+    }
+  },
+});
 
 exports.inviteUser = emailFunctions.https.onCall(
   crearHandlerCallable(servicioInviteUser)
@@ -249,15 +560,47 @@ exports.acceptInvitation = functionsV1.https.onCall(
   crearHandlerCallable(servicioAcceptInvitation)
 );
 
-exports.connectDrive = functionsV1.https.onCall(
+// Fix UX de restablecimiento de clave (2026-07-15): NO requiere auth (quien olvido su clave
+// no esta logueado). Usa emailFunctions (mismo patron que inviteUser) por el secret de Resend.
+exports.sendPasswordReset = emailFunctions.https.onCall(
+  crearHandlerCallable(servicioSendPasswordReset)
+);
+
+exports.connectDrive = driveFunctions.https.onCall(
   crearHandlerCallable(servicioConnectDrive)
 );
 
-exports.driveOAuthCallback = functionsV1.https.onCall(
+exports.driveOAuthCallback = driveFunctions.https.onCall(
   crearHandlerCallable(servicioDriveOAuthCallback)
 );
 
-exports.syncDriveMetadata = functionsV1.https.onRequest(async (req, res) => {
+exports.listDriveFolder = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioListDriveFolder)
+);
+
+exports.disconnectDrive = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioDisconnectDrive)
+);
+
+exports.getDriveConnection = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioGetDriveConnection)
+);
+
+exports.setDriveFolder = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioSetDriveFolder)
+);
+
+exports.getTemporaryFileUrl = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioGetTemporaryFileUrl)
+);
+
+exports.getTemporaryFileUrlRecurso = driveFunctions.https.onCall(
+  crearHandlerCallable(servicioGetTemporaryFileUrlRecurso)
+);
+
+exports.proxyDriveMedia = driveFunctions.https.onRequest(servicioProxyDriveMedia);
+
+exports.syncDriveMetadata = driveFunctions.https.onRequest(async (req, res) => {
   return cors(req, res, async () => {
     try {
       await servicioSyncDriveMetadata(req, res);
@@ -272,10 +615,93 @@ exports.publishAsignacion = functionsV1.https.onCall(
   crearHandlerCallable(servicioPublishAsignacion)
 );
 
+exports.publishAsignacionesBatch = functionsV1.https.onCall(
+  crearHandlerCallable(servicioPublishAsignacionesBatch)
+);
+
+exports.registrarAsistenciaJornada = functionsV1.https.onCall(
+  crearHandlerCallable(servicioRegistrarAsistencia)
+);
+
+exports.actualizarUsuarioStaff = functionsV1.https.onCall(
+  crearHandlerCallable(servicioActualizarUsuarioStaff)
+);
+
+// Alta/edicion/baja de sedes -- movido a Cloud Function (bug real 2026-07-16: el limite
+// de sedes del plan y la unicidad de nombre solo se chequeaban del lado del cliente,
+// sin ninguna barrera server-side. Ver academico/sedes.js para el detalle completo).
+exports.createSede = functionsV1.https.onCall(
+  crearHandlerCallable(servicioCreateSede)
+);
+exports.updateSede = functionsV1.https.onCall(
+  crearHandlerCallable(servicioUpdateSede)
+);
+exports.deleteSede = functionsV1.https.onCall(
+  crearHandlerCallable(servicioDeleteSede)
+);
+
+// Alta segura de estudiantes -- movido a Cloud Function (mismo patron de bug real que
+// sedes: el limite del plan, `tenant.limiteEstudiantes` -- que ya incluye plan base +
+// addons comprados -- solo se validaba en el boton de la UI, nunca en el servidor. Ver
+// academico/estudiantes.js para el detalle completo). `update`/`delete` de estudiantes NO
+// cambian: siguen gateados por isInstructor() en firestore.rules, sin pasar por Cloud
+// Function (uso mucho mas frecuente que sedes, fuera de alcance de este fix puntual).
+exports.crearEstudiante = functionsV1.https.onCall(
+  crearHandlerCallable(servicioCrearEstudiante)
+);
+
+// Sembrado/limpieza de datos DEMO para el panel "Progreso por Estudiante" (pedido
+// puntual 2026-07-15 para la presentación a padres de Gajog). Ver
+// academico/datosDemoProgreso.js para el detalle y el porqué de que viva en una
+// Cloud Function (las reglas de Firestore no permiten escribir metricasEstudiante
+// de otro estudiante desde el cliente, ni siquiera como Admin).
+exports.generarDatosDemoProgreso = functionsV1.https.onCall(
+  crearHandlerCallable(servicioGenerarDatosDemoProgreso)
+);
+exports.limpiarDatosDemoProgreso = functionsV1.https.onCall(
+  crearHandlerCallable(servicioLimpiarDatosDemoProgreso)
+);
+
 exports.vencerAsignacionesAcademicas = functionsV1.pubsub
   .schedule("every day 02:00")
   .timeZone("America/Bogota")
   .onRun(async () => servicioVencerAsignaciones(new Date()));
+
+// Auto-transicion confirmada -> en_curso por horario (decision 2026-07-11, pedido
+// explicito del usuario). Cada 5 min, solo entre 7am y 9pm hora Bogota (fuera de ese
+// rango no hay clases programadas segun la grilla de Agenda, no vale la pena invocar).
+exports.iniciarJornadasPorHorario = functionsV1.pubsub
+  .schedule("*/5 7-21 * * *")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioIniciarJornadasPorHorario(new Date()));
+
+// Plan B #1 (fix tutor-role-end-to-end): recordatorios de pago diarios al buzón del consultor.
+// Una vez al día (8am Bogota); crea UNA notificación por estudiante con saldo pendiente por mes.
+exports.recordatoriosPagoDiarios = functionsV1.pubsub
+  .schedule("every day 08:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioRecordatoriosPago(new Date()));
+
+// Recordatorios de estudio diarios al buzón de estudiantes/tutores (ver
+// functions/academico/recordatoriosEstudio.js). Misma cadencia que recordatoriosPagoDiarios;
+// el cooldown por situacion (24h/una vez/7 dias) evita que se repita el mismo aviso a diario.
+exports.recordatoriosEstudioDiarios = functionsV1.pubsub
+  .schedule("every day 08:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioRecordatoriosEstudio(new Date()));
+
+// Plan B #3 (fix tutor-role-end-to-end): trigger al crear un evento -> notifica al buzón de los
+// estudiantes del tenant (con inscripción abierta). Try/catch para no fallar la creación del evento.
+exports.notificarEventoNuevo = functionsV1.firestore
+  .document("eventos/{eventoId}")
+  .onCreate(async (snap, context) => {
+    try {
+      return await servicioNotificarEventoNuevo(snap.data(), context.params.eventoId, new Date());
+    } catch (err) {
+      console.error("[notificarEventoNuevo] error:", err);
+      return null;
+    }
+  });
 
 exports.consolidateProgress = functionsV1.https.onCall(
   crearHandlerCallable(servicioConsolidateProgress)
@@ -287,6 +713,13 @@ exports.firmarCheckoutWompi = paymentFunctions.https.onCall(
       integritySecret: () => process.env.WOMPI_INTEGRITY_SECRET,
     })
   )
+);
+
+// Crea un payment_source reutilizable en Wompi a partir de un token de tarjeta ya
+// tokenizado en el frontend, y deja al tenant listo para el cobro automático mensual
+// (cobroAutomaticoMensual, más abajo). Ver functions/wompiCobroAutomatico.js.
+exports.crearFuentePagoWompi = paymentFunctions.https.onCall(
+  crearHandlerCallable(servicioCrearFuentePagoWompi)
 );
 
 const cors = require("cors")({ origin: true });
@@ -411,9 +844,12 @@ exports.activarSuscripcionManual = functionsV1.https.onRequest((req, res) => {
       transactionId,
     });
 
+    // No se recalcula fechaVencimiento acá: la fuente de verdad es el webhook de Wompi
+    // (webhookWompi), que ya corrió antes de llegar a este punto (lo exige la validación
+    // de arriba) y ya dejó fechaVencimiento correctamente calculada según el período real
+    // de la compra (mensual/anual).
     await tenantRef.update({
-      estadoSuscripcion: 'activo',
-      fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
+      estadoSuscripcion: 'activo'
     });
 
     const userRecord = await admin.auth().getUserByEmail(email);
@@ -493,16 +929,40 @@ exports.webhookWompi = paymentFunctions.https.onRequest(async (req, res) => {
     });
 
     if (ref && (ref.startsWith('SUSC_') || ref.startsWith('tnt-'))) {
-      const tId = ref.includes('_') ? ref.split('_')[2] : ref;
+      // Fix inconsistencia de referencia (2026-07-15): con el checkout unificado el reference
+      // tiene el formato SUSC_<tenantId>_<itemType>_<itemId>_<periodo>_<timestamp>, pero
+      // formatos viejos/desconocidos podían tener otra cantidad de segmentos. El tenantId
+      // SIEMPRE tiene forma tnt-<dígitos> (nunca contiene "_"), así que se extrae por patrón
+      // en vez de por índice fijo de split (que solo funcionaba para el formato legacy).
+      const tenantIdMatch = ref.match(/tnt-\d+/);
+      const tId = tenantIdMatch ? tenantIdMatch[0] : ref;
+      const segmentosRef = ref.split('_');
+      const periodoRef = segmentosRef.includes('anual')
+        ? 'anual'
+        : (segmentosRef.includes('mensual') ? 'mensual' : null);
+
       try {
         const tSnap = await admin.firestore().collection('tenants').doc(tId).get();
         if (tSnap.exists) {
           const tenantData = tSnap.data();
 
+          // La fecha de vencimiento depende del período real comprado (antes eran siempre
+          // "hoy + 31 días" fijos sin importar mensual/anual). Un pago anual debe cubrir 12
+          // meses calendario; si el período no se puede determinar (referencia en formato
+          // viejo/desconocido) se asume mensual.
+          const hoy = new Date();
+          const fechaVencimiento = periodoRef === 'anual'
+            ? new Date(hoy.getFullYear(), hoy.getMonth() + 12, hoy.getDate())
+            : new Date(hoy.getFullYear(), hoy.getMonth() + 1, hoy.getDate());
+
           // 1. Activar Suscripción
           await admin.firestore().collection('tenants').doc(tId).update({
             estadoSuscripcion: 'activo',
-            fechaVencimiento: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 31 * 24 * 60 * 60 * 1000)),
+            fechaVencimiento: admin.firestore.Timestamp.fromDate(fechaVencimiento),
+            // Resetea el contador de fallos de cobro automático en CUALQUIER pago exitoso
+            // reconciliado por este webhook (manual o del cron cobroAutomaticoMensual) --
+            // inofensivo si el tenant no usa cobro automático (queda en 0 sin efecto).
+            cobroAutomaticoIntentosFallidos: 0,
             ultimoPagoWompi: {
               transactionId: data.transaction.id,
               status: data.transaction.status,
@@ -514,36 +974,26 @@ exports.webhookWompi = paymentFunctions.https.onRequest(async (req, res) => {
 
           // 2. Activar Usuario Admin
           const uSnap = await admin.firestore().collection('usuarios').where('tenantId', '==', tId).limit(1).get();
+          let adminData = null;
           if (!uSnap.empty) {
+            adminData = uSnap.docs[0].data();
             await uSnap.docs[0].ref.update({ estadoContrato: 'Activo' });
           }
 
-          // 3. ENVIAR EMAIL DE BIENVENIDA (Versión Premium)
+          // 3. ENVIAR EMAIL DE PAGO EXITOSO (comprobante + bienvenida)
           if (tenantData.emailClub && tenantData.passwordTemporal) {
-            console.log(`Enviando email de bienvenida desde Webhook a: ${tenantData.emailClub}`);
+            console.log(`Enviando email de pago exitoso desde Webhook a: ${tenantData.emailClub}`);
             try {
               await enviarCorreo(getResend(), {
                 from: "Tudojang Academia <info@tudojang.com>",
                 to: [tenantData.emailClub],
-                subject: `🥋 ¡Acceso Activado: ${tenantData.nombreClub}!`,
-                html: `
-                    <div style="${ESTILOS_EMAIL}">
-                      ${HEADER_HTML('Dojang Activado')}
-                      <div style="padding: 40px 30px;">
-                        <p>Hola Sabonim, confirmamos el pago de tu suscripción para <b>${tenantData.nombreClub}</b>.</p>
-                        <div style="background: #f1f5f9; padding: 25px; border-radius: 16px; margin: 30px 0; border: 1px solid #e2e8f0;">
-                          <p style="margin: 0 0 10px 0; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Credenciales de Acceso</p>
-                          <p style="margin: 0;"><strong>Usuario:</strong> ${tenantData.emailClub}</p>
-                          <p style="margin: 5px 0 0 0;"><strong>Clave Temporal:</strong> <code style="background: #ffffff; padding: 4px 8px; border-radius: 6px; color: #CD2E3A; border: 1px solid #cbd5e1;">${tenantData.passwordTemporal}</code></p>
-                        </div>
-                        <p>Ya puedes configurar tu academia y empezar a registrar estudiantes.</p>
-                        <div style="text-align: center; margin-top: 40px;">
-                          <a href="https://tudojang.com/#/login" style="background: #CD2E3A; color: #ffffff; padding: 18px 35px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; display: inline-block;">Entrar a Tudojang</a>
-                        </div>
-                      </div>
-                      ${FOOTER_HTML}
-                    </div>
-                  `
+                subject: `🥋 ¡Pago Confirmado: ${tenantData.nombreClub}!`,
+                html: construirHtmlPagoExitoso({
+                  nombreUsuario: (adminData && adminData.nombreUsuario) || tenantData.emailClub,
+                  nombreAcademia: tenantData.nombreClub,
+                  montoPagado: montoFormateado.replace(/\s/g, ''),
+                  fechaPago: hoy.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }),
+                })
               });
             } catch (emailErr) {
               console.error("Error enviando email desde webhook:", emailErr);
@@ -556,6 +1006,62 @@ exports.webhookWompi = paymentFunctions.https.onRequest(async (req, res) => {
   }
   res.status(200).send('OK');
 });
+
+// HTML del email de aviso al tenant cuando el cobro automático falla 3 veces seguidas y
+// se suspende la suscripción. Reusa ESTILOS_EMAIL/HEADER_HTML/FOOTER_HTML ya definidos
+// arriba (mismos helpers que provisionarUsuarioOnboarding/enviarBienvenidaTudojang).
+const construirHtmlFalloCobroAutomatico = (nombreClub) => `
+  <div style="${ESTILOS_EMAIL}">
+    ${HEADER_HTML('Cobro Automático Fallido')}
+    <div style="padding: 30px;">
+      <h2 style="color: #CD2E3A; margin-top: 0;">No pudimos procesar tu pago</h2>
+      <p>Intentamos cobrar automáticamente la suscripción de <b>${nombreClub || 'tu academia'}</b> en Tudojang 3 veces y no fue posible completar el pago.</p>
+      <p>Tu suscripción quedó <b>suspendida</b>. Por favor actualizá tu método de pago o contactá a soporte para reactivarla.</p>
+      <p style="margin-top: 30px;">Soporte: <a href="mailto:info@tudojang.com">info@tudojang.com</a></p>
+    </div>
+  </div>
+`;
+
+// Cron de cobro automático mensual (mecanismo de suscripción recurrente sobre Wompi
+// Colombia, que no tiene suscripciones nativas -- ver functions/wompiCobroAutomatico.js).
+// Corre una vez al día: entre corridas, cualquier tenant con fechaVencimiento vencida
+// sigue vencido hasta un cobro exitoso, así que basta una pasada diaria (mismo criterio
+// de frecuencia que vencerAsignacionesAcademicas/recordatoriosPagoDiarios arriba).
+const listarTenantsPendientesDeCobroFirestore = crearListadoTenantsPendientesDeCobroFirestore(
+  admin.firestore()
+);
+const obtenerWompiPaymentSourceIdFirestore = crearLectorWompiPaymentSourceIdFirestore(
+  admin.firestore()
+);
+const servicioCobroAutomaticoMensual = crearServicioCobroAutomaticoMensual({
+  // listarTenantsPendientesDeCobroFirestore ya filtra en memoria por fechaVencimiento
+  // (normalizarFecha soporta tanto Timestamp -- como la escribe webhookWompi -- como
+  // string 'YYYY-MM-DD' -- como la escribe el frontend al crear el tenant -- así que le
+  // pasamos `ahora` tal cual, sin envolverlo en Timestamp).
+  listarTenantsPendientesDeCobro: (ahora) => listarTenantsPendientesDeCobroFirestore(ahora),
+  // wompiPaymentSourceId ya no vive en tenants/{tenantId} raíz (fix seguridad 2026-07-18) --
+  // se lee del subdocumento privado tenants/{tenantId}/privado/facturacion.
+  obtenerWompiPaymentSourceId: (tenantId) => obtenerWompiPaymentSourceIdFirestore(tenantId),
+  crearTransaccionWompi: (args) =>
+    crearTransaccionRecurrenteWompi({ ...args, wompiPrivateKey: process.env.WOMPI_PRIVATE_KEY }),
+  actualizarTenant: (tenantId, datos) =>
+    admin.firestore().collection('tenants').doc(tenantId).update(datos),
+  incrementarUno: () => admin.firestore.FieldValue.increment(1),
+  enviarCorreoFalloPago: async (tenant) => {
+    if (!tenant?.emailClub) return;
+    await enviarCorreo(getResend(), {
+      from: "Tudojang Academia <info@tudojang.com>",
+      to: [tenant.emailClub],
+      subject: `⚠️ Suscripción suspendida: no pudimos cobrar ${tenant.nombreClub || 'tu academia'}`,
+      html: construirHtmlFalloCobroAutomatico(tenant.nombreClub),
+    });
+  },
+});
+
+exports.cobroAutomaticoMensual = paymentFunctions.pubsub
+  .schedule("every 24 hours")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioCobroAutomaticoMensual(new Date()));
 
 /**
  * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)

@@ -1,5 +1,6 @@
 import React from 'react';
 import { type ProgresoLocalSync, type ProgresoSyncPayload, useProgressSync } from '../../hooks/academico/useProgressSync';
+import { useRegistrarActividad } from '../../hooks/academico/useRegistrarActividad';
 
 interface VideoPlayerProps {
   tenantId: string;
@@ -9,7 +10,13 @@ interface VideoPlayerProps {
   totalSegundos: number;
   sincronizar: (payload: ProgresoSyncPayload) => void | Promise<void>;
   cargarProgreso?: () => ProgresoLocalSync | null | Promise<ProgresoLocalSync | null>;
+  /** Props opcionales para el registro de métricas académicas */
+  estudianteId?: string;
+  estudianteNombre?: string;
+  recursoId?: string;
 }
+
+const CHECKPOINTS_PORCENTAJE = [25, 50, 75, 100];
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
   tenantId,
@@ -19,8 +26,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   totalSegundos,
   sincronizar,
   cargarProgreso,
+  estudianteId,
+  estudianteNombre,
+  recursoId,
 }) => {
   const buscandoRef = React.useRef(false);
+  const checkpointsAlcanzadosRef = React.useRef<Set<number>>(new Set());
+
   const { flush, progreso, registrarVideoSegundo } = useProgressSync({
     tenantId,
     asignacionId,
@@ -28,6 +40,50 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     sincronizar,
     cargarProgreso,
   });
+
+  // Hook de métricas — solo activo si se proveen los datos del estudiante
+  const { registrarProgresoVideo } = useRegistrarActividad({
+    tenantId,
+    estudianteId: estudianteId ?? '',
+    estudianteNombre,
+    asignacionId,
+    recursoId: recursoId ?? asignacionId,
+    tituloRecurso: titulo,
+  });
+
+  const manejarTimeUpdate = React.useCallback(
+    (event: React.SyntheticEvent<HTMLVideoElement>) => {
+      if (buscandoRef.current) return;
+      const video = event.currentTarget;
+      const segundo = Math.floor(video.currentTime);
+
+      if (segundo >= 0 && segundo < totalSegundos) {
+        registrarVideoSegundo(segundo);
+      }
+
+      // Calcular % visto y disparar checkpoint si aplica
+      if (estudianteId && totalSegundos > 0) {
+        const pctActual = Math.floor((video.currentTime / totalSegundos) * 100);
+        for (const checkpoint of CHECKPOINTS_PORCENTAJE) {
+          if (pctActual >= checkpoint && !checkpointsAlcanzadosRef.current.has(checkpoint)) {
+            checkpointsAlcanzadosRef.current.add(checkpoint);
+            registrarProgresoVideo({
+              porcentajeVisto: checkpoint,
+              segundosTotales: totalSegundos,
+              segundosVistos: Math.round(video.currentTime),
+              checkpoints: Array.from(checkpointsAlcanzadosRef.current).sort((a, b) => a - b),
+            });
+          }
+        }
+      }
+    },
+    [estudianteId, registrarVideoSegundo, registrarProgresoVideo, totalSegundos]
+  );
+
+  // Resetear checkpoints cuando cambia la asignación
+  React.useEffect(() => {
+    checkpointsAlcanzadosRef.current = new Set();
+  }, [asignacionId]);
 
   return (
     <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6">
@@ -60,13 +116,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             onSeeked={() => {
               buscandoRef.current = false;
             }}
-            onTimeUpdate={(event) => {
-              if (buscandoRef.current) return;
-              const segundo = Math.floor(event.currentTarget.currentTime);
-              if (segundo >= 0 && segundo < totalSegundos) {
-                registrarVideoSegundo(segundo);
-              }
-            }}
+            onTimeUpdate={manejarTimeUpdate}
             className="w-full rounded-2xl bg-black"
           />
 
@@ -95,3 +145,4 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 };
 
 export default VideoPlayer;
+

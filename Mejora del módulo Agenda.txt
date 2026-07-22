@@ -1,0 +1,694 @@
+# Instrucción de desarrollo para Claude: Mejora del módulo Agenda
+
+Actúa como desarrollador senior. Necesito mejorar el módulo **Agenda** sin romper la lógica existente del sistema.
+
+Esta tarea corresponde únicamente al módulo **Agenda**.
+
+No desarrolles nuevamente el módulo Clase en Vivo.
+
+No reconstruyas Centro de Estudios.
+
+No crees una lógica paralela de clases, programas, materiales, grados, sedes o maestros.
+
+Agenda debe funcionar como la **vista semanal operativa** de las clases programadas y como el punto de edición granular de una clase específica.
+
+## 1. Objetivo general
+
+Convertir Agenda en una vista semanal tipo parrilla/calendario donde se visualicen las clases programadas por día y hora, y desde cada clase se pueda editar únicamente esa clase de forma individual.
+
+La edición debe ser granular, segura, trazable y sincronizada con el ecosistema existente:
+
+* Centro de Estudios.
+* Programas.
+* Clases programadas.
+* Materiales asignados.
+* Grados.
+* Sedes.
+* Maestros.
+* Tenant.
+* Hub Estudiantes.
+* Clase en Vivo, solo como módulo consumidor de la programación.
+
+## 2. Principio de arquitectura
+
+Centro de Estudios sigue siendo la fuente principal de:
+
+* Programas.
+* Estructura académica.
+* Grados.
+* Categorías.
+* Materiales.
+* Tags.
+* Maestros.
+* Sedes.
+* Configuración base de clases.
+
+Agenda no debe crear una segunda fuente de verdad.
+
+Agenda debe:
+
+* Visualizar las clases programadas.
+* Navegar por semanas.
+* Editar instancias específicas de clase.
+* Validar permisos.
+* Validar disponibilidad de maestro y sede.
+* Mantener relaciones con programa, tenant, grados y materiales.
+* Disparar o actualizar estados consumibles por Hub Estudiantes y Clase en Vivo.
+
+Agenda no debe:
+
+* Crear programas masivos desde cero.
+* Crear materiales base.
+* Eliminar materiales compartidos.
+* Reemplazar Centro de Estudios.
+* Reescribir la lógica de Clase en Vivo.
+* Duplicar clases, materiales o relaciones.
+
+## 3. Vista principal de Agenda
+
+Crear una parrilla semanal con navegación entre semanas.
+
+La vista debe incluir:
+
+* Botón para ir a la semana anterior.
+* Botón para ir a la semana siguiente.
+* Botón para volver a la semana actual.
+* Encabezado con el rango de fechas de la semana visible.
+* Columnas por día de la semana.
+* Filas horarias desde **7:00 a. m. hasta 10:00 p. m.**
+* Intervalos configurables de 30 o 60 minutos.
+* Bloques visuales para cada clase programada.
+* Carga únicamente de la semana visible para evitar lentitud.
+* Diseño responsive para escritorio, tablet y móvil.
+
+La semana debe poder configurarse según el tenant:
+
+* Lunes a domingo por defecto.
+* Permitir ajuste futuro si el tenant maneja otra configuración.
+
+Cada bloque de clase debe mostrar, como mínimo:
+
+* Nombre de la clase.
+* Hora de inicio y finalización.
+* Sede.
+* Maestro asignado.
+* Estado activo/inactivo/cancelado.
+* Indicador de material asignado o pendiente.
+* Indicador de grados asociados.
+* Programa al que pertenece.
+* Ícono de edición si el usuario tiene permiso.
+
+Usar la estética actual de la app. No rediseñar visualmente todo el sistema.
+
+## 4. Acciones sobre cada clase
+
+Cada bloque de clase debe tener un ícono de lápiz para editar.
+
+Reglas:
+
+* El lápiz solo aparece si el usuario tiene permiso de edición.
+* Si el usuario puede ver la clase pero no editarla, no mostrar lápiz o mostrarlo deshabilitado.
+* No mostrar botón de eliminar directamente en la parrilla.
+* No permitir edición masiva desde Agenda.
+* No permitir arrastrar y soltar clases si no existe validación completa de disponibilidad.
+* Si se implementa drag and drop, debe pasar por las mismas reglas del modal de edición.
+
+Al hacer clic en el lápiz, abrir un modal dentro de la misma vista de Agenda.
+
+No abrir una página nueva.
+
+No sacar al usuario del contexto semanal.
+
+## 5. Modal de edición singular de clase
+
+El modal debe permitir editar una sola clase seleccionada.
+
+El modal debe dividirse en dos secciones o pestañas:
+
+* Programa.
+* Materiales.
+
+La edición debe reutilizar, invocar o respetar la lógica existente de Centro de Estudios.
+
+No crear formularios paralelos si ya existen componentes reutilizables.
+
+Si los modales actuales de Centro de Estudios no pueden incrustarse directamente, extraer o reutilizar sus formularios internos como componentes compartidos, manteniendo la misma lógica de validación y persistencia.
+
+## 6. Pestaña Programa
+
+Esta sección permite editar datos generales de la clase.
+
+Campos mínimos:
+
+* Hora de inicio.
+* Hora de finalización.
+* Fecha de la clase.
+* Sede.
+* Maestro asignado.
+* Grado o grados vinculados.
+* Estado de la clase.
+* Programa asociado.
+* Tags académicos asociados si ya existen.
+* Observación administrativa corta si el sistema ya contempla ese campo.
+
+Reglas:
+
+* El programa asociado no debe cambiarse libremente si eso rompe la relación original.
+* Si se permite cambiar programa, debe validarse que los grados, materiales y tags sigan siendo compatibles.
+* El maestro seleccionado debe pertenecer al tenant.
+* La sede seleccionada debe pertenecer al tenant.
+* Los grados seleccionados deben pertenecer al programa o estructura académica correspondiente.
+* El sistema debe mostrar únicamente maestros disponibles para ese horario o advertir conflictos antes de guardar.
+
+## 7. Pestaña Materiales
+
+Esta sección permite ver y ajustar los materiales asignados a esa clase específica.
+
+Debe mostrar:
+
+* Materiales actualmente asignados.
+* Tipo de material.
+* Tags del material.
+* Grados o niveles relacionados.
+* Estado del material.
+* Indicador de compatibilidad con los tags de la clase.
+* Opción para agregar o quitar relación con material existente.
+
+Reglas:
+
+* No crear materiales nuevos desde Agenda.
+* No eliminar materiales base desde Agenda.
+* Al quitar un material, solo se elimina la relación entre esa clase y ese material.
+* Si el material está compartido por otras clases, no debe afectarse.
+* Si un material está inactivo o eliminado en Centro de Estudios, mostrar advertencia y no permitir asignarlo.
+* El campo “uso de material” en Agenda debe referirse a la asignación prevista para la clase, no al checkpoint real de uso durante la clase.
+
+Importante:
+
+El registro real de si el material fue usado, mencionado, practicado o quedó pendiente corresponde al módulo Clase en Vivo, no a Agenda.
+
+Agenda solo define qué material está asignado o previsto para esa clase.
+
+## 8. Eliminación o desactivación de clase
+
+La opción de eliminar solo debe aparecer dentro del modal.
+
+Debe existir confirmación explícita antes de ejecutar la acción.
+
+Mensaje sugerido:
+
+“¿Está seguro de eliminar esta clase? Esta acción afectará la programación visible en Agenda, Hub Estudiantes y Clase en Vivo. Los materiales asociados no serán eliminados, solo se quitará la relación con esta clase.”
+
+Reglas:
+
+* Por defecto, eliminar debe ser una eliminación lógica o desactivación, no borrado físico.
+* Si el sistema ya usa soft delete, respetar ese patrón.
+* Si el sistema usa hard delete, validar dependencias antes de aplicar.
+* No eliminar materiales compartidos.
+* No eliminar estudiantes.
+* No eliminar programas.
+* No eliminar registros históricos de asistencia.
+* Si la clase ya tiene asistencia registrada, no permitir borrado físico.
+* Si la clase ya tuvo operación en Clase en Vivo, permitir solo cancelación, cierre administrativo o desactivación controlada.
+* Registrar en auditoría quién eliminó o desactivó la clase.
+
+Permisos recomendados:
+
+* Tenant/admin puede eliminar o desactivar clases.
+* Maestro asignado puede editar su clase, pero no eliminarla salvo que exista un permiso explícito del tenant.
+* Si el sistema ya tiene permisos más específicos, respetarlos.
+
+## 9. Roles y permisos
+
+Agenda debe validar permisos en frontend y backend.
+
+Roles mínimos:
+
+* Tenant/admin.
+* Maestro asignado.
+* Otros maestros.
+* Estudiantes.
+* Acudientes/padres, si existen en el sistema.
+
+Reglas:
+
+* Tenant/admin puede ver y editar cualquier clase dentro de su tenant.
+* Maestro asignado puede editar únicamente las clases donde esté asignado.
+* Maestro no asignado puede ver la clase solo si su rol lo permite, pero no puede editarla.
+* Estudiantes no pueden editar Agenda.
+* Acudientes/padres no pueden editar Agenda.
+* Toda edición debe ser rechazada en backend si el usuario no tiene permiso.
+* No confiar solo en ocultar botones en frontend.
+* Toda acción relevante debe registrar `updatedBy`, fecha, hora y rol.
+
+## 10. Validaciones antes de guardar
+
+Antes de guardar cualquier cambio, validar:
+
+* La clase tiene `classId`.
+* La clase tiene `tenantId`.
+* La clase tiene relación con programa o estructura académica.
+* La hora de inicio existe.
+* La hora de finalización existe.
+* La hora de inicio es menor que la hora de finalización.
+* La clase está dentro del rango permitido por configuración.
+* La sede existe y está activa.
+* El maestro existe y está activo.
+* El maestro pertenece al tenant.
+* La sede pertenece al tenant.
+* Los grados existen y están activos.
+* Los materiales asignados existen y están activos.
+* No hay cruce de horario para el mismo maestro.
+* No hay cruce de horario para la misma sede.
+* No hay conflicto con otra clase activa.
+* No se generan clases duplicadas.
+* No se generan relaciones huérfanas.
+* No se guardan datos incompletos.
+
+Los errores deben ser específicos.
+
+Ejemplos:
+
+* “El maestro ya tiene una clase asignada en este horario.”
+* “La sede seleccionada no está disponible entre 4:00 p. m. y 5:00 p. m.”
+* “El material seleccionado está inactivo en Centro de Estudios.”
+* “No tienes permiso para editar esta clase.”
+
+## 11. Disponibilidad de maestro y sede
+
+Al cambiar horario, maestro o sede:
+
+* Validar disponibilidad antes de guardar.
+* Mostrar advertencia si hay conflicto.
+* No permitir guardar si el conflicto es bloqueante.
+* Permitir solo maestros activos del tenant.
+* Permitir solo sedes activas del tenant.
+* Si se reasigna maestro, validar que el nuevo maestro esté disponible.
+* Si se reasigna sede, validar que la sede esté disponible.
+* Si el usuario es maestro asignado, no debe poder reasignarse a otro maestro salvo permiso explícito.
+* El admin sí puede reasignar maestro si no hay conflicto.
+
+## 12. Integridad de datos
+
+No se deben crear datos huérfanos.
+
+Al editar una clase, mantener:
+
+* Relación con tenant.
+* Relación con programa.
+* Relación con fecha y horario.
+* Relación con sede.
+* Relación con maestro.
+* Relación con grados.
+* Relación con materiales.
+* Relación con estados consumidos por Hub Estudiantes y Clase en Vivo.
+
+Reglas:
+
+* No duplicar clases por error.
+* No duplicar materiales.
+* No crear materiales nuevos desde Agenda.
+* No crear maestros desde Agenda.
+* No crear sedes desde Agenda.
+* No modificar datos personales de estudiantes desde Agenda.
+* No modificar estructura académica base desde Agenda.
+* No borrar relaciones históricas necesarias para reportes.
+* Si un maestro, sede o material fue eliminado en Centro de Estudios, Agenda debe mostrar advertencia y pedir reasignación o corrección.
+
+## 13. Sincronización con Centro de Estudios
+
+Centro de Estudios es la fuente de verdad de los datos académicos.
+
+Agenda debe actualizar o consultar mediante los servicios existentes.
+
+Reglas:
+
+* Antes de guardar, validar que los IDs referenciados sigan existiendo.
+* Si se actualiza una clase desde Agenda, la información debe quedar coherente con Centro de Estudios.
+* Si Centro de Estudios cambia un maestro, sede, grado o material, Agenda debe reflejarlo.
+* Si el sistema ya usa listeners, eventos o suscripciones, reutilizarlos.
+* Si no existen, implementar una actualización mínima segura al guardar y al cargar la semana visible.
+* No crear APIs nuevas si ya existen servicios reutilizables.
+* No cambiar nombres de campos, rutas, colecciones o modelos sin justificarlo.
+
+## 14. Relación con Clase en Vivo
+
+Agenda no debe desarrollar Clase en Vivo.
+
+Agenda solo debe mantener la información necesaria para que Clase en Vivo pueda activarse correctamente.
+
+Reglas:
+
+* Clase en Vivo solo puede existir para clases reales programadas.
+* Si una clase está inactiva, eliminada o cancelada, Clase en Vivo no debe activarse.
+* Si se cambia el horario de una clase, Clase en Vivo debe consumir el nuevo horario.
+* Si se cambia el maestro asignado, Clase en Vivo debe consumir el nuevo maestro.
+* Si se cambia la sede, Clase en Vivo debe consumir la nueva sede.
+* Si se cancela la clase, Clase en Vivo debe ocultarse o bloquearse.
+* La ventana de activación de Clase en Vivo debe ser configurable y no estar quemada en Agenda.
+
+Usar o crear constantes centralizadas si no existen:
+
+```ts
+LIVE_CLASS_OPEN_BEFORE_MINUTES = 15
+LIVE_CLASS_CLOSE_AFTER_MINUTES = 15
+```
+
+Agenda puede mostrar un indicador de estado relacionado con Clase en Vivo:
+
+* Programada.
+* Próxima.
+* Disponible para operación.
+* En curso.
+* Finalizada.
+* Cancelada.
+
+Pero la operación de QR, check-in, check-out y checkpoint de materiales pertenece al módulo Clase en Vivo.
+
+## 15. Relación con Hub Estudiantes
+
+Agenda debe exponer o dejar disponible la información para que Hub Estudiantes muestre las clases futuras de la semana.
+
+Hub Estudiantes debe poder consumir:
+
+* Clases próximas de la semana.
+* Día y hora.
+* Nombre de clase.
+* Maestro.
+* Sede o modalidad.
+* Material asignado si aplica.
+* Estado de disponibilidad de Clase en Vivo.
+
+Reglas desde Agenda:
+
+* Las clases futuras deben existir y estar consultables aunque todavía no estén en ventana de Clase en Vivo.
+* No mostrar clases canceladas como disponibles.
+* No mostrar clases de otro tenant.
+* No mostrar clases que no correspondan al estudiante, grado o programa.
+* Si Agenda edita horario, sede, maestro o estado, Hub Estudiantes debe reflejar el cambio.
+
+No desarrollar toda la interfaz de Hub Estudiantes en esta tarea, salvo que ya exista una dependencia directa necesaria para consumir la agenda.
+
+## 16. Estados sugeridos de clase en Agenda
+
+Usar o adaptar estados claros según el modelo existente.
+
+Estados sugeridos:
+
+```ts
+scheduled
+active
+inactive
+cancelled
+completed
+deleted
+pending_assignment
+```
+
+Significado:
+
+* `scheduled`: clase programada correctamente.
+* `active`: clase activa y visible.
+* `inactive`: clase desactivada temporalmente.
+* `cancelled`: clase cancelada.
+* `completed`: clase ya finalizada.
+* `deleted`: eliminación lógica.
+* `pending_assignment`: falta maestro, sede o dato obligatorio.
+
+No cambiar los estados existentes si el sistema ya tiene una convención funcional. Adaptar esta propuesta al modelo actual.
+
+## 17. Concurrencia y conflictos
+
+Evitar que dos usuarios sobrescriban cambios al mismo tiempo.
+
+Implementar o respetar un mecanismo de control de versiones.
+
+Opciones válidas:
+
+* `updatedAt`
+* `version`
+* `lastModified`
+* bloqueo optimista
+
+Regla:
+
+Si dos usuarios editan la misma clase y uno guarda primero, el segundo no debe sobrescribir silenciosamente.
+
+Debe aparecer un mensaje como:
+
+“La clase fue modificada por otro usuario. Actualiza la información antes de guardar.”
+
+## 18. Atomicidad y transacciones
+
+Las operaciones de edición deben ser consistentes.
+
+Reglas:
+
+* Si falla la actualización principal, no guardar relaciones parciales.
+* Si falla la relación con materiales, no dejar la clase parcialmente actualizada sin control.
+* Si se actualiza horario y maestro, ambos cambios deben quedar sincronizados.
+* Si se elimina o desactiva una clase, las relaciones deben quedar consistentes.
+* Si el backend o base de datos permite transacciones, usarlas.
+* Si no permite transacciones directas, implementar compensación o rollback lógico.
+* Mostrar errores claros al usuario.
+
+## 19. Auditoría
+
+Registrar trazabilidad de cambios.
+
+Cada cambio importante debe guardar:
+
+* `classId`
+* `tenantId`
+* Usuario que cambió.
+* Rol del usuario.
+* Fecha y hora.
+* Campos modificados.
+* Valor anterior.
+* Valor nuevo.
+* Motivo si se solicita.
+* Fuente del cambio: Agenda.
+
+Acciones auditables:
+
+* Cambio de hora.
+* Cambio de sede.
+* Cambio de maestro.
+* Cambio de grados.
+* Cambio de materiales asignados.
+* Activación/desactivación.
+* Cancelación.
+* Eliminación lógica.
+* Reasignación.
+
+## 20. UX del modal
+
+El modal debe ser claro, rápido y no sobrecargar al usuario.
+
+Debe incluir:
+
+* Título con nombre de la clase.
+* Fecha y horario actual.
+* Pestañas Programa y Materiales.
+* Botón guardar cambios.
+* Botón cancelar.
+* Botón eliminar o desactivar, solo si el usuario tiene permiso.
+* Mensajes de validación visibles.
+* Confirmación antes de eliminar.
+* Opcional: resumen de cambios antes de guardar si ya existe patrón similar.
+
+Reglas UX:
+
+* No cerrar modal si hay errores.
+* No perder cambios sin advertencia.
+* Mostrar estado de guardado.
+* Mostrar éxito al guardar.
+* Refrescar la parrilla sin recargar toda la página.
+* Mantener al usuario en la misma semana después de guardar.
+
+## 21. Rendimiento
+
+La parrilla debe ser rápida.
+
+Reglas:
+
+* Cargar solo la semana visible.
+* No cargar todo el año si no es necesario.
+* Usar filtros por tenant, rango de fechas y estado.
+* Evitar consultas repetidas innecesarias.
+* Reutilizar datos maestros cacheados si el sistema ya lo permite.
+* Refrescar solo los datos afectados después de guardar.
+* No hacer recarga total de la aplicación.
+
+## 22. Implementación por fases
+
+### Fase 1: Auditoría obligatoria
+
+Antes de modificar código, revisar:
+
+* Estructura actual del módulo Agenda.
+* Componentes actuales de Agenda.
+* Cómo Centro de Estudios crea programas y clases.
+* Cómo se relacionan clases, materiales, grados, sedes y maestros.
+* Modelos, colecciones o tablas relacionadas con clases.
+* Servicios o APIs existentes.
+* Lógica actual de roles, permisos y tenant.
+* Cómo Hub Estudiantes consume clases futuras.
+* Cómo Clase en Vivo identifica la clase activa.
+* Si existen registros de asistencia relacionados.
+* Si existe patrón de soft delete.
+* Si existe auditoría o logs.
+* Si existe control de concurrencia.
+
+Entregar primero un resumen técnico de lo encontrado.
+
+No escribir código antes de esta auditoría.
+
+### Fase 2: Plan técnico
+
+Después de auditar, proponer:
+
+* Archivos exactos a modificar.
+* Componentes a reutilizar.
+* Componentes nuevos estrictamente necesarios.
+* Servicios a tocar.
+* Modelos o tipos afectados.
+* Validaciones que se van a implementar.
+* Riesgos.
+* Estrategia de rollback.
+* Pruebas necesarias.
+
+Para cada archivo indicar:
+
+* Qué se modifica.
+* Por qué.
+* Qué riesgo tiene.
+* Cómo se valida que no se rompió nada.
+
+### Fase 3: Implementación
+
+Implementar con cambios mínimos y trazables:
+
+* Parrilla semanal.
+* Navegación entre semanas.
+* Rango horario 7:00 a. m. a 10:00 p. m.
+* Carga por semana visible.
+* Bloques visuales de clases.
+* Indicadores de estado, maestro, sede, grados y materiales.
+* Ícono de edición según permisos.
+* Modal de edición singular.
+* Pestaña Programa.
+* Pestaña Materiales.
+* Reutilización de lógica de Centro de Estudios.
+* Validaciones de permisos.
+* Validaciones de disponibilidad.
+* Confirmación para eliminar/desactivar.
+* Actualización de la parrilla sin recargar.
+* Sincronización de estados consumibles por Hub Estudiantes y Clase en Vivo.
+* Auditoría de cambios.
+* Control de concurrencia.
+* Prevención de datos huérfanos.
+
+### Fase 4: Validación
+
+Probar los siguientes casos:
+
+* Tenant/admin ve la agenda semanal.
+* Maestro asignado ve su agenda.
+* Maestro no asignado no puede editar clase ajena.
+* Tenant/admin edita cualquier clase de su tenant.
+* Maestro asignado edita únicamente su clase.
+* Estudiante no puede editar.
+* Acudiente/padre no puede editar.
+* Se navega a semana anterior.
+* Se navega a semana siguiente.
+* Se vuelve a semana actual.
+* La parrilla muestra clases de 7:00 a. m. a 10:00 p. m.
+* Se abre modal desde ícono de lápiz.
+* Se edita hora de inicio.
+* Se edita hora de finalización.
+* Se edita sede.
+* Se edita maestro.
+* Se edita estado activo/inactivo.
+* Se editan materiales asignados.
+* Se editan grados vinculados.
+* No se puede guardar clase sin maestro.
+* No se puede guardar clase sin sede.
+* No se puede guardar clase sin horario válido.
+* No se puede cruzar horario de maestro.
+* No se puede cruzar horario de sede.
+* No se puede asignar material inactivo.
+* No se puede asignar maestro inactivo.
+* No se puede editar clase de otro tenant.
+* Eliminar pide confirmación.
+* Eliminar no borra materiales compartidos.
+* Clase con asistencia registrada no se borra físicamente.
+* La parrilla se actualiza sin recargar toda la página.
+* Hub Estudiantes recibe o puede consultar la clase actualizada.
+* Clase en Vivo consume el nuevo horario si cambia.
+* Clase cancelada no habilita Clase en Vivo.
+* Dos usuarios editando la misma clase generan conflicto controlado.
+* Se registra auditoría de cambios.
+* No quedan datos huérfanos.
+
+## 23. Criterios de aceptación
+
+La tarea se considera terminada cuando:
+
+* Agenda muestra una parrilla semanal clara.
+* La parrilla cubre de 7:00 a. m. a 10:00 p. m.
+* Se puede navegar entre semanas.
+* Se puede volver a la semana actual.
+* Las clases se muestran como bloques visuales.
+* Cada bloque muestra datos mínimos relevantes.
+* El ícono de edición aparece solo cuando corresponde.
+* La edición abre modal en la misma vista.
+* El modal edita una sola clase.
+* El modal está dividido en Programa y Materiales.
+* Se reutiliza la lógica existente de Centro de Estudios.
+* Agenda no crea una lógica paralela de programas o materiales.
+* La edición valida permisos en frontend y backend.
+* La edición valida disponibilidad de maestro y sede.
+* La eliminación o desactivación tiene confirmación.
+* No se eliminan materiales compartidos.
+* No se crean datos huérfanos.
+* No se duplican clases.
+* No se rompe Hub Estudiantes.
+* No se rompe Clase en Vivo.
+* La información queda sincronizada para consumo de otros módulos.
+* Existe auditoría de cambios.
+* Existe manejo de conflictos por edición simultánea.
+* El flujo actual del sistema se mantiene.
+* Los cambios son mínimos, seguros y trazables.
+
+## 24. Restricciones finales para Claude
+
+No rediseñes toda la aplicación.
+
+No crees una agenda independiente.
+
+No dupliques lógica de Centro de Estudios.
+
+No desarrolles Clase en Vivo dentro de esta tarea.
+
+No desarrolles Hub Estudiantes completo dentro de esta tarea.
+
+No cambies nombres de campos, rutas, modelos, colecciones o servicios sin justificarlo.
+
+No elimines código existente sin validar dependencias.
+
+No reemplaces componentes existentes si pueden reutilizarse.
+
+No implementes edición masiva.
+
+No quemes valores configurables en múltiples archivos.
+
+No avances a implementación sin auditar primero.
+
+Primero entrega:
+
+1. Resumen de auditoría.
+2. Archivos involucrados.
+3. Riesgos detectados.
+4. Plan de implementación.
+5. Luego sí ejecuta los cambios.

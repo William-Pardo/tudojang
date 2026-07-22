@@ -3,7 +3,7 @@ import type {
   ObtenerAsignacionesRequest,
   ObtenerAsignacionesResponse,
 } from '../../models/academico/asignacionService.types';
-import { ordenarAsignacionesPorUrgencia } from '../../utils/academico/centroEstudios';
+import { ordenarAsignacionesPorUrgencia, calcularUrgenciaAsignacion } from '../../utils/academico/centroEstudios.ts';
 import { obtenerAsignacionesPorEstudiante, aplicaAlEstudiante } from './asignacionService';
 import { progresoRepository, type ProgresoRepository, type FirestoreProgressRepository } from './progresoRepository';
 
@@ -39,8 +39,13 @@ export interface FirestoreCentroEstudiosRepositoryDeps {
   getDoc: (reference: any) => Promise<{ exists: () => boolean; data: () => any }>;
   collection: (...segments: any[]) => any;
   query: (...args: any[]) => any;
-  where: (field: string, op: string, value: any) => any;
-  getDocs: (query: any) => Promise<{ docs: Array<{ id: string; data: () => any }> }>;
+  // Fix 2026-07-21 (`npm run typecheck`): `op` estaba tipado como `string`, pero el `where`
+  // real del SDK lo declara como el union `WhereFilterOp` -- `string` no es asignable a un
+  // union de literales, asi que la dep nunca aceptaba la funcion real.
+  where: (field: string, op: any, value: any) => any;
+  // Fix 2026-07-21: faltaba `empty` en el contrato, y sin embargo la linea 87 de este mismo
+  // archivo lo usa (`if (!querySnap.empty)`). El tipo mentia sobre lo que el codigo exige.
+  getDocs: (query: any) => Promise<{ empty: boolean; docs: Array<{ id: string; data: () => any }> }>;
 }
 
 export class FirestoreCentroEstudiosRepository implements CentroEstudiosRepository {
@@ -56,15 +61,49 @@ export class FirestoreCentroEstudiosRepository implements CentroEstudiosReposito
     }
 
     try {
+      let estudianteData: any = null;
+      let estudianteDocId: string = estudianteId;
+
+      // 1. Intentar búsqueda directa por UID
       const estudianteRef = this.deps.doc(this.deps.db, 'estudiantes', estudianteId);
       const estudianteSnap = await this.deps.getDoc(estudianteRef);
-      if (!estudianteSnap.exists()) {
+
+      if (estudianteSnap.exists()) {
+        estudianteData = estudianteSnap.data();
+      } else {
+        // 2. Fallback: Obtener el correo del usuario logueado
+        const usuarioRef = this.deps.doc(this.deps.db, 'usuarios', estudianteId);
+        const usuarioSnap = await this.deps.getDoc(usuarioRef);
+
+        if (usuarioSnap.exists()) {
+          const usuarioData = usuarioSnap.data();
+          const email = usuarioData.email?.toLowerCase().trim();
+
+          if (email) {
+            // 3. Buscar en /estudiantes por correo electrónico
+            const estudiantesRef = this.deps.collection(this.deps.db, 'estudiantes');
+            const q = this.deps.query(
+              estudiantesRef,
+              this.deps.where('tenantId', '==', tenantId),
+              this.deps.where('correo', '==', email)
+            );
+            const querySnap = await this.deps.getDocs(q);
+
+            if (!querySnap.empty) {
+              estudianteData = querySnap.docs[0].data();
+              estudianteDocId = querySnap.docs[0].id;
+            }
+          }
+        }
+      }
+
+      if (!estudianteData) {
         return { asignaciones: [] };
       }
 
       const estudiante = {
-        id: estudianteId,
-        ...estudianteSnap.data(),
+        id: estudianteDocId,
+        ...estudianteData,
       };
 
       const asignacionesRef = this.deps.collection(this.deps.db, 'tenants', tenantId, 'asignaciones');
@@ -73,10 +112,20 @@ export class FirestoreCentroEstudiosRepository implements CentroEstudiosReposito
 
       const asignacionesValidas: AsignacionCentroEstudios[] = [];
       for (const docSnap of snap.docs) {
-        const data = docSnap.data();
+        const data = docSnap.data() as Partial<AsignacionCentroEstudios>;
+        // Fix (bug reportado: abrir un material real crasheaba MaterialPreviewModal con
+        // "Cannot read properties of undefined (reading 'replace')"): un doc real de
+        // `asignaciones` es un AsignacionAcademica -- NUNCA tiene estadoProgreso/
+        // porcentajeProgreso/urgencia (son específicos de AsignacionCentroEstudios,
+        // calculados). Antes de este fix quedaban `undefined` para cualquier asignación
+        // real (solo el fixture demo los traía hardcodeados), y este era el primer
+        // camino que llegaba a renderizar una asignación real end-to-end.
         const asignacion = {
           id: docSnap.id,
           ...data,
+          estadoProgreso: data.estadoProgreso ?? 'disponible',
+          porcentajeProgreso: data.porcentajeProgreso ?? 0,
+          urgencia: calcularUrgenciaAsignacion(data.fechaCierre),
         } as AsignacionCentroEstudios;
 
         if (aplicaAlEstudiante(asignacion, estudiante)) {
@@ -105,6 +154,11 @@ export interface CrearCentroEstudiosRepositoryOptions {
 export function crearCentroEstudiosRepository(
   options: CrearCentroEstudiosRepositoryOptions = {}
 ): CentroEstudiosRepository {
+  const win = typeof window !== 'undefined' ? (window as any) : undefined;
+  if (win?.Cypress && Array.isArray(win.__CENTRO_ESTUDIOS_ASIGNACIONES__)) {
+    return new CentroEstudiosDemoRepository();
+  }
+
   if (options.modo === 'firestore' && options.firestoreDeps) {
     return new FirestoreCentroEstudiosRepository(
       options.firestoreDeps,

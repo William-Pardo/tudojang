@@ -40,7 +40,7 @@ const MasterAccess: React.FC = () => {
 
                 <div className="relative z-10">
                     <div className="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 rounded-[2rem] flex items-center justify-center mx-auto mb-10 border border-white/10 shadow-2xl">
-                        <IconoLogoOficial className="w-12 h-12 grayscale opacity-40 hover:opacity-100 transition-opacity duration-700" title="Aliant Master Key" />
+                        <IconoLogoOficial className="w-12 h-12 grayscale opacity-40 hover:opacity-100 transition-opacity duration-700" aria-label="Aliant Master Key" />
                     </div>
 
                     <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Vault Door</h1>

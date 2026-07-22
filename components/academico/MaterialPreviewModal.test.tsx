@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MaterialPreviewModal from './MaterialPreviewModal';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
@@ -26,20 +26,61 @@ const asignacion: AsignacionCentroEstudios = {
 };
 
 describe('MaterialPreviewModal', () => {
-  it('renderiza quiz cuando el recurso es evaluación', () => {
-    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} />);
+  beforeEach(() => {
+    localStorage.clear();
+    // jsdom no implementa URL.createObjectURL/revokeObjectURL -- el flujo de blob
+    // autenticado del proxy los necesita para armar la URL local del <video>/<img>.
+    URL.createObjectURL = jest.fn().mockReturnValue('blob:mock-url');
+    URL.revokeObjectURL = jest.fn();
+  });
+
+  const crearRepositoryMock = () => ({
+    leerQuiz: jest.fn().mockResolvedValue(null),
+    guardarQuiz: jest.fn().mockResolvedValue(undefined),
+    leerSync: jest.fn().mockResolvedValue(null),
+    guardarSync: jest.fn().mockResolvedValue(undefined),
+    aplicarAAsignaciones: jest.fn((asignaciones) => asignaciones),
+  });
+
+  const preguntasQuizMock = [
+    {
+      id: 'seguridad-1',
+      enunciado: '¿Qué debe hacer un estudiante antes de iniciar una práctica técnica?',
+      opciones: [
+        'Entrar al área sin autorización',
+        'Saludar, escuchar instrucciones y revisar el espacio',
+        'Practicar técnicas sin supervisión',
+      ],
+      respuestaCorrecta: 'Saludar, escuchar instrucciones y revisar el espacio',
+    },
+  ];
+
+  const crearQuizServiceMock = () => ({
+    obtenerQuiz: jest.fn().mockResolvedValue(preguntasQuizMock),
+  });
+
+  it('renderiza quiz cuando el recurso es evaluación', async () => {
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={crearQuizServiceMock()} />);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByText(/quiz interactivo/i)).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { name: /quiz: seguridad y conducta/i })).toHaveLength(2);
-    expect(screen.getByText(/quiz interactivo/i)).toBeInTheDocument();
     expect(screen.getByText('45%')).toBeInTheDocument();
+  });
+
+  it('muestra un aviso claro cuando el quiz todavía no tiene preguntas configuradas', async () => {
+    const quizService = { obtenerQuiz: jest.fn().mockResolvedValue(null) };
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={quizService} />);
+
+    expect(await screen.findByText(/todavía no tiene preguntas configuradas/i)).toBeInTheDocument();
+    expect(screen.queryByText(/quiz interactivo/i)).not.toBeInTheDocument();
   });
 
   it('renderiza visor PDF para material no evaluativo', () => {
     render(<MaterialPreviewModal asignacion={{ ...asignacion, uso: 'estudio', titulo: 'Material base' }} onCerrar={jest.fn()} />);
 
     expect(screen.getByText(/visor pdf/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /marcar pagina 1 como vista/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /marcar pagina actual como vista/i })).toBeInTheDocument();
   });
 
   it('carga progreso guardado al abrir material no evaluativo', async () => {
@@ -68,13 +109,336 @@ describe('MaterialPreviewModal', () => {
 
   it('actualiza estado local del modal cuando el quiz se aprueba', async () => {
     const user = userEvent.setup();
-    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} />);
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={crearQuizServiceMock()} />);
 
-    await user.click(screen.getByLabelText(/saludar, escuchar instrucciones/i));
+    await user.click(await screen.findByLabelText(/saludar, escuchar instrucciones/i));
     await user.click(screen.getByRole('button', { name: /enviar respuestas/i }));
 
     expect(screen.getByText(/quiz aprobado/i)).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('aprobado')).toBeInTheDocument();
+  });
+
+  it('guarda progreso de quiz en el repositorio inyectado', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock();
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} repository={repository} quizService={crearQuizServiceMock()} />);
+
+    await user.click(await screen.findByLabelText(/saludar, escuchar instrucciones/i));
+    await user.click(screen.getByRole('button', { name: /enviar respuestas/i }));
+
+    expect(repository.guardarQuiz).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: 'tenant-1',
+      asignacionId: 'a1',
+      aprobado: true,
+      estadoPostQuiz: 'aprobado',
+    }));
+  });
+
+  it('guarda avance PDF en el repositorio inyectado al sincronizar', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock();
+    render(
+      <MaterialPreviewModal
+        asignacion={{ ...asignacion, uso: 'estudio', titulo: 'Material base' }}
+        onCerrar={jest.fn()}
+        repository={repository}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /marcar pagina actual como vista/i }));
+    await user.click(screen.getByRole('button', { name: /sincronizar avance/i }));
+
+    expect(repository.guardarSync).toHaveBeenCalledWith('tenant-1', 'a1', expect.objectContaining({
+      paginasVistas: [1],
+      segundosUnicos: [],
+    }));
+  });
+
+  it('solicita URL temporal segura para material Drive no evaluativo', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        ok: true,
+        url: 'https://drive-temporal.test/file',
+        fileName: 'Material base.pdf',
+        mimeType: 'application/pdf',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn().mockResolvedValue(new Blob(['contenido'], { type: 'application/pdf' })),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Material base',
+          externalFileId: 'drive-file-real',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    expect(await screen.findByText(/acceso seguro listo/i)).toBeInTheDocument();
+    expect(driveService.obtenerUrlTemporal).toHaveBeenCalledWith('tenant-1', 'a1', 'drive-file-real');
+    expect(driveService.obtenerBlobProtegido).toHaveBeenCalledWith('https://drive-temporal.test/file');
+  });
+
+  it('en modoVistaPrevia usa obtenerUrlTemporalRecurso (recursoId) en vez de obtenerUrlTemporal (asignacion real)', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn(),
+      obtenerUrlTemporalRecurso: jest.fn().mockResolvedValue({
+        ok: true,
+        url: 'https://drive-temporal.test/preview-file',
+        fileName: 'Material base.pdf',
+        mimeType: 'application/pdf',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn().mockResolvedValue(new Blob(['contenido'], { type: 'application/pdf' })),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Material base',
+          recursoId: 'recurso-preview-1',
+          externalFileId: 'drive-file-real',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+        modoVistaPrevia
+      />
+    );
+
+    expect(await screen.findByText(/acceso seguro listo/i)).toBeInTheDocument();
+    expect(driveService.obtenerUrlTemporalRecurso).toHaveBeenCalledWith('tenant-1', 'recurso-preview-1');
+    expect(driveService.obtenerUrlTemporal).not.toHaveBeenCalled();
+  });
+
+  it('reproduce una imagen usando el blob autenticado del proxy, no la URL cruda (bloqueada por CORS)', async () => {
+    const blobImagen = new Blob(['fake-image-bytes'], { type: 'image/png' });
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        ok: true,
+        url: 'https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?tenantId=tenant-1&fileId=f1&asignacionId=a1',
+        fileName: 'foto.png',
+        mimeType: 'image/png',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn().mockResolvedValue(blobImagen),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'foto.png',
+          externalFileId: 'drive-file-real',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    const img = await screen.findByAltText('foto.png');
+    expect(img).toHaveAttribute('src', 'blob:mock-url');
+    expect(driveService.obtenerBlobProtegido).toHaveBeenCalledWith(
+      'https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?tenantId=tenant-1&fileId=f1&asignacionId=a1'
+    );
+  });
+
+  it('reproduce video usando el blob autenticado del proxy, no la URL cruda (bloqueada por CORS)', async () => {
+    const blobVideo = new Blob(['fake-video-bytes'], { type: 'video/mp4' });
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        ok: true,
+        url: 'https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?tenantId=tenant-1&fileId=f1&asignacionId=a1',
+        fileName: 'clase.mp4',
+        mimeType: 'video/mp4',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn().mockResolvedValue(blobVideo),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'clase.mp4',
+          externalFileId: 'drive-file-real',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    const video = await screen.findByLabelText(/video clase\.mp4/i);
+    expect(video).toHaveAttribute('src', 'blob:mock-url');
+  });
+
+  describe('material de video con youtubeVideoId (reemplazo de Drive por YouTube)', () => {
+    class FakeYoutubePlayer {
+      static instancias: FakeYoutubePlayer[] = [];
+      currentTime = 0;
+      duration = 90;
+      events: any;
+
+      constructor(_elementId: string, config: any) {
+        this.events = config.events;
+        FakeYoutubePlayer.instancias.push(this);
+        Promise.resolve().then(() => this.events?.onReady?.());
+      }
+
+      getCurrentTime() { return this.currentTime; }
+      getDuration() { return this.duration; }
+      destroy() {}
+
+      dispararEstado(estado: number) {
+        this.events?.onStateChange?.({ data: estado });
+      }
+    }
+
+    const YT_PLAYER_STATE = { ENDED: 0, PLAYING: 1, PAUSED: 2 };
+
+    beforeEach(() => {
+      FakeYoutubePlayer.instancias = [];
+      (window as any).YT = { Player: FakeYoutubePlayer, PlayerState: YT_PLAYER_STATE };
+    });
+
+    afterEach(() => {
+      delete (window as any).YT;
+    });
+
+    it('usa el reproductor de YouTube y NO pide acceso temporal de Drive (elimina el costo de proxyDriveMedia)', async () => {
+      const driveService = {
+        obtenerUrlTemporal: jest.fn(),
+        obtenerBlobProtegido: jest.fn(),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-fundamentos.mp4',
+            externalFileId: 'drive-file-real',
+            youtubeVideoId: 'dQw4w9WgXcQ',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      expect(await screen.findByLabelText(/reproductor de youtube/i)).toBeInTheDocument();
+      expect(driveService.obtenerUrlTemporal).not.toHaveBeenCalled();
+      expect(driveService.obtenerBlobProtegido).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText(/^video clase/i)).not.toBeInTheDocument();
+    });
+
+    it('registra la visualizacion en visualizacionRepository (tenant, recurso, alumno) al pausar', async () => {
+      const registrarSync = jest.fn().mockResolvedValue(undefined);
+      const visualizacionRepository = { registrarSync } as any;
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-fundamentos.mp4',
+            recursoId: 'recurso-yt-1',
+            youtubeVideoId: 'dQw4w9WgXcQ',
+          }}
+          onCerrar={jest.fn()}
+          visualizacionRepository={visualizacionRepository}
+          estudianteId="est-1"
+          estudianteNombre="Juan Perez"
+        />
+      );
+
+      await screen.findByLabelText(/reproductor de youtube/i);
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const player = FakeYoutubePlayer.instancias[0];
+      player.currentTime = 45;
+      player.duration = 90;
+
+      act(() => { player.dispararEstado(YT_PLAYER_STATE.PLAYING); });
+      act(() => { player.dispararEstado(YT_PLAYER_STATE.PAUSED); });
+
+      await waitFor(() => {
+        expect(registrarSync).toHaveBeenCalledWith(
+          'tenant-1',
+          'recurso-yt-1',
+          'est-1',
+          expect.objectContaining({
+            estudianteNombre: 'Juan Perez',
+            posicionSegundos: 45,
+            duracionSegundos: 90,
+            nuevoInicio: true,
+          }),
+        );
+      });
+    });
+
+    it('sigue usando VideoPlayer + Drive para material de video SIN youtubeVideoId (compatibilidad hacia atras)', async () => {
+      const blobVideo = new Blob(['fake-video-bytes'], { type: 'video/mp4' });
+      const driveService = {
+        obtenerUrlTemporal: jest.fn().mockResolvedValue({
+          ok: true,
+          url: 'https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?tenantId=tenant-1&fileId=f1&asignacionId=a1',
+          fileName: 'clase-vieja.mp4',
+          mimeType: 'video/mp4',
+          expiresAt: '2026-06-28T12:15:00.000Z',
+        }),
+        obtenerBlobProtegido: jest.fn().mockResolvedValue(blobVideo),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'clase-vieja.mp4',
+            externalFileId: 'drive-file-real',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      expect(await screen.findByLabelText(/video clase-vieja\.mp4/i)).toBeInTheDocument();
+      expect(driveService.obtenerUrlTemporal).toHaveBeenCalled();
+      expect(screen.queryByLabelText(/reproductor de youtube/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('muestra error controlado si el archivo Drive fue eliminado', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockRejectedValue(
+        Object.assign(new Error('El archivo ya no existe en Google Drive'), { code: 'not-found' }),
+      ),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Material base',
+          externalFileId: 'drive-file-eliminado',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    expect(await screen.findByText(/archivo de drive no disponible/i)).toBeInTheDocument();
   });
 });

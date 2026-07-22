@@ -2,9 +2,11 @@ import {
   advanceCiclo,
   assignProgramaToGrupo,
   createPrograma,
+  generarJornadasDeEjecucion,
   publishPrograma,
 } from './programaService';
 import type { ProgramaAcademico } from '../../models/academico/programa';
+import type { BloqueRecurrente } from '../../models/academico/jornada';
 
 const basePrograma = {
   tenantId: 'tenant-1',
@@ -42,6 +44,18 @@ describe('programaService', () => {
       version: 1,
     }));
     expect(programa.unidades.map((unidad) => unidad.id)).toEqual(['unidad-1', 'unidad-2']);
+  });
+
+  it('crea programa con tags cuando se proveen y los conserva tal cual', () => {
+    const programa = createPrograma({ ...basePrograma, tags: ['infantil', 'iniciación'] });
+
+    expect(programa.tags).toEqual(['infantil', 'iniciación']);
+  });
+
+  it('crea programa sin tags cuando no se proveen, sin romper', () => {
+    const programa = createPrograma(basePrograma);
+
+    expect(programa.tags).toBeUndefined();
   });
 
   it('publica un programa solo si tiene unidades y objetivos', () => {
@@ -101,6 +115,89 @@ describe('programaService', () => {
     expect(advanceCiclo(programa, ejecucion, ['obj-1'])).toEqual(ejecucion);
   });
 
+  it('asigna programa con horario recurrente y fecha de fin', () => {
+    const programa = publishPrograma(createPrograma(basePrograma));
+    const bloques: BloqueRecurrente[] = [{
+      id: 'bloque-sabado',
+      tenantId: 'tenant-1',
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      espacioId: 'tatami-1',
+      instructorId: 'maestro-1',
+      diaSemana: 6,
+      horaInicio: '08:00',
+      horaFin: '09:00',
+      activo: true,
+    }];
+
+    const ejecucion = assignProgramaToGrupo(programa, {
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      fechaInicio: '2026-06-01',
+      bloques,
+      fechaFin: '2026-06-30',
+    });
+
+    expect(ejecucion.bloques).toEqual(bloques);
+    expect(ejecucion.fechaFin).toBe('2026-06-30');
+  });
+
+  it('genera jornadas reales para cada bloque recurrente de la ejecucion', () => {
+    const programa = publishPrograma(createPrograma(basePrograma));
+    const bloques: BloqueRecurrente[] = [
+      {
+        id: 'bloque-sabado',
+        tenantId: 'tenant-1',
+        grupoId: 'grupo-infantil',
+        sedeId: 'sede-principal',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-1',
+        diaSemana: 6,
+        horaInicio: '08:00',
+        horaFin: '09:00',
+        activo: true,
+      },
+      {
+        id: 'bloque-domingo',
+        tenantId: 'tenant-1',
+        grupoId: 'grupo-infantil',
+        sedeId: 'sede-principal',
+        espacioId: 'tatami-1',
+        instructorId: 'maestro-1',
+        diaSemana: 0,
+        horaInicio: '10:00',
+        horaFin: '11:00',
+        activo: true,
+      },
+    ];
+    const ejecucion = assignProgramaToGrupo(programa, {
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      fechaInicio: '2026-06-01',
+      bloques,
+      fechaFin: '2026-06-30',
+    });
+
+    const jornadas = generarJornadasDeEjecucion(programa, ejecucion);
+
+    expect(jornadas).toHaveLength(8); // 4 sabados + 4 domingos en junio 2026
+    expect(jornadas.every((jornada) => jornada.programaId === programa.id)).toBe(true);
+    expect(jornadas.every((jornada) => jornada.ejecucionProgramaId === ejecucion.id)).toBe(true);
+    expect(jornadas.filter((jornada) => jornada.horaInicio === '08:00')).toHaveLength(4);
+    expect(jornadas.filter((jornada) => jornada.horaInicio === '10:00')).toHaveLength(4);
+  });
+
+  it('no genera jornadas si la ejecucion no tiene bloques o fechaFin', () => {
+    const programa = publishPrograma(createPrograma(basePrograma));
+    const ejecucion = assignProgramaToGrupo(programa, {
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      fechaInicio: '2026-06-01',
+    });
+
+    expect(generarJornadasDeEjecucion(programa, ejecucion)).toEqual([]);
+  });
+
   it('marca ejecucion completada cuando termina el ultimo objetivo', () => {
     const programa: ProgramaAcademico = publishPrograma(createPrograma(basePrograma));
     const ejecucion = {
@@ -118,5 +215,35 @@ describe('programaService', () => {
 
     expect(completada.estado).toBe('completado');
     expect(completada.objetivoActualId).toBeNull();
+  });
+
+  it('ignora objetivos impartidos que no existen en el programa', () => {
+    const programa = publishPrograma(createPrograma(basePrograma));
+    const ejecucion = assignProgramaToGrupo(programa, {
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      fechaInicio: '2026-06-27',
+    });
+
+    const resultado = advanceCiclo(programa, ejecucion, ['obj-1', 'obj-INEXISTENTE']);
+
+    expect(resultado.objetivosCompletados).toEqual(['obj-1']);
+    expect(resultado.objetivosCompletados).not.toContain('obj-INEXISTENTE');
+    expect(resultado.estado).not.toBe('completado');
+  });
+
+  it('no marca completado si todos los objetivos pasados son inexistentes', () => {
+    const programa = publishPrograma(createPrograma(basePrograma));
+    const ejecucion = assignProgramaToGrupo(programa, {
+      grupoId: 'grupo-infantil',
+      sedeId: 'sede-principal',
+      fechaInicio: '2026-06-27',
+    });
+
+    const resultado = advanceCiclo(programa, ejecucion, ['obj-FANTASMA-1', 'obj-FANTASMA-2']);
+
+    expect(resultado.objetivosCompletados).toEqual([]);
+    expect(resultado.estado).toBe('activo');
+    expect(resultado.objetivoActualId).toBe('obj-1');
   });
 });

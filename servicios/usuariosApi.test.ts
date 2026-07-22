@@ -1,4 +1,5 @@
-import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import {
   doc,
   getDoc,
@@ -49,6 +50,12 @@ jest.mock('firebase/auth', () => ({
 
 jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
 
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => 'functions-mock'),
+  httpsCallable: jest.fn(() => mockCallable),
+}));
+
 describe('usuariosApi', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,9 +68,13 @@ describe('usuariosApi', () => {
       writable: true,
     });
     (getAuth as jest.Mock).mockReturnValue({
-      currentUser: { uid: 'test-uid' },
+      currentUser: {
+        uid: 'test-uid',
+        getIdTokenResult: jest.fn().mockResolvedValue({ claims: { tenantId: 'tenant-1', rol: 'Admin' } }),
+      },
       signOut: mockAuthSignOut,
     });
+    mockCallable.mockReset();
   });
 
   describe('autenticarUsuario', () => {
@@ -204,34 +215,26 @@ describe('usuariosApi', () => {
   });
 
   describe('actualizarUsuario', () => {
-    it('usa el id solicitado si el snapshot actualizado no lo incluye', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        id: '',
-        data: () => ({ email: 'fallback@test.com' }),
-      });
-      await expect(actualizarUsuario({ nombreUsuario: 'Fallback' }, 'fallback-id')).resolves.toEqual(
-        expect.objectContaining({ id: 'fallback-id' }),
-      );
-    });
-
-    it('deberÃ­a actualizar un usuario existente en Firestore', async () => {
+    // DT-0020: actualizarUsuario dejo de escribir directo a Firestore (updateDoc),
+    // porque firestore.rules bloquea sin excepcion "usuarios/{uid}" (allow create,
+    // update, delete: if false) -- rompia la edicion para TODOS los roles, incluido
+    // Admin. Ahora invoca el callable seguro `actualizarUsuarioStaff` (Admin SDK).
+    it('invoca el callable actualizarUsuarioStaff con el tenantId del admin logueado', async () => {
       const datosActualizados = { nombreUsuario: 'Usuario Editado' };
       const mockUser = { id: 'user123', email: 'test@test.com', ...datosActualizados };
-      (updateDoc as jest.Mock).mockResolvedValueOnce(undefined);
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        id: 'user123',
-        data: () => mockUser,
-      });
+      mockCallable.mockResolvedValueOnce({ data: mockUser });
 
       const updatedUser = await actualizarUsuario(datosActualizados, 'user123');
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        datosActualizados
-      );
+
+      expect(mockCallable).toHaveBeenCalledWith({
+        tenantId: 'tenant-1',
+        usuarioId: 'user123',
+        cambios: datosActualizados,
+      });
       expect(updatedUser).toEqual(mockUser);
     });
 
-    it('deberÃ­a manejar campos de contrato anidados', async () => {
+    it('deberÃ­a manejar campos de contrato anidados delegando el mapeo al callable', async () => {
       const datosActualizados = {
         sueldoBase: 1000,
         duracionContratoMeses: 12,
@@ -239,35 +242,38 @@ describe('usuariosApi', () => {
         fechaInicio: '2023-01-01',
         lugarEjecucion: 'Oficina',
       };
-      (updateDoc as jest.Mock).mockResolvedValueOnce(undefined);
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        id: 'user123',
-        data: () => ({ email: 'test@test.com', contrato: { sueldoBase: 1000 } }),
-      });
+      mockCallable.mockResolvedValueOnce({ data: { id: 'user123', ...datosActualizados } });
 
       await actualizarUsuario(datosActualizados, 'user123');
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          contrato: {
-            sueldoBase: 1000,
-            duracionMeses: 12,
-            tipoVinculacion: 'Fijo',
-            fechaInicio: '2023-01-01',
-            lugarEjecucion: 'Oficina',
-          },
-        })
+
+      expect(mockCallable).toHaveBeenCalledWith({
+        tenantId: 'tenant-1',
+        usuarioId: 'user123',
+        cambios: expect.objectContaining({
+          sueldoBase: 1000,
+          duracionContratoMeses: 12,
+          tipoVinculacion: 'Fijo',
+        }),
+      });
+    });
+
+    it('lanza un error claro si no puede determinar el tenant del admin logueado', async () => {
+      (getAuth as jest.Mock).mockReturnValue({
+        currentUser: { uid: 'test-uid', getIdTokenResult: jest.fn().mockResolvedValue({ claims: {} }) },
+        signOut: mockAuthSignOut,
+      });
+
+      await expect(actualizarUsuario({ nombreUsuario: 'X' }, 'user123')).rejects.toThrow(
+        'No se pudo determinar el tenant del usuario actual.'
       );
-      expect(updateDoc).not.toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({ sueldoBase: expect.any(Number) })
-      );
+      expect(mockCallable).not.toHaveBeenCalled();
     });
 
     it('deberÃ­a usar el modo mock si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as any).isFirebaseConfigured = false;
       const updatedUser = await actualizarUsuario({ nombreUsuario: 'Mock Update' }, 'admin-001');
       expect(updatedUser).toEqual(expect.objectContaining({ nombreUsuario: 'Mock Update' }));
+      expect(mockCallable).not.toHaveBeenCalled();
     });
 
     it('deberÃ­a lanzar un error en modo mock si el usuario no es encontrado', async () => {
@@ -300,15 +306,20 @@ describe('usuariosApi', () => {
   });
 
   describe('enviarCorreoRecuperacion', () => {
-    it('deberÃ­a enviar un correo de recuperaciÃ³n de contraseÃ±a', async () => {
+    // Fix UX de restablecimiento de clave (2026-07-15): ya no usa sendPasswordResetEmail()
+    // del SDK cliente (correo/paginas genericas de Firebase) -- invoca la Cloud Function
+    // `sendPasswordReset`, que entrega el link con la plantilla propia del proyecto.
+    it('deberÃ­a invocar la Cloud Function sendPasswordReset con el email', async () => {
+      mockCallable.mockResolvedValue({ data: { ok: true, enviado: true } });
       await enviarCorreoRecuperacion('test@test.com');
-      expect(sendPasswordResetEmail).toHaveBeenCalledWith(expect.any(Object), 'test@test.com');
+      expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'sendPasswordReset');
+      expect(mockCallable).toHaveBeenCalledWith({ email: 'test@test.com' });
     });
 
     it('no deberÃ­a hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as any).isFirebaseConfigured = false;
       await enviarCorreoRecuperacion('test@test.com');
-      expect(sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(mockCallable).not.toHaveBeenCalled();
     });
   });
 

@@ -1,39 +1,21 @@
 {
   "indexes": [
     {
-      "collectionGroup": "tickets_soporte",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" },
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "tickets_soporte",
+      "collectionGroup": "actividadLogs",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        { "fieldPath": "asignacionId", "order": "ASCENDING" },
+        { "fieldPath": "registradoEn", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "tickets_soporte",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "asignaciones",
+      "collectionGroup": "actividadLogs",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "estado", "order": "ASCENDING" },
-        { "fieldPath": "fechaCierre", "order": "ASCENDING" }
+        { "fieldPath": "estudianteId", "order": "ASCENDING" },
+        { "fieldPath": "registradoEn", "order": "DESCENDING" }
       ]
     },
     {
@@ -50,26 +32,75 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaCierre", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "asignaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
         { "fieldPath": "jornadaId", "order": "ASCENDING" },
         { "fieldPath": "fechaApertura", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "progreso",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "asistencia",
+      "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "estudianteId", "order": "ASCENDING" },
-        { "fieldPath": "estado", "order": "ASCENDING" }
+        { "fieldPath": "fecha", "order": "ASCENDING" },
+        { "fieldPath": "sedeId", "order": "ASCENDING" },
+        { "fieldPath": "estadoEntrega", "order": "ASCENDING" }
       ]
     },
     {
-      "collectionGroup": "progreso",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "estudiantes",
+      "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "asignacionId", "order": "ASCENDING" },
-        { "fieldPath": "estado", "order": "ASCENDING" }
+        { "fieldPath": "nombre", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "fechaEvento", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "fechaEvento", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "finanzas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "finanzas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "fecha", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invitaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "rol", "order": "ASCENDING" }
       ]
     },
     {
@@ -77,7 +108,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "sedeId", "order": "ASCENDING" },
+        { "fieldPath": "espacioId", "order": "ASCENDING" },
         { "fieldPath": "fechaHora", "order": "ASCENDING" }
       ]
     },
@@ -95,8 +126,26 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "espacioId", "order": "ASCENDING" },
+        { "fieldPath": "sedeId", "order": "ASCENDING" },
         { "fieldPath": "fechaHora", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progreso",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "asignacionId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "progreso",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "estudianteId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
       ]
     },
     {
@@ -109,12 +158,56 @@
       ]
     },
     {
-      "collectionGroup": "invitaciones",
+      "collectionGroup": "tickets_soporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tickets_soporte",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "tenantId", "order": "ASCENDING" },
-        { "fieldPath": "estado", "order": "ASCENDING" },
-        { "fieldPath": "rol", "order": "ASCENDING" }
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tickets_soporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tickets_soporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tickets_soporte",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "email", "order": "ASCENDING" }
       ]
     }
   ],

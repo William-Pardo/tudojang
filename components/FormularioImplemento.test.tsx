@@ -50,13 +50,17 @@ describe('FormularioImplemento', () => {
       id: 'item-1',
       nombre: 'Guantes de Boxeo',
       descripcion: 'Guantes de entrenamiento de 12oz',
-      categoria: CategoriaImplemento.Protecciones,
+      // Fix 2026-07-21 (`npm run typecheck`): CategoriaImplemento.Protecciones NO EXISTE.
+      // Los valores reales son ProteccionTorso/ProteccionCabeza/ProteccionExtremidades. Para
+      // "Guantes de Boxeo" corresponde ProteccionExtremidades. Antes la assertion de abajo
+      // comparaba contra `undefined`, o sea que no verificaba la categoria en absoluto.
+      categoria: CategoriaImplemento.ProteccionExtremidades,
       imagenUrl: 'https://example.com/imagen.png',
       variaciones: [{ id: 'v-1', descripcion: '12 OZ / AZUL', precio: 120000 }]
     };
     const { container } = render(<FormularioImplemento {...defaultProps} itemActual={item} />);
     expect(container.querySelector('input[name="nombre"]')).toHaveValue('Guantes de Boxeo');
-    expect(container.querySelector('select[name="categoria"]')).toHaveValue(CategoriaImplemento.Protecciones);
+    expect(container.querySelector('select[name="categoria"]')).toHaveValue(CategoriaImplemento.ProteccionExtremidades);
     expect(container.querySelector('textarea[name="descripcion"]')).toHaveValue('Guantes de entrenamiento de 12oz');
     expect(container.querySelector('img')).toHaveAttribute('src', 'https://example.com/imagen.png');
   });

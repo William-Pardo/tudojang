@@ -1,5 +1,6 @@
 import {
   createInvitation,
+  acceptInvitation,
   listInvitations,
   resendInvitation,
   clearMockInvitations,
@@ -131,6 +132,23 @@ describe('invitacionService', () => {
         rol: 'Estudiante',
         tenantId: 'tenant-123'
       });
+    });
+
+    it('acceptInvitation llama a acceptInvitation con tenant, invitacion, token y password', async () => {
+      mockHttpsCallable.mockResolvedValueOnce({
+        data: { ok: true, uid: 'uid-estudiante' }
+      });
+
+      const res = await acceptInvitation('tenant-123', 'inv-123', 'token-seguro', 'ClaveSegura123');
+
+      expect(httpsCallable).toHaveBeenCalledWith(expect.any(Object), 'acceptInvitation');
+      expect(mockHttpsCallable).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        invitacionId: 'inv-123',
+        token: 'token-seguro',
+        password: 'ClaveSegura123'
+      });
+      expect(res.uid).toBe('uid-estudiante');
     });
   });
 });

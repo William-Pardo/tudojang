@@ -25,9 +25,13 @@ jest.mock('./FilaEstudiante', () => ({
   },
 }));
 
+// Fix 2026-07-21 (`npm run typecheck`): faltaban `telefono` y `correo`, obligatorios en
+// Estudiante. La factory se declaraba `: Estudiante` sin cumplir el tipo.
 const crearEstudiante = (id: string, nombres: string): Estudiante => ({
   id,
   tenantId: 'tenant-1',
+  telefono: '3000000000',
+  correo: `${id}@test.com`,
   nombres,
   apellidos: 'Prueba',
   numeroIdentificacion: id,

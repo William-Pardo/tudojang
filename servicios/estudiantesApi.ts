@@ -1,17 +1,17 @@
 
 // servicios/estudiantesApi.ts
-import { 
-    collection, 
-    getDocs, 
-    doc, 
-    getDoc, 
-    addDoc, 
-    updateDoc, 
+import {
+    collection,
+    getDocs,
+    doc,
+    getDoc,
+    updateDoc,
     deleteDoc,
     query,
     where,
     writeBatch
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Estudiante } from '../tipos';
@@ -105,17 +105,24 @@ export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: s
     return { id: docSnap.id, ...docSnap.data() } as Estudiante;
 };
 
+// Fix seguridad (2026-07-18, mismo bug real ya resuelto para sedes): el límite del plan
+// (`tenant.limiteEstudiantes`, que ya incluye plan base + addons comprados) solo se
+// validaba en el botón de la UI (hooks/useGestionEstudiantes.ts::abrirFormulario). Un
+// `addDoc` directo bypaseaba ese límite por completo -- incluida la importación masiva
+// (components/ModalImportacionMasiva.tsx), que llama a esta misma función en loop. La
+// creación ahora pasa por la Cloud Function `crearEstudiante`, que re-valida el límite
+// server-side antes de escribir (ver functions/academico/estudiantes.js). firestore.rules
+// bloquea `create` directo sobre `estudiantes/{docId}` sin excepción.
 export const agregarEstudiante = async (nuevoEstudiante: Omit<Estudiante, 'id' | 'historialPagos'>): Promise<Estudiante> => {
     if (!isFirebaseConfigured) {
         return { ...nuevoEstudiante, id: `mock-${Date.now()}`, historialPagos: [] } as Estudiante;
     }
-    const estudianteParaGuardar = {
-        ...nuevoEstudiante,
-        historialPagos: [],
-        carnetGenerado: false
-    };
-    const docRef = await addDoc(estudiantesCollection, estudianteParaGuardar);
-    return { id: docRef.id, ...estudianteParaGuardar } as Estudiante;
+    const callable = httpsCallable<
+        Omit<Estudiante, 'id' | 'historialPagos'>,
+        Estudiante
+    >(getFunctions(), 'crearEstudiante');
+    const response = await callable(nuevoEstudiante);
+    return response.data;
 };
 
 export const actualizarEstudiante = async (estudianteActualizado: Estudiante): Promise<Estudiante> => {

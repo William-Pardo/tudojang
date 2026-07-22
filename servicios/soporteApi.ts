@@ -5,8 +5,9 @@ import {
     onSnapshot,
     orderBy,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
+import { getAppFunctions } from '../firebase/functions';
 import { type TicketSoporte, EtapaSoporte } from '../tipos';
 
 const ticketsCollection = collection(db, 'tickets_soporte');
@@ -84,7 +85,7 @@ export const crearTicketSoporte = async (
             hasSensitiveData: boolean;
         },
         CrearTicketSeguroResultado
-    >(getFunctions(), 'crearTicketSoporteSeguro');
+    >(getAppFunctions(), 'crearTicketSoporteSeguro');
     const response = await callable({
         summary: datos.resumenIA || datos.asunto,
         category: datos.asunto || 'soporte',
@@ -116,7 +117,7 @@ export const actualizarTicket = async (
             : cambios.estado === 'proceso'
                 ? 'in_progress'
                 : 'open';
-    const callable = httpsCallable(getFunctions(), 'actualizarTicketSoporteSeguro');
+    const callable = httpsCallable(getAppFunctions(), 'actualizarTicketSoporteSeguro');
     await callable({
         ticketId: id,
         nextStatus,

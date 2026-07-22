@@ -3,32 +3,30 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
-import { PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
+import { PLANES_SAAS } from '../constantes';
 import { formatearPrecio } from '../utils/formatters';
 import { IconoAprobar, IconoEstudiantes, IconoUsuario, IconoCasa } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
+import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
 
 const VistaPasarelaPagos: React.FC = () => {
     const { tenant } = useTenant();
     const [periodoAnual, setPeriodoAnual] = useState(true);
     const [planSeleccionado, setPlanSeleccionado] = useState<'starter' | 'growth' | 'pro'>(tenant?.plan as any || 'growth');
 
-    const irAWompi = () => {
+    const irAWompi = async () => {
         const planObj = (PLANES_SAAS as any)[planSeleccionado];
         const mesesACobrar = periodoAnual ? 10 : 1;
         const montoBase = planObj.precio * mesesACobrar;
-        const montoEnCentavos = montoBase * 100;
 
-        const periodoStr = periodoAnual ? 'ANUAL' : 'MENSUAL';
-        const referenciaTecnica = `SUSC_${planSeleccionado.toUpperCase()}_${periodoStr}_${tenant?.tenantId}_${Date.now()}`;
-
-        // NOTA: Aquí se usa la public-key de producción de Tudojang
-        const urlWompi = `https://checkout.wompi.co/p/?` +
-            `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-            `currency=COP&` +
-            `amount-in-cents=${montoEnCentavos}&` +
-            `reference=${referenciaTecnica}&` +
-            `redirect-url=${window.location.origin}/#/aliant-control`;
+        const urlWompi = await construirUrlCheckoutWompi({
+            tenantId: tenant?.tenantId || 'TEST',
+            itemType: 'plan',
+            itemId: planSeleccionado,
+            periodo: periodoAnual ? 'anual' : 'mensual',
+            montoEnPesos: montoBase,
+            redirectUrl: `${window.location.origin}/#/aliant-control`,
+        });
 
         window.location.href = urlWompi;
     };

@@ -29,6 +29,7 @@ const COLUMNAS_OFICIALES = [
     "Grado_Actual", 
     "Tutor_Nombre_Completo", 
     "Tutor_Identificacion",
+    "Tutor_Correo",
     "Tutor_Telefono",
     "Alergias",
     "Lesiones",
@@ -62,14 +63,14 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
         // --- HOJA 1: ÁREA DE TRABAJO ---
         const wsData = [
             COLUMNAS_OFICIALES.map(c => c.toUpperCase()), 
-            ["JUAN CAMILO", "PEREZ", "10203040", "2015-05-10", "3001234567", "alumno@email.com", "Blanco", "MARIA PEREZ", "52888999", "3109876543", "Ninguna", "Ninguna", "Padre"]
+            ["JUAN CAMILO", "PEREZ", "10203040", "2015-05-10", "3001234567", "alumno@email.com", "Blanco", "MARIA PEREZ", "52888999", "tutor@email.com", "3109876543", "Ninguna", "Ninguna", "Padre"]
         ];
         const ws = XLSX.utils.aoa_to_sheet(wsData);
 
         // Anchos de columna para la hoja principal
         ws['!cols'] = [
             { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 28 }, { wch: 18 }, 
-            { wch: 28 }, { wch: 22 }, { wch: 28 }, { wch: 18 }, { wch: 18 }, 
+            { wch: 28 }, { wch: 22 }, { wch: 28 }, { wch: 18 }, { wch: 28 }, { wch: 18 }, 
             { wch: 25 }, { wch: 25 }, { wch: 25 }
         ];
 
@@ -85,7 +86,7 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
             ["IDENTIFICACION", "SOLO NÚMEROS. Sin puntos, espacios ni guiones. Es la llave única del sistema.", "1020304050"],
             ["FECHA_NACIMIENTO", "FORMATO ISO: AAAA-MM-DD (Año-Mes-Día). Crucial para seguros y grupos.", "2012-05-24"],
             ["GRADO_ACTUAL", "Debe ser igual a uno de la lista oficial que se encuentra abajo.", "Verde Punta Azul"],
-            ["TUTOR (3 CAMPOS)", "OBLIGATORIOS si el alumno es menor de 18 años. El sistema bloqueará la carga si faltan.", "Nombre completo"],
+            ["TUTOR (4 CAMPOS)", "OBLIGATORIOS si el alumno es menor de 18 años. El sistema bloqueará la carga si faltan.", "Nombre completo"],
             ["CORREO", "Obligatorio para mayores de 18 años (para su propia firma digital).", "juan@ejemplo.com"],
             ["TELEFONO", "Número de 10 dígitos para notificaciones de WhatsApp automáticas.", "3001234567"],
             ["ALERGIAS / LESIONES", "Si no tiene, escriba 'NINGUNA'. No deje la celda vacía para el expediente médico.", "Asma / N/A"],
@@ -124,8 +125,8 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
         if (!id || isNaN(Number(id))) errores.push("ID Inválido");
         
         if (edad > 0 && edad < 18) {
-            if (!row["Tutor_Nombre_Completo"] || !row["Tutor_Identificacion"] || !row["Tutor_Telefono"]) {
-                errores.push("Menor sin datos de Tutor");
+            if (!row["Tutor_Nombre_Completo"] || !row["Tutor_Identificacion"] || !row["Tutor_Correo"] || !row["Tutor_Telefono"]) {
+                errores.push("Menor sin datos completos de Tutor");
             }
         } else if (edad >= 18) {
             if (!row["Correo"]) errores.push("Adulto requiere Correo");
@@ -198,7 +199,13 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
         setPaso('procesando');
         
         let exitos = 0;
-        for (const row of datosRaw) {
+        // Fix 2026-07-22: antes las filas rechazadas se descartaban con un `console.error`
+        // suelto y siempre se mostraba "Importación Exitosa" en verde. Importar 200 alumnos
+        // con un plan de 50 dejaba al operador creyendo que los 200 habian entrado. Se
+        // acumulan los fallos para poder reportarlos, y se guarda la fila del Excel (la 1 es
+        // el encabezado, asi que la primera de datos es la 2) para que sean ubicables.
+        const fallos: { fila: number; error: any }[] = [];
+        for (const [indice, row] of datosRaw.entries()) {
             try {
                 let fNac = row["Fecha_Nacimiento_AAAA_MM_DD"];
                 if (fNac instanceof Date) fNac = fNac.toISOString().split('T')[0];
@@ -222,15 +229,39 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
                         apellidos: '',
                         numeroIdentificacion: String(row["Tutor_Identificacion"]),
                         telefono: String(row["Tutor_Telefono"]),
-                        correo: String(row["Correo"] || '')
+                        correo: String(row["Tutor_Correo"] || '')
                     } : undefined
                 };
                 await agregarEstudiante(payload as any);
                 exitos++;
-            } catch (e) { console.error("Error en fila:", e); }
+            } catch (e: any) {
+                fallos.push({ fila: indice + 2, error: e });
+                console.error("Error en fila:", indice + 2, e);
+            }
         }
 
-        mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
+        if (fallos.length === 0) {
+            mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
+        } else {
+            // El limite del plan es el unico motivo ACCIONABLE para el operador (subir de
+            // plan o comprar un addon), asi que si aparece se muestra su mensaje textual en
+            // vez del conteo generico. Lo lanza el callable `crearEstudiante` con code
+            // 'resource-exhausted' (functions/academico/estudiantes.js), que httpsCallable
+            // entrega prefijado como 'functions/resource-exhausted'.
+            const porLimiteDePlan = fallos.find((f) =>
+                String(f.error?.code ?? '').includes('resource-exhausted')
+            );
+            const detalle = porLimiteDePlan
+                ? porLimiteDePlan.error.message
+                : fallos.length === 1
+                    ? '1 fila no se pudo importar.'
+                    : `${fallos.length} filas no se pudieron importar.`;
+
+            mostrarNotificacion(
+                `Se registraron ${exitos} de ${datosRaw.length} alumnos. ${detalle}`,
+                "error"
+            );
+        }
         onExito();
     };
 

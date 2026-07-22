@@ -39,6 +39,23 @@ test("repository contains no Wompi private, event, or integrity credentials", ()
   );
 });
 
+// Agregado 2026-07-22 tras encontrar un Personal Access Token de GitHub embebido en texto
+// plano en la URL del remoto (`.git/config`).
+//
+// ALCANCE, para no crear falsa sensacion de seguridad: este test cubre los FUENTES DEL
+// REPOSITORIO, no `.git/config` -- ese archivo no esta versionado y varia por clone, asi que
+// un test de contenido no puede vigilarlo. O sea, NO habria detectado aquel hallazgo. Lo que
+// si evita es el modo de falla adyacente y mas grave: que un token quede commiteado en un
+// archivo del repo, donde vive para siempre en el historial aunque despues se borre.
+test("repository contains no GitHub personal access tokens", () => {
+  // Prefijos oficiales de GitHub: ghp_ (classic), gho_ (OAuth), ghu_/ghs_ (app),
+  // ghr_ (refresh), github_pat_ (fine-grained).
+  assert.doesNotMatch(
+    securitySensitiveSources,
+    /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,})\b/
+  );
+});
+
 test("operational scripts do not hardcode Firebase web API keys", () => {
   const scripts = path.join(root, "scripts");
   const scriptSources = fs
@@ -50,9 +67,23 @@ test("operational scripts do not hardcode Firebase web API keys", () => {
   assert.doesNotMatch(scriptSources, /AIza[0-9A-Za-z_-]{20,}/);
 });
 
-test("production bundle contains no backend AI secrets or quota constants", () => {
+// Este es el UNICO test del archivo que necesita `dist/`; los cuatro de arriba escanean el
+// codigo fuente y corren siempre.
+//
+// Antes hacia `assert.equal(fs.existsSync(dist), true)` y por lo tanto FALLABA en cualquier
+// entorno limpio. En local pasaba solo porque quedaba un `dist/` de un build anterior --
+// dependencia oculta en un artefacto, invisible hasta que corrio en CI (run #105).
+//
+// Ahora se saltea cuando no hay bundle, y el job de deploy lo ejecuta EXPLICITAMENTE despues
+// del build (`npm run test:bundle-security`), que es su unico lugar util: ahi el bundle esta
+// compilado CON los secretos reales. Compilarlo sin secretos en el job de pruebas lo haria
+// pasar trivialmente -- un test que se aprueba a si mismo.
+test("production bundle contains no backend AI secrets or quota constants", (t) => {
   const dist = path.join(root, "dist");
-  assert.equal(fs.existsSync(dist), true, "run npm run build before this test");
+  if (!fs.existsSync(dist)) {
+    t.skip("sin dist/: corre despues del build via `npm run test:bundle-security`");
+    return;
+  }
 
   const files = fs
     .readdirSync(dist, { recursive: true })

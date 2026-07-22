@@ -51,7 +51,7 @@ describe('AsistenteVirtual', () => {
     (escucharMiTicketActivo as jest.Mock).mockReturnValue(jest.fn());
   });
 
-  it('identifica visualmente una respuesta local', async () => {
+  it('muestra respuestas sin etiquetas internas de fuente', async () => {
     const user = userEvent.setup();
     (consultarSoporte as jest.Mock).mockResolvedValue({
       state: 'answer', source: 'local', answer: 'Respuesta del catálogo.', remaining: null,
@@ -60,7 +60,23 @@ describe('AsistenteVirtual', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
     await user.type(screen.getByPlaceholderText(/Describa su inquietud/i), 'Pregunta');
     await user.click(screen.getByRole('button', { name: 'Enviar mensaje' }));
-    expect(await screen.findByText('Manual verificado')).toBeInTheDocument();
+    expect(await screen.findByText(/Respuesta del cat/i)).toBeInTheDocument();
+    const etiquetasInternas = [
+      ['Manual', 'verificado'].join(' '),
+      ['Respuesta', 'con', 'IA'].join(' '),
+      ['Soporte', 'humano'].join(' '),
+    ];
+    etiquetasInternas.forEach(etiqueta => {
+      expect(screen.queryByText(etiqueta)).not.toBeInTheDocument();
+    });
+  });
+
+  it('no muestra estado de IA ni cuota en el encabezado', async () => {
+    const user = userEvent.setup();
+    render(<AsistenteVirtual />);
+    await user.click(screen.getByRole('button', { name: 'Abrir chat' }));
+    expect(screen.queryByText(new RegExp(['IA', 'disponible'].join(' '), 'i'))).not.toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(['Manual', 'ilimitado'].join(' '), 'i'))).not.toBeInTheDocument();
   });
 
   it('muestra cuota agotada y ofrece soporte humano', async () => {

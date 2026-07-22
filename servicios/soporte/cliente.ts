@@ -1,4 +1,5 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { getAppFunctions } from '../../firebase/functions';
 import { CATALOGO_SOPORTE_V1 } from '../../shared/soporte/catalogo.v1';
 import type { HistorialSoporteInput, RolSoporte } from '../../shared/soporte/tipos';
 import { prepararContextoSoporte } from './contexto';
@@ -64,10 +65,34 @@ export async function consultarSoporte(input: ConsultaSoporteInput): Promise<Res
     }
 
     try {
+        const localAssistantUrl = process.env.VITE_ASSISTANT_LOCAL_URL;
+        if (localAssistantUrl) {
+            const response = await fetch(`${localAssistantUrl.replace(/\/$/, '')}/consultarAsistenteIa`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data: {
+                        question: input.question,
+                        context: context.turns,
+                        intentIds,
+                        role: input.role,
+                    },
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok) throw payload?.error ?? new Error('Local assistant failed');
+            const data = payload.data ?? payload.result;
+            return {
+                ...data,
+                state: data.source === 'ai' ? 'answer' : 'unavailable',
+                canEscalate: data.source === 'human',
+            };
+        }
+
         const callable = httpsCallable<
             { question: string; context: unknown[]; intentIds: string[] },
             Omit<ResultadoConsultaSoporte, 'state'> & { source: 'ai' | 'human' }
-        >(getFunctions(), 'consultarAsistenteIa');
+        >(getAppFunctions(), 'consultarAsistenteIa');
         const response = await callable({
             question: input.question,
             context: context.turns,

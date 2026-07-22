@@ -16,12 +16,14 @@ import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
 import { actualizarCapacidadClub, actualizarPlanClub } from '../servicios/configuracionApi';
 import { COSTOS_ADICIONALES, PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
-import { firmarCheckoutWompi } from '../servicios/wompiApi';
+import { construirUrlCheckoutWompi, crearFuentePagoWompi } from '../servicios/wompiApi';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
+import InvitacionesView from './admin/InvitacionesView';
+import VinculosView from './admin/VinculosView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 import { obtenerLimiteEquipoTecnico, obtenerLimiteOperativo } from '../utils/limitesSaas';
@@ -97,51 +99,30 @@ const ModalPagoCheckout: React.FC<{
     onExito: (datos: any) => void
 }> = ({ item, tipo, tenantId, onCerrar, onExito }) => {
     const { mostrarNotificacion } = useNotificacion();
+    // Selector Mensual/Anual (mismo patron que vistas/PasarelaPagos.tsx y
+    // vistas/LicenciaSuspendida.tsx). Solo aplica a cambio/renovacion de plan -- los
+    // addons (+alumnos, +usuario, +sede) son siempre un cargo mensual recurrente.
+    const [periodoAnual, setPeriodoAnual] = useState(false);
+    const esPlan = tipo === 'plan';
+    const MESES_A_COBRAR_ANUAL = 10; // 12 meses de plan, 10 cobrados (2 de bonificación).
+    const montoFinal = esPlan && periodoAnual ? item.precio * MESES_A_COBRAR_ANUAL : item.precio;
 
     const handleProcederAlPago = async () => {
         try {
-            // Si el item tiene una urlPago directa (Links personalizados del dashboard)
-            // se prioriza para permitir pagos manuales mientras se activa recurrencia.
-            if (item.urlPago) {
-                window.open(item.urlPago, '_blank');
-                if (tipo === 'addon') onExito({ tipo: 'addon', item: item.key });
-                else onExito({ tipo: 'plan', plan: item.id });
-                onCerrar();
-                return;
-            }
+            const urlRetorno = `${window.location.origin}/#/`;
+            const urlWompi = await construirUrlCheckoutWompi({
+                tenantId,
+                itemType: tipo === 'addon' ? 'addon' : 'plan',
+                itemId: tipo === 'addon' ? item.key : item.id,
+                periodo: esPlan && periodoAnual ? 'anual' : 'mensual',
+                montoEnPesos: montoFinal,
+                redirectUrl: urlRetorno,
+            });
 
-            if (tipo === 'addon') {
-                mostrarNotificacion("Link de pago no configurado.", "error");
-            } else {
-                const precio = item.precio;
-                const precioEnCentavos = precio * 100;
-                const moneda = 'COP';
-                // Usamos el formato SUSC_ para que el webhook lo reconozca
-                const referencia = `SUSC_${tenantId}_${item.id}_${Date.now()}`;
-                const signature = await firmarCheckoutWompi({
-                    reference: referencia,
-                    amountInCents: precioEnCentavos,
-                    currency: moneda,
-                });
-
-                const urlRetorno = `${window.location.origin}/#/`;
-                let urlWompi = `https://checkout.wompi.co/p/?` +
-                    `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                    `currency=${moneda}&` +
-                    `amount-in-cents=${precioEnCentavos}&` +
-                    `reference=${referencia}&` +
-                    `signature:integrity=${signature}&` +
-                    `redirect-url=${encodeURIComponent(urlRetorno)}`;
-
-                // Si el item tiene un ID de plan de Wompi, lo añadimos para habilitar recurrencia automática
-                if (item.wompiPlanId) {
-                    urlWompi += `&subscription-plan-id=${item.wompiPlanId}`;
-                }
-
-                window.open(urlWompi, '_blank');
-                onExito({ tipo: 'plan', plan: item.id });
-                onCerrar();
-            }
+            window.open(urlWompi, '_blank');
+            if (tipo === 'addon') onExito({ tipo: 'addon', item: item.key });
+            else onExito({ tipo: 'plan', plan: item.id });
+            onCerrar();
         } catch (error) {
             console.error("Error al redireccionar a pasarela:", error);
             mostrarNotificacion("Error al conectar con la pasarela de pagos.", "error");
@@ -157,14 +138,37 @@ const ModalPagoCheckout: React.FC<{
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Serás redirigido a la pasarela segura de Wompi</p>
                     </div>
 
+                    {esPlan && (
+                        <div className="flex justify-center">
+                            <div className="bg-gray-100 dark:bg-white/10 p-1.5 rounded-2xl flex items-center shadow-inner">
+                                <button
+                                    type="button"
+                                    onClick={() => setPeriodoAnual(false)}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
+                                >
+                                    Mensual
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPeriodoAnual(true)}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
+                                >
+                                    Anual (Ahorra 2 Meses)
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
                         <div className="flex justify-between items-center">
                             <span className="text-[10px] font-black uppercase text-gray-400">Concepto</span>
                             <span className="text-xs font-black dark:text-white uppercase">{item.label || item.nombre}</span>
                         </div>
                         <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
-                            <span className="text-[10px] font-black uppercase text-gray-400">Inversión</span>
-                            <span className="text-2xl font-black text-tkd-blue">{formatearPrecio(item.precio)}</span>
+                            <span className="text-[10px] font-black uppercase text-gray-400">
+                                {esPlan && periodoAnual ? 'Inversión (pago único anual)' : 'Inversión'}
+                            </span>
+                            <span className="text-2xl font-black text-tkd-blue">{formatearPrecio(montoFinal)}</span>
                         </div>
                     </div>
 
@@ -177,6 +181,197 @@ const ModalPagoCheckout: React.FC<{
                 </div>
             </div>
         </div>
+    );
+};
+
+// Decisión (2026-07-15, confirmada contra https://docs.wompi.co/en/docs/colombia/fuentes-de-pago/
+// y https://docs.wompi.co/en/docs/colombia/widget-checkout-web/): NO se usa `new WidgetCheckout(...).open(callback)`
+// para tokenizar. Ese constructor JS solo está documentado para el widget de COBRO (exige
+// amountInCents/reference y devuelve result.transaction) -- no tiene modo tokenización.
+// El único modo tokenización real documentado por Wompi es el embed HTML
+// `<script data-render="button" data-widget-operation="tokenize">` dentro de un <form>, que
+// al completarse hace un POST de navegación de página completa al `action` del form (pensado
+// para apps server-rendered, no para una SPA: exigiría un endpoint HTTP nuevo -- no un
+// callable-- y perder el estado de React). En su lugar se usa la tokenización directa que
+// Wompi documenta como alternativa explícita para este caso (POST /v1/tokens/cards con la
+// public key, sin backend de por medio -- mismo nivel de PCI-compliance: "the card data
+// should only travel between the device and the API, never through the merchant's server").
+// El resultado (token) se manda tal cual al callable `crearFuentePagoWompi`.
+interface DatosTarjetaCobroAutomatico {
+    numero: string;
+    nombreTitular: string;
+    mesExpiracion: string;
+    anioExpiracion: string;
+    cvc: string;
+}
+
+const DATOS_TARJETA_INICIAL: DatosTarjetaCobroAutomatico = {
+    numero: '',
+    nombreTitular: '',
+    mesExpiracion: '',
+    anioExpiracion: '',
+    cvc: '',
+};
+
+const SeccionCobroAutomatico: React.FC<{
+    tenant: ConfiguracionClub,
+    // wompiPaymentSourceId ya no se propaga a ConfiguracionClub (fix seguridad 2026-07-18:
+    // ese campo se movió al subdocumento privado tenants/{tenantId}/privado/facturacion,
+    // fuera del doc principal del tenant que sincroniza el listener de Firestore). El
+    // callable crearFuentePagoWompi lo sigue devolviendo -- es la respuesta directa al mismo
+    // Admin que lo acaba de crear -- pero ya no hay razón para guardarlo en el estado local.
+    onActivado: () => void
+}> = ({ tenant, onActivado }) => {
+    const { mostrarNotificacion } = useNotificacion();
+    const [formularioAbierto, setFormularioAbierto] = useState(false);
+    const [datosTarjeta, setDatosTarjeta] = useState<DatosTarjetaCobroAutomatico>(DATOS_TARJETA_INICIAL);
+    const [enviando, setEnviando] = useState(false);
+
+    const inputStyle = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all disabled:opacity-50";
+
+    const handleCambioTarjeta = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setDatosTarjeta(prev => ({ ...prev, [name]: value }));
+    };
+
+    const validarFormulario = (): string | null => {
+        const numeroLimpio = datosTarjeta.numero.replace(/\s+/g, '');
+        if (!/^\d{13,19}$/.test(numeroLimpio)) return "Número de tarjeta inválido.";
+        if (!datosTarjeta.nombreTitular.trim()) return "El nombre del titular es obligatorio.";
+        if (!/^(0[1-9]|1[0-2])$/.test(datosTarjeta.mesExpiracion)) return "Mes de expiración inválido (MM).";
+        if (!/^\d{2}$/.test(datosTarjeta.anioExpiracion)) return "Año de expiración inválido (AA).";
+        if (!/^\d{3,4}$/.test(datosTarjeta.cvc)) return "CVC inválido.";
+        return null;
+    };
+
+    const handleActivarCobroAutomatico = async () => {
+        const errorValidacion = validarFormulario();
+        if (errorValidacion) {
+            mostrarNotificacion(errorValidacion, "error");
+            return;
+        }
+
+        setEnviando(true);
+        try {
+            const numeroLimpio = datosTarjeta.numero.replace(/\s+/g, '');
+            const respuestaTokenizacion = await fetch('https://production.wompi.co/v1/tokens/cards', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${CONFIGURACION_WOMPI.publicKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    number: numeroLimpio,
+                    cvc: datosTarjeta.cvc,
+                    exp_month: datosTarjeta.mesExpiracion,
+                    exp_year: datosTarjeta.anioExpiracion,
+                    card_holder: datosTarjeta.nombreTitular.trim(),
+                }),
+            });
+
+            const cuerpoTokenizacion = await respuestaTokenizacion.json().catch(() => null);
+
+            if (!respuestaTokenizacion.ok || cuerpoTokenizacion?.status !== 'CREATED' || !cuerpoTokenizacion?.data?.id) {
+                const mensajesError = cuerpoTokenizacion?.error?.messages
+                    ? Object.values(cuerpoTokenizacion.error.messages).flat().join(' ')
+                    : null;
+                throw new Error(mensajesError || "No se pudo validar la tarjeta con la pasarela de pagos.");
+            }
+
+            const token = cuerpoTokenizacion.data.id as string;
+
+            await crearFuentePagoWompi({ tenantId: tenant.tenantId, token });
+
+            setDatosTarjeta(DATOS_TARJETA_INICIAL);
+            setFormularioAbierto(false);
+            mostrarNotificacion("Cobro automático activado exitosamente.", "success");
+            onActivado();
+        } catch (error) {
+            mostrarNotificacion(
+                error instanceof Error ? error.message : "No se pudo activar el cobro automático.",
+                "error"
+            );
+        } finally {
+            setEnviando(false);
+        }
+    };
+
+    if (tenant.cobroAutomaticoActivo) {
+        return (
+            <section className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-gray-100 dark:border-white/10">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-green-50 dark:bg-green-900/10 rounded-2xl text-green-600">
+                        <IconoAprobar className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-black uppercase tracking-tight text-gray-900 dark:text-white">Cobro automático activo</h3>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">La mensualidad se debitará automáticamente cada mes</p>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
+    return (
+        <section className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-6">
+            <div>
+                <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Cobro Automático</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 max-w-2xl leading-relaxed">
+                    Registra una tarjeta para que la mensualidad de tu plan se cobre automáticamente cada mes, sin gestiones manuales.
+                </p>
+            </div>
+
+            {!formularioAbierto ? (
+                <button
+                    onClick={() => setFormularioAbierto(true)}
+                    className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                >
+                    Activar Cobro Automático
+                </button>
+            ) : (
+                <div className="space-y-5 max-w-lg animate-fade-in">
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 block tracking-widest">Número de Tarjeta</label>
+                        <input type="text" name="numero" inputMode="numeric" maxLength={19} value={datosTarjeta.numero} onChange={handleCambioTarjeta} placeholder="4242 4242 4242 4242" className={inputStyle} disabled={enviando} />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 block tracking-widest">Nombre del Titular</label>
+                        <input type="text" name="nombreTitular" value={datosTarjeta.nombreTitular} onChange={handleCambioTarjeta} placeholder="Como aparece en la tarjeta" className={inputStyle} disabled={enviando} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 block tracking-widest">Mes (MM)</label>
+                            <input type="text" name="mesExpiracion" inputMode="numeric" maxLength={2} value={datosTarjeta.mesExpiracion} onChange={handleCambioTarjeta} placeholder="08" className={inputStyle} disabled={enviando} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 block tracking-widest">Año (AA)</label>
+                            <input type="text" name="anioExpiracion" inputMode="numeric" maxLength={2} value={datosTarjeta.anioExpiracion} onChange={handleCambioTarjeta} placeholder="28" className={inputStyle} disabled={enviando} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-gray-400 mb-2 ml-1 block tracking-widest">CVC</label>
+                            <input type="text" name="cvc" inputMode="numeric" maxLength={4} value={datosTarjeta.cvc} onChange={handleCambioTarjeta} placeholder="123" className={inputStyle} disabled={enviando} />
+                        </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button
+                            onClick={handleActivarCobroAutomatico}
+                            disabled={enviando}
+                            className="flex-1 bg-tkd-red disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+                        >
+                            {enviando ? 'Procesando...' : 'Confirmar Tarjeta'}
+                        </button>
+                        <button
+                            onClick={() => { setFormularioAbierto(false); setDatosTarjeta(DATOS_TARJETA_INICIAL); }}
+                            disabled={enviando}
+                            className="flex-1 sm:flex-none text-gray-400 font-black uppercase text-[10px] tracking-widest py-4 px-6 hover:text-gray-600 transition-colors disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                    <p className="text-[9px] text-gray-400 uppercase font-bold italic">Tus datos de tarjeta viajan directo a la pasarela de pagos Wompi. Nunca pasan por nuestros servidores.</p>
+                </div>
+            )}
+        </section>
     );
 };
 
@@ -198,7 +393,7 @@ const VistaConfiguracion: React.FC = () => {
     const { sedes, sedesVisibles, totalSedesActivas, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
 
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'licencia'>('branding');
+    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>('branding');
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
@@ -222,7 +417,11 @@ const VistaConfiguracion: React.FC = () => {
             cerrarModalSede();
             mostrarNotificacion("Sede guardada correctamente.", "success");
         } catch (e) {
-            mostrarNotificacion("Error al guardar la sede.", "error");
+            // createSede/updateSede (Cloud Functions) ahora pueden rechazar con un motivo
+            // real y específico (límite de plan alcanzado, nombre duplicado) -- mostrar ese
+            // mensaje en vez de uno genérico, si está disponible.
+            const mensaje = e instanceof Error && e.message ? e.message : "Error al guardar la sede.";
+            mostrarNotificacion(mensaje, "error");
         }
     };
 
@@ -333,8 +532,16 @@ const VistaConfiguracion: React.FC = () => {
     if (cargando || esTenantTemporal) return <Loader texto="Sincronizando Consola..." />;
 
     const inputClasses = "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-3 text-xs font-black text-gray-900 dark:text-white uppercase outline-none focus:ring-2 focus:ring-tkd-blue shadow-inner transition-all";
+    // Fix tutor-role-end-to-end (2026-07-14): Tutor y Estudiante son CONSULTORES (solo lectura),
+    // no parte del equipo técnico / nómina. No deben figurar en la gestión de personal ni
+    // contar contra el cupo del plan (que es de staff). Se filtran de la tabla y del conteo.
+    // Existen para autenticarse y leer sus datos, pero se administran desde el directorio de
+    // estudiantes (donde se define el tutor), no desde acá.
+    const usuariosStaff = usuarios.filter(
+        (u) => u.rol !== RolUsuario.Tutor && u.rol !== RolUsuario.Estudiante
+    );
     const limiteEquipoTecnico = obtenerLimiteEquipoTecnico(localConfigClub);
-    const equipoTecnicoCompleto = limiteEquipoTecnico > 0 && usuarios.length >= limiteEquipoTecnico;
+    const equipoTecnicoCompleto = limiteEquipoTecnico > 0 && usuariosStaff.length >= limiteEquipoTecnico;
 
     return (
         <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
@@ -397,11 +604,12 @@ const VistaConfiguracion: React.FC = () => {
             )}
 
             {!isWizardMode && (
-                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit overflow-x-auto no-scrollbar">
-                    <div className="flex flex-row gap-1">
+                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full overflow-visible">
+                    <div className="flex flex-row flex-wrap gap-1">
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
                             { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
+                            { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
                             { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
                             { id: 'alertas', label: 'Alertas', icon: IconoCampana },
@@ -410,10 +618,10 @@ const VistaConfiguracion: React.FC = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
                                 <tab.icon className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                                <span className="hidden md:inline">{tab.label}</span>
+                                <span className="inline">{tab.label}</span>
                             </button>
                         ))}
                     </div>
@@ -459,6 +667,20 @@ const VistaConfiguracion: React.FC = () => {
                                         <label className="text-[9px] font-black uppercase text-tkd-red block mb-2 ml-1 tracking-widest">Mora Mensual (%)</label>
                                         <input type="number" min="0" name="moraPorcentaje" value={localConfigClub.moraPorcentaje || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="0" />
                                     </div>
+                                </div>
+                                <div className="p-6 bg-sky-50 dark:bg-sky-900/10 rounded-3xl border border-sky-100 dark:border-sky-800/20 space-y-3">
+                                    <label className="text-[10px] font-black uppercase text-sky-700 dark:text-sky-400 tracking-widest">Link de Pago en Línea (Opcional)</label>
+                                    <input
+                                        type="text"
+                                        name="linkPagoMensualidad"
+                                        value={localConfigClub.linkPagoMensualidad || ''}
+                                        onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)}
+                                        className={inputClasses}
+                                        placeholder="https://checkout.wompi.co/l/..."
+                                    />
+                                    <p className="text-[9px] text-gray-400 font-bold italic">
+                                        Pegá acá el link de pago de tu cuenta en Wompi, PayU o ePayco para que tus alumnos puedan pagar en línea. Tudojang no gestiona ni recibe este dinero — ver Términos de Servicio.
+                                    </p>
                                 </div>
                                 <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-800/20 space-y-4">
                                     <div className="flex justify-between items-center">
@@ -684,8 +906,13 @@ const VistaConfiguracion: React.FC = () => {
                                                         <button onClick={() => { setSedeEdit(s); setModalSedeAbierto(true); }} className="p-2 text-gray-400 hover:text-tkd-blue transition-colors"><IconoEditar className="w-4 h-4" /></button>
                                                         <button onClick={async () => {
                                                             if (window.confirm(`¿Seguro de eliminar la sede ${s.nombre}?`)) {
-                                                                await eliminarSede(s.id!);
-                                                                mostrarNotificacion("Sede eliminada.", "success");
+                                                                try {
+                                                                    await eliminarSede(s.id!);
+                                                                    mostrarNotificacion("Sede eliminada.", "success");
+                                                                } catch (e) {
+                                                                    const mensaje = e instanceof Error && e.message ? e.message : "Error al eliminar la sede.";
+                                                                    mostrarNotificacion(mensaje, "error");
+                                                                }
                                                             }
                                                         }} className="p-2 text-gray-400 hover:text-tkd-red transition-colors"><IconoEliminar className="w-4 h-4" /></button>
                                                     </div>
@@ -717,14 +944,14 @@ const VistaConfiguracion: React.FC = () => {
                             <button
                                 onClick={() => abrirFormularioUsuario()}
                                 disabled={equipoTecnicoCompleto}
-                                title={equipoTecnicoCompleto ? `Límite alcanzado: ${usuarios.length} de ${limiteEquipoTecnico}` : undefined}
+                                title={equipoTecnicoCompleto ? `Límite alcanzado: ${usuariosStaff.length} de ${limiteEquipoTecnico}` : undefined}
                                 className="bg-tkd-blue disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all"
                             >
                                 <IconoAgregar className="w-4 h-4" /> Vincular Instructor
                             </button>
                         </div>
                         <div className="tkd-card p-0">
-                            <TablaUsuarios usuarios={usuarios} onEditar={abrirFormularioUsuario} onEliminar={abrirConfirmacionEliminar} onGestionarContrato={() => { }} />
+                            <TablaUsuarios usuarios={usuariosStaff} onEditar={abrirFormularioUsuario} onEliminar={abrirConfirmacionEliminar} onGestionarContrato={() => { }} />
                         </div>
                         {isWizardMode && currentStep === 4 && (
                             <button
@@ -803,6 +1030,79 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
+                {!isWizardMode && activeTab === 'accesos' && (
+                    <div className="space-y-8 animate-fade-in">
+                        <section className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-6">
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.35em] text-tkd-red mb-2">Perfiles externos</p>
+                                <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-dark dark:text-white">Configuración de login externo</h3>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2 max-w-3xl">
+                                    Controla el acceso de alumnos y tutores que no trabajan dentro del club. Las invitaciones también se pueden enviar desde el registro o edición de cada estudiante.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {[
+                                    {
+                                        key: 'loginEstudiantesActivo',
+                                        title: 'Activar cuentas externas',
+                                        description: 'Permite crear login para alumnos y tutores.'
+                                    },
+                                    {
+                                        key: 'invitarEstudianteAlCrear',
+                                        title: 'Invitar estudiante al crear',
+                                        description: 'Marca por defecto el envío al correo del alumno.'
+                                    },
+                                    {
+                                        key: 'invitarTutorAlCrear',
+                                        title: 'Invitar tutor al crear',
+                                        description: 'Marca por defecto el envío al acudiente cuando exista correo.'
+                                    }
+                                ].map((item) => {
+                                    const cuentasExternas = localConfigClub.configuracionCuentasExternas || {};
+                                    const checked = !!cuentasExternas[item.key as keyof typeof cuentasExternas];
+
+                                    return (
+                                        <label key={item.key} className={`p-5 rounded-3xl border-2 cursor-pointer transition-all ${checked ? 'border-tkd-blue bg-tkd-blue/5' : 'border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5'}`}>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">{item.title}</h4>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-2 leading-relaxed">{item.description}</p>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        setLocalConfigClub(prev => prev ? {
+                                                            ...prev,
+                                                            configuracionCuentasExternas: {
+                                                                ...(prev.configuracionCuentasExternas || {}),
+                                                                [item.key]: e.target.checked
+                                                            }
+                                                        } : prev);
+                                                    }}
+                                                    className="w-5 h-5 accent-tkd-blue shrink-0"
+                                                />
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => guardarConfiguracionesHandler()}
+                                className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                            >
+                                Guardar configuración de cuentas
+                            </button>
+                        </section>
+
+                        <InvitacionesView />
+                        <VinculosView />
+                    </div>
+                )}
+
                 {!isWizardMode && activeTab === 'licencia' && (
                     <div className="space-y-10 animate-fade-in">
                         <div className="bg-tkd-dark text-white p-10 rounded-[3rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8 border border-white/5 relative overflow-hidden">
@@ -820,6 +1120,17 @@ const VistaConfiguracion: React.FC = () => {
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
 
+                        <SeccionCobroAutomatico
+                            tenant={localConfigClub}
+                            onActivado={() => {
+                                setLocalConfigClub(prev => prev ? {
+                                    ...prev,
+                                    cobroAutomaticoActivo: true,
+                                    cobroAutomaticoIntentosFallidos: 0,
+                                } : prev);
+                            }}
+                        />
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {[
                                 {
@@ -831,7 +1142,7 @@ const VistaConfiguracion: React.FC = () => {
                                 },
                                 {
                                     label: 'Docentes / Staff',
-                                    used: usuarios.length,
+                                    used: usuariosStaff.length,
                                     limit: obtenerLimiteEquipoTecnico(localConfigClub),
                                     icon: IconoUsuario,
                                     color: 'text-green-500'
@@ -955,7 +1266,7 @@ const VistaConfiguracion: React.FC = () => {
                             {Object.values(COSTOS_ADICIONALES).map(addon => (
                                 <div key={addon.key} className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
                                     <h4 className="text-xl font-black uppercase tracking-tight dark:text-white">{addon.label}</h4>
-                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">{formatearPrecio(addon.precio)} <span className="text-[9px] opacity-40">Pago único</span></p>
+                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">{formatearPrecio(addon.precio)} <span className="text-[9px] opacity-40">Pago mensual</span></p>
                                     <button onClick={() => setItemAPagar({ item: addon, tipo: 'addon' })} className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm">Adquirir Capacidad</button>
                                 </div>
                             ))}

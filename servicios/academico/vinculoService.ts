@@ -5,9 +5,11 @@ import {
   query,
   where,
   setDoc,
-  deleteDoc
+  deleteDoc,
+  getDoc
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../../firebase/config';
+import type { Estudiante } from '../../tipos';
 
 export interface VinculoTutorEstudiante {
   id: string;
@@ -15,6 +17,8 @@ export interface VinculoTutorEstudiante {
   estudianteId: string;
   tenantId: string;
   creadoEn: string;
+  studentAuthUid?: string; // Auth UID del estudiante (agregado en Fase 1)
+  tutorId?: string; // Auth UID del tutor (agregado en Fase 1)
 }
 
 // In-memory mock storage for local/test mode
@@ -44,10 +48,25 @@ export const linkTutorEstudiante = async (
       tutorEmail: emailLimpio,
       estudianteId,
       tenantId,
-      creadoEn: new Date().toISOString()
+      creadoEn: new Date().toISOString(),
+      studentAuthUid: undefined
     };
     mockVinculos.push(newMock);
     return id;
+  }
+
+  // FASE 4: Leer el Estudiante doc para obtener su authUid
+  let studentAuthUid: string | undefined;
+  try {
+    const estudianteRef = doc(db, 'estudiantes', estudianteId);
+    const estudianteSnap = await getDoc(estudianteRef);
+    if (estudianteSnap.exists()) {
+      const estudianteData = estudianteSnap.data() as Estudiante;
+      studentAuthUid = estudianteData.authUid; // Campo agregado en Fase 1
+    }
+  } catch (err) {
+    // Log pero no bloques si hay error al leer estudiante
+    console.error(`No se pudo leer Estudiante ${estudianteId}:`, err);
   }
 
   const docRef = doc(db, 'tenants', tenantId, 'vinculos', id);
@@ -56,8 +75,14 @@ export const linkTutorEstudiante = async (
     tutorEmail: emailLimpio,
     estudianteId,
     tenantId,
-    creadoEn: new Date().toISOString()
+    creadoEn: new Date().toISOString(),
   };
+  // Firestore rechaza valores `undefined`. Solo incluimos studentAuthUid si existe.
+  // (El vínculo tutor↔estudiante real ya vive en estudiante.tutor.correo; este doc es
+  // complementario y no debe romperse cuando el estudiante aún no tiene authUid.)
+  if (studentAuthUid) {
+    vinculoData.studentAuthUid = studentAuthUid;
+  }
 
   await setDoc(docRef, vinculoData);
   return id;

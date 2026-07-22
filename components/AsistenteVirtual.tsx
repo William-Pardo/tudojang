@@ -12,11 +12,10 @@ const AsistenteVirtual: React.FC = () => {
     const { usuario } = useAuth();
     const [abierto, setAbierto] = useState(false);
     const [mensaje, setMensaje] = useState('');
-    const [historial, setHistorial] = useState<{ texto: string; soyYo: boolean; fuente?: ResultadoConsultaSoporte['source'] }[]>([]);
+    const [historial, setHistorial] = useState<{ texto: string; soyYo: boolean }[]>([]);
     const [cargando, setCargando] = useState(false);
     const [mostrarBtnEscalar, setMostrarBtnEscalar] = useState(false);
     const [miTicket, setMiTicket] = useState<TicketSoporte | null>(null);
-    const [restantes, setRestantes] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -75,9 +74,7 @@ const AsistenteVirtual: React.FC = () => {
         setHistorial(prev => [...prev, {
             texto: respuestaLimpia || "Entendido. ¿Deseas escalar a soporte humano?",
             soyYo: false,
-            fuente: resultado.source,
         }]);
-        setRestantes(resultado.remaining?.user ?? null);
         } catch (consultaError) {
             console.error('[AsistenteVirtual] Error al consultar soporte:', consultaError);
             setError('Error al cargar la respuesta');
@@ -167,10 +164,8 @@ const AsistenteVirtual: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-widest leading-none">Aliant Master Support</p>
-                                    {miTicket ? (
+                                    {miTicket && (
                                         <p className="text-[8px] font-bold text-green-400 uppercase mt-1">Caso: #{miTicket.id.slice(-4)}</p>
-                                    ) : (
-                                        <p className="text-[8px] font-bold text-gray-400 uppercase mt-1">IA disponible: {restantes ?? 'según plan'} · Manual ilimitado</p>
                                     )}
                                 </div>
                             </div>
@@ -188,11 +183,6 @@ const AsistenteVirtual: React.FC = () => {
                                 <div key={i} className={`flex ${h.soyYo ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[85%] p-3.5 rounded-2xl text-[11px] font-medium leading-relaxed ${h.soyYo ? 'bg-tkd-blue text-white rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-tl-none shadow-sm'}`}>
                                         {h.texto}
-                                        {!h.soyYo && h.fuente && (
-                                            <span className="block mt-2 text-[8px] font-black uppercase tracking-wider text-tkd-blue">
-                                                {h.fuente === 'local' ? 'Manual verificado' : h.fuente === 'ai' ? 'Respuesta con IA' : 'Soporte humano'}
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -267,11 +257,6 @@ const AsistenteVirtual: React.FC = () => {
                 {miTicket && !abierto && (
                     <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 animate-pulse">
                         !
-                    </div>
-                )}
-                {!miTicket && !abierto && (
-                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-tkd-red text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
-                        {restantes ?? '∞'}
                     </div>
                 )}
             </motion.button>

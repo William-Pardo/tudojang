@@ -1,7 +1,6 @@
 import {
   createUserWithEmailAndPassword,
   getAuth,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateCurrentUser,
@@ -17,6 +16,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Usuario } from '../tipos';
 import { RolUsuario } from '../tipos';
@@ -58,6 +58,16 @@ let usuariosMock: UsuarioContrasena[] = [
     numeroIdentificacion: '1020304052', whatsapp: '3201234567', rol: RolUsuario.Asistente,
     tenantId: 'escuela-gajog-001', sedeId: '1', contrasena: 'asistente123',
   },
+  {
+    id: 'estudiante-001', email: 'juan@test.com', nombreUsuario: 'Juan Pérez (Estudiante)',
+    numeroIdentificacion: '10101', whatsapp: '3001234568', rol: RolUsuario.Estudiante,
+    tenantId: 'escuela-gajog-001', contrasena: 'juan123',
+  },
+  {
+    id: 'estudiante-002', email: 'maria@test.com', nombreUsuario: 'Maria Lopez (Estudiante)',
+    numeroIdentificacion: '20202', whatsapp: '3001234569', rol: RolUsuario.Estudiante,
+    tenantId: 'escuela-gajog-001', contrasena: 'maria123',
+  }
 ];
 
 export const esperar = (milliseconds: number): Promise<void> =>
@@ -160,13 +170,30 @@ export const obtenerUsuarios = async (): Promise<Usuario[]> => {
   return listActiveUsers(await firestoreRepository.list());
 };
 
+// DT-0020: firestore.rules bloquea sin excepcion "usuarios/{uid}" (allow create,
+// update, delete: if false) -- un update de cliente directo (firestoreRepository.update)
+// rompia la edicion de CUALQUIER usuario para TODOS los roles, incluido Admin. Ahora
+// invoca el callable seguro `actualizarUsuarioStaff` (Admin SDK, valida rol+tenant
+// server-side), mismo patron que `publicarAsignacion`/`registrarAsistenciaClase`.
 export const actualizarUsuario = async (datos: any, id: string): Promise<Usuario> => {
   if (!isFirebaseConfigured) {
     const result = updateLocalUser(usuariosMock, id, datos);
     usuariosMock = result.usuarios;
     return result.usuario;
   }
-  return firestoreRepository.update(id, buildUpdateData(datos));
+
+  const tokenResult = await getAuth().currentUser?.getIdTokenResult();
+  const tenantId = tokenResult?.claims?.tenantId as string | undefined;
+  if (!tenantId) {
+    throw new Error('No se pudo determinar el tenant del usuario actual.');
+  }
+
+  const callable = httpsCallable<{ tenantId: string; usuarioId: string; cambios: any }, Usuario>(
+    getFunctions(),
+    'actualizarUsuarioStaff',
+  );
+  const response = await callable({ tenantId, usuarioId: id, cambios: datos });
+  return response.data;
 };
 
 export const eliminarUsuario = async (id: string): Promise<void> => {
@@ -178,8 +205,18 @@ export const eliminarUsuario = async (id: string): Promise<void> => {
   await firestoreRepository.softDelete(id, new Date().toISOString());
 };
 
+// Fix UX de restablecimiento de clave (2026-07-15): antes usaba sendPasswordResetEmail() del
+// SDK cliente, que manda el correo/páginas GENÉRICAS de Firebase (firebaseapp.com, en inglés,
+// sin marca, sin volver a la app). Ahora invoca la Cloud Function `sendPasswordReset`, que
+// genera el mismo link real de Firebase pero lo entrega con la plantilla propia del proyecto
+// vía Resend, y apunta a /restablecer-clave en el dominio real de la app.
 export const enviarCorreoRecuperacion = async (email: string): Promise<void> => {
-  if (isFirebaseConfigured) await sendPasswordResetEmail(getAuth(), email);
+  if (!isFirebaseConfigured) return;
+  const sendPasswordResetCF = httpsCallable<{ email: string }, { ok: boolean; enviado: boolean }>(
+    getFunctions(),
+    'sendPasswordReset'
+  );
+  await sendPasswordResetCF({ email });
 };
 
 export const guardarTokenNotificacionUsuario = async (idUsuario: string, token: string): Promise<void> => {

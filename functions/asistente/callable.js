@@ -164,6 +164,12 @@ const crearHandlerCallable = (service) => async (data, context) => {
       "not-found",
     ]);
     const code = allowedCodes.has(error?.code) ? error.code : "internal";
+    if (code === "internal") {
+      console.error("[callable:internal]", {
+        message: error?.message,
+        stack: error?.stack,
+      });
+    }
     throw new functions.https.HttpsError(
       code,
       code === "internal" ? "No fue posible procesar la consulta" : error.message

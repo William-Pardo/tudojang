@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Política de privacidad | Tudojang</title>
+  <meta name="description" content="Política de privacidad de Tudojang SaaS.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      color-scheme: light;
+      --primary: #0f172a;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --warning: #d97706;
+      --warning-bg: #fffbeb;
+      --text-main: #334155;
+      --text-muted: #64748b;
+      --bg-app: #f8fafc;
+      --bg-card: #ffffff;
+      --border: #e2e8f0;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --shadow-md: 0 20px 40px -15px rgba(15,23,42,0.06);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+      color: var(--text-main);
+      background: var(--bg-app);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 60px 20px 90px;
+    }
+
+    /* Header legal */
+    .legal-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .legal-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 1.4rem;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+    .legal-brand img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+    }
+    .legal-title {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900;
+      color: var(--primary);
+      letter-spacing: -0.03em;
+      margin: 0 0 12px;
+      line-height: 1.15;
+    }
+    .legal-meta {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    /* Contenedor Premium */
+    .legal-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 48px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .legal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      background: linear-gradient(90deg, var(--accent), #3b82f6, #60a5fa);
+    }
+
+    /* Secciones */
+    .legal-section {
+      margin-bottom: 40px;
+    }
+    .legal-section:last-child {
+      margin-bottom: 0;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 14px;
+    }
+    .legal-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border-radius: 12px;
+      flex-shrink: 0;
+    }
+    .legal-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .legal-section h2 {
+      font-size: 1.35rem;
+      font-weight: 750;
+      color: var(--primary);
+      margin: 0;
+    }
+    .legal-section p {
+      color: var(--text-main);
+      margin: 0 0 16px;
+    }
+    .legal-section a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .legal-section a:hover {
+      border-color: var(--accent);
+    }
+
+    /* Listas y viñetas */
+    .legal-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px;
+    }
+    .legal-list li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 14px;
+      color: var(--text-main);
+    }
+    .legal-list li::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .legal-list li strong {
+      color: var(--primary);
+    }
+
+    /* Alertas */
+    .legal-alert {
+      background: var(--warning-bg);
+      border-left: 4px solid var(--warning);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      color: #78350f;
+      font-size: 0.95rem;
+    }
+    .legal-alert strong {
+      color: #451a03;
+    }
+
+    /* Footer */
+    .legal-footer {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 48px;
+    }
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: var(--primary);
+      color: #ffffff !important;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s;
+      box-shadow: 0 4px 12px rgba(15,23,42,0.15);
+    }
+    .btn-back:hover {
+      background: #1e293b;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: transparent;
+      color: var(--primary) !important;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      background: var(--border);
+      transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+      .legal-card {
+        padding: 24px;
+      }
+      .legal-footer {
+        flex-direction: column;
+      }
+      .btn-back, .btn-secondary {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="legal-header">
+      <a href="/" class="legal-brand">
+        <img src="/Logo_TuDojang.png" alt="Logo Tudojang">
+        <span>Tudojang</span>
+      </a>
+      <h1 class="legal-title">Política de privacidad</h1>
+      <span class="legal-meta">Última actualización: 12 de julio de 2026</span>
+    </div>
+
+    <article class="legal-card">
+      <div class="legal-section">
+        <p>
+          En Tudojang nos tomamos muy en serio la protección y el respeto por tus datos personales. Esta Política de privacidad describe de manera transparente, clara y sencilla cómo recopilamos, usamos, almacenamos y resguardamos la información cuando utilizás nuestro servicio SaaS para la gestión de escuelas de artes marciales.
+        </p>
+      </div>
+
+      <!-- Sección 1 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </div>
+          <h2>1. Responsable del Tratamiento y Contacto</h2>
+        </div>
+        <p>
+          El responsable del tratamiento de los datos en la plataforma es el equipo técnico y operativo de Tudojang (marca registrada de **Aliant Labs**). Si tenés cualquier consulta, querés ejercer algún derecho sobre tus datos o querés reportar un inconveniente, escribinos directamente a: <a href="mailto:aliantlab@gmail.com">aliantlab@gmail.com</a>.
+        </p>
+      </div>
+
+      <!-- Sección 2 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <h2>2. Información que Tratamos</h2>
+        </div>
+        <p>
+          Para que la plataforma funcione de manera óptima para vos y tu escuela, tratamos las siguientes categorías de datos:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Datos de Cuenta de Administrador/Profesor:</strong> Nombre completo, correo electrónico, rol organizativo y credenciales de acceso seguro.</li>
+          <li><strong>Datos Institucionales (Tenant):</strong> Nombre de la escuela o dojang, sedes físicas, planes contratados y configuraciones internas del dojang.</li>
+          <li><strong>Datos de los Estudiantes y Tutores:</strong> Nombres, fechas de nacimiento, asistencia, historial de exámenes, graduaciones (cinturones), pagos de cuotas y datos de contacto de los acudientes/tutores (en caso de menores).</li>
+          <li><strong>Datos Laborales / Staff:</strong> Registros operacionales de horas de entrada/salida y asistencia de instructores con el fin de organizar la escuela.</li>
+          <li><strong>Datos de Google Drive:</strong> Exclusivamente los metadatos y enlaces de los archivos autorizados y vinculados para el módulo de Centro de Estudios.</li>
+        </ul>
+      </div>
+
+      <!-- Sección 3 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          </div>
+          <h2>3. Uso de Google Drive y Ámbito "drive.file"</h2>
+        </div>
+        <p>
+          Tudojang proporciona una integración opcional con Google Drive para que los administradores y profesores puedan asociar y disponibilizar materiales académicos (como manuales de formas, vídeos o reglamentos) dentro del Centro de Estudios de los alumnos.
+        </p>
+        <p>
+          Nuestra aplicación solicita de forma explícita el alcance restringido y limitado:
+          <code>https://www.googleapis.com/auth/drive.file</code>
+        </p>
+        <p>
+          Esto significa que Tudojang <strong>únicamente puede leer, escribir y gestionar los archivos específicos que vos selecciones y autorices explícitamente</strong> dentro de la plataforma. De ninguna manera solicitamos ni poseemos acceso general a la totalidad de los archivos de tu Google Drive. Los datos obtenidos a través de la API de Google se utilizan pura y exclusivamente para listar los recursos del dojang y no se comparten con terceros, no se venden, ni se utilizan para alimentar modelos de publicidad o marketing.
+        </p>
+      </div>
+
+      <!-- Sección 4 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          </div>
+          <h2>4. Finalidades del Tratamiento y Base Legal</h2>
+        </div>
+        <p>
+          Utilizamos los datos recopilados para las siguientes finalidades esenciales:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Prestación del Servicio:</strong> Administrar las operaciones del dojang, registros de asistencia, reservas, membresías y emisión de carnets.</li>
+          <li><strong>Gestión de Notificaciones:</strong> Permitir que las escuelas envíen alertas a sus alumnos sobre clases, cambios de horarios o eventos.</li>
+          <li><strong>Seguridad:</strong> Proteger la integridad de la base de datos de cada escuela y evitar accesos no autorizados mediante controles estrictos de seguridad de tipo multi-tenant.</li>
+        </ul>
+      </div>
+
+      <!-- Sección 5 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          </div>
+          <h2>5. Marketing Directo, Comunidad y Comunicaciones Promocionales</h2>
+        </div>
+        <p>
+          En conformidad con las normativas vigentes de tratamiento de datos personales, el uso de información para fines de promoción se rige bajo las siguientes bases de consentimiento:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Consentimiento de Estudiantes y Tutores:</strong> Al registrarse y crear su login individual de acceso a la plataforma, los estudiantes y/o sus tutores legales otorgan su consentimiento explícito para recibir correos electrónicos, boletines y notificaciones promocionales.</li>
+          <li><strong>Finalidad del Consentimiento:</strong> Dicho consentimiento autoriza a Aliant Labs a enviar ofertas comerciales sobre Tudojang y a invitar a los usuarios a formar parte de su comunidad virtual, donde se comercializarán y promocionarán otros productos, contenidos y servicios relacionados de la marca.</li>
+          <li><strong>Revocación Directa:</strong> Los usuarios finales pueden revocar este consentimiento de manera autónoma en cualquier momento. Podrán desactivar las alertas comerciales desde la configuración de su perfil de usuario o seleccionando el enlace de desuscripción al pie de cualquier correo promocional enviado por Aliant Labs.</li>
+        </ul>
+      </div>
+
+      <!-- Sección 6 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <h2>6. Conservación, Bloqueo y Retención de Datos</h2>
+        </div>
+        <p>
+          Los datos personales se conservarán mientras persista la relación activa entre la escuela y Tudojang, o hasta que se solicite la supresión por parte del titular.
+        </p>
+        <div class="legal-alert">
+          <strong>🔒 Cláusula de Retención Legal y Bloqueo (5 Años):</strong> Una vez que un estudiante se da de baja del dojang o la escuela rescinde su suscripción a Tudojang, no eliminamos los datos de inmediato por razones de seguridad jurídica. Procedemos al <strong>bloqueo de la información durante un plazo máximo de 5 años</strong>. Durante este período, los datos se mantienen inactivos e inaccesibles para la operación regular, guardándose exclusivamente para responder ante eventuales requerimientos de autoridades legales, auditorías o defensa de derechos y responsabilidades derivadas del tratamiento. Pasados los 5 años, los datos se eliminan definitivamente o se anonimizan de forma irreversible.
+        </div>
+      </div>
+
+      <!-- Sección 7 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <h2>7. Seguridad y Privacidad de los Datos</h2>
+        </div>
+        <p>
+          Aplicamos medidas de seguridad técnicas e institucionales avanzadas para prevenir la pérdida de datos, la alteración o el acceso no autorizado:
+        </p>
+        <ul class="legal-list">
+          <li><strong>Aislamiento Estricto:</strong> Cada dojang posee un espacio de almacenamiento segregado lógicamente para evitar filtraciones de datos entre diferentes escuelas.</li>
+          <li><strong>Encriptación y Resguardos:</strong> La información crítica de contraseñas se almacena encriptada y bajo protocolos seguros.</li>
+          <li><strong>Google Drive:</strong> Se facilita la revocación automática de accesos directamente desde el Panel de Seguridad de Google por parte del usuario, lo que desvincula instantáneamente el scope <code>drive.file</code> de la base de datos de Tudojang.</li>
+        </ul>
+      </div>
+
+      <!-- Sección 8 -->
+      <div class="legal-section">
+        <div class="section-header">
+          <div class="legal-icon">
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </div>
+          <h2>8. Tus Derechos</h2>
+        </div>
+        <p>
+          Como titular de los datos, tenés derecho a acceder, rectificar, actualizar o solicitar la supresión de tu información personal. Para canalizar estas solicitudes podés comunicarte directamente escribiendo a <a href="mailto:aliantlab@gmail.com">aliantlab@gmail.com</a> indicando tu solicitud. Responderemos a la brevedad.
+        </p>
+      </div>
+    </article>
+
+    <div class="legal-footer">
+      <a href="/" class="btn-back">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Volver a Tudojang
+      </a>
+      <a href="/terms.html" class="btn-secondary">
+        Ver Términos del Servicio
+      </a>
+    </div>
+  </main>
+</body>
+</html>

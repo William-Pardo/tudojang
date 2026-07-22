@@ -19,8 +19,15 @@ export interface InvitacionUsuario {
   creadoEn: string;
   expiraEn: string;
   actionLink?: string;
+  activationLink?: string;
   aceptadaEn?: string;
   uid?: string;
+  // Fix tutor-role-end-to-end (2026-07-14): la Cloud Function `inviteUser` crea la
+  // invitación en Firestore ANTES de intentar enviar el correo (Resend). Si el envío
+  // de correo falla (infra), la invitación igual existe con su `activationLink`. Este
+  // flag distingue "correo enviado" de "invitación creada pero correo no enviado", para
+  // que el frontend pueda surfacear el link y el admin lo mande por WhatsApp.
+  emailEnviado?: boolean;
 }
 
 // In-memory mock storage for local/test mode
@@ -35,7 +42,11 @@ export const getMockInvitations = () => mockInvitations;
 export const createInvitation = async (
   tenantId: string,
   email: string,
-  rol: RolAcademico
+  rol: RolAcademico,
+  // Fix consistencia de plantillas (2026-07-15): nombre del destinatario (y del alumno, para
+  // la plantilla de Tutor) para personalizar el correo real. Opcional -- el llamador manual
+  // desde Configuración → Cuentas Externas no conoce el nombre; el backend usa un fallback.
+  datosPersonalizados?: { nombreDestinatario?: string; nombreAlumno?: string }
 ): Promise<InvitacionUsuario> => {
   const emailLimpio = email.toLowerCase().trim();
 
@@ -43,9 +54,10 @@ export const createInvitation = async (
     const ahora = new Date();
     const expira = new Date();
     expira.setDate(expira.getDate() + 7);
+    const id = `inv-${Date.now()}`;
     
     const newMock: InvitacionUsuario = {
-      id: `inv-${Date.now()}`,
+      id,
       email: emailLimpio,
       rol,
       tenantId,
@@ -53,19 +65,27 @@ export const createInvitation = async (
       creadoPor: 'mock-admin-uid',
       creadoEn: ahora.toISOString(),
       expiraEn: expira.toISOString(),
-      actionLink: `https://mock.tudojang.com/#/activar-cuenta?invitationId=inv-${Date.now()}`
+      activationLink: `http://localhost:5173/#/activar-cuenta?tenantId=${encodeURIComponent(tenantId)}&invitacionId=${encodeURIComponent(id)}&token=mock-token`
     };
     mockInvitations.push(newMock);
     return newMock;
   }
 
   const inviteUserCF = httpsCallable<
-    { email: string; rol: RolAcademico; tenantId: string },
-    { ok: boolean; invitacionId: string; expiraEn: string }
+    { email: string; rol: RolAcademico; tenantId: string; nombreDestinatario?: string; nombreAlumno?: string },
+    { ok: boolean; invitacionId: string; expiraEn: string; emailEnviado?: boolean; activationLink?: string }
   >(getFunctions(), 'inviteUser');
 
-  const response = await inviteUserCF({ email: emailLimpio, rol, tenantId });
-  const { invitacionId } = response.data;
+  // La CF ya NO aborta si el correo falla: crea la invitación y devuelve `emailEnviado`
+  // + `activationLink`. Así el frontend puede surfacear el enlace de activación al admin.
+  const response = await inviteUserCF({
+    email: emailLimpio,
+    rol,
+    tenantId,
+    nombreDestinatario: datosPersonalizados?.nombreDestinatario,
+    nombreAlumno: datosPersonalizados?.nombreAlumno,
+  });
+  const { invitacionId, emailEnviado, activationLink } = response.data;
 
   const docRef = doc(db, 'tenants', tenantId, 'invitaciones', invitacionId);
   const snap = await getDoc(docRef);
@@ -74,7 +94,12 @@ export const createInvitation = async (
     throw new Error('La invitación se creó pero no se pudo encontrar en Firestore');
   }
 
-  return { id: snap.id, ...snap.data() } as InvitacionUsuario;
+  return {
+    id: snap.id,
+    ...snap.data(),
+    emailEnviado: emailEnviado ?? true,
+    activationLink: activationLink ?? (snap.data() as any).activationLink,
+  } as InvitacionUsuario;
 };
 
 export const listInvitations = async (tenantId: string): Promise<InvitacionUsuario[]> => {
@@ -87,14 +112,17 @@ export const listInvitations = async (tenantId: string): Promise<InvitacionUsuar
   return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as InvitacionUsuario));
 };
 
-export const resendInvitation = async (tenantId: string, invitationId: string): Promise<void> => {
+export const resendInvitation = async (
+  tenantId: string,
+  invitationId: string
+): Promise<{ emailEnviado: boolean; activationLink?: string }> => {
   if (!isFirebaseConfigured) {
     const inv = mockInvitations.find(i => i.id === invitationId && i.tenantId === tenantId);
     if (!inv) throw new Error('Invitación no encontrada');
     inv.creadoEn = new Date().toISOString();
     const expira = new Date(Date.now() + 86400000 * 7 + 10000); // 10s offset to guarantee a different string
     inv.expiraEn = expira.toISOString();
-    return;
+    return { emailEnviado: true, activationLink: inv.activationLink };
   }
 
   const docRef = doc(db, 'tenants', tenantId, 'invitaciones', invitationId);
@@ -106,12 +134,55 @@ export const resendInvitation = async (tenantId: string, invitationId: string): 
 
   const invData = snap.data() as Omit<InvitacionUsuario, 'id'>;
 
+  // Fix mitigación de login (2026-07-15): el correo (Resend) puede fallar. La CF `inviteUser`
+  // ya NO aborta en ese caso -- devuelve `emailEnviado` + `activationLink` de la invitación
+  // NUEVA que crea. Se lo devolvemos al llamador para que pueda ofrecer el enlace manual sin
+  // depender de que el correo llegue (mismo patrón que createInvitation).
   const inviteUserCF = httpsCallable<
     { email: string; rol: RolAcademico; tenantId: string },
-    { ok: boolean; invitacionId: string; expiraEn: string }
+    { ok: boolean; invitacionId: string; expiraEn: string; emailEnviado?: boolean; activationLink?: string }
   >(getFunctions(), 'inviteUser');
 
-  await inviteUserCF({ email: invData.email, rol: invData.rol, tenantId });
-  
+  const response = await inviteUserCF({ email: invData.email, rol: invData.rol, tenantId });
+
   await updateDoc(docRef, { estado: 'revocada' });
+
+  return {
+    emailEnviado: response.data.emailEnviado ?? true,
+    activationLink: response.data.activationLink,
+  };
+};
+
+export const acceptInvitation = async (
+  tenantId: string,
+  invitacionId: string,
+  token: string,
+  password: string
+): Promise<{ ok: boolean; uid: string }> => {
+  if (!tenantId || !invitacionId || !token || !password) {
+    throw new Error('El enlace de activación está incompleto.');
+  }
+
+  if (password.length < 8) {
+    throw new Error('La contraseña debe tener al menos 8 caracteres.');
+  }
+
+  if (!isFirebaseConfigured) {
+    const inv = mockInvitations.find(
+      item => item.tenantId === tenantId && item.id === invitacionId && item.estado === 'pendiente'
+    );
+    if (!inv) throw new Error('Invitación no encontrada o ya utilizada.');
+    inv.estado = 'aceptada';
+    inv.aceptadaEn = new Date().toISOString();
+    inv.uid = `mock-${invitacionId}`;
+    return { ok: true, uid: inv.uid };
+  }
+
+  const acceptInvitationCF = httpsCallable<
+    { tenantId: string; invitacionId: string; token: string; password: string },
+    { ok: boolean; uid: string }
+  >(getFunctions(), 'acceptInvitation');
+
+  const response = await acceptInvitationCF({ tenantId, invitacionId, token, password });
+  return response.data;
 };

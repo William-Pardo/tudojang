@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import { GradoTKD } from '../tipos';
 
-const mockBookNew = jest.fn(() => ({}));
-const mockAoaToSheet = jest.fn((data: unknown) => ({ data }));
-const mockBookAppendSheet = jest.fn();
+// Fix 2026-07-21 (`npm run typecheck`): estos mocks se invocan con spread (`...args`)
+// pero su implementacion no declaraba parametros, asi que TS infirio ARIDAD 0 (TS2556).
+const mockBookNew = jest.fn((..._args: unknown[]) => ({}));
+const mockAoaToSheet = jest.fn((...args: unknown[]) => ({ data: args[0] }));
+const mockBookAppendSheet = jest.fn((..._args: unknown[]) => undefined);
 const mockSheetToJson = jest.fn();
 const mockWriteFile = jest.fn();
 const mockRead = jest.fn();
@@ -25,7 +27,10 @@ jest.mock('xlsx', () => ({
 import ModalImportacionMasiva from './ModalImportacionMasiva';
 
 const mockMostrarNotificacion = jest.fn();
-const mockAgregarEstudiante = jest.fn();
+// Fix 2026-07-21 (`npm run typecheck`): sin implementacion, `jest.fn()` no infiere que
+// devuelve una promesa, y `mockResolvedValue`/`mockRejectedValueOnce` fallaban con
+// "not assignable to parameter of type 'never'". Se declara la firma asincrona real.
+const mockAgregarEstudiante = jest.fn(async (..._args: unknown[]): Promise<void> => {});
 let mockSedesVisibles: { id: string; nombre: string }[] = [{ id: 'sede-1', nombre: 'Principal' }];
 
 jest.mock('framer-motion', () => ({
@@ -56,11 +61,15 @@ const mockFileReaderInstance: {
 } = {
   result: null,
   onload: null,
+  // Fix 2026-07-21 (`npm run typecheck`): la implementacion declara un parametro `this`
+  // tipado, lo que produce un `Mock<(this: ...) => void>` que no es asignable al
+  // `jest.Mock` (= `Mock<UnknownFunction>`) declarado arriba. El cast conserva el `this`
+  // tipado dentro de la funcion, que es lo que hace legible este fake de FileReader.
   readAsArrayBuffer: jest.fn(function (this: typeof mockFileReaderInstance, _file: File) {
     if (this.onload && this.result) {
       this.onload({ target: { result: this.result } });
     }
-  }),
+  }) as unknown as jest.Mock,
 };
 
 const filaBase = {
@@ -73,6 +82,7 @@ const filaBase = {
   Grado_Actual: GradoTKD.Blanco,
   Tutor_Nombre_Completo: '',
   Tutor_Identificacion: '',
+  Tutor_Correo: '',
   Tutor_Telefono: '',
   Alergias: 'Ninguna',
   Lesiones: 'Ninguna',
@@ -286,7 +296,9 @@ describe('ModalImportacionMasiva', () => {
     expect(screen.getByText('Inconsistencias').closest('div')?.parentElement).toHaveTextContent('3');
     expect(screen.getByText('Falta Nombre')).toBeInTheDocument();
     expect(screen.getByText('ID Inválido')).toBeInTheDocument();
-    expect(screen.getByText('Menor sin datos de Tutor')).toBeInTheDocument();
+    // Fix 2026-07-22: el mensaje del componente es "Menor sin datos COMPLETOS de Tutor"
+    // (ModalImportacionMasiva.tsx:129). El test quedo con la redaccion vieja.
+    expect(screen.getByText('Menor sin datos completos de Tutor')).toBeInTheDocument();
     expect(screen.getByText(/Grado 'Grado Inventado' no reconocido/)).toBeInTheDocument();
     expect(screen.getByText('Ficha médica vacía')).toBeInTheDocument();
     expect(screen.getByText('Adulto requiere Correo')).toBeInTheDocument();
@@ -318,6 +330,11 @@ describe('ModalImportacionMasiva', () => {
         Correo: '',
         Tutor_Nombre_Completo: 'LUIS GOMEZ',
         Tutor_Identificacion: '11223344',
+        // Fix 2026-07-22: la validacion de menores paso a exigir TAMBIEN `Tutor_Correo`
+        // (ModalImportacionMasiva.tsx:128). Como `filaBase` lo trae vacio, esta fila
+        // quedaba con error critico y el boton mostraba "Corregir Errores" en vez de
+        // "Confirmar e Inyectar".
+        Tutor_Correo: 'luis@email.com',
         Tutor_Telefono: '3009998877',
       },
     ]);
@@ -374,10 +391,13 @@ describe('ModalImportacionMasiva', () => {
 
     await user.click(screen.getByRole('button', { name: /Confirmar e Inyectar/i }));
 
+    // Fix 2026-07-22: este caso afirmaba 'Importación Exitosa ... success' MIENTRAS una de
+    // las dos filas fallaba -- codificaba el defecto: el operador veia verde y no se
+    // enteraba de la fila perdida. Ahora se reporta el conteo real con severidad de error.
     await waitFor(() => {
       expect(mockMostrarNotificacion).toHaveBeenCalledWith(
-        'Importación Exitosa: 1 alumnos registrados.',
-        'success'
+        'Se registraron 1 de 2 alumnos. 1 fila no se pudo importar.',
+        'error'
       );
     });
 
@@ -477,6 +497,10 @@ describe('ModalImportacionMasiva', () => {
         Grado_Actual: '',
         Tutor_Nombre_Completo: '',
         Tutor_Identificacion: '',
+        // Fix 2026-07-22: faltaba `Tutor_Correo`. El componente exige las 14 columnas
+        // oficiales en la primera fila (`estructuraCorrecta`); sin ella abortaba con
+        // "Estructura inválida" y la vista previa nunca se renderizaba.
+        Tutor_Correo: '',
         Tutor_Telefono: '',
         Alergias: '',
         Lesiones: '',
@@ -526,5 +550,90 @@ describe('ModalImportacionMasiva', () => {
     expect(screen.getByText('Auditor de Carga Masiva')).toBeInTheDocument();
     unmount();
     expect(screen.queryByText('Auditor de Carga Masiva')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------------
+  // Reporte de filas rechazadas.
+  //
+  // Antes del enforcement server-side de `limiteEstudiantes`, TODAS las filas entraban:
+  // el limite del plan solo se validaba en el boton de la UI. Ese era un bug, pero ruidoso.
+  // Al arreglarlo (commit 70865de) las filas de mas empezaron a rechazarse correctamente...
+  // y este componente las descartaba con un `console.error` por fila para despues mostrar
+  // SIEMPRE "Importación Exitosa" en verde. Importar 200 alumnos con un plan de 50 dejaba al
+  // operador creyendo que los 200 habian entrado. El fix del backend habia convertido un bug
+  // visible en uno silencioso.
+  // ---------------------------------------------------------------------------------
+  describe('reporte de filas rechazadas', () => {
+    const importarDosFilas = async (
+      user: ReturnType<typeof userEvent.setup>,
+      container: HTMLElement
+    ) => {
+      await simularCargaExcel(container, [
+        { ...filaBase },
+        { ...filaBase, Nombres: 'SOFIA', Identificacion: '77665544' },
+      ]);
+      await user.click(screen.getByRole('button', { name: /Confirmar e Inyectar/i }));
+    };
+
+    it('avisa cuántas filas se rechazaron en vez de reportar éxito total', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+      mockAgregarEstudiante
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Falla de red'));
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          'Se registraron 1 de 2 alumnos. 1 fila no se pudo importar.',
+          'error'
+        );
+      });
+      expect(mockMostrarNotificacion).not.toHaveBeenCalledWith(
+        expect.stringContaining('Importación Exitosa'),
+        'success'
+      );
+    });
+
+    it('cuando el rechazo es por límite del plan, muestra ese motivo accionable', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+      const limite: any = new Error(
+        'Límite del plan superado (50 alumnos). Por favor, suba de plan o agregue un addon para agregar más estudiantes.'
+      );
+      limite.code = 'functions/resource-exhausted';
+      mockAgregarEstudiante
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(limite);
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          expect.stringContaining('Límite del plan superado (50 alumnos)'),
+          'error'
+        );
+      });
+      // El conteo real tambien viaja, para que el operador sepa que SI entro.
+      expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+        expect.stringContaining('Se registraron 1 de 2 alumnos'),
+        'error'
+      );
+    });
+
+    it('mantiene el mensaje de éxito cuando no se rechaza ninguna fila', async () => {
+      const user = userEvent.setup();
+      const { container } = renderModal();
+
+      await importarDosFilas(user, container);
+
+      await waitFor(() => {
+        expect(mockMostrarNotificacion).toHaveBeenCalledWith(
+          'Importación Exitosa: 2 alumnos registrados.',
+          'success'
+        );
+      });
+    });
   });
 });

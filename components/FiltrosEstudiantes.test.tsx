@@ -17,6 +17,12 @@ describe('FiltrosEstudiantes', () => {
     filtroSede: 'todos',
     setFiltroSede: jest.fn(),
     sedes: [{ id: 'norte', nombre: 'Sede Norte' }, { id: 'sur', nombre: 'Sede Sur' }] as any,
+    // Fix 2026-07-21 (`npm run typecheck`): faltaban `onLimpiar` y `filtrosActivos`, props
+    // OBLIGATORIAS de FiltrosEstudiantes que se agregaron al componente y nunca al fixture.
+    // Los 6 tests venian renderizando el componente con ambas en `undefined`, o sea que la
+    // funcion de limpiar filtros jamas se ejercio en ninguna prueba.
+    onLimpiar: jest.fn(),
+    filtrosActivos: false,
   };
 
   beforeEach(() => jest.clearAllMocks());

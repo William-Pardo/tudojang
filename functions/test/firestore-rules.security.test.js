@@ -20,7 +20,7 @@ test("ticket reads require owner tenant or SuperAdmin", () => {
   assert.match(rules, /resource\.data\.userId == request\.auth\.uid/);
   assert.match(
     rules,
-    /resource\.data\.tenantId == request\.auth\.token\.tenantId/
+    /resource\.data\.tenantId == currentTenantId\(\)/
   );
 });
 
@@ -32,5 +32,18 @@ test("clients cannot read or write quotas and telemetry", () => {
   assert.match(
     rules,
     /match \/asistente_telemetria\/\{eventId\}[\s\S]*allow read, write: if false;/
+  );
+});
+
+// Fix 2026-07-18 (bug real, mismo patron ya resuelto para sedes): el limite del plan de
+// estudiantes (`tenant.limiteEstudiantes`) solo se validaba en el boton de la UI. `create`
+// directo del cliente ahora esta bloqueado sin excepcion -- solo la Cloud Function
+// `crearEstudiante` (functions/academico/estudiantes.js) puede dar de alta. `update`/
+// `delete` NO cambian: siguen gateados por isInstructor(), a diferencia de sedes (que
+// bloquea las tres operaciones) porque no hay ningun hallazgo de limite sobre esas dos.
+test("clients cannot create students directly -- update/delete stay gated by isInstructor()", () => {
+  assert.match(
+    rules,
+    /match \/estudiantes\/\{docId\}[\s\S]*allow create: if false;[\s\S]*allow update, delete: if isInstructor\(\);/
   );
 });

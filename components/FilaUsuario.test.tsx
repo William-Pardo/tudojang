@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FilaUsuario } from './FilaUsuario';
 import type { Usuario } from '../tipos';
+import { RolUsuario } from '../tipos';
 
 // Mock de framer-motion
 jest.mock('framer-motion', () => ({
@@ -23,13 +24,27 @@ jest.mock('./Iconos', () => ({
 }));
 
 describe('FilaUsuario', () => {
+  // Fix 2026-07-21 (`npm run typecheck`): el fixture declaraba `: Usuario` pero (a) le
+  // faltaban 3 campos obligatorios (numeroIdentificacion, whatsapp, tenantId), (b) usaba
+  // `rol: 'Administrador'`, un rol que NO EXISTE en el enum RolUsuario -- el valor real es
+  // 'Admin'. Como `obtenerEtiquetaRol` devuelve `String(rol)` tal cual, el test verificaba
+  // el renderizado de un rol imposible en produccion. Se corrigio tambien la assertion.
+  // (c) `contrato: null` -> el campo es opcional, se omite.
   const mockUsuarioBase: Usuario = {
     id: '1',
     nombreUsuario: 'Juan Perez',
     email: 'juan.perez@example.com',
-    rol: 'Administrador',
-    contrato: null,
+    numeroIdentificacion: '1000000',
+    whatsapp: '3000000000',
+    tenantId: 'tenant-1',
+    rol: RolUsuario.Admin,
   };
+
+  // Contrato parcial: estos tests solo ejercen el badge de firmado/pendiente, que depende
+  // unicamente de `contrato.firmado`. Se acota el tipo en un helper en vez de inventar un
+  // contrato completo (sueldoBase, duracionMeses, etc.) que no aporta al caso de prueba.
+  const conContrato = (firmado: boolean): Usuario =>
+    ({ ...mockUsuarioBase, contrato: { firmado } } as unknown as Usuario);
 
   const mockOnEditar = jest.fn();
   const mockOnEliminar = jest.fn();
@@ -92,12 +107,12 @@ describe('FilaUsuario', () => {
     );
     expect(screen.getByText('Juan Perez')).toBeInTheDocument();
     expect(screen.getByText('juan.perez@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Administrador')).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
   });
 
   // Test Case 3.1: Contrato: Firmado
   test('displays "Contrato: Firmado" when contract is signed', () => {
-    const usuarioFirmado = { ...mockUsuarioBase, contrato: { firmado: true } };
+    const usuarioFirmado = conContrato(true);
     render(
       <FilaUsuario
         usuario={usuarioFirmado}
@@ -115,7 +130,7 @@ describe('FilaUsuario', () => {
 
   // Test Case 3.2: Contrato: Pendiente
   test('displays "Contrato: Pendiente" when contract is pending', () => {
-    const usuarioPendiente = { ...mockUsuarioBase, contrato: { firmado: false } };
+    const usuarioPendiente = conContrato(false);
     render(
       <FilaUsuario
         usuario={usuarioPendiente}

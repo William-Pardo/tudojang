@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
-import VistaHorarios from './Horarios';
+import VistaAgenda from './admin/AgendaView';
 import { IconoDashboard, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
@@ -96,7 +96,7 @@ const VistaAdministracion: React.FC = () => {
                 {activeTab === 'resumen' && <VistaDashboard isSubView={true} />}
                 {activeTab === 'tesoreria' && <VistaFinanzas isSubView={true} initialView="diario" />}
                 {activeTab === 'validar' && <PanelValidacionPagos />}
-                {activeTab === 'horarios' && <VistaHorarios />}
+                {activeTab === 'horarios' && <VistaAgenda />}
                 {activeTab === 'analisis' && <VistaFinanzas isSubView={true} initialView="analitica" />}
             </div>
         </div>

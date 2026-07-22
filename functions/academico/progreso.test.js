@@ -77,6 +77,34 @@ test('consolidateProgress calcula video en progreso sin completar bajo 78%', asy
   assert.equal(writes[0].data.estadoProgreso, 'en_progreso');
 });
 
+test('consolidateProgress notifica el avance SOLO cuando completa', async () => {
+  const avisos = [];
+  const notificarAvance = async (info) => { avisos.push(info); };
+
+  const mkServicio = () => crearServicioConsolidateProgress({
+    obtenerAsignacion: async () => ({ id: 'asig-1', titulo: 'Poomsae 1', tenantId: 'tenant-1', estado: 'publicada', tipo: 'video', totalSegundos: 100 }),
+    guardarProgreso: async () => {},
+    notificarAvance,
+  });
+
+  // Completado (>=78%): notifica
+  await mkServicio()({
+    auth: { uid: 'est-1', token: { tenantId: 'tenant-1' } },
+    data: { tenantId: 'tenant-1', asignacionId: 'asig-1', tipo: 'video', segundosUnicos: Array.from({ length: 80 }, (_, i) => i + 1), totalSegundos: 100 },
+  });
+  assert.equal(avisos.length, 1);
+  assert.equal(avisos[0].uid, 'est-1');
+  assert.equal(avisos[0].asignacionId, 'asig-1');
+  assert.equal(avisos[0].asignacion.titulo, 'Poomsae 1');
+
+  // En progreso (<78%): NO notifica
+  await mkServicio()({
+    auth: { uid: 'est-2', token: { tenantId: 'tenant-1' } },
+    data: { tenantId: 'tenant-1', asignacionId: 'asig-1', tipo: 'video', segundosUnicos: Array.from({ length: 30 }, (_, i) => i + 1), totalSegundos: 100 },
+  });
+  assert.equal(avisos.length, 1); // sigue en 1
+});
+
 test('consolidateProgress actualiza asignacion cuando el progreso queda completado', async () => {
   const updates = [];
   const servicio = crearServicioConsolidateProgress({

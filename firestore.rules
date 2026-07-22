@@ -11,48 +11,59 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return authenticated() && request.auth.token.rol == 'SuperAdmin';
+      return authenticated() && currentRole() == 'SuperAdmin';
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function hasCurrentUser() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function currentTenantId() {
+      return request.auth.token.tenantId != null
+        ? request.auth.token.tenantId
+        : (hasCurrentUser() ? currentUser().tenantId : null);
+    }
+
+    function currentRole() {
+      return request.auth.token.rol != null
+        ? request.auth.token.rol
+        : (hasCurrentUser() ? currentUser().rol : null);
     }
 
     function ownsTicket() {
       return authenticated()
         && resource.data.userId == request.auth.uid
-        && resource.data.tenantId == request.auth.token.tenantId;
-    }
-
-    // Verifica que el documento pertenece al mismo tenant que el usuario
-    function sameTenant() {
-      return authenticated()
-        && resource.data.tenantId == request.auth.token.tenantId;
-    }
-
-    // Verifica que los datos que se están escribiendo usan el tenantId del usuario
-    function writingOwnTenant() {
-      return authenticated()
-        && request.resource.data.tenantId == request.auth.token.tenantId;
+        && resource.data.tenantId == currentTenantId();
     }
 
     // Roles con acceso admin dentro del tenant
     function isAdmin() {
       return authenticated()
-        && request.auth.token.tenantId != null
-        && request.auth.token.rol in ['Admin', 'SuperAdmin'];
+        && currentTenantId() != null
+        && currentRole() in ['Admin', 'SuperAdmin'];
     }
 
-    // Rol Instructor/Editor con acceso operativo
+    // Rol Instructor con acceso operativo. Incluye 'Maestro' (rol docente real desde
+    // 14.9) y 'Editor'/'Asistente' (acceso operativo de Agenda, no necesariamente
+    // docentes). Ver DT-0019: esta funcion nunca se actualizo cuando 'Maestro' se separo
+    // de 'Editor' como rol propio, bloqueando en la practica a los maestros reales.
     function isInstructor() {
       return authenticated()
-        && request.auth.token.rol in ['Admin', 'Editor', 'Asistente', 'SuperAdmin'];
+        && currentRole() in ['Admin', 'Editor', 'Asistente', 'Maestro', 'SuperAdmin'];
     }
 
-    // Rol Estudiante académico
+    // Rol Estudiante acadÃ©mico
     function isEstudiante() {
-      return authenticated() && request.auth.token.rol == 'Estudiante';
+      return authenticated() && currentRole() == 'Estudiante';
     }
 
-    // Rol Tutor (padre/acudiente) — solo lectura sobre recursos relacionados
+    // Rol Tutor (padre/acudiente) â€” solo lectura sobre recursos relacionados
     function isTutor() {
-      return authenticated() && request.auth.token.rol == 'Tutor';
+      return authenticated() && currentRole() == 'Tutor';
     }
 
     function tutorLinkedToStudent(tenantId, uid) {
@@ -63,15 +74,28 @@ service cloud.firestore {
 
     function canReadProgress(tenantId, uid) {
       return authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && (request.auth.uid == uid || isAdmin() || tutorLinkedToStudent(tenantId, uid));
     }
 
     function canWriteOwnStudentProgress(tenantId, uid) {
       return authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && request.auth.uid == uid
         && isEstudiante();
+    }
+
+    // Defensa en profundidad (2026-07-18): linkPagoMensualidad es el Payment Link externo
+    // (Wompi/PayU/ePayco) de la CUENTA de la academia -- Tudojang no procesa ese dinero, pero
+    // igual valida que el dominio pertenezca a una pasarela conocida antes de persistirlo, por
+    // si el frontend fuera bypaseado. La validación real y la whitelist "fuente de verdad"
+    // viven en constantes.ts (DOMINIOS_PASARELAS_PAGO_PERMITIDOS) -- si se agrega/quita una
+    // pasarela ahí, esta regex debe actualizarse manualmente en paralelo (no hay forma de
+    // compartir la lista entre el bundle de frontend y las reglas de Firestore).
+    function linkPagoMensualidadValido() {
+      let link = request.resource.data.get('linkPagoMensualidad', '');
+      return link == ''
+        || link.matches('https://(checkout\\.wompi\\.co|checkout\\.payulatam\\.com|checkout\\.epayco\\.co|secure\\.payco\\.co)/.*');
     }
 
     // =========================================================================
@@ -91,92 +115,321 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Perfil de usuario autenticado usado durante login.
+    match /usuarios/{uid} {
+      allow get: if authenticated()
+        && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /tenants/{tenantId} {
+      allow get: if authenticated()
+        && (currentTenantId() == tenantId || isSuperAdmin());
+      allow list: if authenticated();
+      allow create, update: if isAdmin()
+        && currentTenantId() == tenantId
+        && linkPagoMensualidadValido();
+      allow delete: if false;
+    }
+
+    match /notificaciones_config/{tenantId} {
+      allow read, write: if isAdmin()
+        && currentTenantId() == tenantId;
+    }
+
+    // Datos privados de facturación del tenant (fix seguridad 2026-07-18: wompiPaymentSourceId
+    // vivía en tenants/{tenantId} raíz, donde `allow get` permite a CUALQUIER usuario
+    // autenticado del tenant leerlo -- Instructor/Editor/Asistente/Maestro no tienen por qué
+    // ver el identificador de la fuente de pago Wompi del tenant. Se movió a este subdocumento
+    // con el mismo patrón restrictivo que notificaciones_config/driveConnections: solo
+    // Admin/SuperAdmin del propio tenant. cobroAutomaticoActivo/cobroAutomaticoIntentosFallidos
+    // NO se movieron -- siguen en tenants/{tenantId} porque no son sensibles por sí solos y el
+    // cron diario los necesita en una query directa sobre esa colección.
+    match /tenants/{tenantId}/privado/{docId} {
+      allow read, write: if isAdmin()
+        && currentTenantId() == tenantId;
+    }
+
+    match /sedes/{docId} {
+      allow read: if isInstructor();
+      // Fix 2026-07-16 (bug real: puerta trasera del limite de sedes del plan -- el
+      // conteo y la unicidad de nombre SOLO se validaban en el boton de la UI, nunca
+      // aca. Cualquier Admin podia crear sedes ilimitadas via un write directo,
+      // bypaseando el limite del plan por completo). Toda escritura ahora pasa por
+      // createSede/updateSede/deleteSede (Cloud Functions), mismo criterio ya usado
+      // para usuarios/{uid}.
+      allow create, update, delete: if false;
+    }
+
+    match /programas/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /estudiantes/{docId} {
+      // Fix tutor-role-end-to-end (2026-07-14): un Tutor (padre/acudiente) puede LEER
+      // los estudiantes donde figura como acudiente (resource.data.tutor.correo ==
+      // su email de login). El vínculo ya vive en el doc del estudiante, no hay que
+      // calzar Auth UIDs. Como el query del Tutor filtra por `tutor.correo == suEmail`,
+      // Firestore garantiza que solo recibe sus propios hijos.
+      // Fix 2026-07-16 (bug reportado: Estudiante no veía material ni clases -- nunca se le
+      // agregó el caso análogo al de Tutor): resolveStudentsForConsultor(tenantId, email,
+      // esTutor=false) consulta where('correo', '==', email) para que el propio Estudiante
+      // resuelva su registro -- esa query SIEMPRE fallaba con permission-denied porque esta
+      // regla solo contemplaba isInstructor()/Tutor, nunca al propio Estudiante.
+      allow read: if isInstructor()
+        || (isTutor() && resource.data.tutor.correo == request.auth.token.email)
+        || (isEstudiante() && resource.data.correo == request.auth.token.email);
+      // Fix 2026-07-18 (bug real: puerta trasera del limite de estudiantes del plan -- el
+      // limite (`limiteEstudiantes`, plan base + addons) SOLO se validaba en el boton de
+      // la UI (hooks/useGestionEstudiantes.ts), nunca aca. Cualquier Instructor podia crear
+      // estudiantes ilimitados via un write directo -- incluida la importacion masiva, que
+      // llama al mismo punto de entrada en loop -- bypaseando el limite del plan por
+      // completo. `create` ahora pasa exclusivamente por la Cloud Function `crearEstudiante`
+      // (mismo criterio ya usado para `sedes/{id}`, ver academico/estudiantes.js).
+      // `update`/`delete` NO cambian: se usan con mucha mas frecuencia que en sedes (cambios
+      // de estado de pago, edicion de datos) y no tienen ningun hallazgo de limite asociado
+      // -- mover esos tambien a Cloud Functions es un cambio de alcance mayor al bug real.
+      allow create: if false;
+      allow update, delete: if isInstructor();
+    }
+
+    match /eventos/{docId} {
+      // Fix tutor-role-end-to-end (2026-07-14): los consultores (Tutor/Estudiante) pueden LEER
+      // los eventos del club para ver a cuáles aplican. Son anuncios del tenant, no datos
+      // sensibles. Escritura sigue restringida a staff.
+      allow read: if isInstructor() || isTutor() || isEstudiante();
+      allow create, update, delete: if isInstructor();
+    }
+
+    match /implementos/{docId} {
+      // Fix tutor-role-end-to-end (2026-07-14): consultores (Tutor/Estudiante) pueden LEER la
+      // Tienda (implementos). Escritura solo Admin.
+      allow read: if isInstructor() || isTutor() || isEstudiante();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /solicitudesCompra/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isInstructor();
+      allow delete: if isAdmin();
+    }
+
+    match /solicitudesInscripcion/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isInstructor();
+      allow delete: if isAdmin();
+    }
+
+    match /transaccionesPago/{docId} {
+      allow read: if isInstructor();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /finanzas/{docId} {
+      allow read: if isInstructor();
+      allow create, update, delete: if isAdmin();
+    }
+
     // =========================================================================
-    // Módulo académico — colecciones por tenant
+    // MÃ³dulo acadÃ©mico â€” colecciones por tenant
     // =========================================================================
 
     // Conexiones de Google Drive (solo admin del tenant)
     match /tenants/{tenantId}/driveConnections/{connId} {
       allow read, write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Invitaciones de usuarios académicos (Estudiante / Tutor)
+    // Invitaciones de usuarios acadÃ©micos (Estudiante / Tutor)
     match /tenants/{tenantId}/invitaciones/{invId} {
       allow read: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow create, update: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow delete: if false;
     }
 
-    // Vínculos Tutor ↔ Estudiante (N:M)
+    // VÃ­nculos Tutor â†” Estudiante (N:M)
     match /tenants/{tenantId}/vinculos/{vinculoId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && (isAdmin() || isTutor());
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Espacios físicos de sede
+    // Espacios fÃ­sicos de sede
     match /tenants/{tenantId}/espacios/{espacioId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Programas académicos
+    // Programas acadÃ©micos
     match /tenants/{tenantId}/programasAcademicos/{programaId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow write: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
     // Ejecuciones de programa por grupo
     match /tenants/{tenantId}/ejecucionesPrograma/{ejecucionId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId
+        && currentTenantId() == tenantId
         && !isTutor();
       allow write: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Jornadas de instrucción
-    match /tenants/{tenantId}/jornadas/{jornadaId} {
+    // Roster explícito de estudiantes matriculados en una ejecución de programa.
+    // Baja frecuencia (acción administrativa) → escritura directa gateada por rol,
+    // a diferencia de `asistencias` (Decisión 3) que sí exige Admin SDK por ser
+    // alta frecuencia y requerir cruce de pertenencia.
+    match /tenants/{tenantId}/ejecucionesPrograma/{ejecucionId}/inscripciones/{estudianteId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId
+        && !isTutor();
       allow create: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
-      // Las transiciones de estado se hacen vía Cloud Function (no directamente)
-      allow update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
-      allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId
+        && request.resource.data.estudianteId == estudianteId
+        && request.resource.data.tenantId == tenantId;
+      // No hay `request.resource` en `delete` (Firestore Security Rules: el
+      // documento entrante no existe en un borrado) — validar solo rol+tenant,
+      // igual que el patrón ya usado para `asignaciones` en este mismo archivo.
+      allow delete: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow update: if false; // re-matricular = delete + create; sin estados intermedios ambiguos
     }
 
-    // Biblioteca: recursos académicos
+    // Jornadas de instruccion
+    match /tenants/{tenantId}/jornadas/{jornadaId} {
+      // Cualquier usuario autenticado del tenant puede LEER las jornadas (son horarios de
+      // clase: grupo/sede/hora/instructor, no datos sensibles por-alumno). Cubre Estudiante
+      // y — fix tutor-role-end-to-end (2026-07-14) — también Tutor: el padre ve la Agenda en
+      // modo solo lectura y el CLIENTE (AgendaView) la filtra a las clases de su hijo por
+      // sede+grupo. La restricción previa por `estudianteId == uid` no aplicaba al modelo
+      // real de jornadas (no tienen estudianteId) y bloqueaba al Tutor por completo.
+      allow read: if authenticated()
+        && currentTenantId() == tenantId;
+      allow create: if isInstructor()
+        && currentTenantId() == tenantId;
+      // Las transiciones de estado se hacen via Cloud Function (no directamente).
+      // Subtarea 12.2: el "maestro asignado" (resource.data.instructorId == uid)
+      // puede editar solo SU jornada; Admin/SuperAdmin pueden editar cualquiera del
+      // tenant. Editor/Asistente NO asignado queda rechazado en backend.
+      //
+      // Extension posterior al cierre del modulo 12 (matriz de roles de Agenda, ver
+      // CIERRE CENTRO DE ESTUDIOS.md): se agrega un tercer OR para Asistente/Editor que
+      // el Admin autorizo explicitamente via el flag `permisoEdicionAgenda` del propio
+      // documento de usuario (tipos.ts, Usuario.permisoEdicionAgenda). `hasCurrentUser()`
+      // guarda el `get()` -- sin esa guarda, `currentUser()` lanza si el uid autenticado
+      // no tiene un documento real en `usuarios/{uid}` (p.ej. contextos de test que solo
+      // usan custom claims). El `get()` en si mismo es gratis en la practica: Firestore
+      // cachea lecturas repetidas al MISMO documento dentro de una misma evaluacion de
+      // regla, y `currentUser()` ya se invoca (via currentTenantId()/currentRole()) en la
+      // mayoria de los casos reales sin custom claims. Se acota a `currentRole() in
+      // ['Asistente', 'Editor']` a proposito: el flag SOLO aplica a esos dos roles (Admin/
+      // SuperAdmin ya entran por isAdmin(), Maestro por instructorId) -- si el campo
+      // quedara true en el documento de un Maestro por error de datos, no le da acceso a
+      // jornadas ajenas.
+      allow update: if isInstructor()
+        && currentTenantId() == tenantId
+        && (
+          isAdmin()
+          || resource.data.instructorId == request.auth.uid
+          || (
+            currentRole() in ['Asistente', 'Editor']
+            && hasCurrentUser()
+            && currentUser().permisoEdicionAgenda == true
+          )
+        );
+      // Ampliacion posterior al cierre inicial de esta extension (decision de producto
+      // explicita del usuario, ver CIERRE CENTRO DE ESTUDIOS.md): "eliminar" ya NO se
+      // restringe a Admin/SuperAdmin -- replica EXACTO el mismo criterio de tres OR ya
+      // usado en `update` arriba (Admin/SuperAdmin siempre; Maestro asignado solo SU
+      // jornada via `resource.data.instructorId`; Asistente/Editor solo con el flag
+      // `permisoEdicionAgenda == true`, guardado por `hasCurrentUser()` por la misma razon
+      // documentada en `update`). Esta regla es la unica defensa de backend contra el
+      // BORRADO FISICO real: el borrado seguro (guarda de 12.6 -- no borrar una jornada ya
+      // operada/con asistencia real) es una validacion de APLICACION, no de esta regla --
+      // vive en `evaluarEliminacionSegura`/`eliminarJornadaSegura`
+      // (servicios/academico/jornadaRepository.ts) y corre ANTES de que el cliente le pida
+      // a Firestore que borre el documento. Ampliar aca a Maestro/Asistente-Editor no abre
+      // una via nueva de bypass de esa guarda: el UNICO camino real de "eliminar clase"
+      // (icono de la parrilla + boton del modal, ambos sobre `useEliminacionJornadaSegura`)
+      // siempre pasa por `eliminarJornadaSegura` antes de tocar Firestore, para cualquier
+      // rol. Ver nota separada sobre `eliminarJornadasEnLote` (primitiva de limpieza de
+      // previews de AsignacionesView.tsx, sin esta guarda) en CIERRE CENTRO DE ESTUDIOS.md.
+      allow delete: if isInstructor()
+        && currentTenantId() == tenantId
+        && (
+          isAdmin()
+          || resource.data.instructorId == request.auth.uid
+          || (
+            currentRole() in ['Asistente', 'Editor']
+            && hasCurrentUser()
+            && currentUser().permisoEdicionAgenda == true
+          )
+        );
+    }
+
+    match /tenants/{tenantId}/jornadas/{jornadaId}/auditoria/{auditId} {
+      allow read: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow create: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow update, delete: if false;
+    }
+
+    // Asistencia (check-in/check-out) por estudiante sobre una jornada.
+    // Escritura exclusiva del callable `registrarAsistenciaJornada` (Admin SDK,
+    // bypassa reglas) porque valida pertenencia contra el roster de inscripciones
+    // (design.md, Decision 3) — alta frecuencia de escaneo, no vale la pena
+    // duplicar esa lógica de cruce en reglas. El cliente NUNCA escribe directo.
+    match /tenants/{tenantId}/jornadas/{jornadaId}/asistencias/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId;
+      allow write: if false;
+    }
+
+    // Biblioteca: recursos acadÃ©micos
     match /tenants/{tenantId}/recursos/{recursoId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow create, update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
       allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
     }
 
-    // Asignaciones académicas
-    match /tenants/{tenantId}/asignaciones/{asignacionId} {
-      // Estudiante puede leer sus propias asignaciones
+    // Banco de preguntas de un recurso tipo 'quiz' de la biblioteca. Mismo criterio de
+    // gating que recursos/asignaciones (isInstructor = Admin/SuperAdmin/Editor/Asistente/Maestro).
+    match /tenants/{tenantId}/quizzes/{recursoId} {
       allow read: if authenticated()
-        && request.auth.token.tenantId == tenantId;
-      // Solo instructores pueden crear/modificar asignaciones
+        && currentTenantId() == tenantId;
+      allow create, update, delete: if isInstructor()
+        && currentTenantId() == tenantId;
+    }
+
+    // Asignaciones acadÃ©micas
+    match /tenants/{tenantId}/asignaciones/{asignacionId} {
+      // Lectura para cualquier usuario autenticado del tenant (Estudiante y — fix
+      // tutor-role-end-to-end 2026-07-14 — Tutor): son materiales académicos de las clases
+      // del tenant, que la Agenda muestra junto a cada jornada. El cliente ya filtra a las
+      // clases del hijo. La restricción previa por `estudianteId == uid` no aplicaba
+      // (bloqueaba al Tutor y las asignaciones se indexan por jornada/grupo, no por uid).
+      allow read: if authenticated()
+        && currentTenantId() == tenantId;
+      // Solo instructores pueden crear/modificar/eliminar asignaciones
       allow create, update: if isInstructor()
-        && request.auth.token.tenantId == tenantId;
-      allow delete: if isAdmin()
-        && request.auth.token.tenantId == tenantId;
+        && currentTenantId() == tenantId;
+      allow delete: if isInstructor()
+        && currentTenantId() == tenantId;
     }
 
     // Progreso del estudiante
@@ -191,6 +444,63 @@ service cloud.firestore {
       allow write: if canWriteOwnStudentProgress(tenantId, uid);
     }
 
+    // Visualizaciones de video de YouTube (reemplazo de Drive SOLO para video, decisión de
+    // producto 2026-07: costo $0 de hosting + tracking real de reproducción vía la IFrame
+    // Player API -- ver servicios/academico/visualizacionRepository.ts). Estructura por
+    // RECURSO -> alumno (no alumno -> asignación como `progreso` arriba) para que el
+    // reporte de staff (Paso 7) pueda listar todos los alumnos de un recurso sin
+    // collectionGroup query. Mismo criterio de lectura que `progreso` pero ampliado a
+    // isInstructor() (no solo isAdmin) porque el reporte lo consume cualquier staff
+    // operativo (Maestro/Editor/Asistente), igual que `metricasEstudiante`/`actividadLogs`.
+    match /tenants/{tenantId}/visualizaciones/{recursoId}/alumnos/{uid} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == uid || isInstructor() || tutorLinkedToStudent(tenantId, uid));
+      allow write: if canWriteOwnStudentProgress(tenantId, uid);
+    }
+
+    // Logs de actividad académica
+    match /tenants/{tenantId}/actividadLogs/{logId} {
+      allow create: if authenticated()
+        && currentTenantId() == tenantId
+        && request.resource.data.estudianteId == request.auth.uid;
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == resource.data.estudianteId || isInstructor());
+    }
+
+    // Métricas agregadas de progreso del estudiante
+    match /tenants/{tenantId}/metricasEstudiante/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (request.auth.uid == estudianteId || isInstructor());
+      // El frontend escribe estas métricas agregadas al registrar actividad
+      allow write: if authenticated()
+        && currentTenantId() == tenantId
+        && request.auth.uid == estudianteId;
+    }
+
+    // Buzón de notificaciones (fix tutor-role-end-to-end 2026-07-14). Colección raíz
+    // `historialNotificaciones`: cada doc referencia un `estudianteId`. Staff ve todo; un
+    // consultor (Tutor/Estudiante) ve SOLO las de su(s) estudiante(s), validando contra el
+    // doc del estudiante (tutor.correo para Tutor, correo para Estudiante == token.email).
+    match /historialNotificaciones/{notifId} {
+      allow read: if isInstructor()
+        || (isTutor() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
+        || (isEstudiante() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.correo == request.auth.token.email);
+      allow create: if isInstructor();
+      // Marcar como leída: staff, o el consultor dueño — y solo puede tocar el campo `leida`.
+      allow update: if isInstructor()
+        || (
+          (
+            (isTutor() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
+            || (isEstudiante() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.correo == request.auth.token.email)
+          )
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leida'])
+        );
+      allow delete: if false;
+    }
+
     // =========================================================================
     // Catch-all: denegar todo lo no declarado
     // =========================================================================
@@ -199,3 +509,4 @@ service cloud.firestore {
     }
   }
 }
+

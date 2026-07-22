@@ -1,11 +1,20 @@
 
 // tipos.ts 
 
+// Regla canonica de roles (decision de producto del usuario, 2026-07-09 — ver
+// CIERRE CENTRO DE ESTUDIOS.md 14.9):
+//   - Tutor   = padre/acudiente. NUNCA un instructor ni un miembro del Equipo Tecnico.
+//   - Maestro = rol de quien ensena y asigna clases (el rol docente del Equipo Tecnico).
+//   - Editor  = Secretaria (gestion de alumnos/tienda/cobros); su capacidad docente es legacy.
+//   - Asistente solo aparece como instructor de Programa si el admin lo habilita
+//     (features.asistenteInstructorPrograma).
 export enum RolUsuario {
     Admin = 'Admin',
     Editor = 'Editor',
     Asistente = 'Asistente',
+    Estudiante = 'Estudiante',
     Tutor = 'Tutor',
+    Maestro = 'Maestro',
     SuperAdmin = 'SuperAdmin'
 }
 
@@ -138,9 +147,27 @@ export interface ConfiguracionClub {
     passwordTemporal?: string;
     onboardingStep?: number; // 0: Inicio, 1: Info, 2: Branding (Opc), 3: Sede, 4: Equipo, 5: Completo
     activarFormularioInscripcion?: boolean; // Nuevo: Toggle para el formulario público
+    configuracionCuentasExternas?: {
+        loginEstudiantesActivo?: boolean;
+        invitarEstudianteAlCrear?: boolean;
+        invitarTutorAlCrear?: boolean;
+    };
     features?: {
         centroEstudios?: boolean; // Módulo de estudio académico — activación por tenant
     };
+    cobroAutomaticoActivo?: boolean;
+    cobroAutomaticoIntentosFallidos?: number; // se resetea a 0 tras un cobro exitoso
+    linkPagoMensualidad?: string; // URL de Payment Link externo (Wompi/PayU/ePayco) de la CUENTA de la academia, para que sus alumnos paguen mensualidad en línea. Tudojang no procesa ni recibe este dinero -- ver Términos de Servicio. Debe pertenecer a un dominio de DOMINIOS_PASARELAS_PAGO_PERMITIDOS (constantes.ts).
+}
+
+// Fix seguridad 2026-07-18: wompiPaymentSourceId vivía en ConfiguracionClub (documento
+// tenants/{tenantId} raíz), legible por `allow get` a CUALQUIER usuario autenticado del
+// tenant (Instructor/Editor/Asistente/Maestro incluidos) según firestore.rules. Se movió al
+// subdocumento tenants/{tenantId}/privado/facturacion, acotado a Admin/SuperAdmin. Los otros
+// dos campos de cobro automático (cobroAutomaticoActivo/cobroAutomaticoIntentosFallidos) NO
+// se movieron -- se quedan en ConfiguracionClub porque no son sensibles por sí solos.
+export interface FacturacionPrivadaTenant {
+    wompiPaymentSourceId?: number | null;
 }
 
 export interface Estudiante {
@@ -173,6 +200,7 @@ export interface Estudiante {
     rh?: string;
     direccion?: string;
     barrio?: string;
+    authUid?: string;
     tutor?: {
         nombres: string;
         apellidos: string;
@@ -296,7 +324,11 @@ export enum TipoNotificacion {
     AvisoVencimiento = 'AvisoVencimiento',
     ConfirmacionCompra = 'ConfirmacionCompra',
     ConfirmacionInscripcionEvento = 'ConfirmacionInscripcionEvento',
-    SolicitudCompraAdmin = 'SolicitudCompraAdmin'
+    SolicitudCompraAdmin = 'SolicitudCompraAdmin',
+    // Plan B #2 (fix tutor-role-end-to-end): avance académico (material completado).
+    AvanceAcademico = 'AvanceAcademico',
+    // Plan B #3 (fix tutor-role-end-to-end): evento nuevo con inscripción abierta.
+    EventoNuevo = 'EventoNuevo'
 }
 
 export enum EstadoEntrega {
@@ -377,6 +409,17 @@ export interface Usuario {
         firmado: boolean;
     };
     deletedAt?: string; // Soft delete: fecha de eliminación (ISO string)
+    // Matriz de roles de Agenda (extension posterior al cierre del modulo 12, ver
+    // CIERRE CENTRO DE ESTUDIOS.md): permiso de EDICION de Agenda otorgado por un Admin a
+    // un usuario Asistente/Editor puntual (Admin/SuperAdmin siempre editan todo; Maestro
+    // edita solo su propia clase asignada via instructorId -- ninguno de esos dos casos
+    // necesita este flag). Por defecto false/undefined: Asistente/Editor pueden CONSULTAR
+    // Agenda pero no editar hasta que un Admin active este flag. El control visual/toggle
+    // para que un Admin lo active desde `vistas/Configuracion.tsx` queda PENDIENTE (zona
+    // exclusiva de Codex, ver nota en COORDINACION CODEX ANTIGRAVITY - CENTRO ESTUDIOS.md) --
+    // este campo solo define el dato; la logica de permiso vive en
+    // `puedeEditarJornada` (vistas/admin/MisClasesView.tsx) y en `firestore.rules`.
+    permisoEdicionAgenda?: boolean;
 }
 
 export enum TipoVinculacionColaborador {
@@ -498,3 +541,4 @@ export interface ReportePagoEstudiante {
     validadoPor?: string; // ID del usuario que aprobó
     fechaValidacion?: string;
 }
+

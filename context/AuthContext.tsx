@@ -6,6 +6,39 @@ import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { autenticarUsuario, cerrarSesion as apiCerrarSesion, enviarCorreoRecuperacion as apiEnviarCorreoRecuperacion } from '../servicios/api';
 import type { Usuario } from '../tipos';
+import { RolUsuario } from '../tipos';
+
+// Helper to normalize role strings to the enum values (case‑insensitive).
+// Exportado para poder testearlo directo. Regla canonica de roles (CIERRE
+// CENTRO DE ESTUDIOS.md 14.9): 'maestro' es un rol propio (quien ensena y
+// asigna clases); 'tutor' es el padre/acudiente — no son alias entre si.
+export const normalizeRol = (rol: string | undefined): RolUsuario | undefined => {
+  if (!rol) return undefined;
+  const cleaned = rol.trim().toLowerCase();
+  switch (cleaned) {
+    case 'admin':
+      return RolUsuario.Admin;
+    case 'superadmin':
+      return RolUsuario.SuperAdmin;
+    case 'editor':
+      return RolUsuario.Editor;
+    case 'asistente':
+      return RolUsuario.Asistente;
+    case 'estudiante':
+      return RolUsuario.Estudiante;
+    case 'tutor':
+      return RolUsuario.Tutor;
+    case 'maestro':
+      return RolUsuario.Maestro;
+    default:
+      return undefined;
+  }
+};
+
+
+
+
+
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -60,9 +93,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setUsuario(null);
               return;
             }
-            setUsuario({
+setUsuario({
               id: firebaseUser.uid,
               email: firebaseUser.email!,
+              // Normalizamos el rol para que coincida con la enum
+              rol: normalizeRol(userData.rol) ?? userData.rol as any,
               ...userData
             } as Usuario);
           } else {
@@ -82,6 +117,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (qSnap && !qSnap.empty) {
               const userData = qSnap.docs[0].data();
+              const profileDocId = qSnap.docs[0].id;
               console.log(`[AuthContext] Perfil recuperado por email query.`);
               // Verificar si el usuario fue eliminado (soft delete)
               if (userData.deletedAt) {
@@ -91,9 +127,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUsuario(null);
                 return;
               }
+              if (profileDocId !== firebaseUser.uid) {
+                await setDoc(doc(db, 'usuarios', firebaseUser.uid), userData, { merge: true });
+              }
               setUsuario({
-                id: qSnap.docs[0].id,
+                id: firebaseUser.uid,
                 email: firebaseUser.email!,
+                // Normalizamos el rol para evitar problemas de mayúsculas/minúsculas
+                rol: normalizeRol(userData.rol) ?? userData.rol as any,
                 ...userData
               } as Usuario);
             } else {

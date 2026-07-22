@@ -6,11 +6,18 @@ import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD, TipoNotificacion } from '../tipos';
 import { enviarNotificacion } from '../servicios/api';
 import { generarMensajePersonalizado } from '../servicios/geminiService';
+import { createInvitation } from '../servicios/academico/invitacionService';
+import { RolAcademico } from '../models/academico';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion, useSedes } from '../context/DataContext';
 import { generarUrlAbsoluta } from '../utils/formatters';
 
 const ITEMS_PER_PAGE = 10;
+
+type DatosEstudianteFormulario = Estudiante & {
+    enviarInvitacionLoginEstudiante?: boolean;
+    enviarInvitacionLoginTutor?: boolean;
+};
 
 export const useGestionEstudiantes = () => {
     const { estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante, cargarEstudiantes } = useEstudiantes();
@@ -89,17 +96,88 @@ export const useGestionEstudiantes = () => {
         setEstudianteEnEdicion(null);
     };
 
-    const guardarEstudiante = async (datosEstudiante: Estudiante) => {
+    const guardarEstudiante = async (datosEstudiante: DatosEstudianteFormulario) => {
         setCargandoAccion(true);
         try {
-            if (datosEstudiante.id) {
-                await actualizarEstudiante(datosEstudiante);
+            const {
+                enviarInvitacionLoginEstudiante,
+                enviarInvitacionLoginTutor,
+                ...datosPersistibles
+            } = datosEstudiante;
+
+            // Fix tutor-role-end-to-end (2026-07-14): normalizar emails a minúsculas.
+            // La regla de Firestore compara `estudiante.tutor.correo == request.auth.token.email`
+            // (que Firebase entrega en minúsculas), y el resolver también consulta en minúsculas.
+            // Sin esto, un correo con mayúsculas rompería silenciosamente la resolución tutor→hijo.
+            if (datosPersistibles.correo) {
+                datosPersistibles.correo = datosPersistibles.correo.toLowerCase().trim();
+            }
+            if (datosPersistibles.tutor?.correo) {
+                datosPersistibles.tutor = {
+                    ...datosPersistibles.tutor,
+                    correo: datosPersistibles.tutor.correo.toLowerCase().trim(),
+                };
+            }
+
+            const enviarInvitacionAcademica = async (estudiante: Estudiante, rol: RolAcademico) => {
+                const tenantId = estudiante.tenantId || configClub.tenantId;
+                const correoDestino = rol === 'Estudiante' ? estudiante.correo : estudiante.tutor?.correo;
+
+                if (!correoDestino) return;
+
+                if (!tenantId || tenantId === 'PLATFORM_INIT_PENDING') {
+                    mostrarNotificacion('Estudiante guardado, pero no se pudo enviar la invitación: tenant no identificado.', 'warning');
+                    return;
+                }
+
+                try {
+                    // Fix consistencia de plantillas (2026-07-15): manda el nombre real para
+                    // que el correo (plantillas por rol) salga personalizado, no con fallback
+                    // genérico. Tutor necesita AMBOS nombres (suyo + el del alumno vinculado).
+                    const nombreAlumno = `${estudiante.nombres || ''} ${estudiante.apellidos || ''}`.trim();
+                    const nombreDestinatario = rol === 'Estudiante'
+                        ? nombreAlumno
+                        : `${estudiante.tutor?.nombres || ''} ${estudiante.tutor?.apellidos || ''}`.trim();
+                    const invitacion = await createInvitation(tenantId, correoDestino, rol, {
+                        nombreDestinatario: nombreDestinatario || undefined,
+                        nombreAlumno: rol === 'Tutor' ? (nombreAlumno || undefined) : undefined,
+                    });
+
+                    // Fix tutor-role-end-to-end (2026-07-14, ajuste post-feedback): NO abrir
+                    // WhatsApp ni tomar el portapapeles por cada guardado — en registro masivo
+                    // eso genera conflictos (pedido explícito del usuario). La invitación se
+                    // entrega por CORREO (la CF ya usa el dominio correcto). Solo notificamos.
+                    if (!invitacion.activationLink) {
+                        mostrarNotificacion(`Estudiante guardado, pero no se pudo generar la invitación para ${correoDestino}.`, 'warning');
+                        return;
+                    }
+
+                    if (invitacion.emailEnviado) {
+                        mostrarNotificacion(`Invitación de login enviada por correo a ${correoDestino}.`, 'success');
+                    } else {
+                        // El correo no salió (Resend), pero la invitación quedó creada y válida.
+                        // El admin puede reenviarla desde Configuración → Invitaciones.
+                        mostrarNotificacion(`Invitación creada para ${correoDestino}. El correo automático no salió — reenvíala desde Invitaciones si hace falta.`, 'info');
+                    }
+                } catch (error: any) {
+                    mostrarNotificacion(`Estudiante guardado, pero no se pudo generar la invitación a ${correoDestino}: ${error.message}`, 'warning');
+                }
+            };
+
+            if (datosPersistibles.id) {
+                await actualizarEstudiante(datosPersistibles);
                 mostrarNotificacion("Estudiante actualizado correctamente.", "success");
+
+                if (enviarInvitacionLoginEstudiante) await enviarInvitacionAcademica(datosPersistibles, 'Estudiante');
+                if (enviarInvitacionLoginTutor) await enviarInvitacionAcademica(datosPersistibles, 'Tutor');
             } else {
                 // Los campos metodoPago y cobrarMesSiguiente vienen del formulario y
                 // se persisten en Firestore junto con el resto del documento del estudiante.
-                const nuevoEstudiante = await agregarEstudiante(datosEstudiante);
+                const nuevoEstudiante = await agregarEstudiante(datosPersistibles);
                 mostrarNotificacion("Estudiante creado correctamente.", "success");
+
+                if (enviarInvitacionLoginEstudiante) await enviarInvitacionAcademica(nuevoEstudiante, 'Estudiante');
+                if (enviarInvitacionLoginTutor) await enviarInvitacionAcademica(nuevoEstudiante, 'Tutor');
 
                 // Comunicación exclusiva por WhatsApp para estudiantes/tutores
                 const destinatario = nuevoEstudiante.tutor?.telefono;

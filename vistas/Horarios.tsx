@@ -1,14 +1,22 @@
 
 // vistas/Horarios.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProgramas, useSedes, useConfiguracion, useConfiguracion as useDataConfig } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
-import { IconoCasa, IconoUsuario, IconoAgregar, IconoInformacion, IconoEditar, IconoEliminar } from '../components/Iconos';
+import { IconoCasa, IconoUsuario, IconoAgregar, IconoInformacion, IconoEditar, IconoEliminar, IconoAprobar } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import ModalAgendarClase from '../components/ModalAgendarClase';
 import { BloqueHorario, RolUsuario } from '../tipos';
 import { obtenerInstructoresAgenda } from '../utils/instructoresAgenda';
+import { obtenerClasesAcademicasDelTenant, type ClaseAcademicaAgenda } from '../servicios/academico/agendaAcademicaService';
+import { estaJornadaEnVentana } from '../servicios/academico/ventanaClaseEnVivoService';
+
+// Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): mismo intervalo de recalculo que
+// `hooks/useVentanaClaseEnVivo.ts` (60s), para que el boton "Iniciar Clase en Vivo" aparezca/
+// desaparezca sin necesidad de recargar la pagina si el usuario la deja abierta.
+const INTERVALO_RECALCULO_VENTANA_MS = 60_000;
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -18,15 +26,27 @@ const VistaHorarios: React.FC = () => {
     const { usuarios } = useDataConfig();
     const { usuario } = useAuth();
     const { mostrarNotificacion } = useNotificacion();
+    const navigate = useNavigate();
 
     const [filtroSede, setFiltroSede] = useState('todas');
     const [filtroInstructor, setFiltroInstructor] = useState('todos');
     const [modalAbierto, setModalAbierto] = useState(false);
     const [bloqueEdit, setBloqueEdit] = useState<Partial<BloqueHorario> | null>(null);
+    const [clasesAcademicas, setClasesAcademicas] = useState<ClaseAcademicaAgenda[]>([]);
+    // Fase 4: ventana horaria dinamica del trigger "Iniciar Clase en Vivo", recalculada cada
+    // 60s (ver INTERVALO_RECALCULO_VENTANA_MS arriba).
+    const [ahoraIso, setAhoraIso] = useState(() => new Date().toISOString());
 
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin;
     const esInstructor = usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente;
     const instructoresAgenda = useMemo(() => obtenerInstructoresAgenda(usuarios), [usuarios]);
+
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            setAhoraIso(new Date().toISOString());
+        }, INTERVALO_RECALCULO_VENTANA_MS);
+        return () => clearInterval(intervalId);
+    }, []);
 
     // Si es instructor, por defecto filtrar por él mismo
     useState(() => {
@@ -35,6 +55,19 @@ const VistaHorarios: React.FC = () => {
         }
     });
 
+    useEffect(() => {
+        let activo = true;
+        if (!usuario?.tenantId) return;
+
+        obtenerClasesAcademicasDelTenant(usuario.tenantId).then((clases) => {
+            if (activo) setClasesAcademicas(clases);
+        });
+
+        return () => {
+            activo = false;
+        };
+    }, [usuario?.tenantId]);
+
     const agendaFiltrada = useMemo(() => {
         return agendaCompleta.filter(bloque => {
             const cumpleSede = filtroSede === 'todas' || bloque.sedeId === filtroSede;
@@ -42,6 +75,23 @@ const VistaHorarios: React.FC = () => {
             return cumpleSede && cumpleInstructor;
         });
     }, [agendaCompleta, filtroSede, filtroInstructor]);
+
+    const hoyIso = new Date().toISOString().slice(0, 10);
+
+    const clasesAcademicasFiltradas = useMemo(() => {
+        return clasesAcademicas.filter(clase => {
+            const cumpleSede = filtroSede === 'todas' || clase.sedeId === filtroSede;
+            const cumpleInstructor = filtroInstructor === 'todos' || clase.instructorId === filtroInstructor;
+            const esCanceladaOReprogramada = clase.estado === 'cancelada' || clase.estado === 'reprogramada';
+            const estaVencida = esCanceladaOReprogramada && clase.proximaFecha < hoyIso;
+            return cumpleSede && cumpleInstructor && !estaVencida;
+        });
+    }, [clasesAcademicas, filtroSede, filtroInstructor, hoyIso]);
+
+    const agendaCombinada = useMemo<Array<BloqueHorario | ClaseAcademicaAgenda>>(
+        () => [...agendaFiltrada, ...clasesAcademicasFiltradas],
+        [agendaFiltrada, clasesAcademicasFiltradas]
+    );
 
     const handleGuardarBloque = async (bloque: BloqueHorario) => {
         let programa = programas.find(p => p.id === bloque.programaId);
@@ -146,37 +196,86 @@ const VistaHorarios: React.FC = () => {
                         </div>
 
                         <div className="space-y-3 min-h-[200px]">
-                            {agendaFiltrada
+                            {agendaCombinada
                                 .filter(b => b.dia === dia)
                                 .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
-                                .map(b => (
-                                    <div key={b.id} className="bg-white dark:bg-gray-800 p-5 rounded-[2.2rem] border-2 border-transparent hover:border-tkd-blue/20 shadow-soft hover:shadow-premium transition-all group overflow-hidden relative">
+                                .map(b => {
+                                    const esAcademica = 'origen' in b && b.origen === 'academico';
+                                    const estadoAcademico = esAcademica ? (b as ClaseAcademicaAgenda).estado : undefined;
+                                    const esCancelada = estadoAcademico === 'cancelada';
+                                    const esReprogramada = estadoAcademico === 'reprogramada';
+                                    const claseAtenuada = esCancelada || esReprogramada;
+                                    // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): trigger real de Agenda ->
+                                    // Clase en Vivo con jornadaId real (spec: "Navegacion de Agenda a Clase en Vivo con
+                                    // jornadaId real"). Solo clases academicas reales (tienen jornadaId), no atenuadas
+                                    // (canceladas/reprogramadas no deben iniciar Clase en Vivo), dentro de la ventana
+                                    // horaria [horaInicio-15, horaFin+15], y visible solo para quien puede operarla
+                                    // (Admin/SuperAdmin/Asistente/Editor -- mismos roles que ya validan permiso server-side
+                                    // en el callable de la Fase 1).
+                                    const claseAcademica = esAcademica ? (b as ClaseAcademicaAgenda) : null;
+                                    const puedeIniciarClaseEnVivo = Boolean(
+                                        claseAcademica &&
+                                        !claseAtenuada &&
+                                        (esAdmin || esInstructor) &&
+                                        estaJornadaEnVentana(
+                                            { fecha: claseAcademica.proximaFecha, horaInicio: claseAcademica.horaInicio, horaFin: claseAcademica.horaFin },
+                                            ahoraIso
+                                        )
+                                    );
+                                    return (
+                                    <div key={b.id} className={`bg-white dark:bg-gray-800 p-5 rounded-[2.2rem] border-2 border-transparent hover:border-tkd-blue/20 shadow-soft hover:shadow-premium transition-all group overflow-hidden relative${claseAtenuada ? ' opacity-60 grayscale' : ''}`}>
                                         <div className="relative z-10 space-y-3">
                                             <div className="flex justify-between items-start">
                                                 <div className="p-2 bg-tkd-blue/10 rounded-xl text-tkd-blue">
                                                     <LogoDinamico className="w-4 h-4" />
                                                 </div>
                                                 <div className="flex gap-1">
-                                                    {esAdmin && (
+                                                    {esAdmin && !esAcademica && (
                                                         <>
-                                                            <button onClick={() => { setBloqueEdit(b); setModalAbierto(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-3 h-3" /></button>
-                                                            <button onClick={() => handleEliminarBloque(b)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-3 h-3" /></button>
+                                                            <button onClick={() => { setBloqueEdit(b as BloqueHorario); setModalAbierto(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-tkd-blue"><IconoEditar className="w-3 h-3" /></button>
+                                                            <button onClick={() => handleEliminarBloque(b as BloqueHorario)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-tkd-red"><IconoEliminar className="w-3 h-3" /></button>
                                                         </>
                                                     )}
                                                 </div>
                                             </div>
                                             <div>
                                                 <h4 className="text-[11px] font-black uppercase text-gray-900 dark:text-white leading-tight">{b.nombrePrograma}</h4>
+                                                {claseAtenuada && (
+                                                    <span className={`inline-block mt-1 px-4 py-1.5 rounded-full text-[10px] font-black uppercase border ${
+                                                        esCancelada
+                                                            ? 'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                                            : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                                    }`}>
+                                                        {esCancelada ? 'Cancelada' : 'Reprogramada'}
+                                                    </span>
+                                                )}
                                                 <p className="text-[8px] font-bold text-tkd-blue uppercase mt-1">G: {b.grupo}</p>
                                                 <p className="text-[7px] font-bold text-gray-400 uppercase mt-0.5">{getNombreSede(b.sedeId)}</p>
+                                                {esAcademica && (
+                                                    <p className="text-[7px] font-bold text-tkd-blue uppercase mt-0.5">
+                                                        {(b as ClaseAcademicaAgenda).materialAsignado.length > 0
+                                                            ? `Material: ${(b as ClaseAcademicaAgenda).materialAsignado.join(', ')}`
+                                                            : 'Sin material asignado'}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="pt-2 border-t dark:border-white/5 flex justify-between items-center">
                                                 <p className="text-[10px] font-black text-gray-900 dark:text-white uppercase">{b.horaInicio}</p>
                                                 <span className="text-[7px] font-black text-gray-300 uppercase">{getNombreInstructor(b.instructorId).split(' ')[0]}</span>
                                             </div>
+                                            {puedeIniciarClaseEnVivo && claseAcademica && (
+                                                <button
+                                                    onClick={() => navigate(`/clase-en-vivo/${claseAcademica.jornadaId}`)}
+                                                    className="w-full flex items-center justify-center gap-2 bg-tkd-red text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-tkd-red/90 transition-all"
+                                                >
+                                                    <IconoAprobar className="w-3 h-3" />
+                                                    Iniciar Clase en Vivo
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
 
                             {esAdmin && (
                                 <button
@@ -203,7 +302,7 @@ const VistaHorarios: React.FC = () => {
                 </div>
                 <div className="flex gap-12">
                     <div className="text-center">
-                        <p className="text-3xl font-black text-tkd-blue">{agendaFiltrada.length}</p>
+                        <p className="text-3xl font-black text-tkd-blue">{agendaCombinada.length}</p>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Bloques / Semana</p>
                     </div>
                     <div className="text-center">

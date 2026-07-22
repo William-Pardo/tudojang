@@ -1,52 +1,52 @@
 // functions/academico/invitaciones.test.js
-// Tests para los servicios de invitaciones académicas.
-// Usan el patrón de inyección de dependencias sin firebase-functions-test.
 
 'use strict';
 
 const {
   crearServicioInviteUser,
   crearServicioAcceptInvitation,
+  hashearTokenInvitacion,
 } = require('./invitaciones');
-
-// ---------------------------------------------------------------------------
-// Helpers de mocks
-// ---------------------------------------------------------------------------
 
 const makeAuth = (overrides = {}) => ({
   getUserByEmail: jest.fn().mockRejectedValue({ code: 'auth/user-not-found' }),
-  generateSignInWithEmailLink: jest.fn().mockResolvedValue('https://link.example.com/invite'),
   createUser: jest.fn().mockResolvedValue({ uid: 'uid-nuevo' }),
   setCustomUserClaims: jest.fn().mockResolvedValue(),
   ...overrides,
 });
 
-const makeDocRef = (data, exists = true) => {
-  const ref = {
-    id: 'inv-123',
-    set: jest.fn().mockResolvedValue(),
-    get: jest.fn().mockResolvedValue({ exists, data: () => data }),
-    update: jest.fn().mockResolvedValue(),
-  };
-  return ref;
-};
+const makeDocRef = (data, exists = true) => ({
+  id: 'inv-123',
+  set: jest.fn().mockResolvedValue(),
+  get: jest.fn().mockResolvedValue({ exists, data: () => data }),
+  update: jest.fn().mockResolvedValue(),
+});
 
 const makeFirestore = (invitacionData, exists = true) => {
-  const docRef = makeDocRef(invitacionData, exists);
+  const invitacionRef = makeDocRef(invitacionData, exists);
+  const usuarioSet = jest.fn().mockResolvedValue();
+
   return {
-    collection: jest.fn().mockReturnValue({
-      doc: jest.fn().mockReturnValue({
-        collection: jest.fn().mockReturnValue({
-          doc: jest.fn().mockReturnValue(docRef),
-        }),
-        set: jest.fn().mockResolvedValue(),
-      }),
+    collection: jest.fn((name) => {
+      if (name === 'usuarios') {
+        return {
+          doc: jest.fn(() => ({ set: usuarioSet })),
+        };
+      }
+
+      return {
+        doc: jest.fn(() => ({
+          collection: jest.fn(() => ({
+            doc: jest.fn(() => invitacionRef),
+          })),
+        })),
+      };
     }),
-    _docRef: docRef,
+    _docRef: invitacionRef,
+    _usuarioSet: usuarioSet,
   };
 };
 
-const makeResend = () => ({});
 const makeEnviarCorreo = () => jest.fn().mockResolvedValue('email-id-123');
 
 const makeContext = (overrides = {}) => ({
@@ -60,27 +60,22 @@ const makeContext = (overrides = {}) => ({
   },
 });
 
-// ---------------------------------------------------------------------------
-// crearServicioInviteUser
-// ---------------------------------------------------------------------------
-
 describe('crearServicioInviteUser', () => {
   const buildService = (authOverrides = {}) => {
     const auth = makeAuth(authOverrides);
     const firestore = makeFirestore();
     const enviarCorreo = makeEnviarCorreo();
-    const resend = makeResend();
     const service = crearServicioInviteUser({
       auth,
       firestore,
       enviarCorreo,
-      resend,
+      resend: {},
       appUrl: 'https://app.tudojang.com',
     });
     return { service, auth, firestore, enviarCorreo };
   };
 
-  it('lanza error si no hay autenticación', async () => {
+  it('lanza error si no hay autenticacion', async () => {
     const { service } = buildService();
     await expect(
       service({ email: 'a@b.com', rol: 'Estudiante', tenantId: 'tenant-abc' }, { auth: null })
@@ -95,65 +90,72 @@ describe('crearServicioInviteUser', () => {
     ).rejects.toThrow('Solo el Admin del tenant');
   });
 
-  it('lanza error si el tenantId no coincide con el del usuario', async () => {
+  it('lanza error si el tenantId no coincide con el usuario', async () => {
     const { service } = buildService();
-    const ctx = makeContext();
     await expect(
-      service({ email: 'a@b.com', rol: 'Estudiante', tenantId: 'otro-tenant' }, ctx)
-    ).rejects.toThrow('No autorizado para este tenant');
+      service({ email: 'a@b.com', rol: 'Estudiante', tenantId: 'otro-tenant' }, makeContext())
+    ).rejects.toThrow('No autorizado');
   });
 
-  it('lanza error si el rol es inválido', async () => {
+  it('lanza error si el rol es invalido', async () => {
     const { service } = buildService();
-    const ctx = makeContext();
     await expect(
-      service({ email: 'a@b.com', rol: 'SuperAdmin', tenantId: 'tenant-abc' }, ctx)
-    ).rejects.toThrow('Rol inválido');
+      service({ email: 'a@b.com', rol: 'SuperAdmin', tenantId: 'tenant-abc' }, makeContext())
+    ).rejects.toThrow('Rol invalido');
   });
 
   it('lanza error si el email ya existe en Firebase Auth', async () => {
     const { service } = buildService({
       getUserByEmail: jest.fn().mockResolvedValue({ uid: 'ya-existe' }),
     });
-    const ctx = makeContext();
     await expect(
-      service({ email: 'existente@b.com', rol: 'Estudiante', tenantId: 'tenant-abc' }, ctx)
+      service({ email: 'existente@b.com', rol: 'Estudiante', tenantId: 'tenant-abc' }, makeContext())
     ).rejects.toThrow('Ya existe un usuario');
   });
 
-  it('crea la invitación y envía el email correctamente para Estudiante', async () => {
-    const { service, enviarCorreo } = buildService();
-    const ctx = makeContext();
+  // Fix consistencia de plantillas (2026-07-15): usa la plantilla HTML real por rol
+  // (plantillasInvitacion.js, antes en --/asignación_de_contraseña_*.html sin conectar) en
+  // vez del HTML generico anterior.
+  it('crea invitacion con token hasheado y envia correo con la plantilla de Estudiante', async () => {
+    const { service, firestore, enviarCorreo } = buildService();
+
     const result = await service(
-      { email: 'nuevo@b.com', rol: 'Estudiante', tenantId: 'tenant-abc' },
-      ctx
+      { email: 'nuevo@b.com', rol: 'Estudiante', tenantId: 'tenant-abc', nombreDestinatario: 'Ana Pérez' },
+      makeContext()
     );
+
     expect(result.ok).toBe(true);
-    expect(result.invitacionId).toBeDefined();
+    expect(result.invitacionId).toBe('inv-123');
+    expect(firestore._docRef.set).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'nuevo@b.com',
+      rol: 'Estudiante',
+      tokenHash: expect.any(String),
+      activationLink: expect.stringContaining('https://app.tudojang.com/#/activar-cuenta?'),
+    }));
+    expect(firestore._docRef.set.mock.calls[0][0].activationLink).toContain('invitacionId=inv-123');
+    expect(firestore._docRef.set.mock.calls[0][0]).not.toHaveProperty('token');
     expect(enviarCorreo).toHaveBeenCalledTimes(1);
+    expect(enviarCorreo.mock.calls[0][1].subject).toContain('bienvenida');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Asignar mi Contraseña');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Ana Pérez');
   });
 
-  it('crea la invitación y envía el email correctamente para Tutor', async () => {
+  it('crea invitacion con la plantilla de Tutor (incluye nombre del tutor y del alumno)', async () => {
     const { service, enviarCorreo } = buildService();
-    const ctx = makeContext();
-    const result = await service(
-      { email: 'padre@familia.com', rol: 'Tutor', tenantId: 'tenant-abc' },
-      ctx
+
+    await service(
+      { email: 'padre@familia.com', rol: 'Tutor', tenantId: 'tenant-abc', nombreDestinatario: 'Carlos Gómez', nombreAlumno: 'Sofía Gómez' },
+      makeContext()
     );
-    expect(result.ok).toBe(true);
-    expect(enviarCorreo).toHaveBeenCalledTimes(1);
-    // Verifica que el asunto mencione el portal de seguimiento para Tutor
-    const emailArgs = enviarCorreo.mock.calls[0][1];
-    expect(emailArgs.subject).toContain('portal de seguimiento');
+
+    expect(enviarCorreo.mock.calls[0][1].subject).toContain('Tutores');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Carlos Gómez');
+    expect(enviarCorreo.mock.calls[0][1].html).toContain('Sofía Gómez');
   });
 });
 
-// ---------------------------------------------------------------------------
-// crearServicioAcceptInvitation
-// ---------------------------------------------------------------------------
-
 describe('crearServicioAcceptInvitation', () => {
-  const futureDate = new Date(Date.now() + 86400000 * 3).toISOString(); // +3 días
+  const futureDate = new Date(Date.now() + 86400000 * 3).toISOString();
 
   const defaultInvitacion = {
     email: 'nuevo@b.com',
@@ -161,54 +163,112 @@ describe('crearServicioAcceptInvitation', () => {
     tenantId: 'tenant-abc',
     estado: 'pendiente',
     expiraEn: futureDate,
+    tokenHash: hashearTokenInvitacion('token-valido'),
   };
 
   const buildService = (invitacionData = defaultInvitacion, exists = true, authOverrides = {}) => {
     const auth = makeAuth(authOverrides);
-    const fs = makeFirestore(invitacionData, exists);
-    const service = crearServicioAcceptInvitation({ auth, firestore: fs });
-    return { service, auth, firestore: fs };
+    const firestore = makeFirestore(invitacionData, exists);
+    const service = crearServicioAcceptInvitation({ auth, firestore });
+    return { service, auth, firestore };
   };
 
-  it('lanza error si la invitación no existe', async () => {
-    const { service } = buildService(null, false);
+  it('lanza error si faltan parametros', async () => {
+    const { service } = buildService();
     await expect(
-      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'clave1234' }, {})
-    ).rejects.toThrow('Invitación no encontrada');
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'clave1234' })
+    ).rejects.toThrow('token');
   });
 
-  it('lanza error si la invitación ya fue aceptada', async () => {
+  it('lanza error si la invitacion no existe', async () => {
+    const { service } = buildService(null, false);
+    await expect(
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', token: 'token-valido', password: 'clave1234' })
+    ).rejects.toThrow('Invitacion no encontrada');
+  });
+
+  it('lanza error si la invitacion ya fue aceptada', async () => {
     const { service } = buildService({ ...defaultInvitacion, estado: 'aceptada' });
     await expect(
-      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'clave1234' }, {})
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', token: 'token-valido', password: 'clave1234' })
     ).rejects.toThrow('ya fue aceptada');
   });
 
-  it('lanza error y marca como vencida si la invitación expiró', async () => {
+  it('lanza error si el token no coincide', async () => {
+    const { service } = buildService();
+    await expect(
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', token: 'token-malo', password: 'clave1234' })
+    ).rejects.toThrow('enlace de activacion');
+  });
+
+  it('lanza error y marca como vencida si la invitacion expiro', async () => {
     const pastDate = new Date(Date.now() - 86400000).toISOString();
     const { service, firestore } = buildService({ ...defaultInvitacion, expiraEn: pastDate });
     await expect(
-      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'clave1234' }, {})
-    ).rejects.toThrow('venció');
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', token: 'token-valido', password: 'clave1234' })
+    ).rejects.toThrow('vencio');
     expect(firestore._docRef.update).toHaveBeenCalledWith({ estado: 'vencida' });
   });
 
-  it('lanza error si la contraseña tiene menos de 8 caracteres', async () => {
+  it('lanza error si la contrasena tiene menos de 8 caracteres', async () => {
     const { service } = buildService();
     await expect(
-      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'corta' }, {})
+      service({ invitacionId: 'inv-123', tenantId: 'tenant-abc', token: 'token-valido', password: 'corta' })
     ).rejects.toThrow('8 caracteres');
   });
 
-  it('acepta la invitación, crea el usuario y asigna custom claims', async () => {
-    const { service, auth } = buildService();
-    const result = await service(
-      { invitacionId: 'inv-123', tenantId: 'tenant-abc', password: 'clave1234segura' },
-      {}
-    );
+  it('acepta invitacion, crea usuario, asigna claims y consume token', async () => {
+    const { service, auth, firestore } = buildService();
+
+    const result = await service({
+      invitacionId: 'inv-123',
+      tenantId: 'tenant-abc',
+      token: 'token-valido',
+      password: 'clave1234segura',
+    });
+
     expect(result.ok).toBe(true);
     expect(result.uid).toBe('uid-nuevo');
     expect(auth.setCustomUserClaims).toHaveBeenCalledWith('uid-nuevo', {
+      rol: 'Estudiante',
+      tenantId: 'tenant-abc',
+    });
+    expect(firestore._usuarioSet).toHaveBeenCalledWith(expect.objectContaining({
+      email: 'nuevo@b.com',
+      rol: 'Estudiante',
+      tenantId: 'tenant-abc',
+    }));
+    expect(firestore._docRef.update).toHaveBeenCalledWith(expect.objectContaining({
+      estado: 'aceptada',
+      uid: 'uid-nuevo',
+      tokenHash: null,
+    }));
+  });
+
+  // Bug real encontrado 2026-07-15: si el email de la invitacion YA tenia una cuenta Auth
+  // (p.ej. invitado antes con otro rol), el flujo reusaba el uid pero nunca aplicaba la
+  // contrasena que la persona acaba de escribir en el formulario -- quedaba con la vieja en
+  // silencio, sin ningun error visible, y no podia loguear con la "nueva" clave.
+  it('si el email ya tiene cuenta, actualiza su contrasena con la recien escrita (no la ignora)', async () => {
+    const updateUser = jest.fn().mockResolvedValue();
+    const createUser = jest.fn();
+    const { service, auth } = buildService(defaultInvitacion, true, {
+      getUserByEmail: jest.fn().mockResolvedValue({ uid: 'uid-existente' }),
+      updateUser,
+      createUser,
+    });
+
+    const result = await service({
+      invitacionId: 'inv-123',
+      tenantId: 'tenant-abc',
+      token: 'token-valido',
+      password: 'claveNuevaSegura1',
+    });
+
+    expect(result.uid).toBe('uid-existente');
+    expect(updateUser).toHaveBeenCalledWith('uid-existente', { password: 'claveNuevaSegura1' });
+    expect(createUser).not.toHaveBeenCalled();
+    expect(auth.setCustomUserClaims).toHaveBeenCalledWith('uid-existente', {
       rol: 'Estudiante',
       tenantId: 'tenant-abc',
     });

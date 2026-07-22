@@ -7,12 +7,13 @@ import {
   resendInvitation,
   InvitacionUsuario
 } from '../../servicios/academico/invitacionService';
+import { enviarCorreoRecuperacion } from '../../servicios/usuariosApi';
 import { RolAcademico } from '../../models/academico';
 
 const InvitacionesView: React.FC = () => {
   const { usuario } = useAuth();
   const { mostrarNotificacion } = useNotificacion();
-  
+
   const [invitaciones, setInvitaciones] = useState<InvitacionUsuario[]>([]);
   const [email, setEmail] = useState('');
   const [rol, setRol] = useState<RolAcademico>('Estudiante');
@@ -40,14 +41,14 @@ const InvitacionesView: React.FC = () => {
   const handleInvitar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !email.includes('@')) {
-      mostrarNotificacion('Por favor ingresa un correo electrónico válido', 'info');
+      mostrarNotificacion('Ingresa un correo electrónico válido.', 'info');
       return;
     }
 
     setEnviando(true);
     try {
       await createInvitation(tenantId, email, rol);
-      mostrarNotificacion('¡Invitación creada y enviada con éxito!', 'success');
+      mostrarNotificacion('Invitación creada y enviada con éxito.', 'success');
       setEmail('');
       cargarInvitaciones();
     } catch (error: any) {
@@ -57,13 +58,59 @@ const InvitacionesView: React.FC = () => {
     }
   };
 
-  const handleReenviar = async (id: string) => {
+  const handleReenviar = async (id: string, email: string) => {
     try {
-      await resendInvitation(tenantId, id);
-      mostrarNotificacion('¡Invitación reenviada con éxito!', 'success');
+      const resultado = await resendInvitation(tenantId, id);
+      if (resultado.emailEnviado) {
+        mostrarNotificacion('Invitación reenviada por correo con éxito.', 'success');
+      } else if (resultado.activationLink) {
+        // El correo no salió, pero la invitación nueva quedó creada y válida. Copiamos el
+        // enlace para que el admin lo comparta manualmente (WhatsApp, etc.) sin depender del
+        // correo -- misma mitigación que "Copiar enlace" en la tabla.
+        try {
+          await navigator.clipboard.writeText(resultado.activationLink);
+          mostrarNotificacion('El correo no salió, pero el enlace de activación se copió al portapapeles.', 'info');
+        } catch {
+          mostrarNotificacion('El correo no salió. Usa "Copiar enlace" en la fila para compartirlo manualmente.', 'info');
+        }
+      } else {
+        mostrarNotificacion('Invitación reenviada, pero no se pudo confirmar el envío del correo.', 'info');
+      }
       cargarInvitaciones();
     } catch (error: any) {
+      // Mitigación de login (2026-07-15): "Ya existe un usuario con el email X" significa que
+      // esta persona YA activó su cuenta (o se creó por otro medio). Reenviar la invitación
+      // NUNCA va a funcionar en ese caso -- lo correcto es restablecer su contraseña, no crear
+      // una cuenta nueva. En vez de dejar al admin con un error confuso, disparamos el reset
+      // de contraseña automáticamente (mismo mecanismo nativo de Firebase que "¿Olvidaste tu
+      // acceso?" en el Login) y se lo explicamos.
+      if (typeof error?.message === 'string' && error.message.includes('Ya existe un usuario')) {
+        try {
+          await enviarCorreoRecuperacion(email);
+          mostrarNotificacion(
+            `${email} ya tiene una cuenta activa. Le enviamos un correo para restablecer su contraseña en su lugar.`,
+            'info'
+          );
+        } catch (resetError: any) {
+          mostrarNotificacion('No se pudo enviar el correo de restablecimiento: ' + resetError.message, 'error');
+        }
+        return;
+      }
       mostrarNotificacion('Error al reenviar invitación: ' + error.message, 'error');
+    }
+  };
+
+  const handleCopiarEnlace = async (activationLink?: string) => {
+    if (!activationLink) {
+      mostrarNotificacion('Esta invitación no tiene enlace de activación disponible.', 'info');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(activationLink);
+      mostrarNotificacion('Enlace de activación copiado.', 'success');
+    } catch {
+      mostrarNotificacion('No fue posible copiar el enlace. Usa el correo enviado.', 'error');
     }
   };
 
@@ -71,23 +118,22 @@ const InvitacionesView: React.FC = () => {
     <div className="p-6 bg-white dark:bg-gray-800 rounded-3xl shadow-soft border border-gray-100 dark:border-white/5 space-y-6">
       <div>
         <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
-          Invitaciones Académicas
+          Cuentas Externas
         </h2>
         <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">
-          Invita a Estudiantes y Tutores al módulo académico
+          Envía invitaciones oficiales para que alumnos y tutores creen su login externo.
         </p>
       </div>
 
-      {/* Formulario de Invitación */}
       <form onSubmit={handleInvitar} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-gray-50 dark:bg-white/5 p-4 rounded-2xl">
         <div className="space-y-1">
           <label htmlFor="invite-email" className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-            Correo Electrónico
+            Correo electrónico
           </label>
           <input
             id="invite-email"
             type="email"
-            placeholder="ejemplo@correo.com"
+            placeholder="estudiante@correo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={enviando}
@@ -97,7 +143,7 @@ const InvitacionesView: React.FC = () => {
 
         <div className="space-y-1">
           <label htmlFor="invite-rol" className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-            Rol Académico
+            Rol académico
           </label>
           <select
             id="invite-rol"
@@ -107,7 +153,7 @@ const InvitacionesView: React.FC = () => {
             className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:border-tkd-blue"
           >
             <option value="Estudiante">Estudiante</option>
-            <option value="Tutor">Tutor (Padre/Acudiente)</option>
+            <option value="Tutor">Tutor / acudiente</option>
           </select>
         </div>
 
@@ -116,11 +162,10 @@ const InvitacionesView: React.FC = () => {
           disabled={enviando}
           className="bg-tkd-dark hover:bg-tkd-blue text-white py-3 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 disabled:opacity-50"
         >
-          {enviando ? 'Enviando...' : 'Enviar Invitación'}
+          {enviando ? 'Enviando...' : 'Enviar invitación'}
         </button>
       </form>
 
-      {/* Listado de Invitaciones */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -156,10 +201,10 @@ const InvitacionesView: React.FC = () => {
                         inv.estado === 'aceptada'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                           : inv.estado === 'pendiente'
-                          ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          : inv.estado === 'vencida'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            : inv.estado === 'vencida'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                       }`}
                     >
                       {inv.estado}
@@ -170,12 +215,24 @@ const InvitacionesView: React.FC = () => {
                   </td>
                   <td className="py-3 text-right">
                     {(inv.estado === 'pendiente' || inv.estado === 'vencida') && (
-                      <button
-                        onClick={() => handleReenviar(inv.id)}
-                        className="text-tkd-blue hover:text-tkd-red font-bold text-xs uppercase tracking-wider transition-colors"
-                      >
-                        Reenviar
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        {inv.activationLink && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopiarEnlace(inv.activationLink)}
+                            className="text-gray-500 hover:text-tkd-blue font-bold text-xs uppercase tracking-wider transition-colors"
+                          >
+                            Copiar enlace
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleReenviar(inv.id, inv.email)}
+                          className="text-tkd-blue hover:text-tkd-red font-bold text-xs uppercase tracking-wider transition-colors"
+                        >
+                          Reenviar
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

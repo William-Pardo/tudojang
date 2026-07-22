@@ -109,9 +109,14 @@ export const buscarAsistenciaHoyPorIdAlumno = async (identificacion: string): Pr
     const asistData = asistSnap.docs[0].data() as Asistencia;
     const nombreOfuscado = `${estData.nombres.split(' ')[0]} ${estData.apellidos[0]}.`;
 
-    return { 
-        asistencia: { id: asistSnap.docs[0].id, ...asistData }, 
-        nombres: nombreOfuscado 
+    return {
+        // Fix 2026-07-21 (detectado por `npm run typecheck`, TS2783): el spread iba DESPUES
+        // del id explicito, y como `Asistencia` declara `id`, el campo almacenado en el
+        // documento pisaba silenciosamente el doc-id real de Firestore. Si ese campo estaba
+        // ausente o desactualizado, se devolvia un id equivocado (o undefined). El doc-id
+        // real es la fuente de verdad, asi que ahora va ultimo.
+        asistencia: { ...asistData, id: asistSnap.docs[0].id },
+        nombres: nombreOfuscado
     };
 };
 

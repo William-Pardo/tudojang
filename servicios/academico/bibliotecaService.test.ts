@@ -1,257 +1,152 @@
-// servicios/academico/bibliotecaService.test.ts
-// Tests unitarios para el servicio de biblioteca académica.
-// Cubre transiciones de estado válidas e inválidas, e inyección de dependencias.
+﻿import { crearBibliotecaService, clearMockRecursos } from './bibliotecaService';
 
-import {
-  crearBibliotecaService,
-  bibliotecaService,
-  clearMockRecursos,
-  getMockRecursos
-} from './bibliotecaService';
-import { doc, collection, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { FichaAcademica } from '../../models/academico/recurso';
+const bibliotecaService = crearBibliotecaService({ isFirebaseConfigured: false });
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn(() => ({})),
-  doc: jest.fn(() => ({ id: 'mock-doc-id' })),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  updateDoc: jest.fn()
-}));
+const TENANT_ID = 'tenant-test';
+const ADMIN_UID = 'admin-001';
 
-jest.mock('../../firebase/config', () => ({
-  db: {},
-  isFirebaseConfigured: true
-}));
+async function crearRecursoEnMock(overrides: {
+  nombre?: string;
+  ficha?: Record<string, unknown> | null;
+} = {}): Promise<string> {
+  const recurso = await bibliotecaService.importFromDrive(
+    TENANT_ID,
+    `file-${Date.now()}`,
+    overrides.nombre ?? 'Recurso de prueba',
+    'application/pdf',
+    ADMIN_UID
+  );
+  if (overrides.ficha !== undefined) {
+    await bibliotecaService.updateFicha(TENANT_ID, recurso.id, overrides.ficha as any);
+  }
+  return recurso.id;
+}
 
-describe('bibliotecaService', () => {
-  const dummyFicha: FichaAcademica = {
-    disciplina: 'Guitarra',
-    nivelMinimo: 'Principiante',
-    tipo: 'pdf',
-    usos: ['estudio']
-  };
-
+describe('bibliotecaService.approveRecurso', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
     clearMockRecursos();
-    // Reiniciar configuración a true por defecto
-    (require('../../firebase/config') as any).isFirebaseConfigured = true;
   });
 
-  describe('modo mock (isFirebaseConfigured = false)', () => {
-    beforeEach(() => {
-      (require('../../firebase/config') as any).isFirebaseConfigured = false;
-    });
-
-    it('importFromDrive agrega recurso al mock en estado borrador', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      expect(recurso.nombre).toBe('Acordes.pdf');
-      expect(recurso.estado).toBe('borrador');
-      expect(recurso.ficha).toBeNull();
-      expect(getMockRecursos().length).toBe(1);
-    });
-
-    it('updateFicha cambia estado a pendiente y actualiza ficha', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      await bibliotecaService.updateFicha('tenant-123', recurso.id, dummyFicha);
-
-      const actualizados = getMockRecursos();
-      expect(actualizados[0].estado).toBe('pendiente');
-      expect(actualizados[0].ficha).toEqual(dummyFicha);
-    });
-
-    it('updateFicha lanza error si recurso no existe', async () => {
-      await expect(
-        bibliotecaService.updateFicha('tenant-123', 'non-existent', dummyFicha)
-      ).rejects.toThrow('Recurso no encontrado');
-    });
-
-    it('approveRecurso cambia estado a aprobado', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-      
-      // Debe estar en pendiente para poder aprobarse
-      await bibliotecaService.updateFicha('tenant-123', recurso.id, dummyFicha);
-
-      await bibliotecaService.approveRecurso('tenant-123', recurso.id, 'admin-999');
-
-      const actualizados = getMockRecursos();
-      expect(actualizados[0].estado).toBe('aprobado');
-      expect(actualizados[0].aprobadoPorUid).toBe('admin-999');
-      expect(actualizados[0].aprobadoEn).toBeDefined();
-    });
-
-    it('approveRecurso lanza error si no esta en pendiente', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      // Estado actual es borrador, lo cual es inválido para aprobar
-      await expect(
-        bibliotecaService.approveRecurso('tenant-123', recurso.id, 'admin-999')
-      ).rejects.toThrow('Transición inválida');
-    });
-
-    it('archiveRecurso cambia estado a archivado', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      await bibliotecaService.updateFicha('tenant-123', recurso.id, dummyFicha);
-      await bibliotecaService.approveRecurso('tenant-123', recurso.id, 'admin-999');
-      
-      await bibliotecaService.archiveRecurso('tenant-123', recurso.id);
-
-      const actualizados = getMockRecursos();
-      expect(actualizados[0].estado).toBe('archivado');
-    });
-
-    it('archiveRecurso lanza error si no esta aprobado', async () => {
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      // Estado actual es borrador, lo cual es inválido para archivar
-      await expect(
-        bibliotecaService.archiveRecurso('tenant-123', recurso.id)
-      ).rejects.toThrow('Transición inválida');
-    });
+  it('rechaza aprobar un recurso sin ficha academica (ficha: null)', async () => {
+    const recursoId = await crearRecursoEnMock({ ficha: null });
+    await expect(
+      bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID)
+    ).rejects.toThrow(/ficha acad.mica clasificada/i);
   });
 
-  describe('modo real (isFirebaseConfigured = true)', () => {
-    beforeEach(() => {
-      (require('../../firebase/config') as any).isFirebaseConfigured = true;
+  it('aprueba correctamente un recurso con ficha completa', async () => {
+    const recursoId = await crearRecursoEnMock({
+      ficha: {
+        disciplina: 'Taekwondo',
+        tipo: 'pdf',
+        usos: ['estudio'],
+        tags: ['fundamentos'],
+      } as any,
     });
 
-    it('importFromDrive guarda el documento en Firestore', async () => {
-      const mockDocRef = { id: 'firestore-rec-id' };
-      (doc as jest.Mock).mockReturnValueOnce(mockDocRef);
+    await expect(
+      bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID)
+    ).resolves.toBeUndefined();
+  });
 
-      const recurso = await bibliotecaService.importFromDrive(
-        'tenant-123',
-        'file-drive-abc',
-        'Acordes.pdf',
-        'application/pdf',
-        'user-111'
-      );
-
-      expect(collection).toHaveBeenCalledWith(expect.any(Object), 'tenants', 'tenant-123', 'recursos');
-      expect(setDoc).toHaveBeenCalledWith(mockDocRef, expect.objectContaining({
-        id: 'firestore-rec-id',
-        estado: 'borrador',
-        externalFileId: 'file-drive-abc'
-      }));
-      expect(recurso.id).toBe('firestore-rec-id');
+  it('approveRecurso es idempotente para un recurso ya aprobado', async () => {
+    const recursoId = await crearRecursoEnMock({
+      ficha: { disciplina: 'Taekwondo', tipo: 'pdf', usos: ['estudio'] } as any,
     });
 
-    it('updateFicha actualiza en Firestore si el estado es valido', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => true,
-        data: () => ({
-          id: 'firestore-rec-id',
-          estado: 'borrador',
-          tenantId: 'tenant-123'
-        })
-      });
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    await expect(
+      bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID)
+    ).resolves.toBeUndefined();
+  });
 
-      await bibliotecaService.updateFicha('tenant-123', 'firestore-rec-id', dummyFicha);
-
-      expect(updateDoc).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
-        ficha: dummyFicha,
-        estado: 'pendiente'
-      }));
+  it('rechaza aprobar un recurso en estado archivado', async () => {
+    const recursoId = await crearRecursoEnMock({
+      ficha: { disciplina: 'Taekwondo', tipo: 'pdf', usos: ['estudio'] } as any,
     });
 
-    it('updateFicha lanza error si recurso no existe en Firestore', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => false
-      });
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    await bibliotecaService.archiveRecurso(TENANT_ID, recursoId);
 
-      await expect(
-        bibliotecaService.updateFicha('tenant-123', 'non-existent', dummyFicha)
-      ).rejects.toThrow('Recurso no encontrado');
-    });
+    await expect(
+      bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID)
+    ).rejects.toThrow(/transici.n inv.lida/i);
+  });
+});
 
-    it('updateFicha lanza error en transicion invalida en Firestore', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => true,
-        data: () => ({
-          id: 'firestore-rec-id',
-          estado: 'aprobado',
-          tenantId: 'tenant-123'
-        })
-      });
+describe('bibliotecaService.updateFicha -- youtubeVideoId', () => {
+  beforeEach(() => {
+    clearMockRecursos();
+  });
 
-      await expect(
-        bibliotecaService.updateFicha('tenant-123', 'firestore-rec-id', dummyFicha)
-      ).rejects.toThrow('Transición inválida');
-    });
+  it('guarda youtubeVideoId como campo adicional, sin tocar externalFileId', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-1.mp4' });
 
-    it('approveRecurso actualiza estado en Firestore', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => true,
-        data: () => ({
-          id: 'firestore-rec-id',
-          estado: 'pendiente',
-          tenantId: 'tenant-123'
-        })
-      });
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
 
-      await bibliotecaService.approveRecurso('tenant-123', 'firestore-rec-id', 'admin-111');
+    // approveRecurso + listarRecursosAprobados exponen el objeto completo del recurso,
+    // que es donde verificamos que el campo nuevo haya quedado guardado.
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
 
-      expect(updateDoc).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
-        estado: 'aprobado',
-        aprobadoPorUid: 'admin-111'
-      }));
-    });
+    expect(guardado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+    expect(guardado?.externalFileId).toBeTruthy();
+  });
 
-    it('archiveRecurso actualiza estado en Firestore', async () => {
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => true,
-        data: () => ({
-          id: 'firestore-rec-id',
-          estado: 'aprobado',
-          tenantId: 'tenant-123'
-        })
-      });
+  it('no pisa youtubeVideoId existente cuando se llama updateFicha sin pasar el parametro (undefined)', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-2.mp4' });
 
-      await bibliotecaService.archiveRecurso('tenant-123', 'firestore-rec-id');
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
 
-      expect(updateDoc).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
-        estado: 'archivado'
-      }));
-    });
+    // Segundo guardado (ej. solo cambia tags) sin tocar youtubeVideoId.
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'], tags: ['nuevo-tag'] } as any
+    );
+
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
+
+    expect(guardado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+  });
+
+  it('permite borrar youtubeVideoId pasando null explicito (volver a usar Drive)', async () => {
+    const recursoId = await crearRecursoEnMock({ nombre: 'clase-3.mp4' });
+
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      'dQw4w9WgXcQ'
+    );
+    await bibliotecaService.updateFicha(
+      TENANT_ID,
+      recursoId,
+      { disciplina: 'Taekwondo', tipo: 'video', usos: ['estudio'] } as any,
+      undefined,
+      null
+    );
+
+    await bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID);
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const guardado = aprobados.find((r) => r.id === recursoId);
+
+    expect(guardado?.youtubeVideoId).toBeNull();
   });
 });

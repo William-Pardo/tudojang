@@ -8,9 +8,16 @@ jest.mock('firebase/app-check', () => ({
 
 describe('App Check', () => {
     const originalKey = process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+    const originalLocation = window.location;
 
     afterEach(() => {
         process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY = originalKey;
+        window.localStorage.clear();
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: originalLocation,
+        });
+        delete (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN;
         jest.clearAllMocks();
     });
 
@@ -28,5 +35,19 @@ describe('App Check', () => {
             expect.any(Object),
             expect.objectContaining({ isTokenAutoRefreshEnabled: true }),
         );
+    });
+
+    it('permite activar debug token en localhost desde localStorage', () => {
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: { ...originalLocation, hostname: 'localhost' },
+        });
+        process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY = 'public-site-key';
+        window.localStorage.setItem('tudojang:appcheck-debug-token', 'true');
+
+        inicializarAppCheck({} as any);
+
+        expect((self as any).FIREBASE_APPCHECK_DEBUG_TOKEN).toBe(true);
+        expect(initializeAppCheck).toHaveBeenCalled();
     });
 });

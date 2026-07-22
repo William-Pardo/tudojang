@@ -15,11 +15,8 @@ import {
     IconoFirma,
     IconoLogoOficial,
     IconoBillete,
-    IconoDeshacer
 } from './Iconos';
 import GeneradorQR from './GeneradorQR';
-import ModalConfirmacion from './ModalConfirmacion';
-import { useNotificacion } from '../context/NotificacionContext';
 
 interface Props {
     estudiante: Estudiante;
@@ -39,7 +36,6 @@ export const FilaEstudiante: React.FC<Props> = ({
     isCard,
 }) => {
     const { usuario } = useAuth();
-    const { mostrarNotificacion } = useNotificacion();
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
     const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
     const esAdmin = usuario?.rol === RolUsuario.Admin;

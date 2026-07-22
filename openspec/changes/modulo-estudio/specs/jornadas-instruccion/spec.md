@@ -26,7 +26,11 @@ El sistema SHALL requerir que el maestro registre asistencia, objetivos impartid
 - **WHEN** el maestro intenta cerrar una jornada sin haber registrado la asistencia
 - **THEN** el sistema SHALL rechazar la operación con error indicando los campos faltantes
 
-### Requirement: Jornada reprogramada genera nueva jornada hija
+### ~~Requirement: Jornada reprogramada genera nueva jornada hija~~ *(SUPERSEDED)*
+
+> **Superseded by**: change `gestion-clases-cancelar-reprogramar` (2026-07-06).
+> La implementación real usa reprogramación in-place (`confirmada→reprogramada→confirmada` en un solo paso via `reprogramarJornada`), sin crear jornadas hijas ni `parentJornadaId`. No existen callers del modelo hija. Véase `servicios/academico/jornadaService.ts#reprogramarJornada`.
+
 El sistema SHALL permitir reprogramar una jornada, lo que SHALL crear una nueva jornada vinculada a la original como "hija". La jornada original SHALL quedar en estado `reprogramada` y NO SHALL avanzar el ciclo del programa.
 
 #### Scenario: Reprogramación de jornada

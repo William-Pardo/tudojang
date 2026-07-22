@@ -43,8 +43,29 @@ export interface AsignacionAcademica {
    */
   recursoId: string;
 
+  /**
+   * ID externo del archivo en Google Drive asociado al recurso.
+   * Se usa para solicitar URLs temporales sin exponer enlaces permanentes.
+   */
+  externalFileId?: string;
+
+  /**
+   * ID de video de YouTube copiado desde `RecursoAcademico.youtubeVideoId` al publicar
+   * (ver `publishAsignacion` en asignacionService.ts). Cuando está presente, el alumno ve
+   * el reproductor real de YouTube (IFrame Player API) en vez del proxy de Drive -- solo
+   * aplica a material de video; PDF sigue igual, con Drive.
+   */
+  youtubeVideoId?: string | null;
+
+  /**
+   * Jornada (clase) real a la que se asignó el material.
+   * Ausente en asignaciones publicadas antes de este campo o sin jornada asociada.
+   */
+  jornadaId?: string;
+
   titulo: string;
   descripcion?: string;
+  tags?: string[];
 
   destinatario: DestinatarioAsignacion;
 
@@ -57,6 +78,10 @@ export interface AsignacionAcademica {
   fechaCierre?: string;
 
   estado: EstadoAsignacionAcademica;
+
+  /** Metadatos del recurso copiados a la asignación */
+  totalPaginas?: number;
+  duracionSegundos?: number;
 
   creadoPorUid: string;
   creadoEn: string;

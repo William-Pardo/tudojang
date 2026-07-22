@@ -59,7 +59,7 @@ describe('QuizView', () => {
     await user.click(screen.getByLabelText('Correcta'));
     await user.click(screen.getByRole('button', { name: /enviar respuestas/i }));
 
-    expect(screen.getByText(/quiz aprobado/i)).toBeInTheDocument();
+    expect(await screen.findByText(/quiz aprobado/i)).toBeInTheDocument();
     expect(screen.getByText(/puntaje: 100%/i)).toBeInTheDocument();
     expect(onResultado).toHaveBeenCalledWith(expect.objectContaining({
       aprobado: true,
@@ -94,14 +94,14 @@ describe('QuizView', () => {
 
     await user.click(screen.getByLabelText('Correcta'));
     await user.click(screen.getByRole('button', { name: /enviar respuestas/i }));
-    expect(screen.getByText(/quiz aprobado/i)).toBeInTheDocument();
+    expect(await screen.findByText(/quiz aprobado/i)).toBeInTheDocument();
 
     unmount();
 
     const onResultadoRestaurado = jest.fn();
     render(<QuizView asignacion={asignacion} preguntas={preguntas} onResultado={onResultadoRestaurado} />);
 
-    expect(screen.getByText(/quiz aprobado/i)).toBeInTheDocument();
+    expect(await screen.findByText(/quiz aprobado/i)).toBeInTheDocument();
     expect(screen.getByText(/puntaje: 100%/i)).toBeInTheDocument();
     expect(onResultadoRestaurado).toHaveBeenCalledWith(expect.objectContaining({
       aprobado: true,

@@ -23,13 +23,13 @@ import {
     getDocs,
     doc,
     getDoc,
-    addDoc,
     updateDoc,
     deleteDoc,
     query,
     where,
     writeBatch,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { GrupoEdad, EstadoPago, GradoTKD, type Estudiante } from '../tipos';
 
@@ -40,12 +40,20 @@ jest.mock('firebase/firestore', () => ({
     getDocs: jest.fn(),
     doc: jest.fn(),
     getDoc: jest.fn(),
-    addDoc: jest.fn(),
     updateDoc: jest.fn(),
     deleteDoc: jest.fn(),
     query: jest.fn(),
     where: jest.fn(),
     writeBatch: jest.fn(),
+}));
+
+// agregarEstudiante ya NO escribe directo a Firestore (fix seguridad 2026-07-18, mismo
+// patrón que sedesApi/agregarSede): pasa por la Cloud Function `crearEstudiante`, que
+// revalida el límite del plan server-side. Mismo mock que servicios/sedesApi.test.ts.
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+    getFunctions: jest.fn(() => 'functions-mock'),
+    httpsCallable: jest.fn(() => mockCallable),
 }));
 
 jest.mock('firebase/storage', () => ({
@@ -271,84 +279,83 @@ describe('estudiantesApi — Suite completa (unitarios + integración + excepci�
     });
 
     // ════════════════════════════════════════════════════════════════════════
-    // 4. agregarEstudiante — Triangulación de grupos por fecha de nacimiento
+    // 4. agregarEstudiante — via Cloud Function crearEstudiante
     // ════════════════════════════════════════════════════════════════════════
-    describe('agregarEstudiante (Triangulación grupos/estado)', () => {
+    // Fix seguridad (2026-07-18, mismo patrón ya resuelto para sedes/agregarSede):
+    // agregarEstudiante YA NO escribe directo a Firestore (`addDoc`) -- pasa por la Cloud
+    // Function `crearEstudiante`, que revalida server-side el límite del plan
+    // (`tenant.limiteEstudiantes`) antes de crear. Antes, ese límite SOLO se chequeaba en
+    // el botón de la UI (hooks/useGestionEstudiantes.ts), bypaseable con un write directo
+    // o vía la importación masiva (ModalImportacionMasiva.tsx), que llama a esta misma
+    // función en loop.
+    describe('agregarEstudiante (Triangulación grupos/estado, via Cloud Function)', () => {
         const baseEstudiante = buildEstudiante();
         const { id, historialPagos, ...sinId } = baseEstudiante;
 
-        it('[Integración] persiste el estudiante y retorna con id asignado por Firestore', async () => {
-            const mockRef = { id: 'nuevo-id-123' };
-            (addDoc as jest.Mock).mockResolvedValue(mockRef);
+        it('[Integración] invoca la Cloud Function crearEstudiante con el payload y retorna el estudiante creado', async () => {
+            const estudianteCreado: Estudiante = { ...baseEstudiante, id: 'nuevo-id-123' };
+            mockCallable.mockResolvedValue({ data: estudianteCreado });
 
             const resultado = await agregarEstudiante(sinId);
 
-            // La collection se llama a nivel de módulo → el primer argumento puede ser undefined en el mock
-            // Lo relevante es verificar el payload del documento
-            expect(addDoc).toHaveBeenCalledTimes(1);
-            const [, payload] = (addDoc as jest.Mock).mock.calls[0];
-            expect(payload).toMatchObject({
-                nombres: 'Juan',
-                historialPagos: [],
-                carnetGenerado: false,
-            });
-            expect(resultado.id).toBe('nuevo-id-123');
+            expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'crearEstudiante');
+            expect(mockCallable).toHaveBeenCalledWith(
+                expect.objectContaining({ nombres: 'Juan' })
+            );
+            expect(resultado).toEqual(estudianteCreado);
         });
 
         it('[Triangulación — Caso 1] estudiante Infantil (< 9 años) se persiste con GrupoEdad.Infantil', async () => {
-            const mockRef = { id: 'tri-infantil' };
-            (addDoc as jest.Mock).mockResolvedValue(mockRef);
-
             const infantil = { ...sinId, grupo: GrupoEdad.Infantil, fechaNacimiento: '2018-01-01' };
+            mockCallable.mockResolvedValue({ data: { ...infantil, id: 'tri-infantil', historialPagos: [] } });
+
             const resultado = await agregarEstudiante(infantil);
 
             expect(resultado.grupo).toBe(GrupoEdad.Infantil);
         });
 
         it('[Triangulación — Caso 2] estudiante Precadet (9-12 años) se persiste con GrupoEdad.Precadetes', async () => {
-            const mockRef = { id: 'tri-precadet' };
-            (addDoc as jest.Mock).mockResolvedValue(mockRef);
-
             const precadet = { ...sinId, grupo: GrupoEdad.Precadetes, fechaNacimiento: '2014-06-01' };
+            mockCallable.mockResolvedValue({ data: { ...precadet, id: 'tri-precadet', historialPagos: [] } });
+
             const resultado = await agregarEstudiante(precadet);
 
             expect(resultado.grupo).toBe(GrupoEdad.Precadetes);
         });
 
         it('[Triangulación — Caso 3] estudiante Cadete (13-17 años) se persiste con GrupoEdad.Cadetes', async () => {
-            const mockRef = { id: 'tri-cadet' };
-            (addDoc as jest.Mock).mockResolvedValue(mockRef);
-
             const cadet = { ...sinId, grupo: GrupoEdad.Cadetes, fechaNacimiento: '2009-03-15' };
+            mockCallable.mockResolvedValue({ data: { ...cadet, id: 'tri-cadet', historialPagos: [] } });
+
             const resultado = await agregarEstudiante(cadet);
 
             expect(resultado.grupo).toBe(GrupoEdad.Cadetes);
         });
 
         it('[Triangulación — Caso 4] estudiante Adulto (≥ 18 años) se persiste con GrupoEdad.Adultos', async () => {
-            const mockRef = { id: 'tri-adulto' };
-            (addDoc as jest.Mock).mockResolvedValue(mockRef);
-
             const adulto = { ...sinId, grupo: GrupoEdad.Adultos, fechaNacimiento: '1990-12-31' };
+            mockCallable.mockResolvedValue({ data: { ...adulto, id: 'tri-adulto', historialPagos: [] } });
+
             const resultado = await agregarEstudiante(adulto);
 
             expect(resultado.grupo).toBe(GrupoEdad.Adultos);
         });
 
-        it('[Unitario — Modo simulado] retorna estudiante con id generado localmente', async () => {
+        it('[Unitario — Modo simulado] retorna estudiante con id generado localmente, sin invocar la Cloud Function', async () => {
             (require('../firebase/config') as any).isFirebaseConfigured = false;
 
             const resultado = await agregarEstudiante(sinId);
 
-            expect(addDoc).not.toHaveBeenCalled();
+            expect(httpsCallable).not.toHaveBeenCalled();
+            expect(mockCallable).not.toHaveBeenCalled();
             expect(resultado.id).toMatch(/^mock-/);
             expect(resultado.historialPagos).toEqual([]);
         });
 
-        it('[Excepción] propaga error si Firestore falla al crear', async () => {
-            (addDoc as jest.Mock).mockRejectedValue(new Error('Cuota excedida'));
+        it('[Excepción] propaga el error si la Cloud Function rechaza (ej. límite del plan alcanzado)', async () => {
+            mockCallable.mockRejectedValue(new Error('Límite del plan superado (50 alumnos)'));
 
-            await expect(agregarEstudiante(sinId)).rejects.toThrow('Cuota excedida');
+            await expect(agregarEstudiante(sinId)).rejects.toThrow(/límite del plan/i);
         });
     });
 

@@ -1,49 +1,33 @@
 // vistas/LicenciaSuspendida.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useEstadoLicencia } from '../hooks/useEstadoLicencia';
 import { IconoLogoOficial, IconoGuardar, IconoInformacion, IconoWhatsApp } from '../components/Iconos';
 import { formatearPrecio } from '../utils/formatters';
-import { PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
-import { firmarCheckoutWompi } from '../servicios/wompiApi';
+import { PLANES_SAAS } from '../constantes';
+import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
+
+// Meses que se cobran en un pago anual (12 meses de plan, 10 cobrados -- 2 de bonificación).
+// Mismo criterio que vistas/PasarelaPagos.tsx.
+const MESES_A_COBRAR_ANUAL = 10;
 
 const LicenciaSuspendida: React.FC = () => {
     const { diasRestantes, fechaVencimiento, plan, diasGracia, configClub } = useEstadoLicencia();
+    const [periodoAnual, setPeriodoAnual] = useState(false);
 
     const planActual = (PLANES_SAAS as any)[plan || 'starter'] || PLANES_SAAS.starter;
+    const montoAPagar = planActual.precio * (periodoAnual ? MESES_A_COBRAR_ANUAL : 1);
 
     const handlePagarConWompi = async () => {
         try {
-            // Priorizar URL de pago personalizada si existe
-            if (planActual.urlPago) {
-                window.location.assign(planActual.urlPago);
-                return;
-            }
-
-            const precio = planActual.precio;
-            const precioEnCentavos = precio * 100;
-            const moneda = 'COP';
-            // IMPORTANTE: Referencia con prefijo SUSC_ para el Webhook
-            const referencia = `SUSC_${configClub?.tenantId || 'TEST'}_${planActual.id}_${Date.now()}`;
-
-            const signature = await firmarCheckoutWompi({
-                reference: referencia,
-                amountInCents: precioEnCentavos,
-                currency: moneda,
-            });
-
             const urlRetorno = `${window.location.origin}/#/`;
-            let urlWompi = `https://checkout.wompi.co/p/?` +
-                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                `currency=${moneda}&` +
-                `amount-in-cents=${precioEnCentavos}&` +
-                `reference=${referencia}&` +
-                `signature:integrity=${signature}&` +
-                `redirect-url=${encodeURIComponent(urlRetorno)}`;
-
-            // Si el plan tiene ID de suscripción automática, lo activamos
-            if (planActual.wompiPlanId) {
-                urlWompi += `&subscription-plan-id=${planActual.wompiPlanId}`;
-            }
+            const urlWompi = await construirUrlCheckoutWompi({
+                tenantId: configClub?.tenantId || 'TEST',
+                itemType: 'plan',
+                itemId: planActual.id,
+                periodo: periodoAnual ? 'anual' : 'mensual',
+                montoEnPesos: montoAPagar,
+                redirectUrl: urlRetorno,
+            });
 
             window.location.assign(urlWompi);
         } catch (error) {
@@ -93,6 +77,26 @@ const LicenciaSuspendida: React.FC = () => {
                         <p className="text-gray-400 font-bold uppercase text-[11px] tracking-widest">Activa instantáneamente el acceso a tu academia</p>
                     </div>
 
+                    {/* SELECTOR DE PERIODO (mismo patron que vistas/PasarelaPagos.tsx) */}
+                    <div className="flex items-center gap-3">
+                        <div className="bg-gray-100 dark:bg-white/10 p-1.5 rounded-2xl flex items-center shadow-inner">
+                            <button
+                                type="button"
+                                onClick={() => setPeriodoAnual(false)}
+                                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
+                            >
+                                Mensual
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPeriodoAnual(true)}
+                                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
+                            >
+                                Anual (Ahorra 2 Meses)
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="tkd-card dark:bg-white/5 border-2 border-tkd-blue/20 p-8 space-y-6 relative overflow-hidden group">
                         <div className="flex justify-between items-start relative z-10">
                             <div>
@@ -100,8 +104,10 @@ const LicenciaSuspendida: React.FC = () => {
                                 <h3 className="text-3xl font-black uppercase tracking-tighter">{planActual.nombre}</h3>
                             </div>
                             <div className="text-right">
-                                <p className="text-3xl font-black text-tkd-blue">{formatearPrecio(planActual.precio)}</p>
-                                <p className="text-[9px] font-black text-gray-400 uppercase">Mensualidad recurrente</p>
+                                <p className="text-3xl font-black text-tkd-blue">{formatearPrecio(montoAPagar)}</p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase">
+                                    {periodoAnual ? 'Pago único anual' : 'Mensualidad recurrente'}
+                                </p>
                             </div>
                         </div>
 

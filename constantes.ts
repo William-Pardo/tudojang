@@ -1,6 +1,7 @@
 
 // constantes.ts
 import { ConfiguracionClub } from './tipos';
+import planesConfig from './functions/planes-config.json';
 
 export const PLANTILLAS_NOTIFICACIONES = {
     BIENVENIDA: [
@@ -91,54 +92,59 @@ export const BASE_CONOCIMIENTO_PQRS = [
     { id: "pagos-1", pregunta: "¿Cuáles son los medios de pago?", respuesta: "Aceptamos transferencias por Nequi, Daviplata o Bancolombia. Por favor, enviar siempre el comprobante para legalizar el pago." }
 ];
 
+// Los valores numéricos (precio, límites) viven en planes-config.json (raíz del repo),
+// única fuente de verdad compartida con functions/wompiCobroAutomatico.js,
+// functions/academico/sedes.js y functions/academico/estudiantes.js. Acá solo se agregan
+// los campos de presentación (id, nombre, características, popular) que son exclusivos
+// del frontend.
 export const PLANES_SAAS = {
     starter: {
         id: 'starter',
         nombre: 'Plan Starter',
-        precio: 160000,
-        limiteEstudiantes: 50,
-        limiteUsuarios: 2,
-        limiteSedes: 2, // 1 Principal + 1 Adicional
+        ...planesConfig.planes.starter, // 1 Principal + 1 Adicional
         caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede Adicional', 'Gestión de Tienda', 'Eventos Básicos'],
-        popular: false,
-        urlPago: 'https://checkout.wompi.co/l/1GGerS',
-        wompiPlanId: ''
+        popular: false
     },
     growth: {
         id: 'growth',
         nombre: 'Plan Growth',
-        precio: 340000,
-        limiteEstudiantes: 150,
-        limiteUsuarios: 5,
-        limiteSedes: 3, // 1 Principal + 2 Adicionales
+        ...planesConfig.planes.growth, // 1 Principal + 2 Adicionales
         caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes Adicionales', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
-        popular: true,
-        urlPago: 'https://checkout.wompi.co/l/JeY7cH',
-        wompiPlanId: ''
+        popular: true
     },
     pro: {
         id: 'pro',
         nombre: 'Plan Pro',
-        precio: 580000,
-        limiteEstudiantes: 350,
-        limiteUsuarios: 10,
-        limiteSedes: 6, // 1 Principal + 5 Adicionales
+        ...planesConfig.planes.pro, // 1 Principal + 5 Adicionales
         caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes Adicionales', 'Soporte Sabonim AI', 'Exportación Pro'],
-        popular: false,
-        urlPago: 'https://checkout.wompi.co/l/M3ayL6',
-        wompiPlanId: ''
+        popular: false
     }
 };
 
 
 export const COSTOS_ADICIONALES = {
-    estudiantes: { cantidad: 10, label: '+10 Alumnos', precio: 15000, key: 'estudiantes', urlPago: 'https://checkout.wompi.co/l/SmeaJa' },
-    instructor: { cantidad: 1, label: '+1 Miembro Equipo', precio: 10000, key: 'instructor', urlPago: 'https://checkout.wompi.co/l/CKvRj2' },
-    sede: { cantidad: 1, label: '+1 Sede Adicional', precio: 30000, key: 'sede', urlPago: 'https://checkout.wompi.co/l/cNOILo' }
+    estudiantes: { ...planesConfig.addons.estudiantes, label: '+10 Alumnos', key: 'estudiantes' },
+    instructor: { ...planesConfig.addons.instructor, label: '+1 Miembro Equipo', key: 'instructor' },
+    sede: { ...planesConfig.addons.sede, label: '+1 Sede Adicional', key: 'sede' }
 };
 
 export const CONFIGURACION_WOMPI = {
     publicKey: "pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB",
     webhookUrl: "https://us-central1-tudojang.cloudfunctions.net/webhookWompi"
 };
+
+// Whitelist deliberadamente acotada a las pasarelas de pago colombianas más comunes.
+// Se usa para validar el Payment Link externo que cada academia configura para que sus
+// alumnos paguen mensualidad (ver ConfiguracionClub.linkPagoMensualidad en tipos.ts).
+// Tudojang NO procesa ni recibe ese dinero -- solo valida que el link apunte a una
+// pasarela conocida antes de mostrarlo al alumno. Para sumar una pasarela nueva alcanza
+// con agregar su dominio de checkout acá, sin tocar el resto del código.
+// IMPORTANTE: si se modifica esta lista, sincronizar también la regex de firestore.rules
+// (match /tenants/{tenantId}, validación de linkPagoMensualidad).
+export const DOMINIOS_PASARELAS_PAGO_PERMITIDOS = [
+    'checkout.wompi.co',
+    'checkout.payulatam.com',
+    'checkout.epayco.co',
+    'secure.payco.co',
+];
 

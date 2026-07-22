@@ -7,9 +7,8 @@ import { registrarNuevaEscuela, buscarTenantPorSlug } from '../servicios/configu
 import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
-import { CONFIGURACION_WOMPI } from '../constantes';
 import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
-import { firmarCheckoutWompi } from '../servicios/wompiApi';
+import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -28,6 +27,8 @@ const generarSlug = (nombre: string) => {
 const RegistroEscuela: React.FC = () => {
     const [paso, setPaso] = useState<'formulario' | 'procesando' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
+    const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
+    const [aceptaTerminos, setAceptaTerminos] = useState(false);
     const [datosTemporales, setDatosTemporales] = useState<any>(null); // Datos tras volver de Wompi
     const [passwordCopiada, setPasswordCopiada] = useState(false); // Control para habilitar login
     const [debugLog, setDebugLog] = useState<string>('');
@@ -38,6 +39,7 @@ const RegistroEscuela: React.FC = () => {
 
     const nombreClub = watch('nombreClub');
     const slugCalculado = nombreClub ? generarSlug(nombreClub) : '';
+    const aceptoCondicionesLegales = aceptaPrivacidad && aceptaTerminos;
 
     // Helper robusto para obtener parámetros sin importar HashRouter
     const getParam = (name: string) => {
@@ -102,6 +104,11 @@ const RegistroEscuela: React.FC = () => {
     }, [window.location.search, window.location.hash]);
 
     const onSubmit = async (data: any) => {
+        if (!aceptoCondicionesLegales) {
+            mostrarNotificacion('Debes aceptar la política de privacidad y los términos del servicio para continuar.', 'error');
+            return;
+        }
+
         const log = (msg: string) => {
             setDebugLog(msg);
             if ((window as any).setAppDebugLog) (window as any).setAppDebugLog(msg);
@@ -167,27 +174,18 @@ const RegistroEscuela: React.FC = () => {
 
             console.log("Calculando firmas...");
             const precioParam = getParam('precio') || '50000';
-            const montoCentavos = parseInt(precioParam) * 100;
-            const referencia = `SUSC_${slug.toUpperCase()}_${nuevoTenantId}`;
-            const moneda = 'COP';
 
             log("Generando firma...");
-            const precioWompi = parseInt(precioParam) * 100;
-            const firmaIntegridad = await firmarCheckoutWompi({
-                reference: nuevoTenantId,
-                amountInCents: precioWompi,
-                currency: 'COP',
+            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
+            const urlWompi = await construirUrlCheckoutWompi({
+                tenantId: nuevoTenantId,
+                itemType: 'alta',
+                itemId: planId || 'starter',
+                periodo: 'mensual',
+                montoEnPesos: parseInt(precioParam, 10),
+                redirectUrl: urlRetorno,
             });
             log("Firma generada. Preparando URL...");
-
-            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
-            const urlWompi = `https://checkout.wompi.co/p/?` +
-                `public-key=${CONFIGURACION_WOMPI.publicKey}&` +
-                `currency=COP&` +
-                `amount-in-cents=${precioWompi}&` +
-                `reference=${nuevoTenantId}&` +
-                `signature:integrity=${firmaIntegridad}&` +
-                `redirect-url=${encodeURIComponent(urlRetorno)}`;
 
             console.log("Redirigiendo a Wompi:", urlWompi);
             log("URL Lista. Redirigiendo...");
@@ -393,17 +391,83 @@ const RegistroEscuela: React.FC = () => {
 
                             <button
                                 type="submit"
-                                disabled={cargando}
+                                disabled={cargando || !aceptoCondicionesLegales}
                                 className="w-full bg-tkd-dark text-white py-6 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-tkd-blue transition-all flex items-center justify-center gap-4 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 mt-4"
                             >
                                 {cargando ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-5 h-5" />}
                                 Ir al Pago Seguro
                             </button>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 cursor-pointer hover:border-tkd-blue/40 transition-colors">
+                                    <input
+                                        id="aceptaPrivacidad"
+                                        type="checkbox"
+                                        checked={aceptaPrivacidad}
+                                        onChange={(event) => setAceptaPrivacidad(event.target.checked)}
+                                        aria-label="Aceptar política de privacidad"
+                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-tkd-blue focus:ring-tkd-blue"
+                                    />
+                                    <span className="text-[9px] font-black uppercase tracking-[0.12em] leading-relaxed text-gray-500">
+                                        Acepto la{' '}
+                                        <a
+                                            href="/privacy.html"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-tkd-blue underline underline-offset-2"
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            política de privacidad
+                                        </a>
+                                    </span>
+                                </label>
+
+                                <label className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4 cursor-pointer hover:border-tkd-blue/40 transition-colors">
+                                    <input
+                                        id="aceptaTerminos"
+                                        type="checkbox"
+                                        checked={aceptaTerminos}
+                                        onChange={(event) => setAceptaTerminos(event.target.checked)}
+                                        aria-label="Aceptar términos del servicio"
+                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-tkd-blue focus:ring-tkd-blue"
+                                    />
+                                    <span className="text-[9px] font-black uppercase tracking-[0.12em] leading-relaxed text-gray-500">
+                                        Acepto los{' '}
+                                        <a
+                                            href="/terms.html"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-tkd-blue underline underline-offset-2"
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            términos del servicio
+                                        </a>
+                                    </span>
+                                </label>
+                            </div>
                         </form>
                     </div>
                 </div>
             </div>
             <footer className="py-8 border-t border-gray-100 text-center bg-white">
+                <div className="mb-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-8">
+                    <a
+                        href="/privacy.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-black text-gray-400 uppercase tracking-[0.25em] hover:text-tkd-blue transition-colors"
+                    >
+                        Política de privacidad
+                    </a>
+                    <a
+                        href="/terms.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-black text-gray-400 uppercase tracking-[0.25em] hover:text-tkd-blue transition-colors"
+                    >
+                        Términos del servicio
+                    </a>
+                </div>
                 <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em]">Aliant • Tudojang SaaS Core 2026</p>
             </footer>
         </div>

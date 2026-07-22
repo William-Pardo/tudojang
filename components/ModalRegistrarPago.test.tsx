@@ -1,13 +1,37 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { obtenerDeudasEstudiante, procesarPagoEfectivo } from '../servicios/pagosApi';
+import { obtenerDeudasEstudiante, procesarPagoEfectivo, obtenerUltimoPagoEfectivo, anularUltimoPagoEfectivo } from '../servicios/pagosApi';
 import { obtenerConfiguracionClub } from '../servicios/configuracionApi';
 
 const generarImagen = jest.fn(), descargarComprobante = jest.fn(), compartirPorWhatsApp = jest.fn();
 jest.mock('./ComprobantesPago', () => ({ useGeneradorComprobante: () => ({ generarImagen, descargarComprobante, compartirPorWhatsApp }) }));
-jest.mock('../servicios/pagosApi', () => ({ obtenerDeudasEstudiante: jest.fn(), procesarPagoEfectivo: jest.fn() }));
+// Fix 2026-07-22: el mock solo declaraba 2 de las 4 funciones que el componente importa.
+// `obtenerUltimoPagoEfectivo` y `anularUltimoPagoEfectivo` llegaban como `undefined` y
+// reventaban al invocarse -- la funcionalidad de anular el ultimo pago se agrego al
+// componente y este mock nunca se actualizo.
+jest.mock('../servicios/pagosApi', () => ({
+  obtenerDeudasEstudiante: jest.fn(),
+  procesarPagoEfectivo: jest.fn(),
+  obtenerUltimoPagoEfectivo: jest.fn(),
+  anularUltimoPagoEfectivo: jest.fn(),
+}));
 jest.mock('../servicios/configuracionApi', () => ({ obtenerConfiguracionClub: jest.fn() }));
+
+// Fix 2026-07-22: el componente pasó a usar `useAuth()` (linea 35) para gatear la anulacion
+// de pagos a Admin. Sin este mock, los 8 tests morian con "useAuth debe ser usado dentro de
+// un AuthProvider" antes de renderizar nada.
+const usuarioLogueado: { valor: any } = { valor: null };
+jest.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ usuario: usuarioLogueado.valor }),
+}));
+
+// Idem: el componente tambien tomo dependencia de `useNotificacion` para avisar el
+// resultado de la anulacion. Sin proveedor ni mock, moria antes de renderizar.
+const mostrarNotificacion = jest.fn();
+jest.mock('../context/NotificacionContext', () => ({
+  useNotificacion: () => ({ mostrarNotificacion }),
+}));
 
 import ModalRegistrarPago from './ModalRegistrarPago';
 
@@ -25,6 +49,9 @@ const deudas: any[] = [
 describe('ModalRegistrarPago', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Rol no-Admin por defecto: la anulacion de pagos esta gateada a Admin, y los casos
+    // originales de esta suite no la ejercitan.
+    usuarioLogueado.valor = { id: 'u1', tenantId: 't1', rol: 'Editor' };
     (obtenerDeudasEstudiante as jest.Mock).mockResolvedValue({ items: deudas });
     (obtenerConfiguracionClub as jest.Mock).mockResolvedValue({ nombreClub: 'Club' });
     generarImagen.mockResolvedValue('data:image/png,ok');
@@ -141,5 +168,100 @@ describe('ModalRegistrarPago', () => {
     resolver(null);
     await waitFor(() => expect(screen.queryByText('Generando comprobante...')).not.toBeInTheDocument());
     expect(screen.queryByAltText('Comprobante de pago')).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------------
+  // Anulacion del ultimo pago.
+  //
+  // Estos casos VIVIAN en components/FilaEstudiante.test.tsx. El commit b0ed3c5
+  // ("feat(finance): unify payment actions in modal") movio la funcionalidad de la fila al
+  // modal, pero los tests se quedaron en el archivo viejo apuntando a un boton `/Deshacer/`
+  // que ya no existe ahi -- por eso 5 de los 6 fallos de esa suite. Se trasladan aca, a
+  // donde la funcionalidad realmente vive, en vez de borrarlos y perder la cobertura.
+  // ---------------------------------------------------------------------------------
+  describe('anulación del último pago', () => {
+    const ultimoPago: any = {
+      id: 'tx-1', reciboId: 'REC-9', fecha: '2026-01-05T10:00:00.000Z',
+      montoTotal: 100, itemsPagados: [{ descripcion: 'Mensualidad', monto: 100 }],
+    };
+
+    const abrirConfirmacion = async (user: ReturnType<typeof userEvent.setup>) => {
+      await screen.findByText('Dobok');
+      await user.click(screen.getByRole('button', { name: /Último Recibo/i }));
+      await user.click(await screen.findByRole('button', { name: /Anular Este Recibo/i }));
+    };
+
+    beforeEach(() => {
+      // La pestaña "Último Recibo" y todo el flujo de anulación estan gateados a Admin
+      // (ModalRegistrarPago.tsx:277, `!resultado && esAdmin`), igual que en la fila de la
+      // que se trasladaron estos casos.
+      usuarioLogueado.valor = { id: 'u1', tenantId: 't1', rol: 'Admin' };
+      (obtenerUltimoPagoEfectivo as jest.Mock).mockResolvedValue(ultimoPago);
+    });
+
+    it('permite cerrar la confirmación sin anular', async () => {
+      const user = userEvent.setup();
+      render(<ModalRegistrarPago estudiante={estudiante} abierto onCerrar={jest.fn()} />);
+      await abrirConfirmacion(user);
+
+      expect(screen.getByText('Deshacer Último Pago')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Cancelar/i }));
+
+      // ModalConfirmacion.handleClose difiere el onCerrar 200ms para la animacion de
+      // salida, asi que el cierre no es sincrono.
+      await waitFor(() =>
+        expect(screen.queryByText('Deshacer Último Pago')).not.toBeInTheDocument()
+      );
+      expect(anularUltimoPagoEfectivo).not.toHaveBeenCalled();
+    });
+
+    it('notifica y cierra la confirmación cuando la anulación es exitosa', async () => {
+      const user = userEvent.setup();
+      let resolver!: (value: any) => void;
+      (anularUltimoPagoEfectivo as jest.Mock).mockReturnValue(new Promise((r) => { resolver = r; }));
+      render(<ModalRegistrarPago estudiante={estudiante} abierto onCerrar={jest.fn()} />);
+      await abrirConfirmacion(user);
+      await user.click(screen.getByRole('button', { name: /^Confirmar$/i }));
+
+      resolver({ exito: true });
+
+      await waitFor(() =>
+        expect(mostrarNotificacion).toHaveBeenCalledWith('Pago anulado correctamente', 'success')
+      );
+      // El id del usuario logueado viaja al servicio para la traza de auditoria.
+      expect(anularUltimoPagoEfectivo).toHaveBeenCalledWith('e1', 'u1');
+      await waitFor(() =>
+        expect(screen.queryByText('Deshacer Último Pago')).not.toBeInTheDocument()
+      );
+    });
+
+    it.each([
+      [{ exito: false, mensaje: 'No hay pagos' }, 'No hay pagos'],
+      [{ exito: false }, 'Error al anular pago'],
+    ])('notifica un resultado fallido sin cerrar la confirmación', async (resultado, mensaje) => {
+      const user = userEvent.setup();
+      (anularUltimoPagoEfectivo as jest.Mock).mockResolvedValue(resultado);
+      render(<ModalRegistrarPago estudiante={estudiante} abierto onCerrar={jest.fn()} />);
+      await abrirConfirmacion(user);
+      await user.click(screen.getByRole('button', { name: /^Confirmar$/i }));
+
+      await waitFor(() => expect(mostrarNotificacion).toHaveBeenCalledWith(mensaje, 'error'));
+      expect(screen.getByText('Deshacer Último Pago')).toBeInTheDocument();
+    });
+
+    it('captura excepciones al anular incluso sin usuario autenticado', async () => {
+      const user = userEvent.setup();
+      // Admin sin `id`: reproduce el caso original ("sin usuario autenticado" = sin uid que
+      // mandar a auditoria). Con usuario null la pestaña ni se renderiza, porque esAdmin
+      // seria false.
+      usuarioLogueado.valor = { rol: 'Admin' };
+      (anularUltimoPagoEfectivo as jest.Mock).mockRejectedValue(new Error('Fallo de red'));
+      render(<ModalRegistrarPago estudiante={estudiante} abierto onCerrar={jest.fn()} />);
+      await abrirConfirmacion(user);
+      await user.click(screen.getByRole('button', { name: /^Confirmar$/i }));
+
+      await waitFor(() => expect(mostrarNotificacion).toHaveBeenCalledWith('Fallo de red', 'error'));
+      expect(anularUltimoPagoEfectivo).toHaveBeenCalledWith('e1', undefined);
+    });
   });
 });

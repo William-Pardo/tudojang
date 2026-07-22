@@ -1,6 +1,8 @@
 import React from 'react';
 import type { DisponibilidadEspacio, EspacioFisico, ReservaEspacio } from '../../models/academico/espacio';
 import { createEspacio, getDisponibilidad } from '../../servicios/academico/espacioService';
+import { espacioRepository } from '../../servicios/academico/espacioRepository';
+import { useAuth } from '../../context/AuthContext';
 
 const reservaExistente: ReservaEspacio = {
   id: 'reserva-existente-1',
@@ -12,6 +14,10 @@ const reservaExistente: ReservaEspacio = {
 };
 
 const EspaciosView: React.FC = () => {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenantId ?? 'tenant-local';
+  const sedeId = usuario?.sedeId ?? '';
+
   const [nombre, setNombre] = React.useState('Tatami principal');
   const [capacidad, setCapacidad] = React.useState('30');
   const [espacios, setEspacios] = React.useState<EspacioFisico[]>([]);
@@ -19,17 +25,40 @@ const EspaciosView: React.FC = () => {
     disponible: true,
     conflictos: [],
   });
+  const [guardando, setGuardando] = React.useState(false);
+  const [errorGuardado, setErrorGuardado] = React.useState<string | null>(null);
 
-  const crear = () => {
-    const espacio = createEspacio({
-      tenantId: 'tenant-demo',
-      sedeId: 'sede-principal',
-      nombre,
-      capacidad: Number(capacidad),
-      disciplinasPermitidas: ['taekwondo'],
-    });
-    setEspacios((actuales) => [...actuales, espacio]);
-    setDisponibilidad({ disponible: true, conflictos: [] });
+  // Carga los espacios REALES del tenant (Firestore o mock segun config). Antes la vista solo
+  // guardaba en memoria local con setEspacios y nunca persistia (DT-0007): el selector de la
+  // Agenda siempre recibia []. Ahora lee del repositorio como fuente de verdad.
+  const cargarEspacios = React.useCallback(async () => {
+    const lista = await espacioRepository.listarEspaciosPorTenant(tenantId);
+    setEspacios(lista);
+  }, [tenantId]);
+
+  React.useEffect(() => {
+    void cargarEspacios();
+  }, [cargarEspacios]);
+
+  const crear = async () => {
+    setGuardando(true);
+    setErrorGuardado(null);
+    try {
+      const espacio = createEspacio({
+        tenantId,
+        sedeId,
+        nombre,
+        capacidad: Number(capacidad),
+        disciplinasPermitidas: ['taekwondo'],
+      });
+      await espacioRepository.guardarEspacio(espacio);
+      await cargarEspacios();
+      setDisponibilidad({ disponible: true, conflictos: [] });
+    } catch {
+      setErrorGuardado('No se pudo guardar el espacio. Intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const probarConflicto = () => {
@@ -82,7 +111,8 @@ const EspaciosView: React.FC = () => {
           <button
             type="button"
             onClick={crear}
-            className="rounded-2xl bg-tkd-dark text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest"
+            disabled={guardando}
+            className="rounded-2xl bg-tkd-dark text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
           >
             Crear espacio
           </button>
@@ -94,6 +124,10 @@ const EspaciosView: React.FC = () => {
             Probar horario con conflicto
           </button>
         </div>
+
+        {errorGuardado ? (
+          <p className="text-xs font-black uppercase tracking-widest text-tkd-red">{errorGuardado}</p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

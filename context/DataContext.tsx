@@ -6,8 +6,10 @@ import type {
     MovimientoFinanciero, Sede, ConfiguracionNotificaciones, ConfiguracionClub,
     Programa, BloqueHorario
 } from '../tipos';
+import { RolUsuario } from '../tipos';
 import * as api from '../servicios/api';
 import { useTenant } from '../components/BrandingProvider';
+import { useAuth } from './AuthContext';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 import { sanearSedes, getSedesVisibles, getTotalSedesActivas } from '../utils/dataIntegrity'; // Importar saneamiento y funciones de sedes
 
@@ -106,6 +108,7 @@ const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { tenant, cargarTenant } = useTenant();
+    const { usuario } = useAuth();
 
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [configNotificaciones, setConfigNotificaciones] = useState<ConfiguracionNotificaciones>({
@@ -136,7 +139,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
-        console.log("[DataContext] Iniciando sincronización para:", tenant.nombreClub, `(ID: ${tenant.tenantId})`);
+        // Fix tutor-role-end-to-end (2026-07-14): Tutor Y Estudiante son consultores — misma
+        // carga acotada (sin colecciones instructor-only, evita permission-denied spam).
+        const isTutor = usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante;
+        console.log("[DataContext] Iniciando sincronización para:", tenant.nombreClub, `(ID: ${tenant.tenantId}) | Rol: ${usuario?.rol || 'desconocido'}`);
         setCargando(true);
         setError(null);
 
@@ -146,18 +152,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
 
         try {
+            // FASE 7: Bifurcación por rol. Tutor NO carga colecciones instructor-only
             const results = await Promise.race([
-                Promise.allSettled([
-                    api.obtenerUsuarios(),
-                    api.obtenerConfiguracionNotificaciones(tenant.tenantId),
-                    api.obtenerSedes(tenant.tenantId).then(sanearSedes),
-                    api.obtenerEstudiantes(),
-                    api.obtenerEventos(),
-                    api.obtenerImplementos(),
-                    api.obtenerSolicitudesCompra(),
-                    api.obtenerMovimientos(),
-                    api.obtenerProgramas()
-                ]),
+                Promise.allSettled(
+                    isTutor
+                        ? [
+                            // Tutor (consultor): tenant data + Tienda (implementos) + Eventos,
+                            // sin colecciones staff (usuarios/sedes/estudiantes).
+                            api.obtenerConfiguracionNotificaciones(tenant.tenantId),
+                            api.obtenerImplementos(),
+                            api.obtenerSolicitudesCompra(),
+                            api.obtenerMovimientos(),
+                            api.obtenerProgramas(),
+                            api.obtenerEventos()
+                        ]
+                        : [
+                            // Admin/Instructor/otros: cargar TODO (behavior anterior)
+                            api.obtenerUsuarios(),
+                            api.obtenerConfiguracionNotificaciones(tenant.tenantId),
+                            api.obtenerSedes(tenant.tenantId).then(sanearSedes),
+                            api.obtenerEstudiantes(),
+                            api.obtenerEventos(),
+                            api.obtenerImplementos(),
+                            api.obtenerSolicitudesCompra(),
+                            api.obtenerMovimientos(),
+                            api.obtenerProgramas()
+                        ]
+                ),
                 syncTimeout
             ]);
 
@@ -168,17 +189,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     return null;
                 });
 
-                const [u, cn, s, e, ev, imp, sc, m, pr] = values;
-
-                if (u) setUsuarios(u as Usuario[]);
-                if (cn) setConfigNotificaciones(cn as ConfiguracionNotificaciones);
-                if (s) setSedes(s as Sede[]);
-                if (e) setEstudiantes(e as Estudiante[]);
-                if (ev) setEventos(ev as Evento[]);
-                if (imp) setImplementos(imp as Implemento[]);
-                if (sc) setSolicitudesCompra(sc as SolicitudCompra[]);
-                if (m) setMovimientos(m as MovimientoFinanciero[]);
-                if (pr) setProgramas(pr as Programa[]);
+                if (isTutor) {
+                    // Tutor: índices son [cn, imp, sc, m, pr, ev]
+                    const [cn, imp, sc, m, pr, ev] = values;
+                    if (cn) setConfigNotificaciones(cn as ConfiguracionNotificaciones);
+                    if (imp) setImplementos(imp as Implemento[]);
+                    if (sc) setSolicitudesCompra(sc as SolicitudCompra[]);
+                    if (m) setMovimientos(m as MovimientoFinanciero[]);
+                    if (pr) setProgramas(pr as Programa[]);
+                    if (ev) setEventos(ev as Evento[]);
+                    console.log("[DataContext] Tutor: cargadas configuración, implementos, solicitudes, movimientos, programas y eventos.");
+                } else {
+                    // Otros: índices son [u, cn, s, e, ev, imp, sc, m, pr]
+                    const [u, cn, s, e, ev, imp, sc, m, pr] = values;
+                    if (u) setUsuarios(u as Usuario[]);
+                    if (cn) setConfigNotificaciones(cn as ConfiguracionNotificaciones);
+                    if (s) setSedes(s as Sede[]);
+                    if (e) setEstudiantes(e as Estudiante[]);
+                    if (ev) setEventos(ev as Evento[]);
+                    if (imp) setImplementos(imp as Implemento[]);
+                    if (sc) setSolicitudesCompra(sc as SolicitudCompra[]);
+                    if (m) setMovimientos(m as MovimientoFinanciero[]);
+                    if (pr) setProgramas(pr as Programa[]);
+                }
             }
 
         } catch (err) {
@@ -188,7 +221,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log("[DataContext] Sincronización finalizada satisfactoriamente o por timeout.");
             setCargando(false);
         }
-    }, [tenant]);
+    }, [tenant, usuario?.rol]);
 
     useEffect(() => {
         cargarTodo();

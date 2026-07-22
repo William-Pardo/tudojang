@@ -6,9 +6,10 @@ import { motion } from 'framer-motion';
 
 import { isFirebaseConfigured } from './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
+import { DataProvider, useEventos } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
 import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
+import { useNotificacion } from './context/NotificacionContext';
 import BrandingProvider, { useTenant } from './components/BrandingProvider';
 import { RolUsuario, type Usuario } from './tipos';
 
@@ -21,18 +22,25 @@ import VistaAdministracion from './vistas/Administracion';
 import { VistaEstudiantes } from './vistas/Estudiantes';
 import { VistaEventos } from './vistas/Eventos';
 import VistaTienda from './vistas/Tienda';
-import VistaMisionKicho from './MisionKicho';
+import VistaMisionKicho from './vistas/MisionKicho';
 import MasterAccess from './vistas/MasterAccess';
 import VistaNotificaciones from './vistas/Notificaciones';
+import VistaBuzonNotificaciones from './vistas/BuzonNotificaciones';
 import VistaMiPerfil from './vistas/MiPerfil';
 import VistaCentroEstudios from './vistas/CentroEstudios';
 import VistaJornadas from './vistas/admin/JornadasView';
+import VistaAgenda from './vistas/admin/AgendaView';
+import { ClaseEnVivoView } from './vistas/ClaseEnVivoView';
 import Vista404 from './vistas/404';
+import VistaActivarCuenta from './vistas/ActivarCuenta';
+import VistaRestablecerClave from './vistas/RestablecerClave';
 import VistaSalidaPublica from './vistas/SalidaPublica';
 import VistaAyudaPqrs from './vistas/AyudaPqrs';
 import VistaMasterDashboard from './vistas/MasterDashboard';
 import LicenciaSuspendida from './vistas/LicenciaSuspendida';
 import { useEstadoLicencia } from './hooks/useEstadoLicencia';
+import { useVentanaClaseEnVivo } from './hooks/useVentanaClaseEnVivo';
+import { driveService } from './services/storage/driveService';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
@@ -49,7 +57,7 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoAgenda, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
 } from './components/Iconos';
@@ -58,17 +66,61 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     const location = ReactRouterDOM.useLocation();
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
 
+    // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): ventana horaria dinamica real,
+    // reemplaza el placeholder `showClaseEnVivo=true` (siempre visible). El link solo se activa
+    // si hay al menos una jornada real del usuario (segun rol/asignacion, ver
+    // `hooks/useVentanaClaseEnVivo.ts`) dentro de `[horaInicio-15min, horaFin+15min]` ahora mismo.
+    // Recalculado cada 60s (mismo intervalo que tenia el placeholder).
+    const { jornadaActiva } = useVentanaClaseEnVivo();
+
+    // Fix tutor-role-end-to-end (2026-07-14): el link "Eventos" se muestra al Tutor SOLO
+    // cuando existe un evento con inscripción abierta hoy (al que puede inscribir a su hijo).
+    // Para el resto de roles la visibilidad no depende de esto.
+    const { eventos } = useEventos();
+    const hoyIsoNav = new Date().toISOString().slice(0, 10);
+    const hayEventoAplicable = eventos.some(
+        (ev) => ev.fechaInicioInscripcion <= hoyIsoNav && hoyIsoNav <= ev.fechaFinInscripcion
+    );
+
     const todosLosEnlaces = [
         { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
-        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor] },
-        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor] },
-        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
+        // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
+        // Centro de Estudios (materiales del hijo) + Alertas.
+        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
+        // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
+        // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
+        // entrada de menu duplicada. Maestro/Estudiante (y Tutor, ya habilitado por el fix
+        // tutor-role-end-to-end) NO tienen acceso a Administracion, asi que necesitan seguir
+        // llegando a su agenda por este link. La ruta /agenda en si NO se elimina (sigue
+        // gateada igual mas abajo), solo se recorta a quien realmente la necesita en el menu.
+        { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
+        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
+        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { ruta: jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : "/clase-en-vivo", texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
+        // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
+        // gestión de Alertas del staff.
+        { ruta: "/buzon", texto: "Notificaciones", icono: IconoCampana, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
-    const enlacesVisibles = todosLosEnlaces.filter(enlace => enlace.roles.includes(usuario.rol));
+    const enlacesVisibles = todosLosEnlaces.filter(enlace => {
+        if (enlace.texto === 'Clase en Vivo') {
+            // Fuera de la ventana horaria, el link queda oculto (Módulo Clase en Vivo.txt §3:
+            // "Fuera de esa ventana, el acceso debe estar bloqueado, oculto o deshabilitado").
+            return enlace.roles.includes(usuario.rol) && !!jornadaActiva;
+        }
+        // Fix tutor-role-end-to-end (2026-07-14): para consultores (Tutor/Estudiante), "Eventos"
+        // solo aparece cuando hay un evento con inscripción abierta al que puede aplicar.
+        if (enlace.texto === 'Eventos' && (usuario.rol === RolUsuario.Tutor || usuario.rol === RolUsuario.Estudiante)) {
+            return enlace.roles.includes(usuario.rol) && hayEventoAplicable;
+        }
+        return enlace.roles.includes(usuario.rol);
+    });
     const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
 
     const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
@@ -120,6 +172,9 @@ const AppLayout: React.FC = () => {
     const { usuario, logout } = useAuth();
     const { puntos, heatmapActivo } = useAnalytics();
     const { suspendido, cargando: cargandoLicencia } = useEstadoLicencia();
+    const { mostrarNotificacion } = useNotificacion();
+    const navigate = ReactRouterDOM.useNavigate();
+    const location = ReactRouterDOM.useLocation();
     const [menuAbierto, setMenuAbierto] = useState(window.innerWidth >= 1024);
     const [busquedaAbierta, setBusquedaAbierta] = useState(false);
     const scrollableContainerRef = useRef<HTMLDivElement>(null);
@@ -128,6 +183,10 @@ const AppLayout: React.FC = () => {
         if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     });
+
+    // Fix tutor-role-end-to-end (2026-07-14): el Tutor (consultor) ahora SÍ accede a Tienda
+    // y Eventos, así que se retiró el guard que lo redirigía de esas rutas. La visibilidad
+    // se controla desde el menú (Eventos solo con inscripción abierta).
 
     useEffect(() => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -138,7 +197,6 @@ const AppLayout: React.FC = () => {
 
     const { tenant, estaCargado } = useTenant();
     const esSuperAdmin = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
-    const location = ReactRouterDOM.useLocation();
 
     // SPINNER DE CARGA INICIAL
     if (!estaCargado) {
@@ -231,10 +289,85 @@ const AppLayout: React.FC = () => {
     );
 };
 
+// Extraída como función pura exportada (antes vivía inline en el JSX de la ruta "/")
+// para que App.routing.test.ts pueda testearla sin renderizar todo el árbol de rutas.
+// Fix tutor-role-end-to-end (2026-07-14) + fix Estudiante (línea de uso más abajo):
+// Tutor/Estudiante (consultores) van a Centro de Estudios como inicio operativo en vez
+// de VistaAdministracion (pantalla de gestión de staff que no deberían ver).
+export function obtenerRutaInicioUsuario(usuario: { rol?: RolUsuario } | null | undefined): string {
+    if (usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante) {
+        return '/centro-estudios';
+    }
+    return '/';
+}
+
+// --- Callback OAuth de Google Drive -------------------------------------------------
+// Reconstruido 2026-07-21: el manejo del callback OAuth de Drive vivía en App.tsx en
+// junio (funciones construirUrlCallbackDrive/obtenerCodigoCallbackDrive, ver
+// docs/DEBUG_DRIVE_OAUTH_CENTRO_ESTUDIOS.md) pero se perdió sin commitear entre sesiones
+// concurrentes Claude/Codex. Efecto: BibliotecaView INICIA la conexión (iniciarConexionOAuth
+// -> redirect a Google) pero NADIE procesaba la vuelta con el `code`, así que la conexión
+// nunca se completaba y quedaba en silencio. Este es el único responsable del callback:
+// BibliotecaView ya NO lo procesa localmente (solo lee el resultado en localStorage), para
+// no consumir dos veces el `code` (los códigos OAuth de Google son de un solo uso).
+export const DRIVE_OAUTH_RETURN_PATH_KEY = 'tudojang:driveOAuthReturnPath';
+
+export interface CallbackDriveParams {
+    code: string | null;
+    error: string | null;
+    /** `state` de OAuth: connectDrive lo setea al tenantId (ver functions/academico/drive.js). */
+    state: string;
+}
+
+// Extrae los parámetros del callback OAuth de Drive tanto del query string real
+// (`https://tudojang.com/?state=..&code=..`, que es donde aterriza Google porque el
+// redirect_uri registrado es la raíz) como de un query embebido en el hash
+// (`#/centro-estudios?state=..&code=..`). Devuelve null si no es un callback de Drive.
+// Un callback válido siempre trae `state` (tenantId) + `code` (éxito) o `error` (rechazo).
+export function extraerCallbackDrive(search: string, hash: string): CallbackDriveParams | null {
+    const fuentes: string[] = [];
+    if (search && search.includes('=')) fuentes.push(search);
+    if (hash) {
+        const indicePregunta = hash.indexOf('?');
+        if (indicePregunta >= 0) fuentes.push(hash.slice(indicePregunta));
+    }
+
+    for (const fuente of fuentes) {
+        const query = fuente.startsWith('?') ? fuente : `?${fuente}`;
+        const params = new URLSearchParams(query);
+        const state = params.get('state');
+        const code = params.get('code');
+        const error = params.get('error');
+        if (state && (code || error)) {
+            return { code: code ?? null, error: error ?? null, state };
+        }
+    }
+    return null;
+}
+
+export function mensajeErrorCallbackDrive(error: string | null): string {
+    if (error === 'access_denied') {
+        return 'No autorizaste el acceso a Google Drive. Vuelve a conectar y acepta el permiso de lectura para poder importar materiales.';
+    }
+    return 'Google no completó la autorización de Drive. Vuelve a intentar la conexión desde Centro de Estudios.';
+}
+
 const AppRoutes: React.FC = () => {
     const { usuario, cargandoSesion } = useAuth();
     const { tenant } = useTenant();
     const [appDebug, setAppDebug] = React.useState('App Iniciada');
+
+    // Detección SÍNCRONA del callback OAuth de Drive (antes de cualquier return condicional,
+    // para no romper el orden de hooks -> minified React error #310, ya sufrido antes en este
+    // mismo flujo, ver DEBUG_DRIVE_OAUTH_CENTRO_ESTUDIOS.md §5). Se lee window.location una
+    // sola vez al montar: aunque el efecto de abajo recargue la página, en ese ciclo el valor
+    // es estable.
+    const callbackDrive = React.useMemo(
+        () => extraerCallbackDrive(window.location.search, window.location.hash),
+        [],
+    );
+    const [procesandoDrive] = React.useState(() => !!callbackDrive);
+    const callbackDriveProcesadoRef = React.useRef(false);
 
     React.useEffect(() => {
         if ((window as any).Cypress) {
@@ -244,11 +377,72 @@ const AppRoutes: React.FC = () => {
         }
     }, []);
 
+    // Único responsable de completar el callback OAuth de Drive: intercambia el `code` por la
+    // conexión (Cloud Function driveOAuthCallback), persiste el resultado en las MISMAS claves
+    // de localStorage que BibliotecaView ya lee, y recarga a una URL hash limpia (sin `?code=`).
+    React.useEffect(() => {
+        if (!callbackDrive || callbackDriveProcesadoRef.current) return;
+        // driveOAuthCallback exige sesión autenticada; esperar a que Firebase la restaure.
+        if (cargandoSesion) return;
+        callbackDriveProcesadoRef.current = true;
+
+        const tenantId = callbackDrive.state;
+        const claveConexion = `tudojang:driveConnection:${tenantId}`;
+        const claveError = `tudojang:driveConnectionError:${tenantId}`;
+        const returnPath = window.localStorage.getItem(DRIVE_OAUTH_RETURN_PATH_KEY) || '/centro-estudios';
+
+        const finalizar = () => {
+            window.localStorage.removeItem(DRIVE_OAUTH_RETURN_PATH_KEY);
+            // Recarga completa a hash limpio: garantiza que el `code` (de un solo uso) no se
+            // reprocese en un refresh y que BibliotecaView monte leyendo el resultado ya escrito.
+            window.location.replace(`${window.location.origin}${window.location.pathname}#${returnPath}`);
+        };
+
+        if (callbackDrive.error || !callbackDrive.code) {
+            window.localStorage.setItem(claveError, mensajeErrorCallbackDrive(callbackDrive.error));
+            finalizar();
+            return;
+        }
+
+        if (!usuario) {
+            window.localStorage.setItem(claveError, 'Tu sesión expiró durante la conexión con Google Drive. Inicia sesión de nuevo y vuelve a conectar.');
+            finalizar();
+            return;
+        }
+
+        // redirectUri debe coincidir EXACTAMENTE con el que usó connectDrive (BibliotecaView
+        // envía `${origin}${pathname}`); acá el pathname es el mismo de la raíz de la app.
+        const redirectUri = `${window.location.origin}${window.location.pathname}`;
+        driveService.procesarCallbackOAuth(tenantId, callbackDrive.code, redirectUri)
+            .then((resultado) => {
+                window.localStorage.setItem(claveConexion, resultado.connectionId);
+                window.localStorage.removeItem(claveError);
+            })
+            .catch((err) => {
+                const mensaje = err instanceof Error && err.message
+                    ? err.message
+                    : 'No se pudo completar la conexión con Google Drive.';
+                window.localStorage.setItem(claveError, mensaje);
+            })
+            .finally(finalizar);
+    }, [callbackDrive, usuario, cargandoSesion]);
+
     const debugDiv = (window as any).Cypress ? (
         <div id="debug-log-onboarding" className="fixed bottom-0 left-0 bg-black/80 text-white text-[10px] p-2 z-[10000] min-w-full">
             {appDebug} | Host: {window.location.hostname} | FB: {String(isFirebaseConfigured)} | Hash: {window.location.hash} | User: {usuario ? usuario.email : 'No'} | Loading: {cargandoSesion ? 'Yes' : 'No'}
         </div>
     ) : null;
+
+    // Mientras se procesa el callback OAuth de Drive mostramos un estado dedicado (la vista se
+    // recarga a /centro-estudios apenas termina): evita un parpadeo de VistaAdministracion con
+    // el `?code=` todavía en la URL.
+    if (procesandoDrive) return (
+        <div className="flex flex-col items-center justify-center h-screen bg-tkd-dark text-white gap-4">
+            <div className="w-12 h-12 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-xs font-black uppercase tracking-widest">Conectando Google Drive...</p>
+            {debugDiv}
+        </div>
+    );
 
     if (cargandoSesion) return (
         <div className="flex items-center justify-center h-screen bg-tkd-dark text-white">
@@ -269,6 +463,15 @@ const AppRoutes: React.FC = () => {
                     <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                     <ReactRouterDOM.Route path="/login" element={<Login />} />
                     <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
+                    {/* Fix 2026-07-15: alguien que llega desde el link de un correo (activar
+                        cuenta / restablecer clave) casi siempre lo hace SIN sesión y SIN tenant
+                        aún resuelto (pestaña nueva / incógnito) -- cae justo en este bloque
+                        restringido. Faltaban acá, así que el catch-all de abajo las mandaba a
+                        "/" sin completar el proceso. Ninguna de las dos depende de `tenant`
+                        (ActivarCuenta usa tenantId del query string; RestablecerClave usa
+                        oobCode contra Firebase Auth directo), así que son seguras acá. */}
+                    <ReactRouterDOM.Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
+                    <ReactRouterDOM.Route path="/restablecer-clave" element={<VistaRestablecerClave />} />
                     <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
                 </ReactRouterDOM.Routes>
                 {debugDiv}
@@ -306,16 +509,46 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
+                {/* Fix tutor-role-end-to-end (2026-07-14): la vista ActivarCuenta existía
+                    pero nunca se ruteó — el enlace de invitación (/#/activar-cuenta) caía en
+                    el catch-all. Ruta pública (sin login): el tutor/estudiante crea su
+                    contraseña acá vía acceptInvitation y luego entra por /login. */}
+                <ReactRouterDOM.Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
+                {/* Fix UX de restablecimiento de clave (2026-07-15): página propia, con marca,
+                    que reemplaza la genérica de Firebase (tudojang.firebaseapp.com/__/auth/action)
+                    a la que redirigía sendPasswordResetEmail() del SDK cliente. */}
+                <ReactRouterDOM.Route path="/restablecer-clave" element={<VistaRestablecerClave />} />
                 <ReactRouterDOM.Route path="/master-access" element={<MasterAccess />} />
 
                 <ReactRouterDOM.Route element={usuario ? <AppLayout /> : <ReactRouterDOM.Navigate to="/login" replace />}>
-                    <ReactRouterDOM.Route path="/" element={usuario?.rol === RolUsuario.Tutor ? <ReactRouterDOM.Navigate to="/mi-perfil" /> : <VistaAdministracion />} />
+                    {/* Fix (bug reportado: el login de Estudiante abría en VistaAdministracion, una
+                        pantalla de gestión de staff que no debería ver): faltaba el mismo caso
+                        especial que ya existía para Tutor. Se redirige a /centro-estudios (no
+                        /mi-perfil) para que apenas entre vea sus materiales/clases -- justo lo
+                        que este bug le impedía ver -- consistente con la intención de diseño ya
+                        documentada en App.routing.test.ts ("Centro de Estudios como inicio
+                        operativo" para ambos roles consultor). */}
+                    <ReactRouterDOM.Route path="/" element={obtenerRutaInicioUsuario(usuario) === '/centro-estudios' ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
+                    {/* Subtarea 12.8: gating ampliado respecto de /jornadas -- incluye Asistente y
+                        SuperAdmin (roles operativos del tenant, seccion 9 del documento de mejora de
+                        Agenda: "otros maestros" pueden VER; Tutor no accede a Agenda).
+                        Extension posterior al cierre del modulo 12 (matriz de roles + iconos de la
+                        parrilla, decision explicita del usuario, ver CIERRE CENTRO DE ESTUDIOS.md):
+                        se agrega RolUsuario.Estudiante en modo SOLO LECTURA (AgendaView.tsx nunca le
+                        muestra los iconos de editar/eliminar -- ver puedeEditarJornada). Mantener este
+                        set de roles en sync con ROLES_CON_ACCESO_AGENDA de AgendaView.tsx. */}
+                    <ReactRouterDOM.Route path="/agenda" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor || usuario?.rol === RolUsuario.Asistente || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Maestro || usuario?.rol === RolUsuario.Estudiante || usuario?.rol === RolUsuario.Tutor ? <VistaAgenda /> : <ReactRouterDOM.Navigate to="/" />} />
+                    <ReactRouterDOM.Route path="/clase-en-vivo/:jornadaId" element={<ClaseEnVivoView />} />
+                    <ReactRouterDOM.Route path="/clase-en-vivo" element={<ClaseEnVivoView />} />
+                    {/* Fix tutor-role-end-to-end (2026-07-14): el Tutor (consultor) ahora accede
+                        a Tienda y Eventos (solo lectura / inscripción de su hijo). */}
                     <ReactRouterDOM.Route path="/tienda" element={<VistaTienda />} />
                     <ReactRouterDOM.Route path="/eventos" element={<VistaEventos />} />
                     <ReactRouterDOM.Route path="/notificaciones" element={<VistaNotificaciones />} />
+                    <ReactRouterDOM.Route path="/buzon" element={<VistaBuzonNotificaciones />} />
                     <ReactRouterDOM.Route path="/mi-perfil" element={<VistaMiPerfil />} />
                     <ReactRouterDOM.Route path="/configuracion" element={usuario?.rol === RolUsuario.Admin ? <VistaConfiguracion /> : <ReactRouterDOM.Navigate to="/" />} />
                     <ReactRouterDOM.Route path="/aliant-control" element={esMaster ? <VistaMasterDashboard /> : <ReactRouterDOM.Navigate to="/" />} />

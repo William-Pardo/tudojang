@@ -64,7 +64,7 @@ test("email-capable Functions bind RESEND_API_KEY from Secret Manager", () => {
   );
   assert.match(
     source,
-    /const paymentFunctions = functionsV1\.runWith\(\{\s*secrets:\s*\["RESEND_API_KEY", "WOMPI_EVENTS_SECRET", "WOMPI_INTEGRITY_SECRET"\]/
+    /const paymentFunctions = functionsV1\.runWith\(\{\s*secrets:\s*\[\s*"RESEND_API_KEY",\s*"WOMPI_EVENTS_SECRET",\s*"WOMPI_INTEGRITY_SECRET",\s*"WOMPI_PRIVATE_KEY",?\s*\]/
   );
   assert.match(
     source,
@@ -73,6 +73,14 @@ test("email-capable Functions bind RESEND_API_KEY from Secret Manager", () => {
   assert.match(
     source,
     /exports\.firmarCheckoutWompi = paymentFunctions\.https\.onCall/
+  );
+  assert.match(
+    source,
+    /exports\.crearFuentePagoWompi = paymentFunctions\.https\.onCall/
+  );
+  assert.match(
+    source,
+    /exports\.cobroAutomaticoMensual = paymentFunctions\.pubsub/
   );
 });
 

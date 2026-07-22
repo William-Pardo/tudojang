@@ -197,8 +197,8 @@ describe('censoApi', () => {
       });
 
       const mockRegistros: RegistroTemporal[] = [
-        { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante1', apellidos: 'Apellido1', telefono: '123', email: 'e1@test.com' } },
-        { id: 'reg2', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante2', apellidos: 'Apellido2', telefono: '456', email: 'e2@test.com' } },
+        { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante1', apellidos: 'Apellido1', telefono: '123', email: 'e1@test.com', fechaNacimiento: '2010-01-01' } },
+        { id: 'reg2', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante2', apellidos: 'Apellido2', telefono: '456', email: 'e2@test.com', fechaNacimiento: '2011-02-02' } },
       ];
 
       const mockBatch = {
@@ -237,7 +237,7 @@ describe('censoApi', () => {
   describe('obtenerRegistrosMision', () => {
     it('debería retornar los registros de una misión', async () => {
       const mockRegistros: RegistroTemporal[] = [
-        { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: {} },
+        { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: '', apellidos: '', email: '', telefono: '', fechaNacimiento: '' } },
       ];
       (getDocs as jest.Mock).mockResolvedValueOnce({
         docs: mockRegistros.map(r => ({ id: r.id, data: () => r })),

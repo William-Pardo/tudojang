@@ -8,6 +8,9 @@ import {
   DriveOAuthCallbackResult,
   DriveListFolderResult,
   TemporaryFileUrlResult,
+  DriveDisconnectResult,
+  DriveConnectionInfo,
+  DriveSetFolderResult,
 } from './driveService';
 
 // ---------------------------------------------------------------------------
@@ -30,7 +33,7 @@ const makeMockCallFn = (responses: Record<string, unknown>) => {
 // ---------------------------------------------------------------------------
 describe('driveService.iniciarConexionOAuth', () => {
   it('llama a la Cloud Function connectDrive y devuelve la URL de OAuth', async () => {
-    const expectedUrl = 'https://accounts.google.com/o/oauth2/v2/auth?scope=drive.readonly';
+    const expectedUrl = 'https://accounts.google.com/o/oauth2/v2/auth?scope=drive.file';
     const callFn = makeMockCallFn({
       connectDrive: { url: expectedUrl } as DriveConnectionResult,
     });
@@ -180,6 +183,93 @@ describe('driveService.listarCarpetaDrive', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Suite: desconectarDrive
+// ---------------------------------------------------------------------------
+describe('driveService.desconectarDrive', () => {
+  it('llama a disconnectDrive con tenantId y devuelve el resultado', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: { ok: true, disconnectedCount: 1 } as DriveDisconnectResult,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.desconectarDrive('tenant-abc');
+
+    expect(callFn).toHaveBeenCalledWith('disconnectDrive');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc' });
+    expect(result).toEqual({ ok: true, disconnectedCount: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: obtenerConexionDrive / guardarCarpetaActiva
+// ---------------------------------------------------------------------------
+describe('driveService.obtenerConexionDrive', () => {
+  it('llama a getDriveConnection con tenantId y devuelve carpeta activa', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: {
+            connected: true,
+            connectionId: 'conn-123',
+            activeFolderId: 'folder-abc',
+            status: 'active',
+          } as DriveConnectionInfo,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.obtenerConexionDrive('tenant-abc');
+
+    expect(callFn).toHaveBeenCalledWith('getDriveConnection');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc' });
+    expect(result).toEqual({
+      connected: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-abc',
+      status: 'active',
+    });
+  });
+});
+
+describe('driveService.guardarCarpetaActiva', () => {
+  it('llama a setDriveFolder con tenantId y folderId', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({
+          data: {
+            ok: true,
+            connectionId: 'conn-123',
+            activeFolderId: 'folder-abc',
+          } as DriveSetFolderResult,
+        });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.guardarCarpetaActiva('tenant-abc', 'folder-abc');
+
+    expect(callFn).toHaveBeenCalledWith('setDriveFolder');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc', folderId: 'folder-abc' });
+    expect(result).toEqual({
+      ok: true,
+      connectionId: 'conn-123',
+      activeFolderId: 'folder-abc',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Suite: obtenerUrlTemporal
 // ---------------------------------------------------------------------------
 describe('driveService.obtenerUrlTemporal', () => {
@@ -257,5 +347,118 @@ describe('driveService.obtenerUrlTemporal', () => {
     await expect(
       service.obtenerUrlTemporal('tenant-abc', 'asig-1', 'file-abc')
     ).rejects.toThrow('Error interno del servidor');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: obtenerUrlTemporalRecurso (Vista previa de Biblioteca, sin asignación)
+// ---------------------------------------------------------------------------
+describe('driveService.obtenerUrlTemporalRecurso', () => {
+  const mockUrlResult: TemporaryFileUrlResult = {
+    ok: true,
+    url: 'https://www.googleapis.com/drive/v3/files/file-abc?alt=media&access_token=tok-xyz',
+    fileName: 'modulo1.pdf',
+    mimeType: 'application/pdf',
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+  };
+
+  it('llama a getTemporaryFileUrlRecurso con tenantId y recursoId (sin asignacionId ni fileId)', async () => {
+    let capturedArgs: unknown;
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockImplementation((args: unknown) => {
+        capturedArgs = args;
+        return Promise.resolve({ data: mockUrlResult });
+      })
+    );
+
+    const service = crearDriveService({ callFn });
+    const result = await service.obtenerUrlTemporalRecurso('tenant-abc', 'recurso-1');
+
+    expect(callFn).toHaveBeenCalledWith('getTemporaryFileUrlRecurso');
+    expect(capturedArgs).toEqual({ tenantId: 'tenant-abc', recursoId: 'recurso-1' });
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('file-abc');
+  });
+
+  it('propaga permission-denied cuando el rol no es staff (Estudiante/Tutor)', async () => {
+    const callFn = jest.fn().mockImplementation((_name: string) =>
+      jest.fn().mockRejectedValue(
+        Object.assign(new Error('No autorizado para previsualizar recursos de la biblioteca'), { code: 'permission-denied' })
+      )
+    );
+
+    const service = crearDriveService({ callFn });
+    const err = await service.obtenerUrlTemporalRecurso('tenant-abc', 'recurso-1').catch((e) => e);
+    expect(err.code).toBe('permission-denied');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: obtenerBlobProtegido (proxy seguro -- fetch con el ID token real de Firebase)
+// ---------------------------------------------------------------------------
+describe('driveService.obtenerBlobProtegido', () => {
+  it('pide la URL con el ID token de Firebase en el header Authorization y devuelve el blob', async () => {
+    const blobFalso = new Blob(['contenido']);
+    let capturedUrl: string | undefined;
+    let capturedInit: RequestInit | undefined;
+    const fetchFn = jest.fn().mockImplementation((url: string, init: RequestInit) => {
+      capturedUrl = url;
+      capturedInit = init;
+      return Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(blobFalso) });
+    });
+    const obtenerIdToken = jest.fn().mockResolvedValue('id-token-de-firebase');
+
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken });
+    const resultado = await service.obtenerBlobProtegido('https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?fileId=x');
+
+    expect(capturedUrl).toBe('https://us-central1-tudojang.cloudfunctions.net/proxyDriveMedia?fileId=x');
+    expect(capturedInit).toEqual({ headers: { Authorization: 'Bearer id-token-de-firebase' } });
+    expect(resultado).toBe(blobFalso);
+  });
+
+  it('no manda header Authorization si no hay usuario logueado (idToken null)', async () => {
+    let capturedInit: RequestInit | undefined;
+    const fetchFn = jest.fn().mockImplementation((_url: string, init: RequestInit) => {
+      capturedInit = init;
+      return Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new Blob()) });
+    });
+    const obtenerIdToken = jest.fn().mockResolvedValue(null);
+
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken });
+    await service.obtenerBlobProtegido('https://proxy.test/x');
+
+    expect(capturedInit).toEqual({ headers: {} });
+  });
+
+  it('lanza error con code not-found si el proxy responde 404', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 404 });
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken: jest.fn().mockResolvedValue('t') });
+
+    const err = await service.obtenerBlobProtegido('https://proxy.test/x').catch((e) => e);
+    expect(err.code).toBe('not-found');
+  });
+
+  it('lanza error con code permission-denied si el proxy responde 403', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 403 });
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken: jest.fn().mockResolvedValue('t') });
+
+    const err = await service.obtenerBlobProtegido('https://proxy.test/x').catch((e) => e);
+    expect(err.code).toBe('permission-denied');
+  });
+
+  it('lanza error con code unauthenticated si el proxy responde 401 (token vencido)', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken: jest.fn().mockResolvedValue('t') });
+
+    const err = await service.obtenerBlobProtegido('https://proxy.test/x').catch((e) => e);
+    expect(err.code).toBe('unauthenticated');
+  });
+
+  it('lanza error con code server-error (no permission-denied) si el proxy responde 500 -- no es un problema de permisos', async () => {
+    const fetchFn = jest.fn().mockResolvedValue({ ok: false, status: 500 });
+    const service = crearDriveService({ fetchFn: fetchFn as any, obtenerIdToken: jest.fn().mockResolvedValue('t') });
+
+    const err = await service.obtenerBlobProtegido('https://proxy.test/x').catch((e) => e);
+    expect(err.code).toBe('server-error');
   });
 });

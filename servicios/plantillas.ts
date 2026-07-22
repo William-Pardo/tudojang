@@ -3,6 +3,7 @@
 import type { Estudiante, ConfiguracionClub, Usuario, Sede } from '../tipos';
 import { RolUsuario } from '../tipos';
 import { formatearPrecio } from '../utils/formatters';
+import { obtenerEtiquetaRol } from '../utils/roles';
 
 const FECHA_HOY_OBJ = () => {
     const fecha = new Date();
@@ -99,11 +100,16 @@ export const generarTextoContratoColaborador = (usuario: Usuario, configClub: Co
     if (!c) return "Contrato no configurado.";
 
     const tipoFinal = c.tipoVinculacion === 'Otro' ? c.tipoVinculacionOtro : c.tipoVinculacion;
-    const valorP = formatearPrecio(c.valorPago);
+    // Fix 2026-07-21 (`npm run typecheck`): `valorPago` es OPCIONAL y esta marcado como
+    // legacy en tipos.ts ("reemplazado por sueldoBase"), asi que en cualquier contrato
+    // nuevo llegaba undefined a formatearPrecio, que espera un number. Se cae a
+    // `sueldoBase` (obligatorio) manteniendo `valorPago` cuando el contrato viejo lo trae.
+    const valorP = formatearPrecio(c.valorPago ?? c.sueldoBase);
+    const rolContrato = obtenerEtiquetaRol(usuario.rol, 'equipoTecnico');
 
     // Encabezado Común
     let texto = `
-CONTRATO DE TRABAJO/PRESTACIÓN ${usuario.rol.toUpperCase()} – ${configClub.nombreClub.toUpperCase()}
+CONTRATO DE TRABAJO/PRESTACIÓN ${rolContrato.toUpperCase()} – ${configClub.nombreClub.toUpperCase()}
 
 Entre los suscritos a saber:
 
@@ -113,7 +119,7 @@ CONTRATANTE:
 - Representante: ${configClub.representanteLegal}
 - Teléfono: ${configClub.metodoPago}
 
-CONTRATADO/A (${usuario.rol}):
+CONTRATADO/A (${rolContrato}):
 - Nombre: ${usuario.nombreUsuario.toUpperCase()}
 - Cédula: ${usuario.numeroIdentificacion}
 - Teléfono: ${usuario.whatsapp}
@@ -127,7 +133,7 @@ Valor a pagar: ${valorP} COP
 ---
 
 Cláusula Primera – Objeto del contrato
-El(la) ${usuario.rol} se compromete a prestar sus servicios al Club ${configClub.nombreClub}, bajo las condiciones pactadas y en el marco de la legislación colombiana vigente.
+El(la) ${rolContrato} se compromete a prestar sus servicios al Club ${configClub.nombreClub}, bajo las condiciones pactadas y en el marco de la legislación colombiana vigente.
 
 Funciones principales:
 `;

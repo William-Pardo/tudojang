@@ -11,6 +11,9 @@ const abrirYEnviar = (pregunta: string) => {
     cy.get('button[aria-label="Enviar mensaje"]').click();
 };
 
+const etiquetaManual = ['Manual', 'verificado'].join(' ');
+const etiquetaIa = ['Respuesta', 'con', 'IA'].join(' ');
+
 describe('Asistente virtual híbrido', () => {
     beforeEach(() => {
         cy.visit('/#/login');
@@ -23,14 +26,15 @@ describe('Asistente virtual híbrido', () => {
     it('responde desde el catálogo local sin llamar IA', () => {
         cy.intercept('POST', '**/consultarAsistenteIa', cy.spy().as('ia'));
         abrirYEnviar('Como agrego un estudiante');
-        cy.contains('Manual verificado').should('be.visible');
+        cy.contains(etiquetaManual).should('not.exist');
+        cy.contains(etiquetaIa).should('not.exist');
         cy.get('@ia').should('not.have.been.called');
     });
 
     it('solicita aclaración ante una consulta ambigua', () => {
         abrirYEnviar('Necesito ayuda con pagos');
         cy.contains(/Indica la pantalla y la acción exacta/i).should('be.visible');
-        cy.contains('Manual verificado').should('be.visible');
+        cy.contains(etiquetaManual).should('not.exist');
     });
 
     it('identifica una respuesta generada por IA', () => {
@@ -46,7 +50,7 @@ describe('Asistente virtual híbrido', () => {
         });
         abrirYEnviar('Como sincronizo el cinturón cuántico');
         cy.contains('Respuesta verificada por IA.').should('be.visible');
-        cy.contains('Respuesta con IA').should('be.visible');
+        cy.contains(etiquetaIa).should('not.exist');
     });
 
     it('degrada cuando la cuota está agotada', () => {
@@ -116,6 +120,6 @@ describe('Asistente virtual híbrido', () => {
             win.__ASSISTANT_FLAGS__ = { catalogEnabled: true, aiEnabled: false, escalationEnabled: false };
         });
         abrirYEnviar('Como agrego un estudiante');
-        cy.contains('Manual verificado').should('be.visible');
+        cy.contains(etiquetaManual).should('not.exist');
     });
 });

@@ -4,18 +4,25 @@ import type {
   ProgramaAcademico,
   UnidadTematica,
 } from '../../models/academico/programa';
+import type { JornadaInstruccion } from '../../models/academico/jornada';
+import { generateJornadasFromBloque } from './jornadaService';
 
 interface CrearProgramaInput {
+  id?: string;
   tenantId: string;
   nombre: string;
   descripcion: string;
   unidades: UnidadTematica[];
+  tags?: string[];
 }
 
 interface AsignarProgramaInput {
+  id?: string;
   grupoId: string;
   sedeId: string;
   fechaInicio: string;
+  bloques?: EjecucionPrograma['bloques'];
+  fechaFin?: string;
 }
 
 const crearId = (prefijo: string) => `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -56,7 +63,7 @@ export function createPrograma(input: CrearProgramaInput): ProgramaAcademico {
   const ahora = new Date().toISOString();
 
   return {
-    id: crearId('programa'),
+    id: input.id || crearId('programa'),
     tenantId: input.tenantId,
     nombre: input.nombre,
     descripcion: input.descripcion,
@@ -65,6 +72,7 @@ export function createPrograma(input: CrearProgramaInput): ProgramaAcademico {
     unidades: ordenarUnidades(input.unidades),
     creadoEn: ahora,
     actualizadoEn: ahora,
+    ...(input.tags ? { tags: input.tags } : {}),
   };
 }
 
@@ -90,7 +98,7 @@ export function assignProgramaToGrupo(
   const ahora = new Date().toISOString();
 
   return {
-    id: crearId('ejecucion'),
+    id: input.id || crearId('ejecucion'),
     tenantId: programa.tenantId,
     programaId: programa.id,
     grupoId: input.grupoId,
@@ -102,7 +110,27 @@ export function assignProgramaToGrupo(
     objetivosCompletados: [],
     creadoEn: ahora,
     actualizadoEn: ahora,
+    ...(input.bloques ? { bloques: input.bloques } : {}),
+    ...(input.fechaFin ? { fechaFin: input.fechaFin } : {}),
   };
+}
+
+export function generarJornadasDeEjecucion(
+  programa: ProgramaAcademico,
+  ejecucion: EjecucionPrograma
+): JornadaInstruccion[] {
+  if (!ejecucion.bloques?.length || !ejecucion.fechaFin) return [];
+
+  const objetivosPlaneados = obtenerObjetivosOrdenados(programa).map((objetivo) => objetivo.id);
+
+  return ejecucion.bloques.flatMap((bloque) => generateJornadasFromBloque({
+    bloque,
+    programaId: programa.id,
+    ejecucionProgramaId: ejecucion.id,
+    objetivosPlaneados,
+    fechaInicio: ejecucion.fechaInicio,
+    fechaFin: ejecucion.fechaFin!,
+  }));
 }
 
 export function advanceCiclo(
@@ -114,9 +142,12 @@ export function advanceCiclo(
     return ejecucion;
   }
 
+  const idsValidos = new Set(obtenerObjetivosOrdenados(programa).map((objetivo) => objetivo.id));
+  const impartidosValidos = objetivosImpartidos.filter((id) => idsValidos.has(id));
+
   const completados = Array.from(new Set([
     ...ejecucion.objetivosCompletados,
-    ...objetivosImpartidos,
+    ...impartidosValidos,
   ]));
   const siguienteObjetivo = obtenerObjetivosOrdenados(programa)
     .find((objetivo) => !completados.includes(objetivo.id));
