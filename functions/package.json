@@ -2,7 +2,7 @@
   "name": "functions",
   "description": "Cloud Functions for Firebase",
   "scripts": {
-    "test": "node --test *.test.js asistente/*.test.js academico/asignaciones.test.js academico/asignacionesScheduler.test.js academico/asistencia.test.js academico/ventanaClaseEnVivo.test.js academico/datosDemoProgreso.test.js academico/destinatarioAsignacion.test.js academico/estudiantes.test.js academico/jornadasScheduler.test.js academico/notificarEvento.test.js academico/passwordReset.test.js academico/plantillasInvitacion.test.js academico/progreso.test.js academico/recordatoriosEstudio.test.js academico/recordatoriosPago.test.js academico/sedes.test.js academico/usuarios.test.js && npm run test:academico:jest",
+    "test": "node --test *.test.js asistente/*.test.js academico/asignaciones.test.js academico/asignacionesScheduler.test.js academico/asistencia.test.js academico/ventanaClaseEnVivo.test.js academico/datosDemoProgreso.test.js academico/destinatarioAsignacion.test.js academico/estudiantes.test.js academico/jornadasScheduler.test.js academico/recogidaScheduler.test.js academico/notificarEvento.test.js academico/passwordReset.test.js academico/plantillasInvitacion.test.js academico/progreso.test.js academico/recordatoriosEstudio.test.js academico/recordatoriosPago.test.js academico/sedes.test.js academico/usuarios.test.js && npm run test:academico:jest",
     "test:academico:jest": "jest --config academico/jest.config.js",
     "test:emulator": "firebase emulators:exec --project demo-tudojang --only auth,firestore \"node --test test/asistente.integration.test.js test/invitaciones.integration.test.js\"",
     "serve": "firebase emulators:start --only functions",

@@ -17,6 +17,10 @@
 const LIVE_CLASS_OPEN_BEFORE_MINUTES = 15;
 const LIVE_CLASS_CLOSE_AFTER_MINUTES = 15;
 
+// WS-3b: cuántos minutos ANTES de `horaFin` se le avisa al acudiente de un chico de RECOGIDA
+// para que llegue a tiempo. Centralizado acá (no quemado en varios lados, §3).
+const NOTIFY_BEFORE_END_MINUTES = 15;
+
 const OFFSET_ZONA_CLUB = '-05:00';
 
 function combinarFechaHoraEnZonaDelClub(fecha, hora) {
@@ -62,10 +66,25 @@ function calcularRetraso(jornada, ahora) {
   return { isLate: minutesLate > 0, minutesLate };
 }
 
+/**
+ * ¿Es momento de avisar a los acudientes de RECOGIDA que la clase esta por terminar? (WS-3b)
+ * True si `ahora` cae en [horaFin - NOTIFY_BEFORE_END_MINUTES, horaFin]. Antes de esa ventana
+ * es muy temprano; despues de `horaFin` el aviso "vení a buscarlo antes de que termine" ya no
+ * tiene sentido (la clase termino).
+ */
+function estaEnVentanaDeAvisoRecogida(jornada, ahora) {
+  const fin = combinarFechaHoraEnZonaDelClub(jornada.fecha, jornada.horaFin);
+  const desde = new Date(fin);
+  desde.setUTCMinutes(desde.getUTCMinutes() - NOTIFY_BEFORE_END_MINUTES);
+  return ahora >= desde && ahora <= fin;
+}
+
 module.exports = {
   LIVE_CLASS_OPEN_BEFORE_MINUTES,
   LIVE_CLASS_CLOSE_AFTER_MINUTES,
+  NOTIFY_BEFORE_END_MINUTES,
   tieneHorario,
   estaEnVentana,
   calcularRetraso,
+  estaEnVentanaDeAvisoRecogida,
 };

@@ -35,6 +35,12 @@ export interface JornadaInstruccion {
    * historial, la asistencia y los reportes siguen viéndola: es solo visibilidad de Agenda.
    */
   archivada?: boolean;
+  /**
+   * Flag idempotente (WS-3b): `true` una vez que el cron avisó a los acudientes de RECOGIDA
+   * que la clase estaba por terminar. Evita reenviar el aviso en cada tick del cron. Ausente
+   * = todavía no se avisó.
+   */
+  avisoRecogidaEnviado?: boolean;
   creadoEn: string;
   actualizadoEn: string;
 }
