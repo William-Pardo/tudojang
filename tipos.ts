@@ -201,6 +201,14 @@ export interface Estudiante {
     direccion?: string;
     barrio?: string;
     authUid?: string;
+    /**
+     * Cómo se va el estudiante a casa al terminar la clase (Clase en Vivo, WS-3).
+     * - `recogida` (default cuando está ausente): un adulto lo pasa a buscar → el sistema
+     *   avisa al acudiente antes de que termine la clase para que llegue a tiempo.
+     * - `ruta_bus`: se va en la ruta de transporte contratada → al hacer check-out (sube al
+     *   bus) se le avisa al acudiente que ya salió, en vez de pedirle que vaya.
+     */
+    modoTransporte?: 'recogida' | 'ruta_bus';
     tutor?: {
         nombres: string;
         apellidos: string;
