@@ -13,9 +13,9 @@ function makeContext({ uid = 'maestro-1', rol = 'Editor', tenantId = 'tenant-1' 
 
 function makeFirestore({
   jornada, inscripciones = [], asistencias = {}, writes = [], estudiantes = {}, ejecucion,
-  metricasAsistencia = {},
+  metricasAsistencia = {}, historialNotificaciones = {},
 } = {}) {
-  const state = { jornada, inscripciones, asistencias, writes, estudiantes, ejecucion, metricasAsistencia };
+  const state = { jornada, inscripciones, asistencias, writes, estudiantes, ejecucion, metricasAsistencia, historialNotificaciones };
   return {
     collection: (name) => makeRef([name], state),
     _state: state,
@@ -96,6 +96,12 @@ function makeRef(path, state) {
         const [, , estudianteId] = metricaMatch;
         const previo = options && options.merge ? state.metricasAsistencia[estudianteId] || {} : {};
         state.metricasAsistencia[estudianteId] = { ...previo, ...data };
+      }
+
+      const notifMatch = joined.match(/^historialNotificaciones\/([^/]+)$/);
+      if (notifMatch) {
+        const [, notifId] = notifMatch;
+        state.historialNotificaciones[notifId] = { ...data };
       }
     },
   };
@@ -406,6 +412,99 @@ test('registrarAsistenciaJornada: el CHECK-IN no acumula (solo el check-out)', a
   await servicio(dataBase(), makeContext()); // check-in
 
   assert.equal(state.metricasAsistencia['estudiante-1'], undefined);
+});
+
+// --- WS-3a: notificacion al acudiente al salir en RUTA DE BUS (§8) --------------------------
+
+const jornadaConTema = { ...jornadaConHorario, tema: 'Taeguk 1', sedeId: 'sede-norte' };
+
+// Estado base para un check-out: entrada previa registrada.
+const stateCheckoutBus = (estudiante) => ({
+  jornada: jornadaConTema,
+  inscripciones: [inscripcionEstudiante1],
+  writes: [],
+  asistencias: { 'jornada-1/estudiante-1': { estudianteId: 'estudiante-1', horaEntrada: '2026-07-25T23:05:00.000Z' } },
+  metricasAsistencia: {},
+  historialNotificaciones: {},
+  estudiantes: { 'estudiante-1': estudiante },
+});
+
+test('registrarAsistenciaJornada: un estudiante de RUTA DE BUS genera aviso al acudiente en el check-out', async () => {
+  const state = stateCheckoutBus({
+    nombres: 'Sofia', apellidos: 'Perez', modoTransporte: 'ruta_bus', tutor: { correo: 'papa@test.com' },
+  });
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'), // 18:50 Bogota
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.notificationStatus, 'ruta_bus');
+  const notif = state.historialNotificaciones['salida-bus-jornada-1-estudiante-1'];
+  assert.ok(notif, 'debe existir la notificacion');
+  assert.equal(notif.estudianteId, 'estudiante-1');
+  assert.equal(notif.destinatario, 'papa@test.com');
+  assert.equal(notif.tipo, 'SalidaRutaBus');
+  assert.match(notif.mensaje, /Sofia Perez/);
+  assert.match(notif.mensaje, /ruta de bus/i);
+  assert.match(notif.mensaje, /18:50/); // hora local del club
+  // Se guarda el estado en la asistencia.
+  assert.equal(state.asistencias['jornada-1/estudiante-1'].notificationStatus, 'ruta_bus');
+});
+
+test('registrarAsistenciaJornada: un estudiante de RECOGIDA (default) NO genera aviso en el check-out', async () => {
+  const state = stateCheckoutBus({
+    nombres: 'Ana', modoTransporte: 'recogida', tutor: { correo: 'mama@test.com' },
+  });
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.notificationStatus, null);
+  assert.deepEqual(state.historialNotificaciones, {});
+});
+
+test('registrarAsistenciaJornada: sin modoTransporte (ausente) se trata como recogida -> sin aviso', async () => {
+  const state = stateCheckoutBus({ nombres: 'Ana', tutor: { correo: 'mama@test.com' } });
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+  assert.equal(resultado.notificationStatus, null);
+});
+
+test('registrarAsistenciaJornada: ruta de bus SIN acudiente -> sin_acudiente, no crea notificacion', async () => {
+  const state = stateCheckoutBus({ nombres: 'Sofia', modoTransporte: 'ruta_bus' }); // sin tutor
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.notificationStatus, 'sin_acudiente');
+  assert.deepEqual(state.historialNotificaciones, {});
+});
+
+test('registrarAsistenciaJornada: el aviso es idempotente por doc-id determinista (no duplica)', async () => {
+  // Aunque el helper corriera dos veces, el id `salida-bus-...` es el mismo -> un solo doc.
+  const state = stateCheckoutBus({
+    nombres: 'Sofia', modoTransporte: 'ruta_bus', tutor: { correo: 'papa@test.com' },
+  });
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'),
+  });
+
+  await servicio(dataBase(), makeContext());
+
+  assert.equal(Object.keys(state.historialNotificaciones).length, 1);
 });
 
 // --- Cycle A2: "maestro solo opera clases donde esta asignado" (.txt §12) --

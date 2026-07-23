@@ -155,6 +155,28 @@ describe('Integracion: lo que el callable ESCRIBE es exactamente lo que el repos
     expect(metrica.estudianteId).toBe('est-sofia');
   });
 
+  it('WS-3a: un estudiante de RUTA DE BUS genera el aviso al acudiente en el buzon al hacer check-out', async () => {
+    sembrarEscenarioCompleto();
+    // Re-siembra al estudiante como de ruta de bus, con acudiente.
+    sembrarDoc('estudiantes/est-sofia', {
+      tenantId: TENANT, nombres: 'Sofia', apellidos: 'Perez', grupo: 'Infantil', grado: 'Blanco',
+      sedeId: 'sede-1', estadoPago: 'Al día', modoTransporte: 'ruta_bus', tutor: { correo: 'papa@test.com' },
+    });
+
+    await registrarAsistenciaJornada(datos(), contexto()); // entrada
+    await registrarAsistenciaJornada(datos(), contexto()); // salida (= sube al bus)
+
+    // El aviso quedo en el buzon real (historialNotificaciones), legible por el tutor via reglas.
+    const notif = leerDoc(`historialNotificaciones/salida-bus-${JORNADA}-est-sofia`)!;
+    expect(notif.estudianteId).toBe('est-sofia');
+    expect(notif.destinatario).toBe('papa@test.com');
+    expect(notif.tipo).toBe('SalidaRutaBus');
+    expect(notif.mensaje).toMatch(/ruta de bus/i);
+
+    // Y el estado quedo en la asistencia.
+    expect(leerDoc(`tenants/${TENANT}/jornadas/${JORNADA}/asistencias/est-sofia`)?.notificationStatus).toBe('ruta_bus');
+  });
+
   it('el documento persistido no tiene campos fuera del contrato RegistroAsistencia', async () => {
     sembrarEscenarioCompleto();
     await registrarAsistenciaJornada(datos(), contexto());

@@ -215,7 +215,18 @@ function crearServicioRegistrarAsistencia({ firestore, ahora = () => new Date() 
     // Read-modify-write en vez de increment() para no depender de FieldValue en los fakes.
     await acumularMetricasAsistencia({ tenant, tenantId, estudianteId, minutosAsistidos, ahora: ahoraIso });
 
-    return { ok: true, tipo: 'salida', hora: ahoraIso, minutosAsistidos };
+    // WS-3a (§8): si el estudiante se va en RUTA DE BUS, el check-out ES el "salio en el bus"
+    // -> avisar al acudiente. Los de modo `recogida` NO se notifican aca (se les avisa antes
+    // de terminar la clase, cron horaFin-15, WS-3b). Mejor esfuerzo: si el aviso falla, el
+    // check-out NO falla (el aviso se puede reintentar); se deja el estado en la asistencia.
+    const notificationStatus = await notificarSalidaRutaBus({
+      firestore, tenant, tenantId, jornada, jornadaId, estudianteId, ahora: ahoraIso,
+    });
+    if (notificationStatus) {
+      await asistenciaRef.set({ notificationStatus }, { merge: true });
+    }
+
+    return { ok: true, tipo: 'salida', hora: ahoraIso, minutosAsistidos, notificationStatus };
   };
 }
 
@@ -223,6 +234,58 @@ function calcularMinutosAsistidos(horaEntradaIso, horaSalidaIso) {
   const inicio = new Date(horaEntradaIso).getTime();
   const fin = new Date(horaSalidaIso).getTime();
   return Math.max(0, Math.round((fin - inicio) / 60000));
+}
+
+const ZONA_HORARIA_CLUB = 'America/Bogota';
+
+// Hora local del club (HH:MM) a partir de un ISO, para el mensaje al acudiente.
+function horaLocalClub(iso) {
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: ZONA_HORARIA_CLUB, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso));
+}
+
+/**
+ * Notifica al acudiente que el estudiante de RUTA DE BUS salio (el check-out = subio al bus).
+ * Devuelve el `notificationStatus` a guardar en la asistencia, o `null` si no aplica (modo
+ * `recogida` / default). NO lanza: un fallo de aviso no debe voltear el check-out (§8).
+ */
+async function notificarSalidaRutaBus({ firestore, tenant, tenantId, jornada, jornadaId, estudianteId, ahora }) {
+  try {
+    const estSnap = await firestore.collection('estudiantes').doc(estudianteId).get();
+    const estudiante = estSnap.exists ? estSnap.data() : null;
+    if (!estudiante || estudiante.modoTransporte !== 'ruta_bus') {
+      return null; // recogida / default: no se avisa en el check-out.
+    }
+
+    const correoAcudiente = estudiante.tutor && estudiante.tutor.correo;
+    if (!correoAcudiente) return 'sin_acudiente';
+
+    const nombreAlumno = [estudiante.nombres, estudiante.apellidos].filter(Boolean).join(' ') || 'Tu hijo/a';
+    const clase = jornada.tema ? ` de ${jornada.tema}` : '';
+    const mensaje = `${nombreAlumno} terminó la clase${clase} y salió en la ruta de bus a las ${horaLocalClub(ahora)}.`;
+
+    // Doc-id DETERMINISTA -> idempotente (no duplica aunque se reintente): un aviso por
+    // check-out de esta jornada+estudiante.
+    const notifId = `salida-bus-${jornadaId}-${estudianteId}`;
+    await firestore.collection('historialNotificaciones').doc(notifId).set({
+      estudianteId,
+      estudianteNombre: nombreAlumno,
+      destinatario: correoAcudiente,
+      canal: 'WhatsApp',
+      tipo: 'SalidaRutaBus',
+      jornadaId,
+      tenantId,
+      mensaje,
+      leida: false,
+      fecha: ahora,
+    });
+
+    return 'ruta_bus';
+  } catch (err) {
+    console.error('[registrarAsistenciaJornada] fallo al notificar salida en ruta de bus', err);
+    return 'error';
+  }
 }
 
 // Acumulado derivado en `tenants/{tenantId}/metricasAsistencia/{estudianteId}` (ver

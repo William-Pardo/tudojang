@@ -26,4 +26,12 @@ export interface RegistroAsistencia {
   isLate?: boolean;
   /** Minutos de retraso respecto de `horaInicio` (0 si llegó a tiempo o antes). */
   minutesLate?: number;
+  /**
+   * Resultado de la notificación al acudiente al hacer check-out (WS-3a, §8).
+   * - `ruta_bus`: se avisó que el estudiante salió en la ruta.
+   * - `sin_acudiente`: no se avisó porque el estudiante no tiene `tutor.correo`.
+   * - `error`: el intento de aviso falló (se puede reintentar).
+   * Ausente para modo `recogida` (a esos se les avisa por otra vía: cron `horaFin-15`, WS-3b).
+   */
+  notificationStatus?: 'ruta_bus' | 'sin_acudiente' | 'error';
 }
