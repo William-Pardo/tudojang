@@ -166,6 +166,84 @@ test('registrarAsistenciaJornada rechaza jornada que no esta en_curso', async ()
   );
 });
 
+// --- Cycle A-ventana: brecha 4-bis-C, la ENTRADA solo dentro de la ventana horaria ---------
+//
+// La jornada de estos tests SI tiene horario. Clase 18:00-19:00 hora Bogota (UTC-5) => ventana
+// [17:45, 19:15] Bogota = [22:45Z, 00:15Z(+1)]. `ahora` se inyecta para ser determinista.
+
+const jornadaConHorario = {
+  ...jornadaEnCurso,
+  fecha: '2026-07-25',
+  horaInicio: '18:00',
+  horaFin: '19:00',
+};
+
+test('registrarAsistenciaJornada registra la ENTRADA cuando ahora cae dentro de la ventana', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({ jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1] }),
+    ahora: () => new Date('2026-07-25T23:30:00.000Z'), // 18:30 Bogota, en plena clase
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.ok, true);
+  assert.equal(resultado.tipo, 'entrada');
+});
+
+test('registrarAsistenciaJornada RECHAZA la entrada DIAS despues (la brecha 4-bis-C)', async () => {
+  // Jornada que quedo en_curso sin cerrar; alguien reusa el link/bookmark 3 dias despues.
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({ jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1] }),
+    ahora: () => new Date('2026-07-28T23:30:00.000Z'), // 3 dias despues, misma hora
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /ventana horaria/i
+  );
+});
+
+test('registrarAsistenciaJornada RECHAZA la entrada apenas pasada la ventana (fin+15)', async () => {
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({ jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1] }),
+    ahora: () => new Date('2026-07-26T00:30:00.000Z'), // 19:30 Bogota, 15 min pasado el cierre (00:15Z)
+  });
+
+  await assert.rejects(
+    () => servicio(dataBase(), makeContext()),
+    /ventana horaria/i
+  );
+});
+
+test('registrarAsistenciaJornada NO aplica la ventana a la SALIDA: un check-out tardio igual se registra', async () => {
+  // Con entrada previa valida, la salida no se bloquea por ventana (no perder el dato de quien
+  // SI estuvo). La entrada ya fue dentro de la ventana; el check-out puede ser un rato despues.
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({
+      jornada: jornadaConHorario,
+      inscripciones: [inscripcionEstudiante1],
+      asistencias: { 'jornada-1/estudiante-1': { estudianteId: 'estudiante-1', horaEntrada: '2026-07-25T23:10:00.000Z' } },
+    }),
+    ahora: () => new Date('2026-07-26T01:00:00.000Z'), // pasada la ventana, pero es la SALIDA
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.ok, true);
+  assert.equal(resultado.tipo, 'salida');
+});
+
+test('registrarAsistenciaJornada: una jornada SIN horario no evalua ventana (compatibilidad/doc malformado)', async () => {
+  // jornadaEnCurso no tiene fecha/horaInicio/horaFin -> se salta la ventana (defensivo).
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore({ jornada: jornadaEnCurso, inscripciones: [inscripcionEstudiante1] }),
+    ahora: () => new Date('2030-01-01T00:00:00.000Z'),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+  assert.equal(resultado.ok, true);
+});
+
 // --- Cycle A2: "maestro solo opera clases donde esta asignado" (.txt §12) --
 // Admin/Asistente/SuperAdmin operan cualquier jornada del tenant (ya lo
 // contempla `isInstructor()` en firestore.rules); Editor ("maestro" en este

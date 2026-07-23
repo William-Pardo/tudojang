@@ -87,9 +87,18 @@ const sembrarEscenarioCompleto = () => {
 
 let registrarAsistenciaJornada: (data: any, context: any) => Promise<any>;
 
+// Reloj fijo DENTRO de la ventana de la jornada sembrada (10:00-11:00 hora Bogota => ventana
+// [15:45Z, 16:15Z]). Necesario desde que el callable valida la ventana en la ENTRADA
+// (brecha 4-bis-C): sin un `ahora` inyectado, usaria la hora real y rechazaria todo por estar
+// fuera de la ventana de una clase con fecha fija en el pasado.
+const AHORA_EN_VENTANA = new Date('2026-07-22T15:30:00.000Z');
+
 beforeEach(() => {
   limpiarFirestoreFake();
-  registrarAsistenciaJornada = crearServicioRegistrarAsistencia({ firestore: crearFirestoreAdminFake() });
+  registrarAsistenciaJornada = crearServicioRegistrarAsistencia({
+    firestore: crearFirestoreAdminFake(),
+    ahora: () => AHORA_EN_VENTANA,
+  });
 });
 
 const datos = (estudianteId = 'est-sofia') => ({ tenantId: TENANT, jornadaId: JORNADA, estudianteId });
@@ -117,9 +126,10 @@ describe('Integracion: lo que el callable ESCRIBE es exactamente lo que el repos
     sembrarEscenarioCompleto();
 
     await registrarAsistenciaJornada(datos(), contexto());
-    // Se fuerza una entrada 30 minutos atras para que el calculo de minutos sea observable.
+    // Se fuerza la entrada 30 min ANTES del reloj inyectado (no `Date.now()` real) para que el
+    // calculo de minutos sea observable y determinista: salida (15:30Z) - entrada (15:00Z) = 30.
     const ruta = `tenants/${TENANT}/jornadas/${JORNADA}/asistencias/est-sofia`;
-    sembrarDoc(ruta, { ...leerDoc(ruta), horaEntrada: new Date(Date.now() - 30 * 60_000).toISOString() });
+    sembrarDoc(ruta, { ...leerDoc(ruta), horaEntrada: new Date(AHORA_EN_VENTANA.getTime() - 30 * 60_000).toISOString() });
 
     const salida = await registrarAsistenciaJornada(datos(), contexto());
     expect(salida).toMatchObject({ ok: true, tipo: 'salida' });
