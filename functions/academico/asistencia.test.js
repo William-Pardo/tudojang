@@ -244,6 +244,66 @@ test('registrarAsistenciaJornada: una jornada SIN horario no evalua ventana (com
   assert.equal(resultado.ok, true);
 });
 
+// --- WS-1: auditoria (checkedInBy/checkedOutBy) + puntualidad (isLate/minutesLate) ---------
+
+test('registrarAsistenciaJornada: el check-in guarda checkedInBy con el uid de quien escaneo', async () => {
+  const state = { jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1], writes: [], asistencias: {} };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:05:00.000Z'), // 18:05, en clase
+  });
+
+  await servicio(dataBase(), makeContext({ uid: 'maestro-1' }));
+
+  assert.equal(state.asistencias['jornada-1/estudiante-1'].checkedInBy, 'maestro-1');
+});
+
+test('registrarAsistenciaJornada: check-in a tiempo => isLate=false, minutesLate=0', async () => {
+  const state = { jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1], writes: [], asistencias: {} };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T22:55:00.000Z'), // 17:55, 5 min antes del inicio
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.isLate, false);
+  assert.equal(resultado.minutesLate, 0);
+  assert.equal(state.asistencias['jornada-1/estudiante-1'].isLate, false);
+});
+
+test('registrarAsistenciaJornada: check-in tarde => isLate=true, minutesLate calculado', async () => {
+  const state = { jornada: jornadaConHorario, inscripciones: [inscripcionEstudiante1], writes: [], asistencias: {} };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:12:00.000Z'), // 18:12, 12 min tarde
+  });
+
+  const resultado = await servicio(dataBase(), makeContext());
+
+  assert.equal(resultado.isLate, true);
+  assert.equal(resultado.minutesLate, 12);
+  assert.equal(state.asistencias['jornada-1/estudiante-1'].minutesLate, 12);
+});
+
+test('registrarAsistenciaJornada: el check-out guarda checkedOutBy', async () => {
+  const state = {
+    jornada: jornadaConHorario,
+    inscripciones: [inscripcionEstudiante1],
+    writes: [],
+    asistencias: { 'jornada-1/estudiante-1': { estudianteId: 'estudiante-1', horaEntrada: '2026-07-25T23:05:00.000Z' } },
+  };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'),
+  });
+
+  const resultado = await servicio(dataBase(), makeContext({ uid: 'admin-9', rol: 'Admin' }));
+
+  assert.equal(resultado.tipo, 'salida');
+  assert.equal(state.asistencias['jornada-1/estudiante-1'].checkedOutBy, 'admin-9');
+});
+
 // --- Cycle A2: "maestro solo opera clases donde esta asignado" (.txt §12) --
 // Admin/Asistente/SuperAdmin operan cualquier jornada del tenant (ya lo
 // contempla `isInstructor()` en firestore.rules); Editor ("maestro" en este

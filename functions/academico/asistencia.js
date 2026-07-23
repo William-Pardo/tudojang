@@ -4,7 +4,7 @@
 
 'use strict';
 
-const { tieneHorario, estaEnVentana } = require('./ventanaClaseEnVivo');
+const { tieneHorario, estaEnVentana, calcularRetraso } = require('./ventanaClaseEnVivo');
 
 const crearError = (code, message) => Object.assign(new Error(message), { code });
 
@@ -177,9 +177,21 @@ function crearServicioRegistrarAsistencia({ firestore, ahora = () => new Date() 
         );
       }
 
-      const registro = { estudianteId, horaEntrada: ahoraIso };
+      // Puntualidad (WS-1, §6) + auditoria de quien escaneo (§12). Sin horario no hay contra
+      // que medir el retraso -> se asume a tiempo.
+      const { isLate, minutesLate } = tieneHorario(jornada)
+        ? calcularRetraso(jornada, ahoraDate)
+        : { isLate: false, minutesLate: 0 };
+
+      const registro = {
+        estudianteId,
+        horaEntrada: ahoraIso,
+        checkedInBy: auth.uid,
+        isLate,
+        minutesLate,
+      };
       await asistenciaRef.set(registro);
-      return { ok: true, tipo: 'entrada', hora: ahoraIso };
+      return { ok: true, tipo: 'entrada', hora: ahoraIso, isLate, minutesLate };
     }
 
     const registroExistente = asistenciaSnap.data();
@@ -193,7 +205,10 @@ function crearServicioRegistrarAsistencia({ firestore, ahora = () => new Date() 
 
     const minutosAsistidos = calcularMinutosAsistidos(registroExistente.horaEntrada, ahoraIso);
 
-    await asistenciaRef.set({ horaSalida: ahoraIso, minutosAsistidos }, { merge: true });
+    await asistenciaRef.set(
+      { horaSalida: ahoraIso, minutosAsistidos, checkedOutBy: auth.uid },
+      { merge: true }
+    );
 
     return { ok: true, tipo: 'salida', hora: ahoraIso, minutosAsistidos };
   };

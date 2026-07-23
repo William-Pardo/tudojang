@@ -51,9 +51,21 @@ function estaEnVentana(jornada, ahora) {
   return { dentro, apertura, cierre };
 }
 
+/**
+ * Puntualidad del check-in (Modulo Clase en Vivo.txt §6): tarde = despues de `horaInicio` (la
+ * hora nominal de inicio, NO la apertura de la ventana en -15). Llegar dentro de [inicio-15,
+ * inicio] es normal. `minutesLate` = 0 si llego a tiempo o antes.
+ */
+function calcularRetraso(jornada, ahora) {
+  const inicio = combinarFechaHoraEnZonaDelClub(jornada.fecha, jornada.horaInicio);
+  const minutesLate = Math.max(0, Math.round((ahora.getTime() - inicio.getTime()) / 60000));
+  return { isLate: minutesLate > 0, minutesLate };
+}
+
 module.exports = {
   LIVE_CLASS_OPEN_BEFORE_MINUTES,
   LIVE_CLASS_CLOSE_AFTER_MINUTES,
   tieneHorario,
   estaEnVentana,
+  calcularRetraso,
 };

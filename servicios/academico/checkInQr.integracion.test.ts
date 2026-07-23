@@ -152,6 +152,11 @@ describe('Integracion: lo que el callable ESCRIBE es exactamente lo que el repos
       'horaEntrada',
       'horaSalida',
       'minutosAsistidos',
+      // WS-1 (auditoria + puntualidad):
+      'checkedInBy',
+      'checkedOutBy',
+      'isLate',
+      'minutesLate',
     ];
 
     // Si el callable empieza a escribir un campo nuevo, este test lo señala y obliga a
