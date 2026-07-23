@@ -90,6 +90,10 @@ const {
   crearListadoJornadasConfirmadasFirestore,
 } = require("./academico/jornadasScheduler");
 const {
+  crearServicioAvisarRecogidaProxima,
+  crearDepsRecogidaFirestore,
+} = require("./academico/recogidaScheduler");
+const {
   crearServicioRecordatoriosPago,
 } = require("./academico/recordatoriosPago");
 const {
@@ -405,6 +409,10 @@ const servicioIniciarJornadasPorHorario = crearServicioIniciarJornadasPorHorario
   listarJornadasConfirmadas: crearListadoJornadasConfirmadasFirestore(admin.firestore())
 });
 
+const servicioAvisarRecogidaProxima = crearServicioAvisarRecogidaProxima(
+  crearDepsRecogidaFirestore(admin.firestore())
+);
+
 // Compartida entre vencerAsignaciones y recordatoriosEstudio (mismo collectionGroup query).
 const listarAsignacionesPublicadasFirestore = crearListadoAsignacionesFirestore(admin.firestore());
 
@@ -674,6 +682,15 @@ exports.iniciarJornadasPorHorario = functionsV1.pubsub
   .schedule("*/5 7-21 * * *")
   .timeZone("America/Bogota")
   .onRun(async () => servicioIniciarJornadasPorHorario(new Date()));
+
+// WS-3b (Clase en Vivo §8): avisa a los acudientes de los chicos de RECOGIDA que la clase
+// esta por terminar (a horaFin-15), para que lleguen a tiempo. Misma cadencia/ventana horaria
+// que el inicio automatico (cada 5 min, 7am-9pm Bogota). Idempotente por jornada. Los de ruta
+// de bus se avisan en el check-out (WS-3a), no aca.
+exports.avisarRecogidaProxima = functionsV1.pubsub
+  .schedule("*/5 7-21 * * *")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioAvisarRecogidaProxima(new Date()));
 
 // Plan B #1 (fix tutor-role-end-to-end): recordatorios de pago diarios al buzón del consultor.
 // Una vez al día (8am Bogota); crea UNA notificación por estudiante con saldo pendiente por mes.

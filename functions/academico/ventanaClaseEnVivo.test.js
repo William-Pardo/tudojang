@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { estaEnVentana, tieneHorario, calcularRetraso } = require('./ventanaClaseEnVivo');
+const { estaEnVentana, tieneHorario, calcularRetraso, estaEnVentanaDeAvisoRecogida } = require('./ventanaClaseEnVivo');
 
 // Clase 18:00-19:00 hora Bogota (UTC-5) => ventana [17:45, 19:15] Bogota = [22:45Z, 00:15Z(+1)].
 const jornada = { fecha: '2026-07-25', horaInicio: '18:00', horaFin: '19:00' };
@@ -59,4 +59,26 @@ test('calcularRetraso: 20 minutos tarde', () => {
   const r = calcularRetraso(jornada, new Date('2026-07-25T23:20:00Z')); // 18:20
   assert.equal(r.isLate, true);
   assert.equal(r.minutesLate, 20);
+});
+
+// Clase termina 19:00 Bogota = 00:00Z(+1). Ventana de aviso = [18:45, 19:00] Bogota =
+// [23:45Z, 00:00Z(+1)].
+test('estaEnVentanaDeAvisoRecogida: 16 min antes del fin todavia NO (muy temprano)', () => {
+  assert.equal(estaEnVentanaDeAvisoRecogida(jornada, new Date('2026-07-25T23:44:00Z')), false);
+});
+
+test('estaEnVentanaDeAvisoRecogida: exactamente 15 min antes del fin => SI', () => {
+  assert.equal(estaEnVentanaDeAvisoRecogida(jornada, new Date('2026-07-25T23:45:00Z')), true);
+});
+
+test('estaEnVentanaDeAvisoRecogida: 5 min antes del fin => SI', () => {
+  assert.equal(estaEnVentanaDeAvisoRecogida(jornada, new Date('2026-07-25T23:55:00Z')), true);
+});
+
+test('estaEnVentanaDeAvisoRecogida: justo en el fin => SI (borde)', () => {
+  assert.equal(estaEnVentanaDeAvisoRecogida(jornada, new Date('2026-07-26T00:00:00Z')), true);
+});
+
+test('estaEnVentanaDeAvisoRecogida: pasado el fin => NO (la clase ya termino)', () => {
+  assert.equal(estaEnVentanaDeAvisoRecogida(jornada, new Date('2026-07-26T00:05:00Z')), false);
 });
