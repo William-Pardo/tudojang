@@ -5,6 +5,13 @@ import AsignarMaterialWizard, { type AsignacionDraft } from './AsignarMaterialWi
 import type { RecursoAcademico } from '../../models/academico/recurso';
 import { GradoTKD } from '../../tipos';
 
+// Los tests del Paso 3 navegan el wizard completo con userEvent y recorren las 13 variantes
+// de grado; tardan 5-10s por su cuenta y, bajo la carga del run completo (154 suites),
+// cruzaban el timeout default de 5000ms de jest de forma intermitente (flake preexistente,
+// no relacionado con ningun cambio de logica). 30s da holgura de sobra sin ocultar un cuelgue
+// real (un cuelgue verdadero igual pasa los 30s).
+jest.setTimeout(30000);
+
 const gruposObjetivoReales = ['Infantil', 'Precadetes', 'Cadetes', 'Adultos', 'Todos'];
 
 const materialPdf: RecursoAcademico = {
