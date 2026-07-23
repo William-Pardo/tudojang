@@ -480,6 +480,27 @@ service cloud.firestore {
         && request.auth.uid == estudianteId;
     }
 
+    // Métricas de ASISTENCIA FÍSICA acumuladas (horas reales de clase en vivo), WS-2 /
+    // `Módulo Clase en Vivo.txt` §7/§11. La clave `{estudianteId}` es el DOC-ID del estudiante
+    // (el que se escanea del QR), NO el authUid — por eso la identidad se resuelve por EMAIL
+    // vía get() sobre el doc del estudiante, igual que `historialNotificaciones` (y NO con
+    // `request.auth.uid == estudianteId`, que aquí sería incorrecto).
+    //
+    // Escritura EXCLUSIVA del callable `registrarAsistenciaJornada` (Admin SDK, bypassa reglas)
+    // al hacer check-out. El cliente NUNCA escribe: es un acumulado derivado.
+    // Lectura: staff del tenant (reportes/KPIs §11), el tutor vinculado (el padre ve las horas
+    // de su hijo), o el propio estudiante.
+    match /tenants/{tenantId}/metricasAsistencia/{estudianteId} {
+      allow read: if authenticated()
+        && currentTenantId() == tenantId
+        && (
+          isInstructor()
+          || (isTutor() && get(/databases/$(database)/documents/estudiantes/$(estudianteId)).data.tutor.correo == request.auth.token.email)
+          || (isEstudiante() && get(/databases/$(database)/documents/estudiantes/$(estudianteId)).data.correo == request.auth.token.email)
+        );
+      allow write: if false;
+    }
+
     // Buzón de notificaciones (fix tutor-role-end-to-end 2026-07-14). Colección raíz
     // `historialNotificaciones`: cada doc referencia un `estudianteId`. Staff ve todo; un
     // consultor (Tutor/Estudiante) ve SOLO las de su(s) estudiante(s), validando contra el
