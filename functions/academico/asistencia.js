@@ -4,6 +4,8 @@
 
 'use strict';
 
+const { tieneHorario, estaEnVentana, calcularRetraso } = require('./ventanaClaseEnVivo');
+
 const crearError = (code, message) => Object.assign(new Error(message), { code });
 
 // Mismo conjunto de roles que `isInstructor()` en firestore.rules (Admin, Editor,
@@ -108,7 +110,9 @@ async function perteneceAEjecucion({ firestore, tenant, tenantId, jornada, estud
   return grupoASlug(estudiante.grupo) === ejecucion.grupoId && estudiante.sedeId === ejecucion.sedeId;
 }
 
-function crearServicioRegistrarAsistencia({ firestore }) {
+// `ahora` inyectable (default: reloj real) para poder probar la ventana horaria de forma
+// determinista sin depender de la hora en que corre el test.
+function crearServicioRegistrarAsistencia({ firestore, ahora = () => new Date() }) {
   return async function registrarAsistenciaJornada(data, context) {
     const auth = requireAuth(context);
     assertRolAutorizado(auth);
@@ -156,12 +160,38 @@ function crearServicioRegistrarAsistencia({ firestore }) {
       .doc(estudianteId);
 
     const asistenciaSnap = await asistenciaRef.get();
-    const ahora = new Date().toISOString();
+    const ahoraDate = ahora();
+    const ahoraIso = ahoraDate.toISOString();
 
     if (!asistenciaSnap.exists) {
-      const registro = { estudianteId, horaEntrada: ahora };
+      // Guarda de ventana horaria (brecha 4-bis-C) — SOLO en la ENTRADA (primer escaneo).
+      // La brecha es EMPEZAR asistencia fuera de la clase (una jornada que quedo en_curso sin
+      // cerrar es escaneable por URL directa dias despues). No se guarda la SALIDA: ya requiere
+      // una entrada previa valida, y un check-out un poco tarde no debe perder el dato.
+      // Si la jornada no tiene horario (doc malformado / fixture viejo) no se evalua ventana:
+      // una JornadaInstruccion real siempre lo tiene.
+      if (tieneHorario(jornada) && !estaEnVentana(jornada, ahoraDate).dentro) {
+        throw crearError(
+          'failed-precondition',
+          'Fuera de la ventana horaria de la clase: solo se puede registrar la entrada durante el horario de la jornada (±15 min)'
+        );
+      }
+
+      // Puntualidad (WS-1, §6) + auditoria de quien escaneo (§12). Sin horario no hay contra
+      // que medir el retraso -> se asume a tiempo.
+      const { isLate, minutesLate } = tieneHorario(jornada)
+        ? calcularRetraso(jornada, ahoraDate)
+        : { isLate: false, minutesLate: 0 };
+
+      const registro = {
+        estudianteId,
+        horaEntrada: ahoraIso,
+        checkedInBy: auth.uid,
+        isLate,
+        minutesLate,
+      };
       await asistenciaRef.set(registro);
-      return { ok: true, tipo: 'entrada', hora: ahora };
+      return { ok: true, tipo: 'entrada', hora: ahoraIso, isLate, minutesLate };
     }
 
     const registroExistente = asistenciaSnap.data();
@@ -173,11 +203,14 @@ function crearServicioRegistrarAsistencia({ firestore }) {
       );
     }
 
-    const minutosAsistidos = calcularMinutosAsistidos(registroExistente.horaEntrada, ahora);
+    const minutosAsistidos = calcularMinutosAsistidos(registroExistente.horaEntrada, ahoraIso);
 
-    await asistenciaRef.set({ horaSalida: ahora, minutosAsistidos }, { merge: true });
+    await asistenciaRef.set(
+      { horaSalida: ahoraIso, minutosAsistidos, checkedOutBy: auth.uid },
+      { merge: true }
+    );
 
-    return { ok: true, tipo: 'salida', hora: ahora, minutosAsistidos };
+    return { ok: true, tipo: 'salida', hora: ahoraIso, minutosAsistidos };
   };
 }
 

@@ -10,16 +10,19 @@
  *   tenants/{t}/jornadas/{j}/asistencias/{e}      -> asistenciaRepository.listarPorJornada
  *     -> ClaseEnVivoView decide si habilita el escaner y que check-ins lista
  *
- * HALLAZGO QUE DOCUMENTA ESTA SUITE (ver ACCIONES_PENDIENTES.md): la ventana horaria
- * `[horaInicio-15, horaFin+15]` gatea el BOTON DE ENTRADA ("Iniciar Clase en Vivo" en
- * Horarios/App, via `estaJornadaEnVentana`/`useVentanaClaseEnVivo`), pero NO esta
- * chequeada dentro de esta vista: `ClaseEnVivoView` habilita el escaner mirando
- * unicamente `estado === 'en_curso'`. El callable server-side tampoco valida ventana
- * (`functions/academico/asistencia.js` solo exige `estado === 'en_curso'`).
+ * VENTANA HORARIA (brecha 4-bis-C, CERRADA server-side el 2026-07-22):
+ * La ventana `[horaInicio-15, horaFin+15]` gatea el BOTON DE ENTRADA ("Iniciar Clase en
+ * Vivo" en Horarios/App). ESTA VISTA sigue habilitando el escaner mirando solo
+ * `estado === 'en_curso'` -- es cosmetico. El LIMITE REAL ahora vive en el callable
+ * `functions/academico/asistencia.js`, que RECHAZA una ENTRADA fuera de la ventana
+ * (`Fuera de la ventana horaria...`, ver `functions/academico/asistencia.test.js`). Asi que
+ * aunque la vista muestre el escaner sobre una jornada vieja que quedo en_curso, un check-in
+ * dias despues es rechazado en el servidor -- el agujero de "escaneable por URL directa dias
+ * despues" quedo cerrado donde importa (el boundary de seguridad), no solo en la UI.
  *
- * O sea: la ventana es una AYUDA DE UI, no un limite real. Los tests de abajo fijan ese
- * comportamiento tal como es hoy, con el caso limite marcado explicitamente para que la
- * decision de cerrarlo (o no) sea consciente y no un descubrimiento en produccion.
+ * Queda como deuda MENOR de UX (no de seguridad): la vista podria ocultar el escaner cuando la
+ * ventana esta cerrada, pero eso requiere inyectar el reloj en la vista; hoy el usuario ve el
+ * escaner y, si escanea fuera de hora, recibe el rechazo del callable.
  */
 
 import React from 'react';
@@ -221,21 +224,23 @@ describe('Integracion: alcance real de la ventana horaria sobre el escaner', () 
     expect(estaJornadaEnVentana(jornada, MUY_DESPUES)).toBe(false);
   });
 
-  it('BRECHA CONOCIDA: con la ventana ya cerrada, una jornada que quedo en_curso sigue permitiendo escanear', async () => {
-    // Nada mueve automaticamente una jornada fuera de 'en_curso': el scheduler solo hace
-    // confirmada -> en_curso, y la salida es el cierre MANUAL desde MisClasesView. Una
-    // jornada que el maestro nunca cerro queda escaneable por URL directa (bookmark, boton
-    // atras, link compartido) dias despues, porque ni esta vista ni el callable validan la
-    // ventana horaria -- solo el estado academico.
+  it('la VISTA sigue mostrando el escaner sobre una jornada vieja en_curso (cosmetico); el LIMITE lo pone el callable', async () => {
+    // Nada mueve automaticamente una jornada fuera de 'en_curso' (el scheduler solo hace
+    // confirmada -> en_curso; la salida es el cierre MANUAL). Esta vista, por si sola, seguiria
+    // mostrando el escaner sobre una jornada vieja -- es cosmetico.
     //
-    // Este test fija el comportamiento ACTUAL a proposito. Si se decide cerrar la brecha
-    // (validar ventana en ClaseEnVivoView y/o en el callable), va a fallar y hay que
-    // invertir la expectativa: eso es exactamente lo que se busca.
+    // La brecha real (registrar asistencia dias despues) YA NO esta abierta: el callable
+    // `registrarAsistenciaJornada` rechaza la ENTRADA fuera de la ventana horaria. Ver la
+    // prueba "RECHAZA la entrada DIAS despues (la brecha 4-bis-C)" en
+    // functions/academico/asistencia.test.js. Aca solo se fija que la vista es cosmetica.
     sembrarJornada({ fecha: '2026-07-20' }); // clase de hace dos dias, nunca cerrada
 
     render(<ClaseEnVivoView jornadaId={JORNADA} />);
 
+    // La vista muestra el escaner (deuda de UX conocida)...
     expect(await screen.findByRole('button', { name: /escanear asistencia/i })).toBeInTheDocument();
+    // ...pero la ventana esta cerrada y el callable rechazaria el check-in (la seguridad no
+    // depende de esta vista).
     expect(estaJornadaEnVentana({ fecha: '2026-07-20', horaInicio: '10:00', horaFin: '11:00' }, MUY_DESPUES))
       .toBe(false);
   });

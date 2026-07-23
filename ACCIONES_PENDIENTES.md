@@ -852,7 +852,37 @@ Verificadas por mutación, no por estar en verde:
 - Desactivar `assertInstructorAsignado` → **muere 1** (el de permisos).
 - Desactivar la guarda `estado === 'en_curso'` en `ClaseEnVivoView` → **mueren 2**.
 
-### 4-bis-C. 🟡 BRECHA ABIERTA — la ventana horaria es una ayuda de UI, no un límite real
+### 4-bis-C. ✅ CERRADA (2026-07-22) — el callable ahora valida la ventana horaria
+
+**Decisión del usuario: cerrarla.** El callable `registrarAsistenciaJornada`
+(`functions/academico/asistencia.js`) ahora **rechaza la ENTRADA fuera de la ventana horaria**
+`[horaInicio-15, horaFin+15]` (hora del club, UTC-5). El agujero de "una jornada que quedó en
+`en_curso` sin cerrar es escaneable por URL directa días después" quedó cerrado en el **límite
+de seguridad** (el servidor), no solo en la UI.
+
+Detalles de diseño:
+- Ventana replicada del lado de functions en `functions/academico/ventanaClaseEnVivo.js` (espejo
+  exacto de `ventanaClaseEnVivoService.ts`: mismos 15/15, mismo offset UTC-5). 7 pruebas propias.
+- Guarda **solo en la ENTRADA** (primer escaneo). La SALIDA no se valida por ventana: ya requiere
+  una entrada previa válida, y un check-out un poco tarde no debe perder el dato de quien sí
+  estuvo. Verificado con un test explícito.
+- Reloj inyectable (`ahora`) para pruebas deterministas; default `new Date()`.
+- Una jornada sin horario (doc malformado / fixture viejo) no evalúa ventana — defensivo; una
+  `JornadaInstruccion` real siempre lo tiene.
+- Verificado por mutación (desactivar el guard → 2 tests rojos).
+
+**Deuda MENOR de UX que queda (no de seguridad):** `ClaseEnVivoView` sigue mostrando el botón
+"Escanear asistencia" aunque la ventana esté cerrada (es cosmético — el callable rechaza igual).
+Ocultarlo requiere inyectar el reloj en la vista + actualizar sus ~6 tests; no se hizo. Hoy el
+usuario ve el escáner y, si escanea fuera de hora, recibe el rechazo del callable.
+
+No hace falta medir producción antes: rechazar un check-in fuera del horario de su clase es
+correcto por definición, independiente de cuántas jornadas queden en `en_curso`.
+
+<details>
+<summary>Estado original (histórico, cuando la brecha estaba abierta)</summary>
+
+#### 🟡 BRECHA ABIERTA — la ventana horaria es una ayuda de UI, no un límite real
 
 Encontrado al cubrir la junta #2. **Decisión pendiente, no defecto confirmado.**
 
@@ -875,6 +905,8 @@ para lo que está.
 
 Antes de decidir conviene medir cuántas jornadas quedan en `en_curso` sin cerrar en
 producción. Si son muchas, el problema real puede ser el cierre manual, no la ventana.
+
+</details>
 
 ---
 
