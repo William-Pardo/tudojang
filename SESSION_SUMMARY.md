@@ -1,33 +1,69 @@
-# Resumen de sesión — 2026-07-08
+# SESSION_SUMMARY — 2026-07-22
 
 ## Objetivo de la sesión
+Completar la cobertura de **pruebas de integración del Centro de Estudios** y, a partir de lo
+que apareciera, corregir bugs reales y resolver los hallazgos de producto que el usuario
+decidiera.
 
-Diagnosticar el módulo **Agenda** contrastando `PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md`, `PLAN_UX_AGENDA.md` y `Mejora del módulo Agenda.txt` contra el código real, registrar un plan de tareas TDD en `CIERRE CENTRO DE ESTUDIOS.md` como módulo 12 (paralelo), y ejecutar las primeras subtareas.
+## Lo que se hizo
 
-## Hallazgo central de la sesión
+### 1. Cobertura de integración — las 7 cadenas del Centro de Estudios (COMPLETA)
+Se mockea solo el SDK de Firestore; servicios, repositorios y componentes corren reales.
 
-`PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md` describe un sistema ("Sistema B": `CohorteAcademica`, `JornadaAcademica`, `ClaseEnVivo`, `servicios/cohortesApi.ts`, `jornadasApi.ts`, `agendaManualApi.ts`, `claseEnVivoApi.ts`, `asistenciaQrApi.ts`, `progresoClaseApi.ts`) marcado `[x]` completo en sus 10 etapas, pero que está **huérfano y roto**: sin tipar, sin consumidores reales (salvo `ClaseEnVivoView.tsx`, parcial), y confirmado por `openspec/changes/clase-en-vivo-checkin-trigger-agenda/proposal.md` como una fachada que nunca persiste en Firestore. El sistema real y vigente, usado por Centro de Estudios, es `models/academico/*` + `servicios/academico/*` (`JornadaInstruccion`, `ProgramaAcademico`, `EjecucionPrograma`, `AsignacionAcademica`).
+| Cadena | Suite |
+|---|---|
+| Biblioteca (importar → clasificar → aprobar → publicar) | `servicios/academico/biblioteca.integracion.test.ts` |
+| Quiz (configurar → responder → métrica del acudiente) | `servicios/academico/quiz.integracion.test.ts` |
+| Identidad del acudiente (vínculos) | `servicios/academico/vinculoIdentidad.integracion.test.ts` |
+| Agenda (edición de jornada) | `servicios/academico/agendaJornada.integracion.test.ts` |
+| Progreso / métricas (analítica) | `servicios/academico/progresoAnalitica.integracion.test.ts` |
+| Publicación de material | `servicios/academico/publicarMaterial.integracion.test.ts` |
+| Generación de jornadas | `servicios/academico/generacionJornadas.integracion.test.ts` |
 
-**Decisión de arquitectura**: todo el módulo 12 se construye sobre el sistema real. `PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md` fue marcado con un banner "SUPERADO" al inicio del archivo, referenciando esta decisión.
+**12 suites de integración, ~147 pruebas.**
 
-## Trabajo realizado
+### 2. Dos bugs de producción encontrados y corregidos
+- **`scoreUltimaEvaluacion` devolvía el PRIMER intento, no el último** (`sort` estable + empate
+  de milisegundos en `registradoEn`). El acudiente veía congelado un score viejo.
+  `servicios/academico/actividadService.ts`.
+- **El correo del acudiente no se normalizaba en la importación masiva** → el padre entraba y
+  veía una pantalla vacía (la query `where('tutor.correo','==', …)` es case-sensitive).
+  Fix centralizado en el callable `crearEstudiante` + `ModalImportacionMasiva.tsx`.
 
-1. Auditoría técnica completa del módulo Agenda vía subagente Explore (solo lectura).
-2. Registro del módulo 12 completo en `CIERRE CENTRO DE ESTUDIOS.md` (12 subtareas, 12.1–12.12), con tabla de estado real por requisito del documento de mejora.
-3. Banner "SUPERADO" agregado a `PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md`.
-4. Implementación TDD (RED→GREEN→REFACTOR→VERIFY→TRACE) de 4 subtareas, cada una delegada a un subagente y **verificada manualmente por el orquestador leyendo el diff real** antes de darla por cerrada:
-   - **12.1** Auditoría — COMPLETA.
-   - **12.2** Permisos "maestro asignado" (backend `firestore.rules` + frontend `MisClasesView.tsx`) — COMPLETA.
-   - **12.3** Disponibilidad de maestro/sede unificada (`existeConflictoHorario` extendida, mensajes específicos por motivo) — COMPLETA.
-   - **12.4** Concurrencia optimista al guardar jornada (`ConflictoConcurrenciaError`, `actualizadoEnEsperado`) — COMPLETA.
-5. Preguntado al usuario si continuar con 12.5 — **sin respuesta tras 4 disparos consecutivos del Stop hook**; la sesión se cierra en este punto sin avanzar 12.5.
+### 3. Migración de correos + diagnóstico contra producción
+`scripts/normalizar-correos.js` (dry-run por defecto, idempotente, reporta cobertura). Corrido
+contra producción: **11 documentos, 0 afectados** — el bug nunca pisó datos (las altas se
+hicieron por el formulario, que sí normalizaba). No hay migración pendiente. El bloqueante de
+la demo a padres quedó descartado.
 
-## Estado al cierre de la sesión
+### 4. Los 4 hallazgos de producto — decididos por el usuario e implementados
+1. Un quiz cuenta como asignación **completada** solo si se aprobó (**≥70%**). Regla unificada
+   en `avanceAsignacionCompletado` (`models/academico/actividad.ts`).
+2. **"Quitar de la agenda"** (archivar, flag `archivada`) para clases ya operadas que no se
+   pueden eliminar ni cancelar. No toca la máquina de estados.
+3. `MaterialPreviewModal`: tres estados separados — **cargando / error+reintentar / vacío** —
+   en vez de confundir fallo de red con "quiz sin preguntas".
+4. Biblioteca: solo se archiva un recurso **ya usado** (publicado en una clase); uno sin usar
+   lanza `RecursoNoPublicadoError` sugiriendo quitarlo de la biblioteca.
 
-- Módulo 12: 4 de 12 subtareas completas (12.1–12.4).
-- Ningún commit realizado. Ningún `npm run build` ejecutado (instrucción explícita del usuario: nunca hacer build tras cambios).
-- El usuario pidió explícitamente revisar el diff acumulado **al terminar todo el módulo 12**, no subtarea por subtarea — así que el working tree queda con cambios sin commitear intencionalmente.
+### 5. Extra: flake preexistente corregido
+`AsignarMaterialWizard.test.tsx` flakeaba por timeout (tests de 5-10s vs límite 5s) bajo la
+carga del run completo → `jest.setTimeout(30000)`.
 
-## Próxima sesión
+## Estado de tests al cierre
+- App: **154 suites / 1628 pruebas / 0 fallos**, 3 skipped.
+- Functions: 267 node:test + 111 jest.
+- Scripts (`test:node`): 25.
+- Typecheck (`tsc --noEmit`): **0 errores**.
 
-Continuar por **12.5 (auditoría completa: rol, valor anterior/nuevo, fuente del cambio)**, salvo que el usuario redirija. Ver `HANDOVER.md` para el detalle de continuidad.
+## Ramas / deploy
+- **PR #4 mergeado a `main` y deployado** (cobertura de integración + 2 bugs). Deploy verde y
+  completo.
+- **`fix/hallazgos-producto-centro-estudios`**: pusheada, 6 commits (Progreso + 4 findings +
+  flake), **PR pendiente de abrir/mergear**.
+- `test/integracion-progreso`: redundante (su commit ya está en la rama de fixes), borrar tras
+  merge.
+
+## Método (constante toda la sesión)
+RED → GREEN → mutación de control → regresión completa → commit por cambio. *Verde ≠ arreglado*:
+correr suites nuevas varias veces reveló flakes y un bug real (`scoreUltimaEvaluacion`).

@@ -1,43 +1,43 @@
-# Reporte de tests — sesión módulo 12 (Agenda), 2026-07-08
+# TEST_REPORT — 2026-07-22
 
-Resultados verificados por el orquestador leyendo el registro de cierre y, en 12.2/12.3/12.4, spot-checkeando el código fuente real (no solo el resumen del subagente).
+Todos los números verificados corriendo los comandos al cierre de la sesión.
 
-## 12.2 — Permisos "maestro asignado"
+## Resumen
 
-| Comando | Resultado |
+| Suite | Comando | Resultado |
+|---|---|---|
+| App (Jest) | `npx jest --runInBand` | **154 suites / 1628 pass / 0 fail** (3 skipped) |
+| Functions (node:test) | `npm --prefix functions test` | 267 pass |
+| Functions (Jest: drive, invitaciones) | (dentro de `test:functions:full`) | 111 pass |
+| Scripts operativos | `npm run test:node` | 25 pass |
+| Typecheck | `npm run typecheck` (`tsc --noEmit`) | **0 errores** |
+
+## Cobertura de integración del Centro de Estudios (12 suites, ~147 pruebas)
+
+| Suite | Foco |
 |---|---|
-| `npm run test:firestore-rules` (emulador) | 26 pass / 0 fail |
-| `npx jest vistas/admin/MisClasesView.test.tsx --runInBand` | 18 pass / 0 fail |
-| `npx jest JornadasView + AsignacionesView --runInBand` | 37 pass / 0 fail (4 suites) |
-| `npx tsc --noEmit` | 0 errores en archivos de producción tocados |
+| `biblioteca.integracion.test.ts` | importar → clasificar → aprobar → publicar; regla de archivado |
+| `quiz.integracion.test.ts` | configurar banco → responder → métrica; regla de "completada" ≥70 |
+| `vinculoIdentidad.integracion.test.ts` | resolución de hijos por email del acudiente (case-sensitivity) |
+| `agendaJornada.integracion.test.ts` | conflicto horario, bloqueo optimista, eliminación segura, archivar |
+| `progresoAnalitica.integracion.test.ts` | cruce métricas → asignación → jornada → programa |
+| `publicarMaterial.integracion.test.ts` | cadena de publicación |
+| `generacionJornadas.integracion.test.ts` | programa → generación de jornadas |
+| `CentroEstudios.integracion.test.tsx` | identidad del consultor |
+| `MisClasesView.integracion.test.tsx` | cierre de jornada |
+| `claseEnVivo.integracion.test.ts` | scheduler ↔ ventana |
+| `checkInQr.integracion.test.ts` | scanner → callable → repositorio |
+| `ClaseEnVivoView.integracion.test.tsx` | ventana → habilitación del scanner |
 
-RED confirmado: 2 tests de reglas fallaban con `Expected request to fail, but it succeeded` antes del fix (cualquier instructor podía editar la clase de otro).
+## Verificación por mutación (esta sesión)
+Cada bug/regla se verificó rompiendo el código a propósito y confirmando que la suite se pone
+en rojo. Casos: score-último-quiz, deduplicación de biblioteca, normalización de correos (5º
+param + regla), guard de ficha, bloqueo optimista de jornada, `archivarJornada` (rama
+Firestore), regla de quiz ≥70, error-vs-vacío del preview, guard de "recurso usado" (×2),
+cruce de programa en analítica, lectura por tenant.
 
-## 12.3 — Disponibilidad de maestro y sede
-
-| Comando | Resultado |
-|---|---|
-| Test RED dirigido (`-t "simulando el filtrado real"`) | 1 fail: `Expected: true, Received: false` (falso negativo confirmado) |
-| `jornadaRepository.test.ts` + `JornadasView.test.tsx` + `MisClasesView.test.tsx` | 48 pass / 0 fail |
-| `AsignacionesView*` (3 suites, no invocan la función tocada) | 31 pass / 0 fail |
-| Barrido amplio `servicios/academico` + `vistas/admin` | 244 pass / 1 fail (ver Known Issues — preexistente, aislada con `git stash`) |
-| `npx tsc --noEmit` | 0 errores en producción |
-
-## 12.4 — Concurrencia optimista
-
-| Comando | Resultado |
-|---|---|
-| Test RED dirigido (`-t "concurrencia optimista"`) | 3 fail: `Received promise resolved instead of rejected` (pisado silencioso confirmado) |
-| `jornadaRepository.test.ts` | 26 pass / 0 fail |
-| Suite conjunta repositorio + `JornadasView` + `MisClasesView` | 56 pass / 0 fail |
-| `AsignacionesView*` (3 suites) | 31 pass / 0 fail (2do parámetro opcional, sin regresión) |
-| `npx tsc --noEmit` | 0 errores en producción |
-
-## No ejecutado en esta sesión (por instrucción explícita del usuario)
-
-- `npm run build` — nunca se corre tras cambios chicos, instrucción permanente del usuario.
-- `npx cypress run` / E2E — fuera de alcance de estas subtareas (lógica de dominio/reglas, no flujo UI completo).
-
-## Ruido preexistente confirmado (no regresión de esta sesión)
-
-`npx tsc --noEmit` reporta errores de tipo `Property 'toBeInTheDocument'/'toEqual' does not exist on type 'Assertion'` en archivos `*.test.ts(x)` en todo el repo — contaminación de tipos Chai/Cypress sobre `expect` de Jest, presente en archivos no tocados por esta sesión (`Finanzas.test.tsx`, `Horarios.test.tsx`, etc.). Documentado en sesiones previas de `CIERRE CENTRO DE ESTUDIOS.md` (Fase 4/5 de `unificar-flujo-publicar-material`), no es un problema nuevo.
+## Nota de estabilidad
+`AsignarMaterialWizard.test.tsx` tenía un **flake preexistente** por timeout (tests de 5-10s
+contra el default de 5s de jest, bajo carga del run completo). Reproducido 3/5. Corregido con
+`jest.setTimeout(30000)`; 6 corridas consecutivas verdes tras el fix, y la regresión completa
+final salió limpia.

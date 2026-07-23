@@ -1,28 +1,33 @@
-# Deuda técnica registrada — sesión módulo 12 (Agenda), 2026-07-08
+# TECHNICAL_DEBT — 2026-07-22
 
-Deuda declarada conscientemente por los subagentes (no descubierta por accidente), documentada en detalle en cada `### Registro de cierre` de `CIERRE CENTRO DE ESTUDIOS.md`. Resumen aquí para referencia rápida.
+Deuda identificada o generada esta sesión. Registro para referencia rápida; el detalle vive en
+`ACCIONES_PENDIENTES.md`.
 
-## De 12.2
+## Generada esta sesión (consciente, acotada)
+- **`archiveRecurso` — chequeo de "usado" permisivo en modo mock.** El guard real (recurso debe
+  haberse publicado en una clase) corre en la rama Firestore, cubierto por integración. En modo
+  local sin Firebase queda permisivo (no hay asignaciones que consultar). Aceptable: modo mock =
+  local/demo, no producción. Inyectable vía `deps.recursoFuePublicado` para tests.
+- **"Quitar de la agenda" (archivar) no tiene UI de revisión/restauración.** El flag `archivada`
+  oculta la jornada de la parrilla; el dato queda y los reportes la ven, pero no hay pantalla
+  para listar/restaurar archivadas. Suficiente para el caso de uso pedido; ampliable.
 
-- Ninguna deuda nueva relevante. `JornadasView.tsx` no se tocó porque construye siempre la jornada en memoria con `instructorId = usuario.id` — el gap de permisos no existe ahí (el gating sería un no-op).
+## Preexistente, confirmada esta sesión
+- **La identidad asume minúsculas en dos capas.** La query cliente Y `firestore.rules` (182,
+  183, 489, 496) comparan correos como strings case-sensitive. El alta ya normaliza; falta una
+  garantía estructural (p.ej. índice/campo normalizado) para que datos futuros no puedan romperlo.
+- **`'America/Bogota'` hardcodeado** en varios lugares (schedulers, ventana de Clase en Vivo).
+  Centralizar en una constante.
+- **Tests de UI lentos** (`AsignarMaterialWizard`: 5-10s por navegar el wizard con userEvent).
+  Se subió el timeout; no se aceleró el render. Deuda de performance de tests, no de correctitud.
+- **`Tudojang.rar` (230 MB)** en el historial de `codex/asistente-hibrido-catalogo` la hace
+  impusheable. Requiere reescritura de historial.
 
-## De 12.3
+## Wart de entorno (no es deuda del código)
+- `git commit` en Windows falla al crear refs `refs/codex/turn-diffs/checkpoints/…` por longitud
+  de path. Los commits se completan igual. Limpiar/desactivar ese mecanismo si molesta.
 
-1. `confirmJornada.validarConfirmacionJornada` sigue desconectada de toda UI — **decisión consciente** (Opción A elegida en vez de Opción B), no un pendiente olvidado. Requeriría armar un `ContextoConfirmacionJornada` completo (capacidad, disciplinas, sedes permitidas, reservas) en cada call site.
-2. Mocks de `AsignacionesView.test.tsx` y hermanos no actualizados al nuevo shape `{ hayConflicto, motivo }` de `existeConflictoHorario` (siguen devolviendo `boolean`). Sin impacto funcional — esa vista no invoca ese método (31/31 tests verdes).
-3. Cuando coinciden instructor Y espacio a la vez, el motivo devuelto es `'instructor'` (prioridad de diseño). No hay un tercer motivo "ambos". Extensible con un tercer valor de union type si se necesita a futuro.
-4. La query de `existeConflictoHorario` ahora trae todas las jornadas del tenant en esa fecha (antes filtraba también por sede/espacio) — trade-off inherente a la Opción A. Sin evidencia de problema de volumen/performance hoy.
-
-## De 12.4
-
-1. Ventana de carrera inherente al patrón `getDoc`+`setDoc` (vs. `runTransaction`) — aceptada conscientemente para el alcance de 12.4 (evitar pisado silencioso en escala de minutos, no atomicidad dura a nivel milisegundo). La atomicidad dura (sección 18 del documento de mejora) queda como item futuro que podría migrar a `runTransaction`.
-2. `guardarEjecucion` (entidad `EjecucionPrograma`, no `JornadaInstruccion`) NO recibió bloqueo optimista — fuera de alcance de 12.4.
-3. `JornadasView.tsx` es un flujo demo que construye la jornada en memoria sin leerla de Firestore antes — el conflicto real es casi imposible ahí, pero se cableó el mecanismo por consistencia.
-4. Si un documento legado no tiene `actualizadoEn`, no se bloquea la escritura (no hay con qué comparar) — decisión deliberada para no romper documentos viejos.
-
-## Preexistente (no de esta sesión, pero relevante para el módulo 12)
-
-- `eliminarJornadasEnLote` en `jornadaRepository.ts` es **hard delete real**, hoy usado solo para limpiar previews en `AsignacionesView.tsx`. Riesgo directo si se reutiliza para "eliminar clase" desde el futuro modal de Agenda (12.6/12.9) sin las guardas que pide `Mejora del módulo Agenda.txt` (no borrar si hay asistencia registrada u operación previa en Clase en Vivo).
-- `jornadaContextService.ts:83` hardcodea un único espacio `'tatami-1'`, pese a existir `EspaciosView.tsx`/`espacioService.ts` reales. Bloquea selección real de sede/espacio en el futuro modal de edición (12.7).
-- `registrarAuditoria` no guarda `rol` del usuario ni valor anterior/nuevo por campo, solo el estado resultante; fallos de auditoría son silenciosos (`console.warn`, no bloquean el guardado). Pendiente de 12.5.
-- Mojibake preexistente en comentarios de `firestore.rules` (ver `ERROR_LOG.md`) — cosmético, no bloqueante, no atendido por estar fuera de alcance.
+## Saldada esta sesión
+- Definición de "asignación completada" **duplicada** en 3 lugares → unificada en
+  `avanceAsignacionCompletado`.
+- Fallo de red del quiz **indistinguible** de "sin preguntas" → tres estados separados.

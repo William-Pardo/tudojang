@@ -1,32 +1,33 @@
-# Recomendaciones — al cierre de la sesión del módulo 12 (Agenda), 2026-07-08
+# RECOMMENDATIONS — 2026-07-22
 
-## Inmediato (próxima sesión)
+## Inmediato (esta sesión / próxima)
+1. **Abrir y mergear el PR** de `fix/hallazgos-producto-centro-estudios` → `main`. Esperar el
+   check verde, mergear (deploya a prod). Borrar `test/integracion-progreso` después.
+2. **Mirar el run de `main` en Actions** tras el merge. Si el deploy de functions falla por
+   Cloud Scheduler, es esperado (hosting + reglas igual quedan). Si esta vez toca un scheduler y
+   falla, ahí sí hay que atender el permiso.
 
-1. **Confirmar si continuar con 12.5** (auditoría completa: rol + valor anterior/nuevo + fuente del cambio) — quedó preguntado sin respuesta al cierre de esta sesión.
-2. Seguir el orden ya planificado en `CIERRE CENTRO DE ESTUDIOS.md`: 12.5 → 12.6 → 12.7 → 12.8 → 12.9 → 12.10 → 12.11 → 12.12. El orden importa: 12.7 (componentes reutilizables) es prerequisito razonable de 12.9 (modal), y 12.8 (parrilla) es prerequisito de 12.9 también.
+## Corto plazo
+3. **Verificar de verdad el permiso de Cloud Scheduler** (deployar un cambio en una función
+   programada y confirmar que no falla). Es la única deuda de infra con impacto real.
+4. **Borrar ramas viejas ya mergeadas** (`docs/permiso-scheduler`) y limpiar el wart de Codex
+   (`refs/codex/turn-diffs/…`) si molesta al commitear.
 
-## Antes de tocar 12.6 (guardas de eliminación)
+## Producto (no urgente, pero conviene decidir)
+5. El mensaje del estado "vacío" del quiz para el estudiante dice "es posible que tu maestro lo
+   haya quitado". Revisar con el usuario si el copy es el deseado en todos los casos (también
+   cubre "nunca se configuró").
+6. Definir si "Quitar de la agenda" (archivar) necesita un lugar para **ver/restaurar** jornadas
+   archivadas (hoy solo se ocultan; el dato queda, pero no hay UI para revisarlas).
 
-Revisar primero todos los usos actuales de `eliminarJornadasEnLote` (hoy solo en `AsignacionesView.tsx` para limpiar previews) antes de decidir si se extiende esa función con guardas o se crea una función separada `desactivarJornada` — el propio checklist de 12.6 ya sugiere esta segunda opción como más segura.
+## Calidad / testing
+7. Los tests de UI con `userEvent` que navegan wizards son lentos (5-10s). Considerar
+   `userEvent.setup({ delay: null })` **junto con** perfilar el render de `AsignarMaterialWizard`
+   si la lentitud molesta (el `jest.setTimeout` sube el techo, no acelera).
+8. Regla de oro confirmada esta sesión: al verificar por **mutación**, mutar la rama que el test
+   REALMENTE recorre (integración = rama Firestore, no la rama mock).
 
-## Antes de tocar 12.7 (componentes reutilizables)
-
-Resolver primero el hardcode de `jornadaContextService.ts:83` (`espacio` único `'tatami-1'`), porque el modal de edición (12.9) va a necesitar selección real de sede/espacio y hoy no la tiene disponible.
-
-## Sobre el diff acumulado
-
-El usuario pidió explícitamente NO revisar/commitear subtarea por subtarea, sino esperar a que el módulo 12 completo (12.1–12.12) esté cerrado. Recomendación: al llegar a 12.12 (validación final), antes de proponer un commit, generar un resumen del diff completo agrupado por subtarea (ya existe la base en `CHANGELOG.md`, que se puede ir actualizando en cada subtarea nueva) para facilitar la revisión humana de un diff que para entonces va a ser grande.
-
-## Sobre `PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md` y el Sistema B
-
-Más allá del banner "SUPERADO" ya agregado, considerar (a decisión del usuario, no ejecutado en esta sesión):
-- Archivar formalmente el change `openspec/changes/clase-en-vivo-checkin-trigger-agenda/` (ya lo propone su propio `tasks.md`, Fase 5, sin implementar).
-- Evaluar si eliminar directamente los 6 archivos huérfanos (`servicios/cohortesApi.ts`, `jornadasApi.ts`, `agendaManualApi.ts`, `claseEnVivoApi.ts`, `asistenciaQrApi.ts`, `progresoClaseApi.ts`) y sus tipos en `tipos.ts`, dado que no tienen consumidores reales fuera de sus propios tests (confirmado en la auditoría 12.1) — esto es una decisión de limpieza de repo, no bloqueante para el módulo 12, y debería tratarse como una tarea aparte, explícitamente autorizada por el usuario antes de borrar código.
-
-## Sobre la deuda de auditoría del código (no del módulo 12)
-
-`jornadaContextService.test.ts` tiene una falla preexistente no relacionada con esta sesión. No se investigó a fondo por estar fuera de alcance — si 12.7 termina tocando ese archivo (por el hardcode de espacio), aprovechar para diagnosticar esa falla en la misma pasada.
-
-## Meta-recomendación sobre el proceso de esta sesión
-
-El patrón de "delegar a subagente con contexto completo + verificar el diff real antes de reportar como cerrado" funcionó bien las 3 veces que se usó (12.2, 12.3, 12.4) — se detectaron 0 discrepancias entre lo reportado por los subagentes y el código real verificado. Mantener este patrón para las subtareas restantes en vez de confiar ciegamente en los resúmenes.
+## Cosas que NO hace falta hacer
+- Migrar correos: el diagnóstico de prod dio 0 afectados. El script queda para importación
+  masiva / restauración de backup.
+- Cargar tutores para los 2 alumnos "sin acudiente" de Gajog: son datos de demo.

@@ -1,45 +1,47 @@
-# Changelog — Módulo 12 (Mejora del módulo Agenda)
+# CHANGELOG
 
-Formato: por subtarea, no por commit (nada de esto está commiteado todavía — ver `HANDOVER.md`, sección "reglas de trabajo", punto 3).
-
-## [12.4] — 2026-07-08 — Concurrencia optimista al guardar jornada
+## [2026-07-22] — Integración Centro de Estudios + 2 bugs de prod + 4 hallazgos de producto
 
 ### Added
-- `ConflictoConcurrenciaError` (clase) y `MENSAJE_CONFLICTO_CONCURRENCIA` en `servicios/academico/jornadaRepository.ts`.
-- `GuardarJornadaOpciones` con `actualizadoEnEsperado?: string`; `guardarJornada` ahora acepta un 2do parámetro opcional.
-
-### Changed
-- `guardarJornada` rechaza la escritura (en vez de sobrescribir en silencio) si el `actualizadoEn` vivo en Firestore difiere del que la vista tenía al leer la jornada.
-- `MisClasesView.tsx` (3 call sites: `transicionar`, `cancelarClase`, `reprogramarClase`) y `JornadasView.tsx` (`registrarCambio`) capturan `ConflictoConcurrenciaError` y muestran el mensaje de negocio.
-
-### Notes
-- Retrocompatible: sin el 2do parámetro, comportamiento idéntico al anterior.
-
-## [12.3] — 2026-07-08 — Disponibilidad de maestro y sede unificada
+- Pruebas de integración de las 7 cadenas del Centro de Estudios (Biblioteca, Quiz, Identidad
+  del acudiente, Agenda, Progreso/analítica, y las ya existentes de publicación y generación de
+  jornadas). 12 suites / ~147 pruebas.
+- `scripts/normalizar-correos.js` + test: migración idempotente de `correo`/`tutor.correo` en
+  `estudiantes`, dry-run por defecto, con reporte de cobertura por tenant.
+- `models/academico/actividad.ts`: `avanceAsignacionCompletado`, `UMBRAL_APROBACION_QUIZ` (70),
+  `UMBRAL_CONSUMO_COMPLETADO` (80).
+- `JornadaInstruccion.archivada?`, `jornadaRepository.archivarJornada()`, acción de auditoría
+  `archivar`, `useEliminacionJornadaSegura.archivar()` + `error.ofrecerArchivar`, botón "Quitar
+  de la agenda" en `AgendaView`.
+- `bibliotecaService`: `RecursoNoPublicadoError`, `recursoFuePublicado` (inyectable),
+  `recursoFuePublicadoEnFirestore`.
+- `MaterialPreviewModal`: estado de error de carga del quiz + botón Reintentar.
 
 ### Fixed
-- `existeConflictoHorario` no detectaba choques del mismo instructor en sedes/espacios distintos (la query filtraba por `sedeId`+`espacioId`, excluyendo esos documentos antes de evaluarlos). Ahora filtra solo por `fecha` y evalúa el solape en memoria.
+- **`scoreUltimaEvaluacion`** devolvía el primer intento en vez del último (`sort` estable +
+  empate de milisegundos). Ahora recorre con `>=`.
+- **Normalización del correo del acudiente** en la importación masiva (antes solo el del alumno).
+  Centralizado en el callable `crearEstudiante`.
+- **Quiz reprobado ya no cuenta como asignación completada** (regla ≥70%).
+- **Callejón sin salida en Agenda**: clase operada que no se puede eliminar ni cancelar → ahora
+  se puede archivar (ocultar de la parrilla sin borrar ni cambiar estado).
+- **`MaterialPreviewModal`**: fallo de carga del quiz ya no se confunde con "quiz sin preguntas".
+- **Archivar recurso de Biblioteca**: exige que el recurso se haya usado (publicado en una clase).
+- **Flake** de `AsignarMaterialWizard.test.tsx` por timeout → `jest.setTimeout(30000)`.
 
-### Changed
-- `existeConflictoHorario`: `Promise<boolean>` → `Promise<{ hayConflicto: boolean; motivo?: 'instructor' | 'espacio' }>`.
-- Nuevo helper exportado `mensajeConflictoHorario(resultado, jornada)` con textos específicos: "El maestro ya tiene una clase asignada en este horario." / "La sede seleccionada no está disponible entre HH:MM y HH:MM."
-- `JornadasView.tsx` y `MisClasesView.tsx` actualizados a los 3 call sites del nuevo shape.
+### Verified
+- Diagnóstico de correos contra producción: 11 documentos, 0 afectados. No hay migración pendiente.
+- Regresión final: 154 suites / 1628 pruebas / 0 fallos; typecheck 0.
 
-## [12.2] — 2026-07-08 — Permisos "maestro asignado"
+### Commits (rama `fix/hallazgos-producto-centro-estudios`, pendiente de PR)
+`51e70aa` progreso · `c7deb9c` quiz ≥70 · `39f4101` archivar jornada · `21f1738` estados del
+quiz · `6faeb13` archivar recurso usado · `02b998c` fix del flake.
 
-### Fixed
-- `firestore.rules`, bloque `jornadas`: cualquier `isInstructor()` del tenant podía editar/cancelar la clase de cualquier otro maestro. Ahora exige `resource.data.instructorId == request.auth.uid`, salvo `isAdmin()`.
+### Ya en `main` (PR #4 mergeado y deployado)
+Cobertura de integración de Biblioteca/Quiz/Identidad/Agenda + los 2 bugs de producción + el
+script de migración.
 
-### Added
-- Helper `puedeEditarJornada(jornada, usuarioId, esAdmin)` en `MisClasesView.tsx`, gateando 4 bloques interactivos.
-- Prop `esAdmin` en `MisClasesView`, alimentada desde `AsignacionesView.tsx`.
-- 6 tests nuevos de reglas en `functions/test/firestore-rules.behavior.test.js`.
+---
 
-## [12.1] — 2026-07-08 — Auditoría técnica del módulo Agenda
-
-### Added
-- Sección "## 12. Mejora modulo Agenda" en `CIERRE CENTRO DE ESTUDIOS.md`, con diagnóstico completo, tabla de estado real por requisito, y 12 subtareas registradas.
-- Banner "SUPERADO" en `PLAN_INTEGRACION_AGENDA_PROGRAMA_CLASE_EN_VIVO.md`.
-
-### Discovered
-- El "Sistema B" (`servicios/cohortesApi.ts` y hermanos) está huérfano y no es el sistema real en producción — ver `PROJECT_CONTEXT.md`.
+_(El changelog del módulo 12 — Agenda, sesiones de julio 08–19 — se movió al historial de
+`CIERRE CENTRO DE ESTUDIOS.md`.)_

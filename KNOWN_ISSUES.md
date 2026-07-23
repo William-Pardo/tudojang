@@ -1,106 +1,40 @@
-# Issues conocidos — Rol Tutor (padre/acudiente) completamente no funcional, auditoría 2026-07-14
+# KNOWN_ISSUES — 2026-07-22
 
-> **✅ RESUELTO (confirmado 2026-07-18, auditoría de integración Centro de Estudios).** El commit `4bbb82d` ("fix(tutor): resuelve rol Tutor/Estudiante no funcional de punta a punta") ya corrigió íntegramente lo descrito abajo — verificado contra código real: `servicios/academico/tutorStudentResolver.ts` resuelve la identidad Tutor→Estudiante, `firestore.rules:182` tiene `tutor.correo == request.auth.token.email`, `DataContext.tsx` ramifica por rol, y `App.tsx` ya no ofrece a Tutor rutas de staff. Esta sección queda como registro histórico del bug, no como estado actual.
+Problemas conocidos, sin resolver, al cierre de la sesión. (Los que se resolvieron esta sesión
+están en `CHANGELOG.md` / `ERROR_LOG.md`.)
 
-**Contexto:** auditoría disparada al preparar una presentación en vivo para ~150 padres del club Gajog (ver `PRESENTACION_GAJOG_GUION_NARRATIVA.md` y `presentacion-gajog-interactive.html`). Se necesitaba confirmar qué ve realmente un usuario con rol `Tutor` (= padre/acudiente, redefinido 2026-07-09 en `utils/roles.ts` — nunca instructor) antes de prometer una demo de login real frente a los padres. Decisión del usuario: NO arreglar ahora — documentar para atender en otra sesión, seguir con la presentación en esta.
+## 1. Permiso de Cloud Scheduler — verde ≠ verificado
+El deploy de `functions` en `deploy.yml` históricamente falla por un permiso de Cloud Scheduler.
+El PR #4 deployó **verde y completo**, PERO ese verde **no prueba** que el permiso esté
+resuelto: probablemente ese deploy no tocó ninguna función programada (`iniciarJornadasPorHorario`,
+`recordatoriosPagoDiarios`, etc.), así que Firebase nunca llamó al scheduler. **Sigue sin
+verificarse de verdad.** Se confirmará el día que un deploy modifique una función programada.
 
-**Conclusión de una línea:** hoy, un Tutor logueado no ve ningún dato real de su hijo/a en ninguna pantalla de la app. Todo lo que ve es vacío, mock, o lo desvía a una pantalla de staff.
+## 2. Rol Tutor — resuelto en código, con una advertencia viva
+El rol Tutor (padre/acudiente) fue arreglado end-to-end en sesiones previas (identidad por
+`tutor.correo == token.email`). ESTA sesión encontró y cerró una causa raíz adicional: el correo
+del acudiente se guardaba sin normalizar en la importación masiva. **Todo el sistema de
+identidad asume minúsculas** — tanto la query cliente como `firestore.rules` (líneas 182, 183,
+489, 496). Cualquier dato futuro con mayúsculas rompe las dos capas. El alta nueva ya normaliza;
+el diagnóstico de prod dio 0 afectados.
 
-## Tabla resumen — qué ve hoy un Tutor
+## 3. Datos de demo en Gajog
+2 de 3 alumnos de `escuela-gajog-001` no tienen objeto `tutor`. Confirmado por el usuario: son
+**datos de demo**, no un hueco de carga real. No requiere acción.
 
-| Ruta | Qué ve realmente |
-|---|---|
-| `/centro-estudios` | Siempre "Aún no tienes materiales asignados", sin importar si existen asignaciones reales. |
-| `/mi-perfil` | 100% mock hardcodeado: "Mis Talones de Pago" y "Mis Horas Realizadas" (arrays con fechas fijas tipo `2024-05-20`), lenguaje de nómina/staff, cero datos del estudiante vinculado. |
-| `/estudiantes` | Tab por defecto lo manda a `GestionClase.tsx`, panel de recepción de TODA la sede (no de "mi hijo"), que además está roto para todos los roles (ver Bug #7). |
+## 4. `Tudojang.rar` (230 MB) bloquea una rama
+La rama `codex/asistente-hibrido-catalogo` es impusheable para siempre por ese binario en el
+historial. Requiere reescritura de historial o descartar la rama.
 
-## Bugs concretos (file:line)
+## 5. Wart de entorno (Windows + Codex)
+`git commit` tira errores ruidosos `cannot lock ref refs/codex/turn-diffs/checkpoints/… Filename
+too long`. Es un mecanismo de checkpoints de Codex cuyos paths exceden el límite de Windows. Los
+commits **igual se completan** (verificar con `git log`). No afecta el repo; es solo ruido.
 
-1. **Nav visible pero colección bloqueada** — `App.tsx:73-74` incluye `RolUsuario.Tutor` en los links `/estudiantes` y `/centro-estudios`, pero `firestore.rules:137-140` (`allow read: if isInstructor()`) no incluye Tutor en `isInstructor()` (`firestore.rules:54-57`).
-2. **Bug de identidad Tutor→Estudiante en Centro de Estudios** — `vistas/CentroEstudios.tsx:64-67` usa `usuario?.id` (UID de Auth del padre) como si fuera el `estudianteId`, en vez de resolver primero el hijo vinculado. `servicios/academico/centroEstudiosRepository.ts:63-64` intenta `getDoc(doc(db,'estudiantes', estudianteId))`, choca contra la regla de arriba, cae en el `catch` genérico (líneas 124-127) y retorna `[]` silenciosamente. **Sospecha fuerte de que este mismo bug rompe también el rol `Estudiante` real**, no solo Tutor — ningún flujo de creación de estudiantes hace que el docId de `/estudiantes` coincida con un Auth UID.
-3. **`vinculos` (Tutor↔Estudiante) con llave que no calza** — `vistas/admin/VinculosView.tsx` (montada en `Configuracion.tsx:878`) SÍ escribe `tenants/{tenantId}/vinculos/{tutorEmail}_{estudianteId}` vía `servicios/academico/vinculoService.ts:29-64`, pero usa el **docId de `/estudiantes`**, mientras que la regla `tutorLinkedToStudent(tenantId, uid)` (`firestore.rules:69-73`, usada por `canReadProgress`, líneas 75-79) espera el **Auth UID del estudiante**. Namespaces distintos que nunca se sincronizan → el vínculo se crea pero no habilita nada. Bonus privacidad menor: la regla de lectura de `vinculos` (`firestore.rules:195-198`) deja que cualquier Tutor del tenant lea TODA la subcolección, no solo sus propios vínculos.
-4. **`/mi-perfil` con contenido heredado de rol staff** — `vistas/MiPerfil.tsx:30-38` (arrays hardcodeados `talonesPago`/`miAsistencia`), `:139` (agrupa `Tutor` con `Asistente` en la misma condición de UI), `:177-210` (sección de pagos sin ningún condicional de rol). Origen confirmado: `vistas/PerfilTutor.tsx` (código muerto, no ruteado, "Panel del Sabonim") — contenido casi calcado, de cuando Tutor significaba instructor.
-5. **Subsistema de check-in/recepción roto para TODOS los roles** — `servicios/asistenciaApi.ts:7` usa la colección raíz `asistencia`, que **no tiene ninguna regla** en `firestore.rules` (cae al catch-all `deny`, líneas ~397-399). Efecto: `GestionClase.tsx` queda en spinner infinito "Conectando al dojang..." para cualquier usuario — y es justo la pantalla a la que hoy se desvía a un Tutor.
-6. **`DataContext.tsx:150-160` hace fetch eager de 9 colecciones instructor/admin-only** (`obtenerUsuarios`, `obtenerSedes`, `obtenerEstudiantes`, `obtenerEventos`, etc.) para CUALQUIER usuario autenticado sin ramificar por rol — genera permission-denied silencioso constante para Tutor, capturado por `Promise.allSettled` pero sin ramificación de qué cargar según rol.
+## 6. Ramas sin mergear
+- `fix/hallazgos-producto-centro-estudios`: pusheada, PR pendiente.
+- `test/integracion-progreso`: redundante (su commit ya viaja en la rama de fixes), borrar tras merge.
+- `docs/permiso-scheduler`: ya mergeada vía PR #4; puede borrarse.
 
-## Propuesta de fix (diseño, no implementado)
-
-- **Bug #2 (identidad):** resolver el `estudianteId` real del hijo vinculado ANTES de llamar a `centroEstudiosRepository` — no usar `usuario.id` del padre directamente.
-- **Bug #3 (vinculos):** sincronizar el Auth UID del estudiante de vuelta al doc `/estudiantes/{docId}` (campo `authUid`) y usar ESE valor de forma consistente en `vinculos` y en `progreso/{uid}/...`, en vez de intentar hacer calzar dos IDs generados independientemente. Acotar además la regla de lectura de `vinculos` para que un Tutor solo lea sus propios vínculos.
-- **Bug #4 (mock data):** eliminar las secciones "Mis Talones de Pago"/"Mis Horas Realizadas" para Tutor; reemplazar por `estadoPago`/`historialPagos` reales del estudiante vinculado (ya existen en el modelo `Estudiante`). Quitar el botón "Abrir Escáner QR" para Tutor (no corresponde a un padre y apunta a una función rota). Considerar borrar `vistas/PerfilTutor.tsx` (código muerto) para que nadie lo reutilice por error.
-- **Bug #5 (asistencia sin regla):** agregar `match /asistencia/{docId}` a `firestore.rules` con condiciones de tenant/sede/rol — prerrequisito independiente si se quisiera reusar esa pantalla para algo, aunque la recomendación de producto es que Tutor ni siquiera debería llegar ahí.
-- **Bug #6 (fetch eager):** ramificar `cargarTodo()` en `DataContext.tsx` según `usuario.rol` — para Tutor, no disparar las 9 colecciones instructor-only.
-- **Decisión de producto pendiente:** ¿mantener `/estudiantes` y `/centro-estudios` como rutas de Tutor una vez arregladas, o quitarlas del sidebar (`App.tsx:73-74`) y construir una experiencia Tutor dedicada? Recomendación de la auditoría: la segunda opción, dado el resto de hallazgos.
-
-## Antes de reintentar cualquier demo con login real de padre
-
-Reproducir al menos el Bug #2 y el Bug #5 con una cuenta Tutor real (o emulador de Firestore) — son los que más directamente prometerían algo incumplible frente a los padres. Ver memoria de proyecto `tutor-role-broken-end-to-end` para contexto adicional.
-
----
-
-# Issues conocidos — módulo 12 (Agenda), al cierre de la sesión 2026-07-08
-
-## Bloqueantes para cumplir `Mejora del módulo Agenda.txt` (pendientes, subtareas 12.5–12.12)
-
-1. **No existe la parrilla semanal** (12.8). `vistas/Horarios.tsx` es una grilla por día sin franja horaria 7am–10pm ni navegación de semanas. No hay ruta `/agenda`.
-2. **No existe el modal de edición granular** con pestañas Programa/Materiales (12.7/12.9). Ni `JornadasView.tsx` ni `MisClasesView.tsx` lo cubren hoy.
-3. **Auditoría incompleta** (12.5): `registrarAuditoria` no guarda `rol` del usuario ni valor anterior/nuevo por campo, y sus fallos son silenciosos.
-4. **Hard delete peligroso sin guardas** (12.6): `eliminarJornadasEnLote` es borrado físico real, usado hoy solo para limpiar previews; sin guarda de "no borrar si hay asistencia u operación en Clase en Vivo".
-5. **Ventana de Clase en Vivo no configurable** (12.10): `App.tsx` tiene el placeholder permanente `showClaseEnVivo = true`; no existen las constantes `LIVE_CLASS_OPEN_BEFORE_MINUTES`/`CLOSE_AFTER_MINUTES`.
-6. **Hub Estudiantes no existe** (12.11): sin roster estudiante-jornada real (bloqueado además por el change `clase-en-vivo-checkin-trigger-agenda`, Fase 0, sin implementar). Decisión ya tomada: exponer solo servicio de lectura, no construir UI completa en este módulo.
-7. **Espacio único hardcodeado** `'tatami-1'` en `jornadaContextService.ts:83`, bloqueando selección real de sede/espacio en el modal futuro.
-
-## Ya resueltos en esta sesión (no reabrir sin evidencia nueva)
-
-- Permisos "maestro asignado" no aplicados ni en frontend ni en backend → resuelto en 12.2.
-- Choque de instructor entre sedes distintas no detectado → resuelto en 12.3.
-- Sin concurrencia optimista (último que guarda gana en silencio) → resuelto en 12.4.
-
-## Cosméticos / bajo impacto, no atendidos (fuera de alcance del módulo 12)
-
-- Mojibake preexistente en comentarios de `firestore.rules` (`acadÃ©mico` en vez de `académico`). Ver `ERROR_LOG.md`.
-- Falla preexistente en `jornadaContextService.test.ts` ("instructores activos"), no relacionada con esta sesión, aislada con `git stash` durante la verificación de 12.3.
-- Ruido de tipos Chai/Cypress sobre `expect` de Jest en `tsc --noEmit` para archivos `*.test.ts(x)` — documentado desde sesiones anteriores del proyecto.
-
-## Riesgo operativo abierto
-
-El repo tiene un volumen grande de cambios sin commitear acumulados de sesiones previas (visible en `git status`), sumado ahora a los cambios del módulo 12. El usuario pidió explícitamente revisar y commitear todo junto al terminar el módulo 12 completo — hasta entonces, el working tree permanece con cambios pendientes de forma intencional. Ver `RECOMMENDATIONS.md`.
-
-## Cierre prematuro de esta sesión por hook compartido (2026-07-09)
-
-Esta sesión no terminó por decisión del usuario de pausar el módulo 12: un hook `Stop` agregado desde otra ventana de Claude Code abierta en paralelo sobre el mismo repo (config de proyecto compartida y con recarga en vivo) empezó a dispararse acá también, sin respuesta del usuario, y esta sesión generó su documentación de cierre siguiendo esa instrucción. **12.5–12.12 quedan pendientes y son el próximo paso**, no trabajo descartado. Detalle completo en `ERROR_LOG.md` (ítems 5–6) y `HANDOVER.md`.
-
----
-
-# Issues conocidos — auditoría de integración Centro de Estudios / Agenda (2026-07-18)
-
-**Contexto:** el usuario pidió pruebas de integración entre lo desarrollado en Centro de Estudios/Agenda (construido en otras conversaciones de Claude Code) y el resto de la app. Antes de escribir tests nuevos, se auditó el estado real del módulo. Conclusión general: la mayoría (Agenda, Programa Académico, Jornadas, Asignaciones, Quizzes, Progreso/métricas, Recordatorios de estudio) está completo y con tests reales pasando. Se decidió atacar 4 hallazgos primero, en este orden — ver progreso de cada uno en las secciones siguientes de este documento a medida que se resuelvan:
-
-1. **247 tests de `functions/academico/` que ningún script de `npm test` ejecuta hoy.** `functions/package.json`'s `"test": "node --test *.test.js asistente/*.test.js"` nunca entra a la carpeta `academico/`. Corridos a mano con el runner correcto por archivo (14 usan `node:test`, 2 usan Jest vía `functions/academico/jest.config.js`): 247/247 pasan. Pero nadie los corre en la práctica — una regresión real en `asistencia.js`, `asignacionesScheduler.js`, `jornadasScheduler.js`, `recordatoriosEstudio.js`, `sedes.js`, `usuarios.js`, etc. pasaría desapercibida.
-2. **Bug de configuración de Jest: `npm test` corre cada test dos veces.** `.claude/worktrees/` no está excluido en `testPathIgnorePatterns` de `jest.config.js` (solo excluye `functions/`, `scripts/`, `cypress/`, `node_modules/`). Reproducido corriendo `TutorDashboardView.test.tsx` en aislado: 2 suites idénticas (una del repo principal, otra de la copia dentro del worktree), con warnings de `jest-haste-map: duplicate manual mock found`.
-3. **Worktree `.claude/worktrees/clase-en-vivo` (rama `worktree-clase-en-vivo`) abandonado y contradictorio.** Apunta a un checkpoint (`f2d16b5`, 2026-07-10) 12 commits detrás del branch principal, con 0 commits propios (todo sin commitear). Implementa "Clase en Vivo" con un diseño de matrícula 100% manual que fue reemplazado en el branch principal por matrícula automática (decisión de arquitectura del 2026-07-11, documentada en `bitacora.json`). Mergearlo tal cual regresaría esa decisión. Seguro de ignorar/eliminar; lo único rescatable es el diseño de Bloque B (notificación WhatsApp, checkpoint de materiales, observaciones rápidas) que el branch principal todavía no construyó.
-4. **Bug de seguridad: `limiteEstudiantes` sin enforcement server-side.** Mismo patrón que tenía `limiteSedes` antes de su fix del 2026-07-16 (`functions/academico/sedes.js`) — el límite de alumnos del plan solo se valida client-side en `hooks/useGestionEstudiantes.ts:86`, sin ninguna Cloud Function ni regla de Firestore que lo haga cumplir en el servidor. No estaba trackeado en `bitacora.json`.
-
-> **⚠️ Corrección (2026-07-18, antes de eliminar el worktree del punto 3):** el reporte inicial de esta auditoría decía que el gap de abajo ya estaba resuelto ("ambas pantallas derivan asistenciaRegistrada de check-ins reales"). **Es incorrecto** — verificado contra el código real antes de tocar nada: `vistas/admin/JornadasView.tsx` (línea 134, 180-191) sí deriva `asistenciaRegistrada` de check-ins reales vía `asistenciaRepository`/`contarCheckIns`, pero `vistas/admin/MisClasesView.tsx` (línea 208, 271, 608) — la pantalla realmente conectada al flujo real de Agenda en producción, según el `design.md` del worktree citado abajo — **sigue usando un checkbox manual local** (`asistenciaPorJornadaId`, `useState`), sin ninguna conexión a `asistenciaRepository`. El gap arquitectónico documentado en el worktree en 2026-07-12 sigue vigente hoy.
-
-> **✅ RESUELTO (2026-07-18, misma sesión de auditoría).** `vistas/admin/MisClasesView.tsx` ahora deriva `asistenciaRegistrada` de check-ins reales, exactamente con el mismo patrón que ya tenía `JornadasView.tsx`: `asistenciaRepository.listarPorJornada()` + `contarCheckIns()` (ambos servicios ya existían, reutilizados sin cambios). Diferencia de forma, no de fondo, respecto al patrón original: `JornadasView.tsx` maneja una sola jornada (`cantidadCheckIns: number`), mientras que `MisClasesView.tsx` maneja una LISTA de jornadas a la vez, así que el estado es un mapa (`cantidadCheckInsPorJornadaId: Record<string, number>`) poblado por un único efecto que solo consulta check-ins de las jornadas en estado `en_curso` (las únicas que se pueden cerrar), usando como dependencia una key estable derivada de esos ids (no el array `jornadas` completo, que cambia de referencia en cada recarga). El checkbox manual (`asistenciaPorJornadaId`/`setAsistenciaPorJornadaId`) fue eliminado del componente; `vistas/admin/MisClasesView.test.tsx` se ajustó para mockear `asistenciaRepository` en vez de clickear el checkbox inexistente. Esta sección queda como registro histórico del bug, no como estado actual (mismo criterio que la sección "Rol Tutor" al principio de este archivo).
-
-5. **Gap arquitectónico real, documentado en el worktree abandonado pero nunca resuelto en el principal** (rescatado de `.claude/worktrees/clase-en-vivo/openspec/changes/clase-en-vivo-checkin-trigger-agenda/design.md`, sección "Desviaciones encontradas en Fase 6", 2026-07-12, antes de eliminar ese worktree): Bloque A de Clase en Vivo describe una sola cadena conectada (Agenda → ventana horaria → check-in QR → cierre con asistencia real), pero en el código esa cadena está partida en dos universos de datos distintos. `JornadasView.tsx` (ruta `/jornadas`) sí deriva asistencia real de check-ins, pero crea su propia `JornadaInstruccion`/`EjecucionPrograma` sintéticos en memoria en cada montaje, sin relación con ningún roster matriculado real. El trigger real de Agenda (`vistas/Horarios.tsx`) dispara sobre jornadas reales generadas por un programa con `bloquesHorarios` — y la pantalla que realmente cierra ESAS jornadas es `vistas/admin/MisClasesView.tsx` (embebida en `/centro-estudios`), que nunca fue tocada por el fix de asistencia real y sigue con el checkbox manual. Conclusión del propio worktree: **una jornada real, matriculada de verdad, disparada de verdad desde Agenda, con check-ins reales vía QR, hoy se cierra igual con un checkbox manual** si el operador usa la pantalla real de producción — el mismo problema de "fuente de verdad manual" que motivó el change completo, todavía presente. Recomendación del worktree: decidir explícitamente entre (a) actualizar `MisClasesView.tsx` para derivar asistencia real (mismo patrón que ya tiene `JornadasView.tsx`, alcance chico), o (b) retirar `JornadasView.tsx`/`/jornadas` y documentar el flujo real como el único soportado, evitando dos pantallas de cierre paralelas.
-
-## Otros hallazgos de la misma auditoría, registrados pero sin decisión de abordarlos aún
-
-- **Documentación de coordinación desactualizada para Clase en Vivo**: tanto `CIERRE CENTRO DE ESTUDIOS.md` sección 13 como `openspec/changes/clase-en-vivo-checkin-trigger-agenda/tasks.md` en el branch principal (checkboxes todos en `[ ]`) no reflejan que el Bloque A de esa feature ya está implementado y funcionando — se construyó por un camino paralelo no documentado ahí.
-- **E2E Cypress roto — PAUSADO explícitamente por el usuario (2026-07-19), atender en sesión dedicada.** `cypress/e2e/modulo-estudio-cierre-jornada.cy.ts` visita `/#/centro-estudios` esperando `<h2>Plan y cierre de clase</h2>` y un checkbox "Asistencia registrada" — ninguno de los dos existe hoy en esa ruta real (esa pantalla/título corresponde a `vistas/admin/JornadasView.tsx`, montada en `/jornadas` con un `<h1>`, no en `/centro-estudios`). No corre en ningún script automatizado, así que no rompe nada visible, pero miente sobre lo que cubre. Investigación completa antes de pausar (para no repetirla desde cero):
-  - **El checkbox de asistencia ya no existe en NINGUNA pantalla real** — tanto `JornadasView.tsx` como `MisClasesView.tsx` (fix de hoy, ver hallazgo #5 arriba) derivan la asistencia de check-ins QR reales. Un test E2E que necesite cerrar una jornada no puede simular esto con un click de checkbox; necesita que exista un check-in real antes.
-  - **El mecanismo para simular un check-in en modo test no existe en el branch principal** — solo existía en el worktree ya eliminado (un gate `window.Cypress` en `asistenciaClaseService.ts` que hacía el toggle entrada/salida contra el store en memoria sin cámara real). Habría que reconstruirlo.
-  - **No hay script de Cypress headless** (`cypress:run`) en `package.json`, solo `cypress:open` (interfaz gráfica, no sirve para CI).
-  - **Hay 10 specs de Cypress en total** (`cypress/e2e/*.cy.ts`), no solo este — no se auditó el estado de los otros 9 antes de pausar. Conectar Cypress a CI sin revisarlos todos arriesga un pipeline rojo por razones no relacionadas.
-  - **El CI (`.github/workflows/deploy.yml`) no corre ningún test hoy**, ni Jest ni Cypress — deploya directo tras `npm run build`.
-  - Nadie pudo confirmar que el binario de Cypress corra en un entorno sandboxeado como este (intentado en sesiones previas y en esta, sin éxito).
-  - Decisión del usuario: no tocar nada de esto por ahora (ni el spec, ni CI, ni el mecanismo de check-in) — dejarlo pausado y registrado para retomarlo con tiempo dedicado.
-- **Tres intentos históricos de pantalla de Tutor**, de los cuales solo uno está vivo: `vistas/tutor/TutorDashboardView.tsx` (código real, tests 8/8 pasando, pero huérfano — nunca importado en `App.tsx`) y `vistas/PerfilTutor.tsx` (ya documentado como código muerto arriba en este archivo) quedaron reemplazados por la solución real vía `CentroEstudios.tsx` + `tutorStudentResolver.ts`.
-  > **✅ RESUELTO (2026-07-19).** Confirmado que ninguno de los dos aparece referenciado en `App.tsx` (el árbol de rutas real) ni en ningún otro archivo salvo un comentario histórico en `components/EscanerAsistencia.tsx`. `TutorDashboardView.tsx` nunca se conectó a datos reales (solo recibía estudiantes por prop, con fallback a datos demo) — decisión del usuario: no invertir en conectarlo, ya que `CentroEstudios.tsx` cumple la función con datos reales. Se eliminaron `vistas/tutor/TutorDashboardView.tsx`, su test, y `vistas/PerfilTutor.tsx` (y la carpeta `vistas/tutor/`, que quedó vacía).
-- **Tres copias hardcodeadas de los límites de plan** (`constantes.ts::PLANES_SAAS`, `functions/wompiCobroAutomatico.js::PLANES_SAAS`, `functions/academico/sedes.js::LIMITE_SEDES_POR_PLAN`), hoy coincidentes pero sin ningún mecanismo automático ni test de paridad entre ellas — riesgo de drift si se cambia un límite en un lado y no en los otros dos.
-- **`App.routing.test.ts` roto desde hace semanas**, re-etiquetado como "preexistente, no relacionado" en cada sesión sin arreglarse ni borrarse — el import roto (`obtenerRutaInicioUsuario`/`construirUrlCallbackDrive`/`obtenerCodigoCallbackDrive`, ya no exportados de `App.tsx`) esconde una posible regresión real de ruteo detrás del ruido de una falla ya conocida.
-- **`npm run test:all` no incluye `test:firestore-rules`** ni cubre `functions/academico/*.test.js` (ver hallazgo #1) — el "correr todo" real del repo deja fuera dos capas completas de tests que sí existen y sí pasan.
-- **CI (`.github/workflows/deploy.yml`) no corre ningún test antes de deployar** — solo `npm run build` del frontend y deploy directo. Todo el testing es manual/local.
+## 7. Centralizar `'America/Bogota'`
+Sigue hardcodeado en varios lugares (schedulers, ventana de Clase en Vivo). Deuda menor.
