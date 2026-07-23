@@ -1047,6 +1047,42 @@ test("cross-tenant read of asistencias is denied", async () => {
   );
 });
 
+// WS-4 (Clase en Vivo §9): checkpoint de materiales. Lo escribe el STAFF desde el cliente
+// (isInstructor + tenant); un no-instructor o un tenant ajeno no puede leer ni escribir.
+const checkpointPath = (db, tenantId, jornadaId, asignacionId) => doc(
+  db, "tenants", tenantId, "jornadas", jornadaId, "checkpointMateriales", asignacionId
+);
+
+test("un instructor puede escribir y leer un checkpoint de material en su tenant", async () => {
+  const instructorDb = client("maestro-1", "tenant-1", "Maestro");
+  await assertSucceeds(
+    setDoc(checkpointPath(instructorDb, "tenant-1", "jor-1", "asig-1"), {
+      asignacionId: "asig-1", jornadaId: "jor-1", tenantId: "tenant-1", estado: "practicado",
+      registradoPorUid: "maestro-1", actualizadoEn: "2026-07-23T00:00:00.000Z",
+    })
+  );
+  await assertSucceeds(getDoc(checkpointPath(instructorDb, "tenant-1", "jor-1", "asig-1")));
+});
+
+test("un Estudiante NO puede escribir ni leer un checkpoint de material", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(checkpointPath(context.firestore(), "tenant-1", "jor-1", "asig-1"), {
+      asignacionId: "asig-1", estado: "usado",
+    });
+  });
+  const estDb = client("est-1", "tenant-1", "Estudiante", { email: "e@test.com" });
+  await assertFails(getDoc(checkpointPath(estDb, "tenant-1", "jor-1", "asig-1")));
+  await assertFails(setDoc(checkpointPath(estDb, "tenant-1", "jor-1", "asig-2"), { estado: "usado" }));
+});
+
+test("un instructor de OTRO tenant no puede leer el checkpoint", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(checkpointPath(context.firestore(), "tenant-1", "jor-1", "asig-1"), { estado: "usado" });
+  });
+  const otroDb = client("maestro-2", "tenant-2", "Maestro");
+  await assertFails(getDoc(checkpointPath(otroDb, "tenant-1", "jor-1", "asig-1")));
+});
+
 // WS-2 (Módulo Clase en Vivo §7/§11): metricasAsistencia. Escritura solo server-side (Admin
 // SDK); lectura para staff, el tutor del alumno y el propio alumno (identidad por email).
 const metricaAsistPath = (db, tenantId, estudianteId) => doc(

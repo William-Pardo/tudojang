@@ -397,6 +397,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Checkpoint pedagógico de materiales de la clase (WS-4, Clase en Vivo §9). A diferencia
+    // de `asistencias` (server-side por el cruce de roster), esto lo escribe el STAFF desde el
+    // cliente (baja frecuencia, sin cruce): lo gatea `isInstructor` + tenant. Lectura: staff
+    // del tenant (es dato pedagógico/operativo, no del alumno).
+    match /tenants/{tenantId}/jornadas/{jornadaId}/checkpointMateriales/{asignacionId} {
+      allow read, write: if isInstructor()
+        && currentTenantId() == tenantId;
+    }
+
     // Biblioteca: recursos acadÃ©micos
     match /tenants/{tenantId}/recursos/{recursoId} {
       allow read: if authenticated()
