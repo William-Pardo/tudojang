@@ -141,6 +141,20 @@ describe('Integracion: lo que el callable ESCRIBE es exactamente lo que el repos
     expect(calcularMinutosAsistidos(registros)).toBe(30);
   });
 
+  it('WS-2: el check-out acumula las horas reales en metricasAsistencia del estudiante', async () => {
+    sembrarEscenarioCompleto();
+
+    await registrarAsistenciaJornada(datos(), contexto()); // entrada
+    const ruta = `tenants/${TENANT}/jornadas/${JORNADA}/asistencias/est-sofia`;
+    sembrarDoc(ruta, { ...leerDoc(ruta), horaEntrada: new Date(AHORA_EN_VENTANA.getTime() - 45 * 60_000).toISOString() });
+    await registrarAsistenciaJornada(datos(), contexto()); // salida (45 min)
+
+    const metrica = leerDoc(`tenants/${TENANT}/metricasAsistencia/est-sofia`)!;
+    expect(metrica.minutosTotales).toBe(45);
+    expect(metrica.clasesAsistidas).toBe(1);
+    expect(metrica.estudianteId).toBe('est-sofia');
+  });
+
   it('el documento persistido no tiene campos fuera del contrato RegistroAsistencia', async () => {
     sembrarEscenarioCompleto();
     await registrarAsistenciaJornada(datos(), contexto());

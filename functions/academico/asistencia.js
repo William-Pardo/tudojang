@@ -210,6 +210,11 @@ function crearServicioRegistrarAsistencia({ firestore, ahora = () => new Date() 
       { merge: true }
     );
 
+    // WS-2 (§7/§11): acumular horas reales por estudiante. Se hace SOLO en el check-out (cuando
+    // ya se conoce la duracion) y una unica vez por clase (un 3er escaneo se rechazo arriba).
+    // Read-modify-write en vez de increment() para no depender de FieldValue en los fakes.
+    await acumularMetricasAsistencia({ tenant, tenantId, estudianteId, minutosAsistidos, ahora: ahoraIso });
+
     return { ok: true, tipo: 'salida', hora: ahoraIso, minutosAsistidos };
   };
 }
@@ -218,6 +223,23 @@ function calcularMinutosAsistidos(horaEntradaIso, horaSalidaIso) {
   const inicio = new Date(horaEntradaIso).getTime();
   const fin = new Date(horaSalidaIso).getTime();
   return Math.max(0, Math.round((fin - inicio) / 60000));
+}
+
+// Acumulado derivado en `tenants/{tenantId}/metricasAsistencia/{estudianteId}` (ver
+// models/academico/metricasAsistencia.ts). Read-modify-write: lee el total actual, suma la
+// clase recien cerrada, reescribe.
+async function acumularMetricasAsistencia({ tenant, tenantId, estudianteId, minutosAsistidos, ahora }) {
+  const ref = tenant.collection('metricasAsistencia').doc(estudianteId);
+  const snap = await ref.get();
+  const previo = snap.exists ? snap.data() : { minutosTotales: 0, clasesAsistidas: 0 };
+
+  await ref.set({
+    estudianteId,
+    tenantId,
+    minutosTotales: (previo.minutosTotales || 0) + minutosAsistidos,
+    clasesAsistidas: (previo.clasesAsistidas || 0) + 1,
+    actualizadoEn: ahora,
+  });
 }
 
 module.exports = {

@@ -13,8 +13,9 @@ function makeContext({ uid = 'maestro-1', rol = 'Editor', tenantId = 'tenant-1' 
 
 function makeFirestore({
   jornada, inscripciones = [], asistencias = {}, writes = [], estudiantes = {}, ejecucion,
+  metricasAsistencia = {},
 } = {}) {
-  const state = { jornada, inscripciones, asistencias, writes, estudiantes, ejecucion };
+  const state = { jornada, inscripciones, asistencias, writes, estudiantes, ejecucion, metricasAsistencia };
   return {
     collection: (name) => makeRef([name], state),
     _state: state,
@@ -68,6 +69,12 @@ function makeRef(path, state) {
         return makeSnap(registro || null);
       }
 
+      const metricaMatch = joined.match(/^tenants\/([^/]+)\/metricasAsistencia\/([^/]+)$/);
+      if (metricaMatch) {
+        const [, , estudianteId] = metricaMatch;
+        return makeSnap(state.metricasAsistencia[estudianteId] || null);
+      }
+
       return makeSnap(null);
     },
     set: async (data, options) => {
@@ -82,6 +89,13 @@ function makeRef(path, state) {
         const key = `${jornadaId}/${estudianteId}`;
         const previo = options && options.merge ? state.asistencias[key] || {} : {};
         state.asistencias[key] = { ...previo, ...data };
+      }
+
+      const metricaMatch = joined.match(/^tenants\/([^/]+)\/metricasAsistencia\/([^/]+)$/);
+      if (metricaMatch) {
+        const [, , estudianteId] = metricaMatch;
+        const previo = options && options.merge ? state.metricasAsistencia[estudianteId] || {} : {};
+        state.metricasAsistencia[estudianteId] = { ...previo, ...data };
       }
     },
   };
@@ -302,6 +316,96 @@ test('registrarAsistenciaJornada: el check-out guarda checkedOutBy', async () =>
 
   assert.equal(resultado.tipo, 'salida');
   assert.equal(state.asistencias['jornada-1/estudiante-1'].checkedOutBy, 'admin-9');
+});
+
+// --- WS-2: acumular horas reales por estudiante en el check-out (§7/§11) --------------------
+
+test('registrarAsistenciaJornada: el check-out acumula minutos y clases en metricasAsistencia', async () => {
+  const state = {
+    jornada: jornadaConHorario,
+    inscripciones: [inscripcionEstudiante1],
+    writes: [],
+    asistencias: { 'jornada-1/estudiante-1': { estudianteId: 'estudiante-1', horaEntrada: '2026-07-25T23:05:00.000Z' } },
+    metricasAsistencia: {},
+  };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:50:00.000Z'), // 45 min despues de la entrada
+  });
+
+  await servicio(dataBase(), makeContext());
+
+  const metrica = state.metricasAsistencia['estudiante-1'];
+  assert.equal(metrica.minutosTotales, 45);
+  assert.equal(metrica.clasesAsistidas, 1);
+  assert.equal(metrica.estudianteId, 'estudiante-1');
+  assert.equal(metrica.tenantId, 'tenant-1');
+});
+
+test('registrarAsistenciaJornada: dos clases distintas SUMAN sobre el acumulado previo', async () => {
+  const state = {
+    jornada: jornadaConHorario,
+    inscripciones: [inscripcionEstudiante1],
+    writes: [],
+    asistencias: { 'jornada-1/estudiante-1': { estudianteId: 'estudiante-1', horaEntrada: '2026-07-25T23:05:00.000Z' } },
+    // Ya asistio a una clase de 60 min antes.
+    metricasAsistencia: { 'estudiante-1': { estudianteId: 'estudiante-1', tenantId: 'tenant-1', minutosTotales: 60, clasesAsistidas: 1 } },
+  };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:35:00.000Z'), // +30 min
+  });
+
+  await servicio(dataBase(), makeContext());
+
+  const metrica = state.metricasAsistencia['estudiante-1'];
+  assert.equal(metrica.minutosTotales, 90); // 60 + 30
+  assert.equal(metrica.clasesAsistidas, 2);
+});
+
+test('registrarAsistenciaJornada: un 3er escaneo (rechazado) NO vuelve a acumular', async () => {
+  const state = {
+    jornada: jornadaConHorario,
+    inscripciones: [inscripcionEstudiante1],
+    writes: [],
+    // Asistencia YA completa (entrada + salida).
+    asistencias: {
+      'jornada-1/estudiante-1': {
+        estudianteId: 'estudiante-1',
+        horaEntrada: '2026-07-25T23:05:00.000Z',
+        horaSalida: '2026-07-25T23:50:00.000Z',
+      },
+    },
+    metricasAsistencia: { 'estudiante-1': { estudianteId: 'estudiante-1', tenantId: 'tenant-1', minutosTotales: 45, clasesAsistidas: 1 } },
+  };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-26T00:00:00.000Z'),
+  });
+
+  await assert.rejects(() => servicio(dataBase(), makeContext()), /ya quedo completa/i);
+
+  // El acumulado no cambio.
+  assert.equal(state.metricasAsistencia['estudiante-1'].minutosTotales, 45);
+  assert.equal(state.metricasAsistencia['estudiante-1'].clasesAsistidas, 1);
+});
+
+test('registrarAsistenciaJornada: el CHECK-IN no acumula (solo el check-out)', async () => {
+  const state = {
+    jornada: jornadaConHorario,
+    inscripciones: [inscripcionEstudiante1],
+    writes: [],
+    asistencias: {},
+    metricasAsistencia: {},
+  };
+  const servicio = crearServicioRegistrarAsistencia({
+    firestore: makeFirestore(state),
+    ahora: () => new Date('2026-07-25T23:05:00.000Z'),
+  });
+
+  await servicio(dataBase(), makeContext()); // check-in
+
+  assert.equal(state.metricasAsistencia['estudiante-1'], undefined);
 });
 
 // --- Cycle A2: "maestro solo opera clases donde esta asignado" (.txt §12) --
