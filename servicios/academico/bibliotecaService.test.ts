@@ -1,4 +1,4 @@
-﻿import { crearBibliotecaService, clearMockRecursos } from './bibliotecaService';
+﻿import { crearBibliotecaService, clearMockRecursos, RecursoNoPublicadoError } from './bibliotecaService';
 
 const bibliotecaService = crearBibliotecaService({ isFirebaseConfigured: false });
 
@@ -71,6 +71,36 @@ describe('bibliotecaService.approveRecurso', () => {
     await expect(
       bibliotecaService.approveRecurso(TENANT_ID, recursoId, ADMIN_UID)
     ).rejects.toThrow(/transici.n inv.lida/i);
+  });
+});
+
+describe('bibliotecaService.archiveRecurso — solo se archiva lo que ya se usó', () => {
+  beforeEach(() => {
+    clearMockRecursos();
+  });
+
+  it('rechaza archivar un recurso que nunca se publicó (recursoFuePublicado -> false)', async () => {
+    const servicio = crearBibliotecaService({
+      isFirebaseConfigured: false,
+      recursoFuePublicado: async () => false,
+    });
+    const recurso = await servicio.importFromDrive(TENANT_ID, 'f1', 'R', 'application/pdf', ADMIN_UID);
+    await servicio.updateFicha(TENANT_ID, recurso.id, { disciplina: 'TKD', tipo: 'pdf', usos: ['estudio'] } as any);
+    await servicio.approveRecurso(TENANT_ID, recurso.id, ADMIN_UID);
+
+    await expect(servicio.archiveRecurso(TENANT_ID, recurso.id)).rejects.toBeInstanceOf(RecursoNoPublicadoError);
+  });
+
+  it('archiva un recurso que sí se publicó (recursoFuePublicado -> true)', async () => {
+    const servicio = crearBibliotecaService({
+      isFirebaseConfigured: false,
+      recursoFuePublicado: async () => true,
+    });
+    const recurso = await servicio.importFromDrive(TENANT_ID, 'f2', 'R', 'application/pdf', ADMIN_UID);
+    await servicio.updateFicha(TENANT_ID, recurso.id, { disciplina: 'TKD', tipo: 'pdf', usos: ['estudio'] } as any);
+    await servicio.approveRecurso(TENANT_ID, recurso.id, ADMIN_UID);
+
+    await expect(servicio.archiveRecurso(TENANT_ID, recurso.id)).resolves.toBeUndefined();
   });
 });
 

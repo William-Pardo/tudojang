@@ -249,47 +249,92 @@ describe('Integracion: eliminar una clase de la agenda', () => {
   });
 });
 
-// --- CARACTERIZACION: el fallback que la UI ofrece no siempre existe ---------------------
+// --- CARACTERIZACION: cancelar NO aplica a estados operados; la salida es ARCHIVAR --------
 
-describe('Caracterizacion: hay estados donde no se puede NI eliminar NI cancelar', () => {
-  // Esto NO dice que el comportamiento este bien.
-  //
-  // `useEliminacionJornadaSegura` ofrece "cancelar en lugar de eliminar" ante CUALQUIER
-  // `EliminacionNoPermitidaError`. Pero la maquina de estados de `jornadaService` no admite
-  // `cancelada` desde todos esos estados:
+describe('Caracterizacion: cancelar no aplica a esos estados, pero ya no es callejon sin salida', () => {
+  // La maquina de estados de `jornadaService` sigue sin admitir `cancelada` desde los estados
+  // ya operados -- eso es correcto y NO se toca:
   //
   //   en_curso         -> ['pendiente_cierre', 'parcial', 'cancelada']   cancelar SI
   //   pendiente_cierre -> ['cerrada', 'parcial']                          cancelar NO
   //   cerrada          -> []                                              cancelar NO
   //   parcial          -> ['cerrada']                                     cancelar NO
   //
-  // O sea: en 3 de los 4 estados "ya operada", el admin no puede eliminar la clase y el
-  // fallback que la UI le ofrece tampoco funciona. Queda en un callejon sin salida.
+  // Antes, en esos 3 estados el admin no podia eliminar (historial) NI cancelar (maquina de
+  // estados), y `cancelarEnLugarDeEliminar` le tiraba el error crudo "Transicion invalida" a
+  // la cara: un callejon sin salida.
   //
-  // Y lo que ve es peor que un callejon: `cancelarEnLugarDeEliminar` captura el error y
-  // pone `err.message` en pantalla, asi que al usuario le aparece el texto interno
-  // "Transicion invalida: cerrada -> cancelada". Ni explica ni sugiere nada.
-  //
-  // Que deberia pasar (permitir cancelar desde esos estados, o decir claramente que una
-  // clase ya cerrada se conserva y no se toca) es DECISION DE PRODUCTO.
-  // Registrado en ACCIONES_PENDIENTES.md.
+  // Decision de producto (2026-07-22): la salida es ARCHIVAR (ocultar de Agenda), cubierto
+  // arriba en "archivar oculta la clase...". Este bloque fija que la maquina de estados sigue
+  // rechazando `cancelada` desde esos estados (no se relajo), para que el flujo correcto sea
+  // archivar y no un cambio de estado indebido.
   it.each(['pendiente_cierre', 'cerrada', 'parcial'] as const)(
-    'en estado %s: eliminar falla Y cancelar tambien falla',
+    'en estado %s: eliminar falla, cancelar NO aplica -> corresponde archivar',
     async (estado) => {
       const jornada = jornadaBase({ estado });
       sembrarJornada(jornada);
 
       await expect(repo.eliminarJornadaSegura(jornada)).rejects.toBeInstanceOf(EliminacionNoPermitidaError);
-
-      // El fallback que la UI ofrece lanza un error interno, no un mensaje de negocio.
+      // La maquina de estados sigue (correctamente) sin admitir cancelar desde aca.
       expect(() => cancelarJornada(jornada, 'Cancelada desde Agenda')).toThrow(
         `Transicion invalida: ${estado} -> cancelada`,
       );
 
-      // La jornada queda intacta: no se pierde nada, pero el admin se queda sin accion.
+      // La salida real: archivar. Funciona y deja la jornada intacta (solo oculta).
+      await repo.archivarJornada!(jornada);
+      expect(leerDoc(`tenants/${TENANT}/jornadas/jor-1`)?.archivada).toBe(true);
       expect(listarPaths(`tenants/${TENANT}/jornadas`)).toHaveLength(1);
     },
   );
+});
+
+// --- Junta 3-bis: archivar, la salida del callejon sin salida ---------------------------
+
+describe('Integracion: archivar oculta la clase de Agenda sin borrarla ni cambiar su estado', () => {
+  it.each(['pendiente_cierre', 'cerrada', 'parcial'] as const)(
+    'en estado %s (que no se puede eliminar ni cancelar) archivar SI funciona',
+    async (estado) => {
+      const operada = jornadaBase({ estado });
+      sembrarJornada(operada);
+
+      // No se puede eliminar...
+      await expect(repo.eliminarJornadaSegura(operada)).rejects.toBeInstanceOf(EliminacionNoPermitidaError);
+      // ...pero archivar es la salida universal.
+      await repo.archivarJornada!(operada);
+
+      const persistida = leerDoc(`tenants/${TENANT}/jornadas/jor-1`)!;
+      // La jornada NO se borro: sigue existiendo, con su estado y su historial intactos.
+      expect(listarPaths(`tenants/${TENANT}/jornadas`)).toHaveLength(1);
+      expect(persistida.estado).toBe(estado);
+      expect(persistida.asistenciaRegistrada).toBe(operada.asistenciaRegistrada);
+      // Solo se prendio el flag de visibilidad.
+      expect(persistida.archivada).toBe(true);
+    },
+  );
+
+  it('la parrilla de Agenda (rango de fechas) NO devuelve las jornadas archivadas', async () => {
+    // AgendaView filtra `archivada` sobre el resultado de listarJornadasPorRangoFechas.
+    sembrarJornada(jornadaBase({ id: 'jor-visible' }));
+    sembrarJornada(jornadaBase({ id: 'jor-archivada', archivada: true }));
+
+    const semana = await repo.listarJornadasPorRangoFechas(TENANT, '2026-07-20', '2026-07-31');
+    const visiblesEnAgenda = semana.filter((j) => !j.archivada);
+
+    expect(visiblesEnAgenda.map((j) => j.id)).toEqual(['jor-visible']);
+  });
+
+  it('archivar es idempotente y no cambia el estado', async () => {
+    const cerrada = jornadaBase({ estado: 'cerrada' });
+    sembrarJornada(cerrada);
+
+    await repo.archivarJornada!(cerrada);
+    await repo.archivarJornada!({ ...cerrada, archivada: true });
+
+    const persistida = leerDoc(`tenants/${TENANT}/jornadas/jor-1`)!;
+    expect(persistida.archivada).toBe(true);
+    expect(persistida.estado).toBe('cerrada');
+    expect(listarPaths(`tenants/${TENANT}/jornadas`)).toHaveLength(1);
+  });
 });
 
 // --- Junta 4: la auditoria queda donde la UI la busca ------------------------------------

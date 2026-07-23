@@ -77,7 +77,10 @@ export interface AuditoriaJornadaInput {
   // confirmada, ver accionesDisponibles en MisClasesView.tsx), y `transicionar()` ya la
   // registraba como `accion: 'restaurar'` -- pero este union nunca se actualizo, asi que
   // toda auditoria de restauracion escribia un valor fuera del contrato declarado.
-  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar' | 'eliminar' | 'restaurar';
+  // 'archivar' agregado 2026-07-22: ocultar de Agenda una clase ya operada que no se puede
+  // eliminar ni cancelar (flag `archivada`, no borra ni cambia estado). La auditoria debe
+  // distinguirla de 'eliminar' (borrado fisico) y de 'cancelar' (cambio de estado soft).
+  accion: 'crear' | 'confirmar' | 'iniciar' | 'cerrar' | 'cancelar' | 'actualizar' | 'eliminar' | 'restaurar' | 'archivar';
   // Subtarea 12.5: diff por campo (valor anterior y nuevo). Antes era el estado resultante
   // plano (p.ej. `{ estado: 'confirmada' }`), sin el valor anterior -- ver diffCambiosJornada.
   cambios: CambioAuditoriaJornada[];
@@ -281,6 +284,13 @@ export interface JornadaRepository {
   // jornada ya se opero, lanza EliminacionNoPermitidaError y NO borra nada (el llamador debe
   // ofrecer cancelarJornada en su lugar). Es la unica via segura para borrar una clase real.
   eliminarJornadaSegura(jornada: JornadaInstruccion): Promise<void>;
+  // Oculta la jornada de la parrilla de Agenda sin borrarla ni cambiar su estado (flag
+  // `archivada`). Es la salida para clases ya operadas que no se pueden ni eliminar (tienen
+  // historial) ni cancelar (la maquina de estados no lo permite). SIEMPRE funciona: no
+  // aplica ninguna guarda de estado -- por diseño, archivar es reversible e inofensivo (solo
+  // afecta visibilidad; el historial/reportes siguen leyendo la jornada). Opcional para no
+  // romper los fakes de test parciales existentes.
+  archivarJornada?(jornada: JornadaInstruccion): Promise<void>;
   // Fix 3 (persistencia/seleccion de Programa academico): lectura puntual de una
   // EjecucionPrograma por id, usada por AsignacionesView para reconstruir
   // horario/sede/instructor/fechas de un programa real al hidratarlo, en vez de dejar
@@ -640,6 +650,21 @@ export function crearJornadaRepository(options: CrearJornadaRepositoryOptions = 
         throw new EliminacionNoPermitidaError(evaluacion.motivo);
       }
       await eliminarLoteInterno(jornada.tenantId, [jornada.id]);
+    },
+
+    async archivarJornada(jornada) {
+      // Solo prende el flag de visibilidad. NO borra, NO cambia estado, NO evalua guardas:
+      // por eso es la salida universal para una clase operada que no se puede eliminar ni
+      // cancelar. Idempotente. El resto del documento (estado, asistencia, cierre) queda igual.
+      const actualizadoEn = new Date().toISOString();
+
+      if (!checkConfigured()) {
+        mockJornadas = upsertById(mockJornadas, { ...jornada, archivada: true, actualizadoEn });
+        return;
+      }
+
+      const ref = deps.doc(getDatabase(), 'tenants', jornada.tenantId, 'jornadas', jornada.id);
+      await deps.setDoc(ref, { archivada: true, actualizadoEn }, { merge: true });
     },
 
     async obtenerEjecucion(tenantId, ejecucionId) {

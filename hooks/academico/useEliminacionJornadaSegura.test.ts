@@ -93,6 +93,61 @@ describe('useEliminacionJornadaSegura', () => {
     expect(result.current.confirmando).toBe(false);
   });
 
+  it('archivar() llama a archivarJornada, audita con accion archivar, avisa onEliminada y cierra', async () => {
+    const repository = crearRepository({ archivarJornada: jest.fn().mockResolvedValue(undefined) });
+    const onEliminada = jest.fn();
+    const { result } = renderHook(() =>
+      useEliminacionJornadaSegura({ repository, tenantId: 'tenant-1', usuarioId: 'admin-1', rol: RolUsuario.Admin, fuente: 'agenda', onEliminada }),
+    );
+
+    act(() => result.current.iniciar(crearJornada({ estado: 'cerrada' })));
+    let devuelto: boolean | undefined;
+    await act(async () => { devuelto = await result.current.archivar(); });
+
+    expect(devuelto).toBe(true);
+    expect(repository.archivarJornada).toHaveBeenCalledWith(expect.objectContaining({ id: 'jornada-1' }));
+    expect(repository.registrarAuditoria).toHaveBeenCalledWith(
+      expect.objectContaining({ fuente: 'agenda', accion: 'archivar' }),
+    );
+    expect(onEliminada).toHaveBeenCalledWith('jornada-1');
+    await waitFor(() => expect(result.current.jornada).toBeNull());
+  });
+
+  it('el flujo del callejon sin salida: eliminar bloqueado -> archivar como salida', async () => {
+    // Una clase CERRADA no se puede eliminar (tiene historial); antes tampoco se podia
+    // cancelar (maquina de estados) y el admin quedaba trabado. Archivar es la salida.
+    const repository = crearRepository({
+      eliminarJornadaSegura: jest.fn().mockRejectedValue(new EliminacionNoPermitidaError('clase_operada')),
+      archivarJornada: jest.fn().mockResolvedValue(undefined),
+    });
+    const { result } = renderHook(() =>
+      useEliminacionJornadaSegura({ repository, tenantId: 'tenant-1', usuarioId: 'admin-1', rol: RolUsuario.Admin, fuente: 'agenda' }),
+    );
+
+    act(() => result.current.iniciar(crearJornada({ estado: 'cerrada' })));
+    await act(async () => { await result.current.confirmar(); });
+    // El borrado quedo bloqueado, la jornada sigue en el flujo.
+    expect(result.current.jornada).not.toBeNull();
+
+    await act(async () => { await result.current.archivar(); });
+    expect(repository.archivarJornada).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.jornada).toBeNull());
+  });
+
+  it('archivar() en un repository sin soporte deja un error claro, no un crash', async () => {
+    const repository = crearRepository(); // sin archivarJornada
+    const { result } = renderHook(() =>
+      useEliminacionJornadaSegura({ repository, tenantId: 'tenant-1', usuarioId: 'admin-1', rol: RolUsuario.Admin, fuente: 'agenda' }),
+    );
+
+    act(() => result.current.iniciar(crearJornada()));
+    let devuelto: boolean | undefined;
+    await act(async () => { devuelto = await result.current.archivar(); });
+
+    expect(devuelto).toBe(false);
+    expect(result.current.error?.mensaje).toMatch(/no permite archivar/i);
+  });
+
   it('si eliminarJornadaSegura rechaza con EliminacionNoPermitidaError, deja error.ofrecerCancelar=true y NO cierra', async () => {
     const repository = crearRepository({
       eliminarJornadaSegura: jest.fn().mockRejectedValue(new EliminacionNoPermitidaError('asistencia_registrada')),

@@ -68,12 +68,41 @@ describe('MaterialPreviewModal', () => {
     expect(screen.getByText('45%')).toBeInTheDocument();
   });
 
-  it('muestra un aviso claro cuando el quiz todavía no tiene preguntas configuradas', async () => {
+  it('vista previa de admin (modoVistaPrevia): quiz vacío avisa que faltan preguntas por configurar', async () => {
     const quizService = { obtenerQuiz: jest.fn().mockResolvedValue(null) };
-    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={quizService} />);
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={quizService} modoVistaPrevia />);
 
     expect(await screen.findByText(/todavía no tiene preguntas configuradas/i)).toBeInTheDocument();
     expect(screen.queryByText(/quiz interactivo/i)).not.toBeInTheDocument();
+  });
+
+  it('estudiante: quiz vacío (carga OK, sin preguntas) muestra "material ya no está disponible", NO el aviso de staff', async () => {
+    const quizService = { obtenerQuiz: jest.fn().mockResolvedValue(null) };
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={quizService} estudianteId="est-1" />);
+
+    expect(await screen.findByText(/material ya no está disponible/i)).toBeInTheDocument();
+    // El estudiante NO ve el mensaje orientado al staff.
+    expect(screen.queryByText(/cargarlas desde la Biblioteca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/quiz interactivo/i)).not.toBeInTheDocument();
+  });
+
+  it('fallo de carga (red): NO dice "sin preguntas" -- muestra error con boton Reintentar que recarga', async () => {
+    // El bug que arregla: antes el catch dejaba preguntas=null, indistinguible de "sin
+    // preguntas", y el alumno veia "no hay preguntas" cuando en realidad fallo la red.
+    const obtenerQuiz = jest.fn()
+      .mockRejectedValueOnce(new Error('network'))   // primer intento: falla
+      .mockResolvedValueOnce(preguntasQuizMock);     // reintento: ahora si carga
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} quizService={{ obtenerQuiz }} estudianteId="est-1" />);
+
+    expect(await screen.findByText(/no se pudo cargar el material/i)).toBeInTheDocument();
+    // No debe mentir con el mensaje de "sin preguntas".
+    expect(screen.queryByText(/no está disponible/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no tiene preguntas configuradas/i)).not.toBeInTheDocument();
+
+    // Reintentar recarga de verdad y aparece el quiz.
+    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+    expect(await screen.findByText(/quiz interactivo/i)).toBeInTheDocument();
+    expect(obtenerQuiz).toHaveBeenCalledTimes(2);
   });
 
   it('renderiza visor PDF para material no evaluativo', () => {

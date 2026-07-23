@@ -20,7 +20,32 @@ import { RecursoAcademico, FichaAcademica } from '../../models/academico/recurso
 export interface BibliotecaServiceDeps {
   db?: Firestore;
   isFirebaseConfigured?: boolean;
+  /**
+   * ¿El recurso fue publicado alguna vez en una clase? (tiene una asignación que lo
+   * referencia y que dejó de ser borrador). Inyectable para poder testear la regla de
+   * archivado sin depender del store de asignaciones. Si no se inyecta y Firebase está
+   * configurado, se consulta Firestore.
+   */
+  recursoFuePublicado?: (tenantId: string, recursoId: string) => Promise<boolean>;
 }
+
+/**
+ * Solo se archiva un recurso que YA SE USÓ: que se publicó al menos una vez en una clase
+ * (decisión de producto 2026-07-22). Un recurso que nunca se publicó no se archiva -- se
+ * quita de la biblioteca. La UI cachea este error para sugerir "no publicar / remover".
+ */
+export class RecursoNoPublicadoError extends Error {
+  constructor(
+    message = 'No se puede archivar un recurso que nunca se publicó en una clase. Si no lo vas a usar, quitalo de la biblioteca.'
+  ) {
+    super(message);
+    this.name = 'RecursoNoPublicadoError';
+  }
+}
+
+// Una asignación cuenta como "publicada alguna vez" si dejó el estado 'borrador' -- incluye
+// las que luego se cerraron o vencieron: la clase igual ocurrió, el recurso se usó.
+const ESTADOS_ASIGNACION_USADA = ['publicada', 'cerrada', 'vencida'];
 
 // In-memory mock storage for local/test mode
 let mockRecursos: RecursoAcademico[] = [];
@@ -251,17 +276,36 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
   /**
    * Archiva el recurso y cambia su estado a 'archivado'.
    */
+  // Regla de archivado (2026-07-22): solo se archiva un recurso YA USADO -- que se publicó al
+  // menos una vez en una clase. Uno que nunca se publicó no se archiva: se quita de la
+  // biblioteca. Antes la guarda era `estado === 'aprobado'`, que dejaba archivar recursos
+  // aprobados pero nunca usados (y bloqueaba archivar uno mal clasificado sin aprobarlo antes).
+  const recursoEstaUsado = async (tenantId: string, recursoId: string): Promise<boolean> => {
+    if (deps.recursoFuePublicado) {
+      return deps.recursoFuePublicado(tenantId, recursoId);
+    }
+    if (checkConfigured()) {
+      return recursoFuePublicadoEnFirestore(getDatabase(), tenantId, recursoId);
+    }
+    // Modo local/demo sin Firebase ni inyección: no hay asignaciones que consultar. Se deja
+    // pasar (comportamiento heredado); la regla real se aplica en el camino de Firestore, que
+    // es el que corre en producción y el que cubre biblioteca.integracion.test.ts.
+    return true;
+  };
+
   const archiveRecurso = async (
     tenantId: string,
     recursoId: string
   ): Promise<void> => {
+    const usado = await recursoEstaUsado(tenantId, recursoId);
+    if (!usado) {
+      throw new RecursoNoPublicadoError();
+    }
+
     if (!checkConfigured()) {
       const recurso = mockRecursos.find(r => r.id === recursoId && r.tenantId === tenantId);
       if (!recurso) {
         throw new Error('Recurso no encontrado');
-      }
-      if (recurso.estado !== 'aprobado') {
-        throw new Error(`Transición inválida: no se puede archivar un recurso en estado ${recurso.estado}`);
       }
       recurso.estado = 'archivado';
       recurso.actualizadoEn = new Date().toISOString();
@@ -272,10 +316,6 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     const snap = await getDoc(docRef);
     if (!snap.exists()) {
       throw new Error('Recurso no encontrado');
-    }
-    const recurso = snap.data() as RecursoAcademico;
-    if (recurso.estado !== 'aprobado') {
-      throw new Error(`Transición inválida: no se puede archivar un recurso en estado ${recurso.estado}`);
     }
     await updateDoc(docRef, {
       estado: 'archivado',
@@ -350,6 +390,23 @@ function normalizarNombreRecurso_(nombre: string): string {
  * recurso si esto da error (se loggea y se sigue) -- el t\u00edtulo del recurso ya qued\u00f3
  * guardado correctamente, que es la operaci\u00f3n principal del usuario.
  */
+/**
+ * ¿Existe alguna asignación de este recurso que dejó de ser borrador? = se publicó al menos
+ * una vez en una clase. Consulta `tenants/{tenantId}/asignaciones` por `recursoId`.
+ */
+async function recursoFuePublicadoEnFirestore(
+  database: Firestore,
+  tenantId: string,
+  recursoId: string
+): Promise<boolean> {
+  const asignacionesRef = collection(database, 'tenants', tenantId, 'asignaciones');
+  const snap = await getDocs(query(asignacionesRef, where('recursoId', '==', recursoId)));
+  return snap.docs.some((docSnap) => {
+    const estado = (docSnap.data() as { estado?: string }).estado;
+    return typeof estado === 'string' && ESTADOS_ASIGNACION_USADA.includes(estado);
+  });
+}
+
 async function propagarTituloAAsignaciones(
   database: Firestore,
   tenantId: string,

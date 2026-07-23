@@ -27,6 +27,7 @@ import type {
   MetadatosVideo,
   MetadatosPdf,
 } from '../../models/academico/actividad';
+import { avanceAsignacionCompletado } from '../../models/academico/actividad';
 
 // ---------------------------------------------------------------------------
 // Almacenamiento en memoria para modo local / tests
@@ -197,7 +198,7 @@ function recalcularMetricas(
     (a) => a.porcentajeConsumo > 0
   ).length;
   const asignacionesCompletadas = avancePorAsignacion.filter(
-    (a) => a.porcentajeConsumo >= 80
+    avanceAsignacionCompletado
   ).length;
 
   const porcentajeGlobalConsumo =

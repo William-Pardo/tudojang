@@ -29,8 +29,8 @@ jest.mock('../../firebase/config', () => ({
   isFirebaseConfigured: true,
 }));
 
-import { limpiarFirestoreFake, leerDoc, listarPaths } from '../../test-utils/fakeFirestore';
-import { crearBibliotecaService } from './bibliotecaService';
+import { limpiarFirestoreFake, leerDoc, listarPaths, sembrarDoc } from '../../test-utils/fakeFirestore';
+import { crearBibliotecaService, RecursoNoPublicadoError } from './bibliotecaService';
 import { publishAsignacion } from './asignacionService';
 
 const TENANT = 'tenant-gajog';
@@ -38,6 +38,13 @@ const ADMIN = 'uid-admin-1';
 
 // Servicio REAL contra el fake de cliente.
 const biblioteca = crearBibliotecaService({ isFirebaseConfigured: true });
+
+// Marca un recurso como USADO: siembra una asignación publicada que lo referencia. Es el
+// requisito para poder archivarlo (regla de producto 2026-07-22: solo se archiva lo usado).
+const publicarEnUnaClase = (recursoId: string, asignacionId = `asig-${recursoId}`) =>
+  sembrarDoc(`tenants/${TENANT}/asignaciones/${asignacionId}`, {
+    id: asignacionId, tenantId: TENANT, recursoId, estado: 'publicada', titulo: 'Clase',
+  });
 
 const importar = (over: Record<string, any> = {}) =>
   biblioteca.importFromDrive(
@@ -136,9 +143,9 @@ describe('Integracion: un recurso solo se aprueba despues de clasificarlo', () =
   it('un recurso archivado ya no puede volver a aprobarse', async () => {
     const recurso = await importar();
     await biblioteca.updateFicha(TENANT, recurso.id, fichaMinima as any);
-    // Regla de dominio: solo se archiva lo que ya estaba APROBADO
-    // (bibliotecaService.archiveRecurso rechaza cualquier otro estado).
     await biblioteca.approveRecurso(TENANT, recurso.id, ADMIN);
+    // Regla de dominio (2026-07-22): solo se archiva un recurso YA USADO. Se publica primero.
+    publicarEnUnaClase(recurso.id);
     await biblioteca.archiveRecurso(TENANT, recurso.id);
 
     await expect(biblioteca.approveRecurso(TENANT, recurso.id, ADMIN))
@@ -148,6 +155,61 @@ describe('Integracion: un recurso solo se aprueba despues de clasificarlo', () =
   it('aprobar un recurso inexistente falla explicitamente', async () => {
     await expect(biblioteca.approveRecurso(TENANT, 'recurso-fantasma', ADMIN))
       .rejects.toThrow(/no encontrado/i);
+  });
+});
+
+// --- Regla de archivado: solo se archiva lo que YA SE USÓ (2026-07-22) -------------------
+
+describe('Integracion: archivar exige que el recurso se haya publicado en una clase', () => {
+  it('un recurso NUNCA publicado NO se puede archivar: sugiere quitarlo de la biblioteca', async () => {
+    const recurso = await importar();
+    await biblioteca.updateFicha(TENANT, recurso.id, fichaMinima as any);
+    await biblioteca.approveRecurso(TENANT, recurso.id, ADMIN);
+    // Aprobado pero jamas publicado en una clase -> no es "usado".
+
+    await expect(biblioteca.archiveRecurso(TENANT, recurso.id))
+      .rejects.toBeInstanceOf(RecursoNoPublicadoError);
+    await expect(biblioteca.archiveRecurso(TENANT, recurso.id))
+      .rejects.toThrow(/quitalo de la biblioteca/i);
+
+    // Sigue aprobado y visible: no se archivo nada.
+    expect(leerDoc(`tenants/${TENANT}/recursos/${recurso.id}`)?.estado).toBe('aprobado');
+  });
+
+  it('un recurso publicado en una clase (usado) SI se archiva', async () => {
+    const recurso = await importar();
+    await biblioteca.updateFicha(TENANT, recurso.id, fichaMinima as any);
+    await biblioteca.approveRecurso(TENANT, recurso.id, ADMIN);
+    publicarEnUnaClase(recurso.id);
+
+    await biblioteca.archiveRecurso(TENANT, recurso.id);
+
+    expect(leerDoc(`tenants/${TENANT}/recursos/${recurso.id}`)?.estado).toBe('archivado');
+  });
+
+  it('una asignacion en BORRADOR no cuenta como usado: no habilita archivar', async () => {
+    const recurso = await importar();
+    await biblioteca.updateFicha(TENANT, recurso.id, fichaMinima as any);
+    await biblioteca.approveRecurso(TENANT, recurso.id, ADMIN);
+    // Existe una asignacion, pero todavia en borrador (nunca se publico).
+    sembrarDoc(`tenants/${TENANT}/asignaciones/asig-borrador`, {
+      id: 'asig-borrador', tenantId: TENANT, recursoId: recurso.id, estado: 'borrador', titulo: 'X',
+    });
+
+    await expect(biblioteca.archiveRecurso(TENANT, recurso.id))
+      .rejects.toBeInstanceOf(RecursoNoPublicadoError);
+  });
+
+  it('una clase ya CERRADA cuenta como usado (la clase ocurrio)', async () => {
+    const recurso = await importar();
+    await biblioteca.updateFicha(TENANT, recurso.id, fichaMinima as any);
+    await biblioteca.approveRecurso(TENANT, recurso.id, ADMIN);
+    sembrarDoc(`tenants/${TENANT}/asignaciones/asig-cerrada`, {
+      id: 'asig-cerrada', tenantId: TENANT, recursoId: recurso.id, estado: 'cerrada', titulo: 'X',
+    });
+
+    await biblioteca.archiveRecurso(TENANT, recurso.id);
+    expect(leerDoc(`tenants/${TENANT}/recursos/${recurso.id}`)?.estado).toBe('archivado');
   });
 });
 
@@ -164,7 +226,8 @@ describe('Integracion: el listado de aprobados es lo que ve el flujo de publicac
 
     const archivado = await importar({ fileId: 'drive-3', nombre: 'Archivado.mp4' });
     await biblioteca.updateFicha(TENANT, archivado.id, fichaMinima as any);
-    await biblioteca.approveRecurso(TENANT, archivado.id, ADMIN); // requisito para archivar
+    await biblioteca.approveRecurso(TENANT, archivado.id, ADMIN);
+    publicarEnUnaClase(archivado.id); // requisito para archivar: haber sido usado
     await biblioteca.archiveRecurso(TENANT, archivado.id);
 
     const aprobados = await biblioteca.listarRecursosAprobados(TENANT);

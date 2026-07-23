@@ -113,6 +113,12 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [preguntasQuiz, setPreguntasQuiz] = React.useState<PreguntaQuiz[] | null>(null);
   const [cargandoPreguntasQuiz, setCargandoPreguntasQuiz] = React.useState(false);
+  // Distingue "fallo la carga (red/permisos)" de "el quiz no tiene preguntas". Antes el catch
+  // dejaba preguntasQuiz=null, el mismo valor que "sin preguntas", asi que un fallo de red se
+  // mostraba como "este quiz no tiene preguntas configuradas". Ahora el error tiene su propio
+  // estado y su boton de reintentar (que efectivamente recarga).
+  const [errorPreguntasQuiz, setErrorPreguntasQuiz] = React.useState(false);
+  const [reintentosQuiz, setReintentosQuiz] = React.useState(0);
 
   const tipoMaterial = React.useMemo(
     () => (asignacion ? detectarTipoMaterial(asignacion) : 'generico'),
@@ -155,24 +161,30 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   // caía a su pregunta demo hardcodeada sin importar el recurso.
   React.useEffect(() => {
     setPreguntasQuiz(null);
+    setErrorPreguntasQuiz(false);
     if (!asignacion || tipoMaterial !== 'quiz') return;
 
     let activo = true;
     setCargandoPreguntasQuiz(true);
     quizService.obtenerQuiz(asignacion.tenantId, asignacion.recursoId)
       .then((preguntas) => {
-        if (activo) setPreguntasQuiz(preguntas);
+        // Exito: `preguntas` puede ser null/[] (el quiz realmente no tiene preguntas) o una
+        // lista. En ambos casos NO es un error -- se limpia el flag de error.
+        if (activo) { setPreguntasQuiz(preguntas); setErrorPreguntasQuiz(false); }
       })
       .catch((err) => {
+        // Fallo real (red/permisos): NO es lo mismo que "sin preguntas". Se marca como error
+        // para ofrecer reintentar, en vez de mentir con "no hay preguntas configuradas".
         console.warn('[MaterialPreviewModal] No se pudo cargar el banco de preguntas', err);
-        if (activo) setPreguntasQuiz(null);
+        if (activo) { setPreguntasQuiz(null); setErrorPreguntasQuiz(true); }
       })
       .finally(() => {
         if (activo) setCargandoPreguntasQuiz(false);
       });
 
     return () => { activo = false; };
-  }, [asignacion, tipoMaterial, quizService]);
+    // `reintentosQuiz` en las deps: al reintentar, el effect vuelve a correr y recarga de verdad.
+  }, [asignacion, tipoMaterial, quizService, reintentosQuiz]);
 
   React.useEffect(() => {
     setAccesoTemporal(null);
@@ -303,6 +315,23 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               <div className="rounded-[1.5rem] bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-6 text-sm font-bold text-gray-400 text-center">
                 Cargando preguntas...
               </div>
+            ) : errorPreguntasQuiz ? (
+              // FALLO DE CARGA (red/permisos), distinto de "sin preguntas": se ofrece reintentar.
+              <div className="rounded-[1.5rem] bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 p-6 text-center">
+                <p className="text-sm font-black uppercase tracking-widest text-red-700 dark:text-red-300">
+                  No se pudo cargar el material
+                </p>
+                <p className="mt-2 text-xs font-bold text-red-600 dark:text-red-400">
+                  Revisá tu conexión e intentá de nuevo.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReintentosQuiz((n) => n + 1)}
+                  className="mt-4 rounded-xl bg-tkd-red px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-red-700"
+                >
+                  Reintentar
+                </button>
+              </div>
             ) : preguntasQuiz && preguntasQuiz.length > 0 ? (
               <QuizView
                 asignacion={asignacion}
@@ -313,13 +342,25 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
                 estudianteNombre={estudianteNombre}
                 recursoId={asignacion.recursoId}
               />
-            ) : (
+            ) : modoVistaPrevia ? (
+              // VACIO en vista previa de admin: la carga fue OK pero no hay preguntas.
               <div className="rounded-[1.5rem] bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900 p-6 text-center">
                 <p className="text-sm font-black uppercase tracking-widest text-yellow-700 dark:text-yellow-300">
                   Este quiz todavía no tiene preguntas configuradas
                 </p>
                 <p className="mt-2 text-xs font-bold text-yellow-600 dark:text-yellow-400">
                   Un Admin o Maestro puede cargarlas desde la Biblioteca.
+                </p>
+              </div>
+            ) : (
+              // VACIO para el estudiante: la carga fue OK pero el quiz no tiene preguntas.
+              // Mensaje orientado al alumno, no al staff.
+              <div className="rounded-[1.5rem] bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-6 text-center">
+                <p className="text-sm font-black uppercase tracking-widest text-tkd-dark dark:text-white">
+                  Este material ya no está disponible
+                </p>
+                <p className="mt-2 text-xs font-bold text-gray-500 dark:text-gray-400">
+                  Es posible que tu maestro lo haya quitado. Consultá con él si creés que es un error.
                 </p>
               </div>
             )

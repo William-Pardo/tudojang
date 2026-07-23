@@ -942,7 +942,7 @@ deduplicación de importación (2 tests rojos).
 
 | # | Hallazgo | Por qué importa |
 |---|---|---|
-| a | `archiveRecurso` **solo acepta recursos ya aprobados** — cualquier otro estado lanza "Transición inválida". El flujo real es importar → clasificar → aprobar → archivar. | No se puede archivar un recurso mal clasificado sin aprobarlo antes. Si eso no es lo deseado, es un bug de diseño del flujo, no del código. **Sin decidir.** |
+| a | ✅ **RESUELTO (2026-07-22).** `archiveRecurso` ahora exige que el recurso se haya **usado** (publicado al menos una vez en una clase: existe una asignación en `publicada`/`cerrada`/`vencida` que lo referencia). Un recurso nunca publicado lanza `RecursoNoPublicadoError` sugiriendo quitarlo de la biblioteca. La vieja guarda `estado === 'aprobado'` se reemplazó. Chequeo inyectable (`deps.recursoFuePublicado`); en Firestore consulta asignaciones. Mutaciones verificadas (guard off, y `borrador` contando como usado). | Decisión del usuario: "usado = alguna vez publicado para una clase". |
 | b | `youtubeVideoId` **no va dentro de la ficha académica**: es el 5º parámetro de `updateFicha`, junto a `tituloVisible`. | Pasarlo dentro de la ficha no lanza error y no persiste nada. Falla silenciosa: el video queda sin id y el recurso se publica igual, con `youtubeVideoId: null`. Vale revisar si algún llamador de producción lo hace mal. **Sin auditar.** |
 
 **Arreglo de infraestructura:** `test-utils/fakeFirestore.ts` no soportaba `doc(collectionRef)`
@@ -1017,6 +1017,28 @@ Verificado por mutación (3, todas en rojo):
 - desactivar el bloqueo optimista → la segunda escritura pisa a la primera
 - ignorar `asistenciaRegistrada` → se borra una clase con historial
 
+#### ✅ RESUELTO (2026-07-22) — "Quitar de la agenda" (archivar) es la salida del callejón
+
+Decisión del usuario: **archivar** (ocultar de Agenda) sin tocar la máquina de estados.
+Implementado:
+- `JornadaInstruccion.archivada?: boolean` (opcional → ninguna jornada existente se afecta).
+- `jornadaRepository.archivarJornada()` — prende el flag, no borra ni cambia estado, siempre
+  funciona. Idempotente.
+- `useEliminacionJornadaSegura.archivar()` — acción universal; `error.ofrecerArchivar` se
+  mantiene en `true` mientras el borrado siga bloqueado, incluso si cancelar también falla
+  (así el admin nunca se queda sin escape).
+- `AgendaView` — la parrilla filtra `archivada` (en la vista, no en el repo: reportes/historial
+  la siguen leyendo) y ofrece el botón **"Quitar de la agenda"**.
+- Auditoría: nueva acción `'archivar'`, distinta de `eliminar`/`cancelar`.
+
+Verificado por mutación (rama Firestore de `archivarJornada`): 7 tests en rojo. La máquina de
+estados NO se relajó: cancelar sigue (correctamente) rechazando `cancelada` desde esos estados.
+
+El texto interno "Transicion invalida" ya no llega al usuario en el flujo normal: si el borrado
+está bloqueado, la UI ofrece cancelar (si aplica) y siempre archivar.
+
+<details><summary>Detalle original del hallazgo (histórico)</summary>
+
 #### 🟡 SIN DECIDIR — hay estados donde no se puede NI eliminar NI cancelar una clase
 
 `useEliminacionJornadaSegura` ofrece *"cancelar en lugar de eliminar"* ante **cualquier**
@@ -1040,6 +1062,8 @@ Qué debería pasar (permitir `cancelada` desde esos estados, o que la UI diga c
 letras que una clase ya cerrada se conserva y no se toca, sin ofrecer un fallback que va a
 fallar) es **decisión de producto, no de código.** Fijado por caracterización en la suite
 (bloque *"Caracterizacion: hay estados donde no se puede NI eliminar NI cancelar"*).
+
+</details>
 
 ### 4-septies. 🔴 BUG CRÍTICO ENCONTRADO Y CORREGIDO — el correo del acudiente no se normalizaba en la importación masiva
 
@@ -1246,6 +1270,23 @@ se pierde — pero el rótulo "completadas" mezcla "abrió el material" con "lo 
 el número que el acudiente lee primero. Fijado como prueba de **caracterización** (documenta el
 comportamiento actual, no lo bendice). **Requiere decisión de producto, no de código.**
 
+#### ✅ RESUELTO (2026-07-22) — fallo de red vs quiz vacío ahora se distinguen
+
+Decisión del usuario. `MaterialPreviewModal` ahora tiene tres estados separados para el quiz:
+- **Cargando** → "Cargando preguntas…"
+- **Error** (el `catch` de `obtenerQuiz`) → "No se pudo cargar el material / Revisá tu conexión"
+  con botón **Reintentar** que efectivamente recarga (contador `reintentosQuiz` en las deps del
+  effect).
+- **Vacío** (carga OK, sin preguntas) → mensaje según contexto: en `modoVistaPrevia` (admin) el
+  aviso de staff "faltan preguntas por configurar"; para el estudiante, "Este material ya no
+  está disponible — es posible que tu maestro lo haya quitado".
+
+Antes el `catch` dejaba `preguntasQuiz = null`, el mismo valor que "sin preguntas", así que un
+fallo de red se mostraba como "este quiz no tiene preguntas". Verificado por mutación (volver a
+tratar el error como vacío → 1 test rojo).
+
+<details><summary>Detalle original (histórico)</summary>
+
 #### 🟡 SIN RESOLVER — fallo de Firestore indistinguible de "quiz sin configurar"
 
 `MaterialPreviewModal.tsx:166-169`: el `catch` de `obtenerQuiz` hace `console.warn` y setea
@@ -1256,6 +1297,8 @@ cargarlas desde la Biblioteca"* aunque el admin sí las haya cargado y lo que fa
 Menos grave de lo que parecía a primera vista: **no** cae a la pregunta demo hardcodeada, así
 que no se registra un score contra un quiz falso. Pero es la **sexta** aparición del patrón del
 proyecto: fallo real disfrazado de estado benigno.
+
+</details>
 
 #### Nota de método
 

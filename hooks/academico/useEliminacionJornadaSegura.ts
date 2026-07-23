@@ -32,6 +32,10 @@ import {
 export interface ErrorEliminacionJornada {
   mensaje: string;
   ofrecerCancelar: boolean;
+  // Archivar (ocultar de Agenda) es la salida UNIVERSAL: siempre funciona. Se mantiene en
+  // `true` mientras el borrado siga bloqueado, incluso si el intento de cancelar tambien
+  // falla -- asi el admin nunca se queda sin escape (el bug de UX que este flujo resuelve).
+  ofrecerArchivar: boolean;
 }
 
 export interface UseEliminacionJornadaSeguraInput {
@@ -66,6 +70,10 @@ export interface UseEliminacionJornadaSeguraResult {
   // Fallback cuando el borrado fisico esta bloqueado: cancela la clase (soft) en su lugar.
   // Mismo criterio de retorno booleano que `confirmar()`.
   cancelarEnLugarDeEliminar: (motivo?: string) => Promise<boolean>;
+  // Salida UNIVERSAL cuando la clase no se puede ni eliminar ni cancelar (ya operada):
+  // la oculta de la parrilla de Agenda (flag `archivada`) sin borrarla ni cambiar su estado.
+  // Siempre funciona. Mismo criterio de retorno booleano que `confirmar()`.
+  archivar: () => Promise<boolean>;
   // Cierra el flujo sin ejecutar ninguna accion (equivalente a "Volver"/cerrar el modal).
   cerrar: () => void;
 }
@@ -97,7 +105,7 @@ export function useEliminacionJornadaSegura(
   }, []);
 
   const registrarAuditoriaSilenciosa = useCallback(
-    async (jornadaId: string, accion: 'eliminar' | 'cancelar', cambios: ReturnType<typeof diffCambiosJornada>) => {
+    async (jornadaId: string, accion: 'eliminar' | 'cancelar' | 'archivar', cambios: ReturnType<typeof diffCambiosJornada>) => {
       try {
         await repository.registrarAuditoria({ tenantId, jornadaId, usuarioId, rol, fuente, accion, cambios });
       } catch (auditError) {
@@ -122,7 +130,8 @@ export function useEliminacionJornadaSegura(
       return true;
     } catch (err) {
       if (err instanceof EliminacionNoPermitidaError) {
-        setError({ mensaje: err.message, ofrecerCancelar: true });
+        // Borrado bloqueado por historial: ofrecer cancelar (si aplica) y SIEMPRE archivar.
+        setError({ mensaje: err.message, ofrecerCancelar: true, ofrecerArchivar: true });
         setConfirmando(false);
         setEliminando(false);
         return false;
@@ -130,6 +139,7 @@ export function useEliminacionJornadaSegura(
       setError({
         mensaje: err instanceof Error ? err.message : 'No se pudo eliminar la clase.',
         ofrecerCancelar: false,
+        ofrecerArchivar: false,
       });
       setConfirmando(false);
       setEliminando(false);
@@ -149,14 +159,41 @@ export function useEliminacionJornadaSegura(
       cerrar();
       return true;
     } catch (err) {
+      // Cancelar fallo (p.ej. la maquina de estados no admite `cancelada` desde este estado):
+      // el borrado sigue bloqueado, asi que archivar sigue siendo la salida. No se pierde.
       setError({
         mensaje: err instanceof Error ? err.message : 'No se pudo cancelar la clase.',
         ofrecerCancelar: false,
+        ofrecerArchivar: true,
       });
       setEliminando(false);
       return false;
     }
   }, [jornada, repository, registrarAuditoriaSilenciosa, onEliminada, cerrar]);
 
-  return { jornada, confirmando, eliminando, error, iniciar, confirmar, cancelarEnLugarDeEliminar, cerrar };
+  const archivar = useCallback(async (): Promise<boolean> => {
+    if (!jornada) return false;
+    if (!repository.archivarJornada) {
+      setError({ mensaje: 'Esta vista no permite archivar clases.', ofrecerCancelar: false, ofrecerArchivar: false });
+      return false;
+    }
+    setEliminando(true);
+    try {
+      await repository.archivarJornada(jornada);
+      await registrarAuditoriaSilenciosa(jornada.id, 'archivar', []);
+      onEliminada?.(jornada.id);
+      cerrar();
+      return true;
+    } catch (err) {
+      setError({
+        mensaje: err instanceof Error ? err.message : 'No se pudo quitar la clase de la agenda.',
+        ofrecerCancelar: false,
+        ofrecerArchivar: false,
+      });
+      setEliminando(false);
+      return false;
+    }
+  }, [jornada, repository, registrarAuditoriaSilenciosa, onEliminada, cerrar]);
+
+  return { jornada, confirmando, eliminando, error, iniciar, confirmar, cancelarEnLugarDeEliminar, archivar, cerrar };
 }

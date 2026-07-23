@@ -269,31 +269,31 @@ describe('Integracion: obtenerMetricas devuelve lo que el panel del acudiente mu
   });
 });
 
-// --- CARACTERIZACION: "completada" NO significa "aprobada" ------------------------------
+// --- REGLA DE PRODUCTO (2026-07-22): "completada" exige APROBAR (>=70%) ------------------
 
-describe('Caracterizacion: reprobar el quiz igual cuenta la asignacion como COMPLETADA', () => {
-  // Esto NO es una prueba de que el comportamiento sea correcto: fija el comportamiento
-  // ACTUAL para que un cambio no pase inadvertido.
-  //
-  // `calcularPorcentajeConsumo` devuelve 100 apenas existe UN log de tipo quiz ("intentarlo
-  // cuenta como consumir el material"), y `asignacionesCompletadas` cuenta todo lo que tenga
-  // consumo >= 80. Resultado: un estudiante que saca 0% aparece con la asignacion COMPLETADA.
-  //
-  // El dato del score si esta (promedioScoreEvaluaciones), asi que la informacion no se
-  // pierde -- pero el rotulo "completadas" mezcla "abrio el material" con "lo aprobo", y es
-  // justo el numero que el acudiente lee primero.
-  //
-  // Registrado en ACCIONES_PENDIENTES.md. Requiere decision de producto, no de codigo.
-  it('score 0 => porcentajeConsumo 100 y asignacionesCompletadas 1', async () => {
+describe('Regla: un quiz solo cuenta como asignacion COMPLETADA si se aprobo (>=70%)', () => {
+  // Decision de producto (2026-07-22): intentar y REPROBAR no es completar. Antes cualquier
+  // intento -- incluso 0% -- marcaba la asignacion como completada para el acudiente, que es
+  // justo el numero que lee primero. La regla vive en `avanceAsignacionCompletado`
+  // (models/academico/actividad.ts): quiz => score >= 70; resto => consumo >= 80.
+  it('reprobar (0%) NO cuenta como completada', async () => {
     const resultado = await responder(TODAS_MAL);
     expect(resultado.aprobado).toBe(false);
     expect(resultado.puntaje).toBe(0);
 
     const metricas = leerDoc(`tenants/${TENANT}/metricasEstudiante/${ESTUDIANTE}`)!;
 
-    expect(metricas.asignacionesCompletadas).toBe(1);
+    expect(metricas.asignacionesCompletadas).toBe(0);
+    // El consumo sigue en 100 (lo abrio) y el score reprobado queda registrado: la
+    // informacion no se pierde, pero el rotulo "completada" ya no miente.
     expect(metricas.porcentajeGlobalConsumo).toBe(100);
-    // El score reprobado SI queda registrado: la informacion existe, el rotulo la ignora.
     expect(metricas.promedioScoreEvaluaciones).toBe(0);
+  });
+
+  it('aprobar (100%) SI cuenta como completada', async () => {
+    await responder(TODAS_BIEN);
+
+    const metricas = leerDoc(`tenants/${TENANT}/metricasEstudiante/${ESTUDIANTE}`)!;
+    expect(metricas.asignacionesCompletadas).toBe(1);
   });
 });
