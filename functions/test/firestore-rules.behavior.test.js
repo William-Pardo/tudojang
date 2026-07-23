@@ -1047,6 +1047,69 @@ test("cross-tenant read of asistencias is denied", async () => {
   );
 });
 
+// WS-2 (Módulo Clase en Vivo §7/§11): metricasAsistencia. Escritura solo server-side (Admin
+// SDK); lectura para staff, el tutor del alumno y el propio alumno (identidad por email).
+const metricaAsistPath = (db, tenantId, estudianteId) => doc(
+  db, "tenants", tenantId, "metricasAsistencia", estudianteId
+);
+
+const sembrarMetricaAsistencia = async (estudianteData) => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "estudiantes", "est-hijo"), {
+      tenantId: "tenant-1", correo: "ale@test.com", tutor: { correo: "papa@test.com" },
+      ...estudianteData,
+    });
+    await setDoc(metricaAsistPath(db, "tenant-1", "est-hijo"), {
+      estudianteId: "est-hijo", tenantId: "tenant-1", minutosTotales: 120, clasesAsistidas: 2,
+      actualizadoEn: "2026-07-22T00:00:00.000Z",
+    });
+  });
+};
+
+test("client write to metricasAsistencia is always denied, even for an instructor", async () => {
+  const instructorDb = client("maestro-1", "tenant-1", "Editor");
+  await assertFails(
+    setDoc(metricaAsistPath(instructorDb, "tenant-1", "est-hijo"), { minutosTotales: 999 })
+  );
+});
+
+test("instructor can read metricasAsistencia in their own tenant", async () => {
+  await sembrarMetricaAsistencia();
+  const instructorDb = client("maestro-1", "tenant-1", "Maestro");
+  await assertSucceeds(getDoc(metricaAsistPath(instructorDb, "tenant-1", "est-hijo")));
+});
+
+test("cross-tenant read of metricasAsistencia is denied", async () => {
+  await sembrarMetricaAsistencia();
+  const otroDb = client("maestro-2", "tenant-2", "Maestro");
+  await assertFails(getDoc(metricaAsistPath(otroDb, "tenant-1", "est-hijo")));
+});
+
+test("tutor can read the metricasAsistencia of their child, not of another student", async () => {
+  await sembrarMetricaAsistencia();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "estudiantes", "est-ajeno"), {
+      tenantId: "tenant-1", correo: "otro@test.com", tutor: { correo: "otropapa@test.com" },
+    });
+    await setDoc(metricaAsistPath(db, "tenant-1", "est-ajeno"), {
+      estudianteId: "est-ajeno", tenantId: "tenant-1", minutosTotales: 30, clasesAsistidas: 1,
+      actualizadoEn: "2026-07-22T00:00:00.000Z",
+    });
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
+  await assertSucceeds(getDoc(metricaAsistPath(tutorDb, "tenant-1", "est-hijo")));
+  await assertFails(getDoc(metricaAsistPath(tutorDb, "tenant-1", "est-ajeno")));
+});
+
+test("estudiante can read their own metricasAsistencia (correo == su email)", async () => {
+  await sembrarMetricaAsistencia();
+  const estDb = client("est-user-1", "tenant-1", "Estudiante", { email: "ale@test.com" });
+  await assertSucceeds(getDoc(metricaAsistPath(estDb, "tenant-1", "est-hijo")));
+});
+
 // Fix tutor-role-end-to-end (2026-07-14): verificación REAL (contra firestore.rules,
 // no mocks) de que un Tutor puede leer al estudiante donde figura como acudiente
 // (estudiante.tutor.correo == su email de login) y NO puede leer a otros.
