@@ -942,7 +942,7 @@ deduplicación de importación (2 tests rojos).
 
 | # | Hallazgo | Por qué importa |
 |---|---|---|
-| a | `archiveRecurso` **solo acepta recursos ya aprobados** — cualquier otro estado lanza "Transición inválida". El flujo real es importar → clasificar → aprobar → archivar. | No se puede archivar un recurso mal clasificado sin aprobarlo antes. Si eso no es lo deseado, es un bug de diseño del flujo, no del código. **Sin decidir.** |
+| a | ✅ **RESUELTO (2026-07-22).** `archiveRecurso` ahora exige que el recurso se haya **usado** (publicado al menos una vez en una clase: existe una asignación en `publicada`/`cerrada`/`vencida` que lo referencia). Un recurso nunca publicado lanza `RecursoNoPublicadoError` sugiriendo quitarlo de la biblioteca. La vieja guarda `estado === 'aprobado'` se reemplazó. Chequeo inyectable (`deps.recursoFuePublicado`); en Firestore consulta asignaciones. Mutaciones verificadas (guard off, y `borrador` contando como usado). | Decisión del usuario: "usado = alguna vez publicado para una clase". |
 | b | `youtubeVideoId` **no va dentro de la ficha académica**: es el 5º parámetro de `updateFicha`, junto a `tituloVisible`. | Pasarlo dentro de la ficha no lanza error y no persiste nada. Falla silenciosa: el video queda sin id y el recurso se publica igual, con `youtubeVideoId: null`. Vale revisar si algún llamador de producción lo hace mal. **Sin auditar.** |
 
 **Arreglo de infraestructura:** `test-utils/fakeFirestore.ts` no soportaba `doc(collectionRef)`
