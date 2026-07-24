@@ -387,3 +387,93 @@ describe('ClaseEnVivoView — selector multi-clase (WS-6, §4)', () => {
     expect(await screen.findByText(/no se encontr.* la jornada/i)).toBeInTheDocument();
   });
 });
+
+// WS-6 (§15.A / §14): header completo -- sede, maestro y cuenta regresiva/expirada de la
+// ventana. Usa jornadaId explicito (renderView), asi que el selector de arriba no interviene.
+describe('ClaseEnVivoView — header completo (WS-6, §15.A/§14)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('muestra el nombre de la sede y del maestro cuando se resuelven', async () => {
+    const repository = crearRepositoryMock([crearJornada({ sedeId: 'sede-1', instructorId: 'maestro-1' })]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const obtenerSedes = jest.fn().mockResolvedValue([{ id: 'sede-1', nombre: 'Sede Central', tenantId: 'tenant-1', direccion: '', ciudad: '', telefono: '' }]);
+    const obtenerUsuario = jest.fn().mockResolvedValue({ id: 'maestro-1', nombreUsuario: 'Maestro Kim' });
+
+    render(
+      <MemoryRouter initialEntries={['/clase-en-vivo/jornada-1']}>
+        <Routes>
+          <Route
+            path="/clase-en-vivo/:jornadaId"
+            element={
+              <ClaseEnVivoView
+                repository={repository}
+                asistenciaRepository={asistenciaRepository}
+                checkpointMaterialService={crearCheckpointServiceMock()}
+                obtenerSedes={obtenerSedes}
+                obtenerUsuario={obtenerUsuario}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/sede central.*maestro kim/i)).toBeInTheDocument();
+    expect(obtenerSedes).toHaveBeenCalledWith('tenant-1');
+    expect(obtenerUsuario).toHaveBeenCalledWith('maestro-1');
+  });
+
+  it('no rompe el header si la sede/el maestro no se pueden resolver (fallo silencioso)', async () => {
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const obtenerSedes = jest.fn().mockRejectedValue(new Error('sin permiso'));
+    const obtenerUsuario = jest.fn().mockRejectedValue(new Error('sin permiso'));
+
+    render(
+      <MemoryRouter initialEntries={['/clase-en-vivo/jornada-1']}>
+        <Routes>
+          <Route
+            path="/clase-en-vivo/:jornadaId"
+            element={
+              <ClaseEnVivoView
+                repository={repository}
+                asistenciaRepository={asistenciaRepository}
+                checkpointMaterialService={crearCheckpointServiceMock()}
+                obtenerSedes={obtenerSedes}
+                obtenerUsuario={obtenerUsuario}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/formas basicas/i)).toBeInTheDocument();
+    await waitFor(() => expect(obtenerSedes).toHaveBeenCalled());
+  });
+
+  it('muestra los minutos restantes de la ventana mientras sigue abierta', async () => {
+    jest.useFakeTimers();
+    // Cierre de una jornada 10:00-11:00 (fecha 2026-07-09) = 11:00 Bogota + 15min = 16:15Z.
+    jest.setSystemTime(new Date('2026-07-09T16:00:00.000Z'));
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderView({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/15 min restantes/i)).toBeInTheDocument();
+  });
+
+  it('muestra "Ventana expirada" cuando ya paso el cierre, aunque la jornada siga en_curso', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-09T16:20:00.000Z'));
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderView({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/ventana expirada/i)).toBeInTheDocument();
+  });
+});

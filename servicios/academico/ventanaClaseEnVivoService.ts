@@ -150,6 +150,20 @@ function diferenciaAbsolutaMinutos(jornada: JornadaInstruccion, ahora: Date): nu
 }
 
 /**
+ * WS-6 (§15.A, header completo: "tiempo restante de ventana"). Minutos que faltan para que
+ * cierre la ventana de check-in (`horaFin + 15min`) -- 0 si ya cerro. Pura, redondea al minuto
+ * mas cercano (mismo criterio de granularidad que el resto del modulo, sin segundos).
+ */
+export function minutosRestantesDeVentana(
+  input: VentanaJornadaInput,
+  ahoraIso: string
+): number {
+  const ahora = new Date(ahoraIso);
+  const { cierre } = calcularVentanaHoraria(input);
+  return Math.max(0, Math.round((cierre.getTime() - ahora.getTime()) / 60_000));
+}
+
+/**
  * NOTA: superado por Bloque B / Fase 9 (`design.md`, Decision 12) -- `calcularJornadasEnVentana`
  * retorna 0..N mas `filtrarJornadasPorPermiso`. Esta version (Fase 4 / Bloque A) retorna una sola
  * jornada: si hay 2+ jornadas activas simultaneamente (p.ej. mismo instructor con 2 grupos), elige

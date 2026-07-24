@@ -14,6 +14,7 @@ import {
   calcularJornadasEnVentana,
   estaJornadaEnVentana,
   calcularIndicadorClaseEnVivo,
+  minutosRestantesDeVentana,
 } from './ventanaClaseEnVivoService';
 import type { JornadaInstruccion } from '../../models/academico/jornada';
 
@@ -117,6 +118,31 @@ describe('ventanaClaseEnVivoService', () => {
       const cerrada = crearJornada({ id: 'jornada-cerrada', horaInicio: '08:00', horaFin: '09:00' });
       const resultado = calcularJornadasEnVentana([activa, cerrada], '2026-06-06T15:01:00.000Z');
       expect(resultado.map((j) => j.id)).toEqual(['jornada-activa']);
+    });
+  });
+
+  // WS-6 (§15.A, header completo): "tiempo restante de ventana".
+  describe('minutosRestantesDeVentana', () => {
+    it('devuelve los minutos que faltan para el cierre (horaFin+15)', () => {
+      const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
+      // Cierre = 11:00 Bogota + 15min = 16:15Z. A las 16:00Z faltan 15 minutos.
+      expect(minutosRestantesDeVentana(jornada, '2026-06-06T16:00:00.000Z')).toBe(15);
+    });
+
+    it('devuelve la duracion completa de la ventana justo en la apertura', () => {
+      const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
+      // Apertura 14:45Z, cierre 16:15Z -> 90 minutos de ventana.
+      expect(minutosRestantesDeVentana(jornada, '2026-06-06T14:45:00.000Z')).toBe(90);
+    });
+
+    it('devuelve 0 exactamente en el cierre', () => {
+      const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
+      expect(minutosRestantesDeVentana(jornada, '2026-06-06T16:15:00.000Z')).toBe(0);
+    });
+
+    it('devuelve 0 (no negativo) cuando ya paso el cierre', () => {
+      const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
+      expect(minutosRestantesDeVentana(jornada, '2026-06-06T16:30:00.000Z')).toBe(0);
     });
   });
 

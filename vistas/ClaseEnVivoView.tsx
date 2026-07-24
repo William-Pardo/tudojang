@@ -28,6 +28,10 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import EscanerAsistenciaClase from '../components/academico/EscanerAsistenciaClase';
 import { useVentanaClaseEnVivo } from '../hooks/useVentanaClaseEnVivo';
+import { minutosRestantesDeVentana } from '../servicios/academico/ventanaClaseEnVivoService';
+import { obtenerSedes as obtenerSedesPorDefecto } from '../servicios/sedesApi';
+import { getUser as obtenerUsuarioPorDefecto } from '../servicios/usuariosApi';
+import type { Sede, Usuario } from '../tipos';
 import {
   jornadaRepository as jornadaRepositoryPorDefecto,
   type JornadaRepository,
@@ -88,6 +92,9 @@ export interface ClaseEnVivoViewProps {
   asistenciaRepository?: AsistenciaRepository;
   /** WS-4b (§9/§15.D): checkpoint pedagogico de materiales. Inyectable para tests. */
   checkpointMaterialService?: CheckpointMaterialService;
+  /** WS-6 (§15.A, header completo). Inyectables para tests, mismo criterio que el resto. */
+  obtenerSedes?: (tenantId?: string) => Promise<Sede[]>;
+  obtenerUsuario?: (id: string) => Promise<Usuario | null>;
 }
 
 type EstadoCarga = 'cargando' | 'no-encontrada' | 'lista';
@@ -98,6 +105,8 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   repository = jornadaRepositoryPorDefecto,
   asistenciaRepository: asistenciaRepositorio = asistenciaRepositoryPorDefecto,
   checkpointMaterialService: checkpointMaterialServicio = checkpointMaterialServicePorDefecto,
+  obtenerSedes: obtenerSedesFn = obtenerSedesPorDefecto,
+  obtenerUsuario: obtenerUsuarioFn = obtenerUsuarioPorDefecto,
 }) => {
   const params = useParams<{ jornadaId?: string }>();
   // Sin id explicito (llegada por el link generico `/clase-en-vivo`, sin :jornadaId): puede
@@ -134,6 +143,10 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   >({});
   const [notaBorradorPorAsignacionId, setNotaBorradorPorAsignacionId] = useState<Record<string, string>>({});
   const [notaAbiertaPorAsignacionId, setNotaAbiertaPorAsignacionId] = useState<Record<string, boolean>>({});
+  // WS-6 (§15.A): header completo -- sede, maestro y cuenta regresiva de la ventana.
+  const [sedeNombre, setSedeNombre] = useState<string | null>(null);
+  const [maestroNombre, setMaestroNombre] = useState<string | null>(null);
+  const [ahoraIso, setAhoraIso] = useState(() => new Date().toISOString());
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -208,6 +221,43 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
     };
   }, [jornadaId, tenantId, repository, cargarAsistencias, cargarCheckpoints]);
 
+  // WS-6 (§15.A): nombre de sede y de maestro para el header. Independiente del resto (mismo
+  // criterio que materiales/checkpoints): un fallo aca degrada a no mostrar el dato, no rompe
+  // la pantalla de escaneo.
+  useEffect(() => {
+    if (!jornadaActual) return;
+    let cancelado = false;
+
+    obtenerSedesFn(jornadaActual.tenantId)
+      .then((sedes) => {
+        if (cancelado) return;
+        setSedeNombre(sedes.find((sede) => sede.id === jornadaActual.sedeId)?.nombre ?? null);
+      })
+      .catch(() => {
+        if (!cancelado) setSedeNombre(null);
+      });
+
+    obtenerUsuarioFn(jornadaActual.instructorId)
+      .then((instructor) => {
+        if (cancelado) return;
+        setMaestroNombre(instructor?.nombreUsuario ?? null);
+      })
+      .catch(() => {
+        if (!cancelado) setMaestroNombre(null);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [jornadaActual?.tenantId, jornadaActual?.sedeId, jornadaActual?.instructorId, obtenerSedesFn, obtenerUsuarioFn]);
+
+  // Cuenta regresiva de la ventana: recalcula cada 60s, mismo intervalo que useVentanaClaseEnVivo.
+  useEffect(() => {
+    if (!jornadaActual) return;
+    const intervalId = setInterval(() => setAhoraIso(new Date().toISOString()), 60_000);
+    return () => clearInterval(intervalId);
+  }, [Boolean(jornadaActual)]);
+
   // WS-6 (§4): sin id explicito, esperamos a que el hook resuelva las candidatas antes de
   // decidir "no encontrada" -- evita un flash de esa pantalla mientras carga. Render temprano
   // (no via estadoCarga) para no acoplar el efecto de arriba al estado del hook.
@@ -274,14 +324,31 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
     );
   }
 
+  const minutosRestantes = minutosRestantesDeVentana(jornadaActual, ahoraIso);
+  const ventanaExpirada = minutosRestantes <= 0;
+
   return (
     <div className="p-8 space-y-6">
       <header className="space-y-1">
-        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+          <span
+            className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest ${
+              ventanaExpirada ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
+            }`}
+          >
+            {ventanaExpirada ? 'Ventana expirada' : `${minutosRestantes} min restantes`}
+          </span>
+        </div>
         <p className="text-white/60">
           {jornadaActual.fecha} · {jornadaActual.horaInicio} - {jornadaActual.horaFin}
         </p>
         {jornadaActual.tema && <p className="text-white/80 font-bold">{jornadaActual.tema}</p>}
+        {(sedeNombre || maestroNombre) && (
+          <p className="text-xs text-white/50">
+            {[sedeNombre, maestroNombre].filter(Boolean).join(' · ')}
+          </p>
+        )}
       </header>
 
       <button
