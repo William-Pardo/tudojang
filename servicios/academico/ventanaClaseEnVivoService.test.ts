@@ -11,6 +11,7 @@
  */
 import {
   calcularVentanaClaseEnVivo,
+  calcularJornadasEnVentana,
   estaJornadaEnVentana,
   calcularIndicadorClaseEnVivo,
 } from './ventanaClaseEnVivoService';
@@ -81,6 +82,41 @@ describe('ventanaClaseEnVivoService', () => {
       const cercana = crearJornada({ id: 'jornada-cercana', horaInicio: '10:00', horaFin: '11:00' });
       const resultado = calcularVentanaClaseEnVivo([lejana, cercana], '2026-06-06T15:01:00.000Z');
       expect(resultado?.id).toBe('jornada-cercana');
+    });
+  });
+
+  // WS-6 (§4, selector multi-clase): a diferencia de calcularVentanaClaseEnVivo (una sola
+  // jornada, la mas cercana), esta version retorna TODAS las candidatas para que la UI ofrezca
+  // un selector cuando un instructor tiene 2+ grupos activos a la vez.
+  describe('calcularJornadasEnVentana', () => {
+    it('devuelve un arreglo vacio sin jornadas', () => {
+      expect(calcularJornadasEnVentana([], '2026-06-06T15:00:00.000Z')).toEqual([]);
+    });
+
+    it('devuelve vacio cuando ninguna jornada esta en su ventana', () => {
+      const jornada = crearJornada({ fecha: '2026-06-07', horaInicio: '10:00', horaFin: '11:00' });
+      expect(calcularJornadasEnVentana([jornada], '2026-06-06T15:30:00.000Z')).toEqual([]);
+    });
+
+    it('devuelve la unica jornada activa cuando solo una esta en ventana', () => {
+      const jornada = crearJornada({ horaInicio: '10:00', horaFin: '11:00' });
+      const resultado = calcularJornadasEnVentana([jornada], '2026-06-06T15:01:00.000Z');
+      expect(resultado).toEqual([jornada]);
+    });
+
+    it('con 2+ jornadas activas simultaneas, devuelve TODAS ordenadas por horaInicio ascendente', () => {
+      const tarde = crearJornada({ id: 'jornada-tarde', horaInicio: '10:00', horaFin: '11:00' });
+      const temprano = crearJornada({ id: 'jornada-temprano', horaInicio: '09:50', horaFin: '10:50' });
+      // Se pasan en orden inverso a proposito para verificar que el orden lo impone la funcion.
+      const resultado = calcularJornadasEnVentana([tarde, temprano], '2026-06-06T15:01:00.000Z');
+      expect(resultado.map((j) => j.id)).toEqual(['jornada-temprano', 'jornada-tarde']);
+    });
+
+    it('no incluye una jornada cuya ventana ya cerro, aunque otra siga activa', () => {
+      const activa = crearJornada({ id: 'jornada-activa', horaInicio: '10:00', horaFin: '11:00' });
+      const cerrada = crearJornada({ id: 'jornada-cerrada', horaInicio: '08:00', horaFin: '09:00' });
+      const resultado = calcularJornadasEnVentana([activa, cerrada], '2026-06-06T15:01:00.000Z');
+      expect(resultado.map((j) => j.id)).toEqual(['jornada-activa']);
     });
   });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClaseEnVivoView } from './ClaseEnVivoView';
 import type { JornadaRepository } from '../servicios/academico/jornadaRepository';
@@ -77,6 +77,29 @@ function crearCheckpointServiceMock(
     listarCheckpoints: jest.fn().mockResolvedValue([]),
     ...overrides,
   };
+}
+
+function renderViewSinId(props: {
+  repository: JornadaRepository;
+  asistenciaRepository: AsistenciaRepository;
+  checkpointMaterialService?: CheckpointMaterialService;
+}) {
+  return render(
+    <MemoryRouter initialEntries={['/clase-en-vivo']}>
+      <Routes>
+        <Route
+          path="/clase-en-vivo"
+          element={
+            <ClaseEnVivoView
+              repository={props.repository}
+              asistenciaRepository={props.asistenciaRepository}
+              checkpointMaterialService={props.checkpointMaterialService ?? crearCheckpointServiceMock()}
+            />
+          }
+        />
+      </Routes>
+    </MemoryRouter>
+  );
 }
 
 function renderView(props: {
@@ -293,5 +316,74 @@ describe('ClaseEnVivoView — checkpoint de materiales (WS-4b, §9/§15.D)', () 
 
     await screen.findByText('Taeguk 1');
     expect(screen.queryByRole('button', { name: /\+ nota/i })).not.toBeInTheDocument();
+  });
+});
+
+// WS-6 (§4): selector multi-clase. Solo aplica cuando NO llega un jornadaId explicito por
+// ruta/prop (renderViewSinId) -- con id explicito el comportamiento es el de siempre, ya
+// cubierto arriba. `usuario.id` del mock de useAuth es 'maestro-1'; las jornadas de estos
+// tests usan ese mismo instructorId para pasar el filtro de rol Editor del hook.
+describe('ClaseEnVivoView — selector multi-clase (WS-6, §4)', () => {
+  // 2026-07-09T15:01:00Z = 10:01 hora Bogota (UTC-5): dentro de la ventana [09:45,11:15] de
+  // una jornada 10:00-11:00 (mismo criterio de offset que ventanaClaseEnVivoService.test.ts).
+  const AHORA_EN_VENTANA = new Date('2026-07-09T15:01:00.000Z');
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(AHORA_EN_VENTANA);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('con exactamente 1 jornada en ventana y sin id explicito, la auto-selecciona (sin selector)', async () => {
+    const unica = crearJornada({ id: 'jornada-unica', instructorId: 'maestro-1', tema: 'Unica clase activa' });
+    const repository = crearRepositoryMock([unica]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderViewSinId({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/unica clase activa/i)).toBeInTheDocument();
+    expect(screen.queryByText(/elegí cuál/i)).not.toBeInTheDocument();
+  });
+
+  it('con 2+ jornadas en ventana y sin id explicito, muestra el selector y NO auto-carga ninguna', async () => {
+    const grupoA = crearJornada({ id: 'jornada-a', instructorId: 'maestro-1', tema: 'Grupo Infantil', horaInicio: '09:50', horaFin: '10:50' });
+    const grupoB = crearJornada({ id: 'jornada-b', instructorId: 'maestro-1', tema: 'Grupo Avanzado', horaInicio: '10:00', horaFin: '11:00' });
+    const repository = crearRepositoryMock([grupoB, grupoA]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderViewSinId({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/tenés 2 clases activas/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /grupo infantil/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /grupo avanzado/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /escanear asistencia/i })).not.toBeInTheDocument();
+  });
+
+  it('clickear una opcion del selector carga esa jornada (escaner, check-ins, materiales)', async () => {
+    const grupoA = crearJornada({ id: 'jornada-a', instructorId: 'maestro-1', tema: 'Grupo Infantil', horaInicio: '09:50', horaFin: '10:50' });
+    const grupoB = crearJornada({ id: 'jornada-b', instructorId: 'maestro-1', tema: 'Grupo Avanzado', horaInicio: '10:00', horaFin: '11:00' });
+    const repository = crearRepositoryMock([grupoA, grupoB]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderViewSinId({ repository, asistenciaRepository });
+
+    const opcionAvanzado = await screen.findByRole('button', { name: /grupo avanzado/i });
+    fireEvent.click(opcionAvanzado);
+
+    expect(await screen.findByRole('button', { name: /escanear asistencia/i })).toBeInTheDocument();
+    expect(screen.queryByText(/tenés 2 clases activas/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /grupo infantil/i })).not.toBeInTheDocument();
+  });
+
+  it('sin ninguna jornada en ventana y sin id explicito, sigue mostrando "no encontrada" (regresion)', async () => {
+    const repository = crearRepositoryMock([]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderViewSinId({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/no se encontr.* la jornada/i)).toBeInTheDocument();
   });
 });

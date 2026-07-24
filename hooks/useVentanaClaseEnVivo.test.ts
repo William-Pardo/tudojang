@@ -114,6 +114,36 @@ describe('useVentanaClaseEnVivo', () => {
     expect(result.current.jornadaActiva).toBeNull();
   });
 
+  // WS-6 (§4, selector multi-clase): jornadasEnVentana expone TODAS las candidatas, no solo
+  // la mas cercana (jornadaActiva), para que la UI pueda ofrecer un selector.
+  it('jornadasEnVentana devuelve las 2+ jornadas activas simultaneas de un Admin', async () => {
+    mockUseAuth.mockReturnValue({
+      usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin },
+    });
+    const grupoA = crearJornada({ id: 'jornada-grupo-a', instructorId: 'maestro-1', horaInicio: '09:50', horaFin: '10:50' });
+    const grupoB = crearJornada({ id: 'jornada-grupo-b', instructorId: 'maestro-2', horaInicio: '10:00', horaFin: '11:00' });
+    const repository = crearRepositoryMock([grupoB, grupoA]);
+
+    const { result } = renderHook(() => useVentanaClaseEnVivo(repository));
+
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    expect(result.current.jornadasEnVentana.map((j) => j.id)).toEqual(['jornada-grupo-a', 'jornada-grupo-b']);
+  });
+
+  it('jornadasEnVentana respeta el mismo filtro de permiso que jornadaActiva (Editor solo ve las suyas)', async () => {
+    mockUseAuth.mockReturnValue({
+      usuario: { id: 'maestro-1', tenantId: 'tenant-1', rol: RolUsuario.Editor },
+    });
+    const propia = crearJornada({ id: 'jornada-propia', instructorId: 'maestro-1' });
+    const deOtro = crearJornada({ id: 'jornada-de-otro', instructorId: 'maestro-2' });
+    const repository = crearRepositoryMock([deOtro, propia]);
+
+    const { result } = renderHook(() => useVentanaClaseEnVivo(repository));
+
+    await waitFor(() => expect(result.current.cargando).toBe(false));
+    expect(result.current.jornadasEnVentana.map((j) => j.id)).toEqual(['jornada-propia']);
+  });
+
   it('recalcula la ventana cada 60s sin volver a consultar el repositorio (memo sobre el resultado ya cargado)', async () => {
     mockUseAuth.mockReturnValue({
       usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin },

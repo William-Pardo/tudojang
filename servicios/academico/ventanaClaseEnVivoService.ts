@@ -169,3 +169,22 @@ export function calcularVentanaClaseEnVivo(
     diferenciaAbsolutaMinutos(actual, ahora) < diferenciaAbsolutaMinutos(masCercana, ahora) ? actual : masCercana
   );
 }
+
+/**
+ * WS-6 (§4, selector multi-clase) -- la pieza de Bloque B / Fase 9 (`design.md`, Decision 12)
+ * que quedo pendiente cuando Bloque A introdujo `calcularVentanaClaseEnVivo` (retorna una sola
+ * jornada, la mas cercana). Esta funcion retorna TODAS las jornadas del usuario que caen en la
+ * ventana horaria ahora mismo -- 0, 1 o N -- para que la UI pueda ofrecer un selector cuando un
+ * mismo instructor tiene 2+ grupos activos a la vez.
+ *
+ * Orden: por `horaInicio` ascendente (orden cronologico del dia, mas intuitivo para elegir que
+ * "la mas cercana a ahora"). Pura, sin efectos -- mismo criterio que el resto del archivo.
+ */
+export function calcularJornadasEnVentana(
+  jornadas: JornadaInstruccion[],
+  ahoraIso: string
+): JornadaInstruccion[] {
+  return jornadas
+    .filter((jornada) => estaJornadaEnVentana(jornada, ahoraIso))
+    .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+}

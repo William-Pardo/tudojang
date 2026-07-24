@@ -27,6 +27,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import EscanerAsistenciaClase from '../components/academico/EscanerAsistenciaClase';
+import { useVentanaClaseEnVivo } from '../hooks/useVentanaClaseEnVivo';
 import {
   jornadaRepository as jornadaRepositoryPorDefecto,
   type JornadaRepository,
@@ -99,9 +100,28 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   checkpointMaterialService: checkpointMaterialServicio = checkpointMaterialServicePorDefecto,
 }) => {
   const params = useParams<{ jornadaId?: string }>();
-  const jornadaId = jornadaIdProp ?? params.jornadaId ?? jornada?.id;
+  // Sin id explicito (llegada por el link generico `/clase-en-vivo`, sin :jornadaId): puede
+  // haber 0, 1 o 2+ jornadas activas ahora para este usuario.
+  const jornadaIdRuta = jornadaIdProp ?? params.jornadaId ?? jornada?.id;
   const { usuario } = useAuth();
   const tenantId = usuario?.tenantId ?? '';
+
+  // WS-6 (§4, selector multi-clase): solo se consulta cuando NO llega un id explicito. Con
+  // exactamente 1 candidata se auto-selecciona (mismo comportamiento de siempre); con 2+, se
+  // ofrece el selector de abajo. Se le pasa `repository` para que los tests puedan inyectar el
+  // mismo mock que ya usa el resto del componente.
+  const { jornadasEnVentana, cargando: cargandoVentana } = useVentanaClaseEnVivo(repository);
+  const [jornadaIdElegida, setJornadaIdElegida] = useState<string | null>(null);
+  const jornadaId = jornadaIdRuta
+    ?? jornadaIdElegida
+    ?? (jornadasEnVentana.length === 1 ? jornadasEnVentana[0].id : undefined);
+  // Con id explicito (el caso de siempre) esto es irrelevante y no debe interferir con el
+  // efecto de carga de abajo -- por eso se resuelve como un render temprano (mas abajo), NO
+  // como parte del efecto/estadoCarga: `useAuth()` puede devolver un objeto `usuario` nuevo en
+  // cada render (asi lo hacen varios mocks de test), lo que haria que `jornadasEnVentana`
+  // cambiara de referencia en cada render y, si el efecto dependiera de ella, lo re-disparara
+  // en bucle y re-fetchara asistencias/checkpoints de mas.
+  const esperandoSeleccionDeVentana = !jornadaIdRuta && !jornadaIdElegida;
 
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>('cargando');
   const [jornadaActual, setJornadaActual] = useState<JornadaInstruccion | null>(null);
@@ -187,6 +207,44 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       cancelado = true;
     };
   }, [jornadaId, tenantId, repository, cargarAsistencias, cargarCheckpoints]);
+
+  // WS-6 (§4): sin id explicito, esperamos a que el hook resuelva las candidatas antes de
+  // decidir "no encontrada" -- evita un flash de esa pantalla mientras carga. Render temprano
+  // (no via estadoCarga) para no acoplar el efecto de arriba al estado del hook.
+  if (esperandoSeleccionDeVentana && cargandoVentana) {
+    return (
+      <div className="p-8 text-center text-white/60">
+        <p>Cargando clase…</p>
+      </div>
+    );
+  }
+
+  if (esperandoSeleccionDeVentana && jornadasEnVentana.length > 1) {
+    return (
+      <div className="p-8 space-y-4">
+        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <p className="text-white/60">
+          Tenés {jornadasEnVentana.length} clases activas ahora mismo. Elegí cuál:
+        </p>
+        <ul className="space-y-2">
+          {jornadasEnVentana.map((candidata) => (
+            <li key={candidata.id}>
+              <button
+                type="button"
+                onClick={() => setJornadaIdElegida(candidata.id)}
+                className="w-full rounded-xl border border-white/10 p-4 text-left hover:border-tkd-blue"
+              >
+                <p className="font-bold">{candidata.tema || '(Sin tema)'}</p>
+                <p className="text-sm text-white/60">
+                  {candidata.horaInicio} - {candidata.horaFin}
+                </p>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   if (estadoCarga === 'cargando') {
     return (
