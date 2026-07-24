@@ -150,6 +150,20 @@ function diferenciaAbsolutaMinutos(jornada: JornadaInstruccion, ahora: Date): nu
 }
 
 /**
+ * WS-6 (§15.A, header completo: "tiempo restante de ventana"). Minutos que faltan para que
+ * cierre la ventana de check-in (`horaFin + 15min`) -- 0 si ya cerro. Pura, redondea al minuto
+ * mas cercano (mismo criterio de granularidad que el resto del modulo, sin segundos).
+ */
+export function minutosRestantesDeVentana(
+  input: VentanaJornadaInput,
+  ahoraIso: string
+): number {
+  const ahora = new Date(ahoraIso);
+  const { cierre } = calcularVentanaHoraria(input);
+  return Math.max(0, Math.round((cierre.getTime() - ahora.getTime()) / 60_000));
+}
+
+/**
  * NOTA: superado por Bloque B / Fase 9 (`design.md`, Decision 12) -- `calcularJornadasEnVentana`
  * retorna 0..N mas `filtrarJornadasPorPermiso`. Esta version (Fase 4 / Bloque A) retorna una sola
  * jornada: si hay 2+ jornadas activas simultaneamente (p.ej. mismo instructor con 2 grupos), elige
@@ -168,4 +182,23 @@ export function calcularVentanaClaseEnVivo(
   return activas.reduce((masCercana, actual) =>
     diferenciaAbsolutaMinutos(actual, ahora) < diferenciaAbsolutaMinutos(masCercana, ahora) ? actual : masCercana
   );
+}
+
+/**
+ * WS-6 (§4, selector multi-clase) -- la pieza de Bloque B / Fase 9 (`design.md`, Decision 12)
+ * que quedo pendiente cuando Bloque A introdujo `calcularVentanaClaseEnVivo` (retorna una sola
+ * jornada, la mas cercana). Esta funcion retorna TODAS las jornadas del usuario que caen en la
+ * ventana horaria ahora mismo -- 0, 1 o N -- para que la UI pueda ofrecer un selector cuando un
+ * mismo instructor tiene 2+ grupos activos a la vez.
+ *
+ * Orden: por `horaInicio` ascendente (orden cronologico del dia, mas intuitivo para elegir que
+ * "la mas cercana a ahora"). Pura, sin efectos -- mismo criterio que el resto del archivo.
+ */
+export function calcularJornadasEnVentana(
+  jornadas: JornadaInstruccion[],
+  ahoraIso: string
+): JornadaInstruccion[] {
+  return jornadas
+    .filter((jornada) => estaJornadaEnVentana(jornada, ahoraIso))
+    .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
 }

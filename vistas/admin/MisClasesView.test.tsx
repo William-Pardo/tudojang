@@ -67,6 +67,19 @@ function crearAsistenciaRepositoryMock(registros: RegistroAsistencia[] = []) {
   };
 }
 
+// WS-4b (§9.3): mismo criterio que crearAsistenciaRepositoryMock -- mockea el servicio de
+// checkpoint de materiales para testear el resumen de cobertura sin depender de Firestore.
+function crearCheckpointServiceMock(
+  materiales: Array<{ asignacionId: string; titulo: string }> = [],
+  checkpoints: Array<{ asignacionId: string; estado: string; jornadaId: string; tenantId: string; registradoPorUid: string; actualizadoEn: string }> = [],
+) {
+  return {
+    listarMaterialesDeJornada: jest.fn().mockResolvedValue(materiales),
+    guardarCheckpoint: jest.fn().mockResolvedValue(undefined),
+    listarCheckpoints: jest.fn().mockResolvedValue(checkpoints),
+  };
+}
+
 describe('MisClasesView', () => {
   beforeEach(() => {
     (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
@@ -782,6 +795,263 @@ describe('MisClasesView', () => {
     expect(await screen.findByText(/^cerrada$/i)).toBeInTheDocument();
     // El fallo de auditoria queda visible para el usuario (no solo en consola).
     expect(await screen.findByText(/no se pudo registrar la auditor/i)).toBeInTheDocument();
+  });
+
+  // WS-4b (§9.3): resumen de cobertura de materiales, informativo antes de cerrar.
+  describe('resumen de cobertura de materiales (§9.3)', () => {
+    it('muestra el % de cobertura de una jornada en_curso con materiales asignados', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', estado: 'en_curso' }),
+        ]),
+        guardarJornada: jest.fn(),
+        registrarAuditoria: jest.fn(),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+      };
+      const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+      const checkpointMaterialService = crearCheckpointServiceMock(
+        [
+          { asignacionId: 'asig-1', titulo: 'Taeguk 1' },
+          { asignacionId: 'asig-2', titulo: 'Combate' },
+        ],
+        [
+          {
+            asignacionId: 'asig-1',
+            estado: 'practicado',
+            jornadaId: 'jornada-1',
+            tenantId: 'tenant-1',
+            registradoPorUid: 'maestro-1',
+            actualizadoEn: '2026-07-06T08:10:00.000Z',
+          },
+        ],
+      );
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+          checkpointMaterialService={checkpointMaterialService as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      // 1 practicado (peso 1) + 1 sin_marcar (0) sobre 2 = 50%.
+      expect(await screen.findByText(/cobertura de materiales: 50%/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 de 2 marcados/i)).toBeInTheDocument();
+      expect(checkpointMaterialService.listarMaterialesDeJornada).toHaveBeenCalledWith('tenant-1', 'jornada-1');
+    });
+
+    it('no muestra el resumen de cobertura cuando la jornada no tiene materiales asignados', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', estado: 'en_curso' }),
+        ]),
+        guardarJornada: jest.fn(),
+        registrarAuditoria: jest.fn(),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+      };
+      const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+      const checkpointMaterialService = crearCheckpointServiceMock([], []);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+          checkpointMaterialService={checkpointMaterialService as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await waitFor(() => expect(checkpointMaterialService.listarMaterialesDeJornada).toHaveBeenCalled());
+      expect(screen.queryByText(/cobertura de materiales/i)).not.toBeInTheDocument();
+    });
+
+    it('el cierre NO queda bloqueado por una cobertura baja o incompleta', async () => {
+      const user = userEvent.setup();
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', estado: 'en_curso', objetivosPlaneados: ['obj-1'] }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+      };
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+      const checkpointMaterialService = crearCheckpointServiceMock(
+        [{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }],
+        [],
+      );
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+          checkpointMaterialService={checkpointMaterialService as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      expect(await screen.findByText(/cobertura de materiales: 0%/i)).toBeInTheDocument();
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() => expect(repository.guardarJornada).toHaveBeenCalled());
+    });
+  });
+
+  // WS-5 (§10): observacion GRUPAL rapida al cierre, siempre opcional.
+  describe('observacion de la clase al cerrar (§10)', () => {
+    function crearRepositoryConCierre() {
+      return {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', estado: 'en_curso', objetivosPlaneados: ['obj-1'] }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+      };
+    }
+
+    it('cerrar SIN tocar la observacion no adjunta ninguna (queda undefined)', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({ observacionClase: undefined }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('marcar categorias (chips, multi-seleccion) las adjunta al cerrar', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      const grupo = screen.getByRole('group', { name: /observación de la clase/i });
+      await user.click(within(grupo).getByRole('button', { name: /buena energía/i }));
+      await user.click(within(grupo).getByRole('button', { name: /buen avance/i }));
+      // Deseleccion: clickear de nuevo saca la categoria.
+      await user.click(within(grupo).getByRole('button', { name: /buena energía/i }));
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({
+            observacionClase: expect.objectContaining({
+              categorias: ['buen_avance'],
+              registradoPorUid: 'maestro-1',
+            }),
+          }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('una nota corta SIN categoria marcada tambien cuenta como observacion', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.type(
+        screen.getByLabelText(/nota corta de la observación/i),
+        'Se interrumpio por lluvia',
+      );
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({
+            observacionClase: expect.objectContaining({
+              categorias: [],
+              notaCorta: 'Se interrumpio por lluvia',
+            }),
+          }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('el cierre NO se bloquea por dejar la observacion sin marcar', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      expect(await screen.findByText(/^cerrada$/i)).toBeInTheDocument();
+    });
   });
 });
 

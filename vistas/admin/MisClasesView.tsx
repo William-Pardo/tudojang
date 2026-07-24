@@ -23,6 +23,40 @@ import {
 } from '../../servicios/academico/asistenciaRepository';
 import { contarCheckIns } from '../../servicios/academico/asistenciaService';
 import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar } from '../../components/Iconos';
+import {
+  checkpointMaterialService as checkpointMaterialServicePorDefecto,
+  type CheckpointMaterialService,
+} from '../../servicios/academico/checkpointMaterialService';
+import { resumirCoberturaClase, type ResumenCoberturaClase } from '../../models/academico/checkpointMaterial';
+import {
+  LIMITE_NOTA_OBSERVACION_CLASE,
+  type CategoriaObservacionClase,
+  type ObservacionClase,
+} from '../../models/academico/jornada';
+
+// WS-5 (§10): flujo GUIADO -- categorias fijas, no texto libre. La nota corta es OPCIONAL y
+// nunca por alumno (es una observacion de GRUPO).
+const CATEGORIAS_OBSERVACION_CLASE: CategoriaObservacionClase[] = [
+  'buena_energia',
+  'baja_energia',
+  'requiere_refuerzo',
+  'buen_avance',
+  'dificultad',
+  'interrumpida',
+  'material_insuficiente',
+  'excelente_participacion',
+];
+
+const ETIQUETA_CATEGORIA_OBSERVACION: Record<CategoriaObservacionClase, string> = {
+  buena_energia: 'Buena energía',
+  baja_energia: 'Baja energía',
+  requiere_refuerzo: 'Requiere refuerzo',
+  buen_avance: 'Buen avance',
+  dificultad: 'Dificultad',
+  interrumpida: 'Interrumpida',
+  material_insuficiente: 'Material insuficiente',
+  excelente_participacion: 'Excelente participación',
+};
 
 interface MisClasesViewProps {
   tenantId: string;
@@ -49,6 +83,10 @@ interface MisClasesViewProps {
   // subcoleccion `asistencias`, en vez de un checkbox manual. Opcional con default en la
   // destructuracion del componente (mismo patron que `repository`/`jornadaRepository`).
   asistenciaRepository?: AsistenciaRepository;
+  // WS-4b (§9.3): resumen de cobertura de materiales, mostrado ANTES de cerrar una clase
+  // en_curso (mismo criterio que cantidadCheckInsPorJornadaId: se calcula solo, no gatea el
+  // cierre -- un maestro puede cerrar con 0% de cobertura si asi fue la clase real).
+  checkpointMaterialService?: CheckpointMaterialService;
   // Fix 4 (persistencia/seleccion de Programa academico): contador que el padre
   // (AsignacionesView) incrementa tras guardar/eliminar un programa para forzar la
   // recarga de jornadas sin remount. Mismo patron refreshTrigger que ya usa
@@ -208,6 +246,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   permisoEdicionAgenda,
   repository = jornadaRepository,
   asistenciaRepository = asistenciaRepositoryPorDefecto,
+  checkpointMaterialService = checkpointMaterialServicePorDefecto,
   refreshTrigger = 0,
   onEditarMaterial,
 }) => {
@@ -219,7 +258,14 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   // es un checkbox manual, se deriva del conteo real de check-ins por jornada (mapa
   // jornadaId -> cantidad, ver efecto de carga mas abajo).
   const [cantidadCheckInsPorJornadaId, setCantidadCheckInsPorJornadaId] = React.useState<Record<string, number>>({});
+  // WS-4b (§9.3): resumen de cobertura de materiales por jornada en_curso.
+  const [coberturaPorJornadaId, setCoberturaPorJornadaId] = React.useState<Record<string, ResumenCoberturaClase>>({});
   const [objetivosImpartidosPorJornadaId, setObjetivosImpartidosPorJornadaId] = React.useState<Record<string, boolean>>({});
+  // WS-5 (§10): observacion grupal rapida, opcional -- se arma al momento de cerrar.
+  const [categoriasObservacionPorJornadaId, setCategoriasObservacionPorJornadaId] = React.useState<
+    Record<string, CategoriaObservacionClase[]>
+  >({});
+  const [notaObservacionPorJornadaId, setNotaObservacionPorJornadaId] = React.useState<Record<string, string>>({});
   // Accion de cancelar/reprogramar expandida en linea, por fila (una a la vez por jornada).
   const [accionExpandidaPorJornadaId, setAccionExpandidaPorJornadaId] = React.useState<Record<string, ClaveAccion | null>>({});
   const [motivoPorJornadaId, setMotivoPorJornadaId] = React.useState<Record<string, string>>({});
@@ -311,6 +357,42 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
     };
   }, [idsEnCursoKey, asistenciaRepository, tenantId]);
 
+  // WS-4b (§9.3): mismo criterio que el efecto de check-ins de arriba -- solo las jornadas
+  // en_curso necesitan el resumen (es lo que se muestra antes de cerrarlas), y un fallo en
+  // una jornada puntual no debe impedir que las demas calculen su cobertura.
+  React.useEffect(() => {
+    const idsEnCurso = idsEnCursoKey ? idsEnCursoKey.split(',') : [];
+    if (idsEnCurso.length === 0) {
+      setCoberturaPorJornadaId({});
+      return;
+    }
+
+    let activo = true;
+    Promise.all(
+      idsEnCurso.map((jornadaId) =>
+        Promise.all([
+          checkpointMaterialService.listarMaterialesDeJornada(tenantId, jornadaId),
+          checkpointMaterialService.listarCheckpoints(tenantId, jornadaId),
+        ])
+          .then(([materiales, checkpoints]): [string, ResumenCoberturaClase] => [
+            jornadaId,
+            resumirCoberturaClase(materiales, checkpoints),
+          ])
+          .catch((): [string, ResumenCoberturaClase] => [
+            jornadaId,
+            resumirCoberturaClase([], []),
+          ]),
+      ),
+    ).then((resultados) => {
+      if (!activo) return;
+      setCoberturaPorJornadaId(Object.fromEntries(resultados));
+    });
+
+    return () => {
+      activo = false;
+    };
+  }, [idsEnCursoKey, checkpointMaterialService, tenantId]);
+
   const transicionar = async (jornada: JornadaInstruccion) => {
     if (guardando) return;
     setGuardando(true);
@@ -318,9 +400,23 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
     try {
       let actualizada: JornadaInstruccion;
       if (jornada.estado === 'en_curso') {
+        // WS-5 (§10): se arma SOLO si el operador marco algo (categoria o nota) -- opcional,
+        // nunca bloquea el cierre.
+        const categoriasObservacion = categoriasObservacionPorJornadaId[jornada.id] ?? [];
+        const notaObservacion = (notaObservacionPorJornadaId[jornada.id] ?? '').trim();
+        const observacionClase: ObservacionClase | undefined =
+          categoriasObservacion.length > 0 || notaObservacion
+            ? {
+                categorias: categoriasObservacion,
+                ...(notaObservacion ? { notaCorta: notaObservacion } : {}),
+                registradoPorUid: usuarioId,
+                actualizadoEn: new Date().toISOString(),
+              }
+            : undefined;
         const pendiente = marcarPendienteCierre(jornada, {
           asistenciaRegistrada: (cantidadCheckInsPorJornadaId[jornada.id] ?? 0) > 0,
           objetivosImpartidos: objetivosImpartidosPorJornadaId[jornada.id] ? jornada.objetivosPlaneados : [],
+          observacionClase,
         });
         actualizada = cerrarJornada(pendiente);
       } else if (jornada.estado === 'cancelada') {
@@ -502,6 +598,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
             {jornadasPagina.map((jornada) => {
               const material = materialPorJornadaId[jornada.id] ?? [];
               const cantidadCheckIns = cantidadCheckInsPorJornadaId[jornada.id] ?? 0;
+              const cobertura = coberturaPorJornadaId[jornada.id];
               const acciones = accionesDisponibles(jornada.estado);
               const accionExpandida = accionExpandidaPorJornadaId[jornada.id] ?? null;
               const cambiosReprogramacion = cambiosReprogramacionPorJornadaId[jornada.id] ?? {
@@ -662,6 +759,17 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                           ? `Asistencia registrada (${cantidadCheckIns} check-in${cantidadCheckIns === 1 ? '' : 's'})`
                           : 'Sin check-ins registrados aún'}
                       </p>
+                      {/* WS-4b (§9.3): informativo, no bloquea el cierre -- una clase sin
+                          materiales asignados no tiene nada que mostrar (cobertura?.total
+                          es 0) y no aparece el bloque. */}
+                      {cobertura && cobertura.total > 0 && (
+                        <p className="text-xs font-bold text-tkd-dark dark:text-white">
+                          Cobertura de materiales: {cobertura.coberturaPorcentaje}%{' '}
+                          <span className="font-medium text-gray-400">
+                            ({cobertura.total - (cobertura.porEstado.sin_marcar ?? 0)} de {cobertura.total} marcados)
+                          </span>
+                        </p>
+                      )}
                       <label className="flex items-center gap-2 text-xs font-bold text-tkd-dark dark:text-white">
                         <input
                           type="checkbox"
@@ -673,6 +781,61 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                         />
                         Objetivos impartidos
                       </label>
+
+                      {/* WS-5 (§10): observacion GRUPAL rapida, siempre opcional -- nunca por
+                          alumno. Categorias fijas (guiado), nota corta libre. */}
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                          Observación de la clase (opcional)
+                        </p>
+                        <div
+                          className="flex flex-wrap gap-1"
+                          role="group"
+                          aria-label={`Observación de la clase del ${jornada.fecha}`}
+                        >
+                          {CATEGORIAS_OBSERVACION_CLASE.map((categoria) => {
+                            const seleccionada = (categoriasObservacionPorJornadaId[jornada.id] ?? []).includes(categoria);
+                            return (
+                              <button
+                                key={categoria}
+                                type="button"
+                                aria-pressed={seleccionada}
+                                onClick={() =>
+                                  setCategoriasObservacionPorJornadaId((actual) => {
+                                    const actuales = actual[jornada.id] ?? [];
+                                    return {
+                                      ...actual,
+                                      [jornada.id]: seleccionada
+                                        ? actuales.filter((c) => c !== categoria)
+                                        : [...actuales, categoria],
+                                    };
+                                  })
+                                }
+                                className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                                  seleccionada
+                                    ? 'bg-tkd-blue text-white'
+                                    : 'bg-white text-gray-500 dark:bg-white/10 dark:text-gray-300'
+                                }`}
+                              >
+                                {ETIQUETA_CATEGORIA_OBSERVACION[categoria]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <textarea
+                          aria-label={`Nota corta de la observación del ${jornada.fecha}`}
+                          placeholder="Nota corta (opcional)..."
+                          maxLength={LIMITE_NOTA_OBSERVACION_CLASE}
+                          value={notaObservacionPorJornadaId[jornada.id] ?? ''}
+                          onChange={(event) =>
+                            setNotaObservacionPorJornadaId((actual) => ({
+                              ...actual,
+                              [jornada.id]: event.target.value,
+                            }))
+                          }
+                          className="rounded-xl border border-gray-200 p-2 text-xs font-medium text-tkd-dark dark:border-white/10 dark:bg-gray-900 dark:text-white"
+                        />
+                      </div>
                     </div>
                   )}
 

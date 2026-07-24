@@ -18,13 +18,19 @@ import {
   jornadaRepository as jornadaRepositoryPorDefecto,
   type JornadaRepository,
 } from '../servicios/academico/jornadaRepository';
-import { calcularVentanaClaseEnVivo } from '../servicios/academico/ventanaClaseEnVivoService';
+import {
+  calcularVentanaClaseEnVivo,
+  calcularJornadasEnVentana,
+} from '../servicios/academico/ventanaClaseEnVivoService';
 import type { JornadaInstruccion } from '../models/academico/jornada';
 
 const INTERVALO_RECALCULO_MS = 60_000;
 
 export interface UseVentanaClaseEnVivoResultado {
+  /** La mas cercana a `ahora` (compat: sigue siendo esta para no romper el link directo de nav). */
   jornadaActiva: JornadaInstruccion | null;
+  /** WS-6 (§4): TODAS las jornadas del usuario activas ahora mismo -- 0, 1 o N. */
+  jornadasEnVentana: JornadaInstruccion[];
   cargando: boolean;
 }
 
@@ -78,5 +84,10 @@ export function useVentanaClaseEnVivo(
     [jornadasVisibles, ahoraIso]
   );
 
-  return { jornadaActiva, cargando };
+  const jornadasEnVentana = useMemo(
+    () => calcularJornadasEnVentana(jornadasVisibles, ahoraIso),
+    [jornadasVisibles, ahoraIso]
+  );
+
+  return { jornadaActiva, jornadasEnVentana, cargando };
 }

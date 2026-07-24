@@ -71,7 +71,13 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     // si hay al menos una jornada real del usuario (segun rol/asignacion, ver
     // `hooks/useVentanaClaseEnVivo.ts`) dentro de `[horaInicio-15min, horaFin+15min]` ahora mismo.
     // Recalculado cada 60s (mismo intervalo que tenia el placeholder).
-    const { jornadaActiva } = useVentanaClaseEnVivo();
+    // WS-6 (§4, selector multi-clase): con 2+ jornadas activas a la vez el link ya NO apunta
+    // directo a la mas cercana -- va a la ruta generica `/clase-en-vivo`, donde ClaseEnVivoView
+    // ofrece el selector. Con exactamente 1, se preserva el link directo de siempre.
+    const { jornadaActiva, jornadasEnVentana } = useVentanaClaseEnVivo();
+    const rutaClaseEnVivo = jornadasEnVentana.length > 1
+        ? '/clase-en-vivo'
+        : (jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : '/clase-en-vivo');
 
     // Fix tutor-role-end-to-end (2026-07-14): el link "Eventos" se muestra al Tutor SOLO
     // cuando existe un evento con inscripción abierta hoy (al que puede inscribir a su hijo).
@@ -99,7 +105,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: jornadaActiva ? `/clase-en-vivo/${jornadaActiva.id}` : "/clase-en-vivo", texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: rutaClaseEnVivo, texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
