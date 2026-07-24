@@ -1,12 +1,14 @@
 import React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClaseEnVivoView } from './ClaseEnVivoView';
 import type { JornadaRepository } from '../servicios/academico/jornadaRepository';
 import type { AsistenciaRepository } from '../servicios/academico/asistenciaRepository';
 import type { JornadaInstruccion } from '../models/academico/jornada';
 import type { RegistroAsistencia } from '../models/academico/asistencia';
+import type { CheckpointMaterialService } from '../servicios/academico/checkpointMaterialService';
+import type { CheckpointMaterialJornada } from '../models/academico/checkpointMaterial';
 
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({
@@ -66,10 +68,22 @@ function crearAsistenciaRepositoryMock(registros: RegistroAsistencia[]): Asisten
   };
 }
 
+function crearCheckpointServiceMock(
+  overrides: Partial<CheckpointMaterialService> = {}
+): CheckpointMaterialService {
+  return {
+    listarMaterialesDeJornada: jest.fn().mockResolvedValue([]),
+    guardarCheckpoint: jest.fn().mockResolvedValue(undefined),
+    listarCheckpoints: jest.fn().mockResolvedValue([]),
+    ...overrides,
+  };
+}
+
 function renderView(props: {
   jornadaId?: string;
   repository: JornadaRepository;
   asistenciaRepository: AsistenciaRepository;
+  checkpointMaterialService?: CheckpointMaterialService;
 }) {
   return render(
     <MemoryRouter initialEntries={[`/clase-en-vivo/${props.jornadaId ?? 'jornada-1'}`]}>
@@ -80,6 +94,7 @@ function renderView(props: {
             <ClaseEnVivoView
               repository={props.repository}
               asistenciaRepository={props.asistenciaRepository}
+              checkpointMaterialService={props.checkpointMaterialService ?? crearCheckpointServiceMock()}
             />
           }
         />
@@ -162,5 +177,121 @@ describe('ClaseEnVivoView', () => {
 
     await user.click(screen.getByRole('button', { name: /cerrar escaner/i }));
     expect(screen.queryByTestId('escaner-clase-mock')).not.toBeInTheDocument();
+  });
+});
+
+describe('ClaseEnVivoView — checkpoint de materiales (WS-4b, §9/§15.D)', () => {
+  it('muestra "sin materiales" cuando la jornada no tiene ninguno asignado', async () => {
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    renderView({ repository, asistenciaRepository });
+
+    expect(await screen.findByText(/no hay materiales asignados/i)).toBeInTheDocument();
+  });
+
+  it('lista los materiales asignados como "Sin marcar" cuando no tienen checkpoint previo', async () => {
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const checkpointService = crearCheckpointServiceMock({
+      listarMaterialesDeJornada: jest.fn().mockResolvedValue([{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }]),
+    });
+    renderView({ repository, asistenciaRepository, checkpointMaterialService: checkpointService });
+
+    expect(await screen.findByText('Taeguk 1')).toBeInTheDocument();
+    expect(screen.getByText('Sin marcar')).toBeInTheDocument();
+    expect(checkpointService.listarMaterialesDeJornada).toHaveBeenCalledWith('tenant-1', 'jornada-1');
+  });
+
+  it('muestra la etiqueta del estado ya registrado para un material con checkpoint previo', async () => {
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const checkpointExistente: CheckpointMaterialJornada = {
+      asignacionId: 'asig-1',
+      jornadaId: 'jornada-1',
+      tenantId: 'tenant-1',
+      estado: 'practicado',
+      registradoPorUid: 'maestro-1',
+      actualizadoEn: '2026-07-09T10:00:00.000Z',
+    };
+    const checkpointService = crearCheckpointServiceMock({
+      listarMaterialesDeJornada: jest.fn().mockResolvedValue([{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }]),
+      listarCheckpoints: jest.fn().mockResolvedValue([checkpointExistente]),
+    });
+    renderView({ repository, asistenciaRepository, checkpointMaterialService: checkpointService });
+
+    expect(await screen.findByText('Practicado', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('marcar un estado (chip) guarda el checkpoint SIN bloquear el escaneo de asistencia', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const checkpointService = crearCheckpointServiceMock({
+      listarMaterialesDeJornada: jest.fn().mockResolvedValue([{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }]),
+    });
+    renderView({ repository, asistenciaRepository, checkpointMaterialService: checkpointService });
+
+    await screen.findByText('Taeguk 1');
+    // El boton de escaneo esta disponible independientemente del estado del checkpoint.
+    expect(screen.getByRole('button', { name: /escanear asistencia/i })).toBeEnabled();
+
+    const grupo = screen.getByRole('group', { name: /estado de taeguk 1/i });
+    await user.click(within(grupo).getByRole('button', { name: /^practicado$/i }));
+
+    await waitFor(() =>
+      expect(checkpointService.guardarCheckpoint).toHaveBeenCalledWith(
+        'tenant-1',
+        'jornada-1',
+        { asignacionId: 'asig-1', estado: 'practicado', notaCorta: undefined },
+        'maestro-1'
+      )
+    );
+    expect(checkpointService.listarCheckpoints).toHaveBeenCalledTimes(2); // carga inicial + recarga tras guardar
+    expect(screen.getByRole('button', { name: /escanear asistencia/i })).toBeEnabled();
+  });
+
+  it('la nota corta solo se puede agregar sobre un material YA marcado, y viaja en el guardado', async () => {
+    const user = userEvent.setup();
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const checkpointExistente: CheckpointMaterialJornada = {
+      asignacionId: 'asig-1',
+      jornadaId: 'jornada-1',
+      tenantId: 'tenant-1',
+      estado: 'parcial',
+      registradoPorUid: 'maestro-1',
+      actualizadoEn: '2026-07-09T10:00:00.000Z',
+    };
+    const checkpointService = crearCheckpointServiceMock({
+      listarMaterialesDeJornada: jest.fn().mockResolvedValue([{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }]),
+      listarCheckpoints: jest.fn().mockResolvedValue([checkpointExistente]),
+    });
+    renderView({ repository, asistenciaRepository, checkpointMaterialService: checkpointService });
+
+    await screen.findByText('Taeguk 1');
+    await user.click(screen.getByRole('button', { name: /\+ nota/i }));
+    await user.type(screen.getByLabelText(/nota corta de taeguk 1/i), 'Cuesta el giro');
+    await user.click(screen.getByRole('button', { name: /guardar nota/i }));
+
+    await waitFor(() =>
+      expect(checkpointService.guardarCheckpoint).toHaveBeenCalledWith(
+        'tenant-1',
+        'jornada-1',
+        { asignacionId: 'asig-1', estado: 'parcial', notaCorta: 'Cuesta el giro' },
+        'maestro-1'
+      )
+    );
+  });
+
+  it('un material SIN checkpoint todavia no ofrece agregar nota', async () => {
+    const repository = crearRepositoryMock([crearJornada()]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+    const checkpointService = crearCheckpointServiceMock({
+      listarMaterialesDeJornada: jest.fn().mockResolvedValue([{ asignacionId: 'asig-1', titulo: 'Taeguk 1' }]),
+    });
+    renderView({ repository, asistenciaRepository, checkpointMaterialService: checkpointService });
+
+    await screen.findByText('Taeguk 1');
+    expect(screen.queryByRole('button', { name: /\+ nota/i })).not.toBeInTheDocument();
   });
 });

@@ -23,6 +23,11 @@ import {
 } from '../../servicios/academico/asistenciaRepository';
 import { contarCheckIns } from '../../servicios/academico/asistenciaService';
 import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar } from '../../components/Iconos';
+import {
+  checkpointMaterialService as checkpointMaterialServicePorDefecto,
+  type CheckpointMaterialService,
+} from '../../servicios/academico/checkpointMaterialService';
+import { resumirCoberturaClase, type ResumenCoberturaClase } from '../../models/academico/checkpointMaterial';
 
 interface MisClasesViewProps {
   tenantId: string;
@@ -49,6 +54,10 @@ interface MisClasesViewProps {
   // subcoleccion `asistencias`, en vez de un checkbox manual. Opcional con default en la
   // destructuracion del componente (mismo patron que `repository`/`jornadaRepository`).
   asistenciaRepository?: AsistenciaRepository;
+  // WS-4b (§9.3): resumen de cobertura de materiales, mostrado ANTES de cerrar una clase
+  // en_curso (mismo criterio que cantidadCheckInsPorJornadaId: se calcula solo, no gatea el
+  // cierre -- un maestro puede cerrar con 0% de cobertura si asi fue la clase real).
+  checkpointMaterialService?: CheckpointMaterialService;
   // Fix 4 (persistencia/seleccion de Programa academico): contador que el padre
   // (AsignacionesView) incrementa tras guardar/eliminar un programa para forzar la
   // recarga de jornadas sin remount. Mismo patron refreshTrigger que ya usa
@@ -208,6 +217,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   permisoEdicionAgenda,
   repository = jornadaRepository,
   asistenciaRepository = asistenciaRepositoryPorDefecto,
+  checkpointMaterialService = checkpointMaterialServicePorDefecto,
   refreshTrigger = 0,
   onEditarMaterial,
 }) => {
@@ -219,6 +229,8 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   // es un checkbox manual, se deriva del conteo real de check-ins por jornada (mapa
   // jornadaId -> cantidad, ver efecto de carga mas abajo).
   const [cantidadCheckInsPorJornadaId, setCantidadCheckInsPorJornadaId] = React.useState<Record<string, number>>({});
+  // WS-4b (§9.3): resumen de cobertura de materiales por jornada en_curso.
+  const [coberturaPorJornadaId, setCoberturaPorJornadaId] = React.useState<Record<string, ResumenCoberturaClase>>({});
   const [objetivosImpartidosPorJornadaId, setObjetivosImpartidosPorJornadaId] = React.useState<Record<string, boolean>>({});
   // Accion de cancelar/reprogramar expandida en linea, por fila (una a la vez por jornada).
   const [accionExpandidaPorJornadaId, setAccionExpandidaPorJornadaId] = React.useState<Record<string, ClaveAccion | null>>({});
@@ -310,6 +322,42 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
       activo = false;
     };
   }, [idsEnCursoKey, asistenciaRepository, tenantId]);
+
+  // WS-4b (§9.3): mismo criterio que el efecto de check-ins de arriba -- solo las jornadas
+  // en_curso necesitan el resumen (es lo que se muestra antes de cerrarlas), y un fallo en
+  // una jornada puntual no debe impedir que las demas calculen su cobertura.
+  React.useEffect(() => {
+    const idsEnCurso = idsEnCursoKey ? idsEnCursoKey.split(',') : [];
+    if (idsEnCurso.length === 0) {
+      setCoberturaPorJornadaId({});
+      return;
+    }
+
+    let activo = true;
+    Promise.all(
+      idsEnCurso.map((jornadaId) =>
+        Promise.all([
+          checkpointMaterialService.listarMaterialesDeJornada(tenantId, jornadaId),
+          checkpointMaterialService.listarCheckpoints(tenantId, jornadaId),
+        ])
+          .then(([materiales, checkpoints]): [string, ResumenCoberturaClase] => [
+            jornadaId,
+            resumirCoberturaClase(materiales, checkpoints),
+          ])
+          .catch((): [string, ResumenCoberturaClase] => [
+            jornadaId,
+            resumirCoberturaClase([], []),
+          ]),
+      ),
+    ).then((resultados) => {
+      if (!activo) return;
+      setCoberturaPorJornadaId(Object.fromEntries(resultados));
+    });
+
+    return () => {
+      activo = false;
+    };
+  }, [idsEnCursoKey, checkpointMaterialService, tenantId]);
 
   const transicionar = async (jornada: JornadaInstruccion) => {
     if (guardando) return;
@@ -502,6 +550,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
             {jornadasPagina.map((jornada) => {
               const material = materialPorJornadaId[jornada.id] ?? [];
               const cantidadCheckIns = cantidadCheckInsPorJornadaId[jornada.id] ?? 0;
+              const cobertura = coberturaPorJornadaId[jornada.id];
               const acciones = accionesDisponibles(jornada.estado);
               const accionExpandida = accionExpandidaPorJornadaId[jornada.id] ?? null;
               const cambiosReprogramacion = cambiosReprogramacionPorJornadaId[jornada.id] ?? {
@@ -662,6 +711,17 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                           ? `Asistencia registrada (${cantidadCheckIns} check-in${cantidadCheckIns === 1 ? '' : 's'})`
                           : 'Sin check-ins registrados aún'}
                       </p>
+                      {/* WS-4b (§9.3): informativo, no bloquea el cierre -- una clase sin
+                          materiales asignados no tiene nada que mostrar (cobertura?.total
+                          es 0) y no aparece el bloque. */}
+                      {cobertura && cobertura.total > 0 && (
+                        <p className="text-xs font-bold text-tkd-dark dark:text-white">
+                          Cobertura de materiales: {cobertura.coberturaPorcentaje}%{' '}
+                          <span className="font-medium text-gray-400">
+                            ({cobertura.total - (cobertura.porEstado.sin_marcar ?? 0)} de {cobertura.total} marcados)
+                          </span>
+                        </p>
+                      )}
                       <label className="flex items-center gap-2 text-xs font-bold text-tkd-dark dark:text-white">
                         <input
                           type="checkbox"

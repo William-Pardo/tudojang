@@ -114,4 +114,8 @@ export const crearCheckpointMaterialService = (deps: CheckpointMaterialServiceDe
   return { listarMaterialesDeJornada, guardarCheckpoint, listarCheckpoints };
 };
 
+// Tipo del servicio (no la factory): permite tipar props/mocks en la UI (ClaseEnVivoView, §15.D)
+// sin acoplarse a la forma interna de `crearCheckpointMaterialService`.
+export type CheckpointMaterialService = ReturnType<typeof crearCheckpointMaterialService>;
+
 export const checkpointMaterialService = crearCheckpointMaterialService();

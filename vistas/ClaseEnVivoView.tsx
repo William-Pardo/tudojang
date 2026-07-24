@@ -37,6 +37,40 @@ import {
 } from '../servicios/academico/asistenciaRepository';
 import type { JornadaInstruccion } from '../models/academico/jornada';
 import type { RegistroAsistencia } from '../models/academico/asistencia';
+import {
+  checkpointMaterialService as checkpointMaterialServicePorDefecto,
+  type MaterialDeJornada,
+  type CheckpointMaterialService,
+} from '../servicios/academico/checkpointMaterialService';
+import type { CheckpointMaterialJornada, EstadoCheckpointMaterial } from '../models/academico/checkpointMaterial';
+import { LIMITE_NOTA_CHECKPOINT } from '../models/academico/checkpointMaterial';
+
+// WS-4b (§15.D): flujo GUIADO -- estados fijos, no texto libre. Orden: primero los de
+// "durante" mas usados (usado/explicado/practicado), despues los de cobertura parcial/nula,
+// y al final los dos que no describen trabajo en esta sesion (pendiente/no_aplica).
+const ESTADOS_CHECKPOINT: EstadoCheckpointMaterial[] = [
+  'planeado',
+  'usado',
+  'explicado',
+  'practicado',
+  'mencionado',
+  'parcial',
+  'no_usado',
+  'pendiente',
+  'no_aplica',
+];
+
+const ETIQUETA_ESTADO_CHECKPOINT: Record<EstadoCheckpointMaterial, string> = {
+  planeado: 'Planeado',
+  usado: 'Usado',
+  explicado: 'Explicado',
+  practicado: 'Practicado',
+  mencionado: 'Mencionado',
+  parcial: 'Parcial',
+  no_usado: 'No usado',
+  pendiente: 'Pendiente',
+  no_aplica: 'No aplica',
+};
 
 export interface ClaseEnVivoViewProps {
   jornadaId?: string;
@@ -51,6 +85,8 @@ export interface ClaseEnVivoViewProps {
   claseActiva?: unknown;
   repository?: JornadaRepository;
   asistenciaRepository?: AsistenciaRepository;
+  /** WS-4b (§9/§15.D): checkpoint pedagogico de materiales. Inyectable para tests. */
+  checkpointMaterialService?: CheckpointMaterialService;
 }
 
 type EstadoCarga = 'cargando' | 'no-encontrada' | 'lista';
@@ -60,6 +96,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   jornada,
   repository = jornadaRepositoryPorDefecto,
   asistenciaRepository: asistenciaRepositorio = asistenciaRepositoryPorDefecto,
+  checkpointMaterialService: checkpointMaterialServicio = checkpointMaterialServicePorDefecto,
 }) => {
   const params = useParams<{ jornadaId?: string }>();
   const jornadaId = jornadaIdProp ?? params.jornadaId ?? jornada?.id;
@@ -70,6 +107,13 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   const [jornadaActual, setJornadaActual] = useState<JornadaInstruccion | null>(null);
   const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>([]);
   const [escanerAbierto, setEscanerAbierto] = useState(false);
+  // WS-4b (§9/§15.D): materiales asignados a la jornada + su checkpoint (si ya se marco).
+  const [materiales, setMateriales] = useState<MaterialDeJornada[]>([]);
+  const [checkpointsPorAsignacionId, setCheckpointsPorAsignacionId] = useState<
+    Record<string, CheckpointMaterialJornada>
+  >({});
+  const [notaBorradorPorAsignacionId, setNotaBorradorPorAsignacionId] = useState<Record<string, string>>({});
+  const [notaAbiertaPorAsignacionId, setNotaAbiertaPorAsignacionId] = useState<Record<string, boolean>>({});
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -80,6 +124,36 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       setAsistencias(registros);
     },
     [asistenciaRepositorio]
+  );
+
+  // Independiente de asistencias/escaneo a proposito (§9.1: "no debe bloquear el check-in").
+  // Un fallo aca no debe tumbar la pantalla de escaneo -- se degrada a "sin materiales".
+  const cargarCheckpoints = useCallback(
+    async (jornadaCargada: JornadaInstruccion) => {
+      const [listaMateriales, listaCheckpoints] = await Promise.all([
+        checkpointMaterialServicio.listarMaterialesDeJornada(jornadaCargada.tenantId, jornadaCargada.id),
+        checkpointMaterialServicio.listarCheckpoints(jornadaCargada.tenantId, jornadaCargada.id),
+      ]);
+      setMateriales(listaMateriales);
+      setCheckpointsPorAsignacionId(
+        Object.fromEntries(listaCheckpoints.map((checkpoint) => [checkpoint.asignacionId, checkpoint]))
+      );
+    },
+    [checkpointMaterialServicio]
+  );
+
+  const guardarCheckpointMaterial = useCallback(
+    async (asignacionId: string, estado: EstadoCheckpointMaterial) => {
+      if (!jornadaActual) return;
+      await checkpointMaterialServicio.guardarCheckpoint(
+        jornadaActual.tenantId,
+        jornadaActual.id,
+        { asignacionId, estado, notaCorta: notaBorradorPorAsignacionId[asignacionId] },
+        usuario?.id ?? ''
+      );
+      await cargarCheckpoints(jornadaActual);
+    },
+    [jornadaActual, checkpointMaterialServicio, notaBorradorPorAsignacionId, usuario, cargarCheckpoints]
   );
 
   useEffect(() => {
@@ -104,6 +178,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
 
       if (encontrada) {
         await cargarAsistencias(encontrada);
+        await cargarCheckpoints(encontrada);
       }
     }
 
@@ -111,7 +186,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
     return () => {
       cancelado = true;
     };
-  }, [jornadaId, tenantId, repository, cargarAsistencias]);
+  }, [jornadaId, tenantId, repository, cargarAsistencias, cargarCheckpoints]);
 
   if (estadoCarga === 'cargando') {
     return (
@@ -171,6 +246,82 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
                 {registro.estudianteId} — {registro.horaSalida ? 'Completo' : 'En curso'}
               </li>
             ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-black uppercase tracking-wide">
+          Materiales de la clase{materiales.length > 0 && ` (${materiales.length})`}
+        </h2>
+        {materiales.length === 0 ? (
+          <p className="text-white/50 text-sm">No hay materiales asignados a esta clase.</p>
+        ) : (
+          <ul className="space-y-3">
+            {materiales.map((material) => {
+              const checkpoint = checkpointsPorAsignacionId[material.asignacionId];
+              const notaAbierta = notaAbiertaPorAsignacionId[material.asignacionId] ?? false;
+              return (
+                <li key={material.asignacionId} className="space-y-2 rounded-xl border border-white/10 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold">{material.titulo}</p>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                      {checkpoint ? ETIQUETA_ESTADO_CHECKPOINT[checkpoint.estado] : 'Sin marcar'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1" role="group" aria-label={`Estado de ${material.titulo}`}>
+                    {ESTADOS_CHECKPOINT.map((estado) => (
+                      <button
+                        key={estado}
+                        type="button"
+                        aria-pressed={checkpoint?.estado === estado}
+                        onClick={() => guardarCheckpointMaterial(material.asignacionId, estado)}
+                        className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                          checkpoint?.estado === estado ? 'bg-tkd-blue text-white' : 'bg-white/10 text-white/70'
+                        }`}
+                      >
+                        {ETIQUETA_ESTADO_CHECKPOINT[estado]}
+                      </button>
+                    ))}
+                  </div>
+                  {checkpoint && (
+                    notaAbierta ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <textarea
+                          aria-label={`Nota corta de ${material.titulo}`}
+                          maxLength={LIMITE_NOTA_CHECKPOINT}
+                          value={notaBorradorPorAsignacionId[material.asignacionId] ?? checkpoint.notaCorta ?? ''}
+                          onChange={(evento) =>
+                            setNotaBorradorPorAsignacionId((actual) => ({
+                              ...actual,
+                              [material.asignacionId]: evento.target.value,
+                            }))
+                          }
+                          className="w-full rounded-lg bg-white/5 p-2 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => guardarCheckpointMaterial(material.asignacionId, checkpoint.estado)}
+                          className="text-[10px] font-black uppercase tracking-widest text-tkd-blue"
+                        >
+                          Guardar nota
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNotaAbiertaPorAsignacionId((actual) => ({ ...actual, [material.asignacionId]: true }))
+                        }
+                        className="text-[10px] font-black uppercase tracking-widest text-white/50"
+                      >
+                        + Nota
+                      </button>
+                    )
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
