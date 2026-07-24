@@ -31,7 +31,9 @@ import { useVentanaClaseEnVivo } from '../hooks/useVentanaClaseEnVivo';
 import { minutosRestantesDeVentana } from '../servicios/academico/ventanaClaseEnVivoService';
 import { obtenerSedes as obtenerSedesPorDefecto } from '../servicios/sedesApi';
 import { getUser as obtenerUsuarioPorDefecto } from '../servicios/usuariosApi';
-import type { Sede, Usuario } from '../tipos';
+import { obtenerEstudiantes as obtenerEstudiantesPorDefecto } from '../servicios/estudiantesApi';
+import { perteneceAutomaticamente } from '../servicios/academico/inscripcionService';
+import type { Sede, Usuario, Estudiante } from '../tipos';
 import {
   jornadaRepository as jornadaRepositoryPorDefecto,
   type JornadaRepository,
@@ -95,6 +97,8 @@ export interface ClaseEnVivoViewProps {
   /** WS-6 (§15.A, header completo). Inyectables para tests, mismo criterio que el resto. */
   obtenerSedes?: (tenantId?: string) => Promise<Sede[]>;
   obtenerUsuario?: (id: string) => Promise<Usuario | null>;
+  /** WS-6 (§15.C, roster esperado). Inyectable para tests. */
+  obtenerEstudiantes?: () => Promise<Estudiante[]>;
 }
 
 type EstadoCarga = 'cargando' | 'no-encontrada' | 'lista';
@@ -107,6 +111,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   checkpointMaterialService: checkpointMaterialServicio = checkpointMaterialServicePorDefecto,
   obtenerSedes: obtenerSedesFn = obtenerSedesPorDefecto,
   obtenerUsuario: obtenerUsuarioFn = obtenerUsuarioPorDefecto,
+  obtenerEstudiantes: obtenerEstudiantesFn = obtenerEstudiantesPorDefecto,
 }) => {
   const params = useParams<{ jornadaId?: string }>();
   // Sin id explicito (llegada por el link generico `/clase-en-vivo`, sin :jornadaId): puede
@@ -147,6 +152,10 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   const [sedeNombre, setSedeNombre] = useState<string | null>(null);
   const [maestroNombre, setMaestroNombre] = useState<string | null>(null);
   const [ahoraIso, setAhoraIso] = useState(() => new Date().toISOString());
+  // WS-6 (§15.C): roster esperado (matricula automatica) para esta jornada. Vacio = no se pudo
+  // calcular (repository sin `obtenerEjecucion`, fallo de red, etc.) -- degrada a no mostrar la
+  // seccion, no rompe el resto de la pantalla.
+  const [rosterEsperado, setRosterEsperado] = useState<Estudiante[]>([]);
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -250,6 +259,42 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       cancelado = true;
     };
   }, [jornadaActual?.tenantId, jornadaActual?.sedeId, jornadaActual?.instructorId, obtenerSedesFn, obtenerUsuarioFn]);
+
+  // WS-6 (§15.C): roster esperado -- cruza la EjecucionPrograma de esta jornada con el padron
+  // de estudiantes usando el MISMO criterio de matricula automatica que ya usa el modal de
+  // asistencia (`perteneceAutomaticamente`, inscripcionService.ts). `obtenerEjecucion` es
+  // opcional en JornadaRepository (no todos los mocks/consumidores lo implementan) -- sin el,
+  // o ante cualquier fallo, el roster queda vacio y la seccion simplemente no se muestra.
+  useEffect(() => {
+    if (!jornadaActual) return;
+    let cancelado = false;
+
+    async function cargarRoster() {
+      try {
+        const ejecucion = await repository.obtenerEjecucion?.(
+          jornadaActual!.tenantId,
+          jornadaActual!.ejecucionProgramaId
+        );
+        if (!ejecucion || cancelado) return;
+
+        const estudiantes = await obtenerEstudiantesFn();
+        if (cancelado) return;
+
+        const esperados = estudiantes.filter(
+          (estudiante) =>
+            estudiante.tenantId === jornadaActual!.tenantId && perteneceAutomaticamente(estudiante, ejecucion)
+        );
+        setRosterEsperado(esperados);
+      } catch {
+        if (!cancelado) setRosterEsperado([]);
+      }
+    }
+
+    cargarRoster();
+    return () => {
+      cancelado = true;
+    };
+  }, [jornadaActual?.tenantId, jornadaActual?.ejecucionProgramaId, repository, obtenerEstudiantesFn]);
 
   // Cuenta regresiva de la ventana: recalcula cada 60s, mismo intervalo que useVentanaClaseEnVivo.
   useEffect(() => {
@@ -374,6 +419,32 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
           </ul>
         )}
       </section>
+
+      {rosterEsperado.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-black uppercase tracking-wide">
+            Asistencia esperada ({asistencias.length}/{rosterEsperado.length})
+          </h2>
+          <ul className="space-y-1">
+            {rosterEsperado.map((estudiante) => {
+              const registro = asistencias.find((a) => a.estudianteId === estudiante.id);
+              const estadoEstudiante = !registro
+                ? 'Pendiente'
+                : registro.horaSalida
+                ? 'Completo'
+                : registro.isLate
+                ? 'Presente (tarde)'
+                : 'Presente';
+              return (
+                <li key={estudiante.id} className="flex justify-between text-sm">
+                  <span>{estudiante.nombres} {estudiante.apellidos}</span>
+                  <span className="text-white/50">{estadoEstudiante}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-black uppercase tracking-wide">

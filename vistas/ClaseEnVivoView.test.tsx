@@ -477,3 +477,132 @@ describe('ClaseEnVivoView — header completo (WS-6, §15.A/§14)', () => {
     expect(await screen.findByText(/ventana expirada/i)).toBeInTheDocument();
   });
 });
+
+// WS-6 (§15.C): roster esperado -- cruza la matricula automatica (misma logica que el modal de
+// asistencia, `perteneceAutomaticamente`) con los check-ins reales.
+describe('ClaseEnVivoView — roster esperado (WS-6, §15.C)', () => {
+  const EJECUCION = {
+    id: 'ejecucion-1',
+    tenantId: 'tenant-1',
+    programaId: 'programa-1',
+    grupoId: 'infantil',
+    sedeId: 'sede-1',
+    estado: 'activo' as const,
+    fechaInicio: '2026-01-01',
+    unidadActualId: null,
+    objetivoActualId: null,
+    objetivosCompletados: [],
+    creadoEn: '2026-01-01T00:00:00.000Z',
+    actualizadoEn: '2026-01-01T00:00:00.000Z',
+  };
+
+  function crearEstudiante(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'est-1',
+      tenantId: 'tenant-1',
+      nombres: 'Juan',
+      apellidos: 'Pérez',
+      numeroIdentificacion: '111',
+      fechaNacimiento: '2015-01-01',
+      grado: 'Blanco',
+      grupo: 'infantil',
+      horasAcumuladasGrado: 0,
+      sedeId: 'sede-1',
+      telefono: '',
+      correo: '',
+      fechaIngreso: '2025-01-01',
+      estadoPago: 'Al día',
+      historialPagos: [],
+      saldoDeudor: 0,
+      consentimientoInformado: true,
+      contratoServiciosFirmado: true,
+      consentimientoImagenFirmado: true,
+      consentimientoFotosVideos: true,
+      carnetGenerado: false,
+      ...overrides,
+    };
+  }
+
+  it('no muestra la seccion cuando el repository no implementa obtenerEjecucion', async () => {
+    const repository = crearRepositoryMock([crearJornada({ sedeId: 'sede-1' })]);
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderView({ repository, asistenciaRepository });
+
+    await screen.findByText(/formas basicas/i);
+    expect(screen.queryByText(/asistencia esperada/i)).not.toBeInTheDocument();
+  });
+
+  it('cruza el roster (matricula automatica) con los check-ins: pendiente / presente / tarde / completo', async () => {
+    const jornada = crearJornada({ sedeId: 'sede-1' });
+    const repository = {
+      ...crearRepositoryMock([jornada]),
+      obtenerEjecucion: jest.fn().mockResolvedValue(EJECUCION),
+    } as unknown as JornadaRepository;
+    const asistenciaRepository = crearAsistenciaRepositoryMock([
+      { estudianteId: 'est-presente', horaEntrada: '2026-07-09T15:00:00.000Z' },
+      { estudianteId: 'est-tarde', horaEntrada: '2026-07-09T15:10:00.000Z', isLate: true, minutesLate: 10 },
+      { estudianteId: 'est-completo', horaEntrada: '2026-07-09T15:00:00.000Z', horaSalida: '2026-07-09T16:00:00.000Z' },
+    ]);
+    const obtenerEstudiantes = jest.fn().mockResolvedValue([
+      crearEstudiante({ id: 'est-pendiente', nombres: 'Ana', apellidos: 'Gomez' }),
+      crearEstudiante({ id: 'est-presente', nombres: 'Luis', apellidos: 'Ruiz' }),
+      crearEstudiante({ id: 'est-tarde', nombres: 'Sara', apellidos: 'Diaz' }),
+      crearEstudiante({ id: 'est-completo', nombres: 'Tomas', apellidos: 'Rey' }),
+      // No pertenece (otra sede): no debe aparecer en el roster.
+      crearEstudiante({ id: 'est-otra-sede', nombres: 'Nadie', apellidos: 'Aqui', sedeId: 'sede-2' }),
+      // `obtenerEstudiantes()` no filtra por tenant (lee la coleccion completa) -- mismo grupo/
+      // sede que la ejecucion, pero de OTRO tenant: no debe colarse en el roster.
+      crearEstudiante({ id: 'est-otro-tenant', nombres: 'Otro', apellidos: 'Tenant', tenantId: 'tenant-2' }),
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/clase-en-vivo/jornada-1']}>
+        <Routes>
+          <Route
+            path="/clase-en-vivo/:jornadaId"
+            element={
+              <ClaseEnVivoView
+                repository={repository}
+                asistenciaRepository={asistenciaRepository}
+                checkpointMaterialService={crearCheckpointServiceMock()}
+                obtenerEstudiantes={obtenerEstudiantes}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(/asistencia esperada \(3\/4\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nadie aqui/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/otro tenant/i)).not.toBeInTheDocument();
+
+    const filaPendiente = (await screen.findByText(/ana gomez/i)).closest('li')!;
+    expect(within(filaPendiente).getByText(/^pendiente$/i)).toBeInTheDocument();
+
+    const filaPresente = screen.getByText(/luis ruiz/i).closest('li')!;
+    expect(within(filaPresente).getByText(/^presente$/i)).toBeInTheDocument();
+
+    const filaTarde = screen.getByText(/sara diaz/i).closest('li')!;
+    expect(within(filaTarde).getByText(/presente \(tarde\)/i)).toBeInTheDocument();
+
+    const filaCompleto = screen.getByText(/tomas rey/i).closest('li')!;
+    expect(within(filaCompleto).getByText(/^completo$/i)).toBeInTheDocument();
+  });
+
+  it('degrada en silencio (sin roster) si obtenerEjecucion falla', async () => {
+    const jornada = crearJornada();
+    const repository = {
+      ...crearRepositoryMock([jornada]),
+      obtenerEjecucion: jest.fn().mockRejectedValue(new Error('sin permiso')),
+    } as unknown as JornadaRepository;
+    const asistenciaRepository = crearAsistenciaRepositoryMock([]);
+
+    renderView({ repository, asistenciaRepository });
+
+    await screen.findByText(/formas basicas/i);
+    await waitFor(() => expect(repository.obtenerEjecucion).toHaveBeenCalled());
+    expect(screen.queryByText(/asistencia esperada/i)).not.toBeInTheDocument();
+  });
+});
