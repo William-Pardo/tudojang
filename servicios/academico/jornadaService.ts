@@ -1,5 +1,5 @@
 import type { EstadoJornada } from '../../models/academico';
-import type { BloqueRecurrente, JornadaInstruccion } from '../../models/academico/jornada';
+import type { BloqueRecurrente, JornadaInstruccion, ObservacionClase } from '../../models/academico/jornada';
 
 interface CrearJornadaInput {
   tenantId: string;
@@ -25,6 +25,8 @@ interface CrearJornadaInput {
 interface PendienteCierreInput {
   asistenciaRegistrada: boolean;
   objetivosImpartidos: string[];
+  // WS-5 (§10): OPCIONAL a proposito -- la observacion grupal nunca es obligatoria para cerrar.
+  observacionClase?: ObservacionClase;
 }
 
 interface GenerarJornadasFromBloqueInput {
@@ -127,6 +129,8 @@ export function marcarPendienteCierre(
     ...transicionar(jornada, 'pendiente_cierre'),
     asistenciaRegistrada: datos.asistenciaRegistrada,
     objetivosImpartidos: [...datos.objetivosImpartidos],
+    // WS-5 (§10): siempre opcional -- una jornada sin observacion pasa este campo en undefined.
+    observacionClase: datos.observacionClase,
   };
 }
 

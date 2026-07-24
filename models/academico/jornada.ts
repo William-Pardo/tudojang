@@ -1,6 +1,31 @@
 import type { EstadoJornada } from './index';
 import type { GradoTKD } from '../../tipos';
 
+/**
+ * Observación GRUPAL rápida al cierre de la clase (WS-5, `Módulo Clase en Vivo.txt` §10).
+ * Categorías fijas (flujo guiado, igual criterio que el checkpoint de materiales) + nota corta
+ * OPCIONAL -- §10 es explícito: nunca exigir nota por alumno, esto es una observación de grupo.
+ */
+export type CategoriaObservacionClase =
+  | 'buena_energia'
+  | 'baja_energia'
+  | 'requiere_refuerzo'
+  | 'buen_avance'
+  | 'dificultad'
+  | 'interrumpida'
+  | 'material_insuficiente'
+  | 'excelente_participacion';
+
+/** Límite de caracteres de la nota corta de observación (mismo criterio que §9.2). */
+export const LIMITE_NOTA_OBSERVACION_CLASE = 280;
+
+export interface ObservacionClase {
+  categorias: CategoriaObservacionClase[];
+  notaCorta?: string;
+  registradoPorUid: string;
+  actualizadoEn: string;
+}
+
 export interface JornadaInstruccion {
   id: string;
   tenantId: string;
@@ -41,6 +66,8 @@ export interface JornadaInstruccion {
    * = todavía no se avisó.
    */
   avisoRecogidaEnviado?: boolean;
+  /** WS-5 (§10): observación grupal rápida registrada al cierre. Ausente = no se registró. */
+  observacionClase?: ObservacionClase;
   creadoEn: string;
   actualizadoEn: string;
 }

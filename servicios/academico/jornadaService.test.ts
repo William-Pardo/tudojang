@@ -69,6 +69,38 @@ describe('jornadaService', () => {
     expect(() => cerrarJornada(jornada)).toThrow(/objetivos/i);
   });
 
+  // WS-5 (§10): la observacion grupal es SIEMPRE opcional -- nunca debe bloquear el cierre.
+  it('cierra sin problema una jornada SIN observacion de clase (opcional)', () => {
+    const jornada = marcarPendienteCierre(iniciarJornada(confirmarJornada(createJornadaBase())), {
+      asistenciaRegistrada: true,
+      objetivosImpartidos: ['obj-1'],
+    });
+
+    expect(jornada.observacionClase).toBeUndefined();
+    expect(() => cerrarJornada(jornada)).not.toThrow();
+  });
+
+  it('guarda la observacion de clase (categorias + nota corta opcional) al marcar pendiente de cierre', () => {
+    const jornada = marcarPendienteCierre(iniciarJornada(confirmarJornada(createJornadaBase())), {
+      asistenciaRegistrada: true,
+      objetivosImpartidos: ['obj-1'],
+      observacionClase: {
+        categorias: ['buena_energia', 'buen_avance'],
+        notaCorta: 'Grupo muy participativo',
+        registradoPorUid: 'maestro-1',
+        actualizadoEn: '2026-07-09T11:00:00.000Z',
+      },
+    });
+
+    expect(jornada.observacionClase).toEqual({
+      categorias: ['buena_energia', 'buen_avance'],
+      notaCorta: 'Grupo muy participativo',
+      registradoPorUid: 'maestro-1',
+      actualizadoEn: '2026-07-09T11:00:00.000Z',
+    });
+  });
+
+
   it('permite cancelar jornada antes de cerrarla', () => {
     const cancelada = cancelarJornada(confirmarJornada(createJornadaBase()), 'Instructor no disponible');
 

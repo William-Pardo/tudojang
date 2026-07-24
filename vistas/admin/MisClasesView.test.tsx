@@ -909,6 +909,150 @@ describe('MisClasesView', () => {
       await waitFor(() => expect(repository.guardarJornada).toHaveBeenCalled());
     });
   });
+
+  // WS-5 (§10): observacion GRUPAL rapida al cierre, siempre opcional.
+  describe('observacion de la clase al cerrar (§10)', () => {
+    function crearRepositoryConCierre() {
+      return {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', estado: 'en_curso', objetivosPlaneados: ['obj-1'] }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+      };
+    }
+
+    it('cerrar SIN tocar la observacion no adjunta ninguna (queda undefined)', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({ observacionClase: undefined }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('marcar categorias (chips, multi-seleccion) las adjunta al cerrar', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      const grupo = screen.getByRole('group', { name: /observación de la clase/i });
+      await user.click(within(grupo).getByRole('button', { name: /buena energía/i }));
+      await user.click(within(grupo).getByRole('button', { name: /buen avance/i }));
+      // Deseleccion: clickear de nuevo saca la categoria.
+      await user.click(within(grupo).getByRole('button', { name: /buena energía/i }));
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({
+            observacionClase: expect.objectContaining({
+              categorias: ['buen_avance'],
+              registradoPorUid: 'maestro-1',
+            }),
+          }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('una nota corta SIN categoria marcada tambien cuenta como observacion', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.type(
+        screen.getByLabelText(/nota corta de la observación/i),
+        'Se interrumpio por lluvia',
+      );
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      await waitFor(() =>
+        expect(repository.guardarJornada).toHaveBeenCalledWith(
+          expect.objectContaining({
+            observacionClase: expect.objectContaining({
+              categorias: [],
+              notaCorta: 'Se interrumpio por lluvia',
+            }),
+          }),
+          expect.anything(),
+        ),
+      );
+    });
+
+    it('el cierre NO se bloquea por dejar la observacion sin marcar', async () => {
+      const user = userEvent.setup();
+      const repository = crearRepositoryConCierre();
+      const asistenciaRepository = crearAsistenciaRepositoryMock([
+        { estudianteId: 'estudiante-1', horaEntrada: '2026-07-06T08:05:00.000Z' },
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          asistenciaRepository={asistenciaRepository as any}
+        />,
+      );
+
+      await screen.findByText(/en curso/i);
+      await user.click(screen.getByRole('checkbox', { name: /objetivos impartidos/i }));
+      await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
+
+      expect(await screen.findByText(/^cerrada$/i)).toBeInTheDocument();
+    });
+  });
 });
 
 // Rediseño visual del contenedor de clase (2026-07-11, pedido explícito del usuario):
