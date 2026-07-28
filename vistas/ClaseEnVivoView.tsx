@@ -265,28 +265,27 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
         } : undefined;
 
         // Registrar cierre: transicionar a 'pendiente_cierre' si estamos en 'en_curso'.
-        // En producción esto iría a Firestore via repository.
-        await repository.actualizarJornada?.(jornadaActual.tenantId, jornadaActual.id, {
-          estado: 'pendiente_cierre' as any,
+        const pendienteCierre = {
+          ...jornadaActual,
+          estado: 'pendiente_cierre' as const,
           asistenciaRegistrada: true,
           objetivosImpartidos: ['(Cierre registrado en ' + new Date().toISOString() + ')'],
           observacionClase: observacion,
           actualizadoEn: new Date().toISOString(),
-        });
+        };
+        await repository.guardarJornada(pendienteCierre);
+
         // Transicionar final a 'cerrada' después.
-        await repository.actualizarJornada?.(jornadaActual.tenantId, jornadaActual.id, {
-          estado: 'cerrada' as any,
+        const cerrada = {
+          ...pendienteCierre,
+          estado: 'cerrada' as const,
           actualizadoEn: new Date().toISOString(),
-        });
+        };
+        await repository.guardarJornada(cerrada);
         setCierreAbierto(false);
         setObservacionesSeleccionadas([]);
         setNotaObservacion('');
-        // Recargar la jornada para reflejar el cierre.
-        const jornadas = await repository.listarJornadasPorTenant(jornadaActual.tenantId);
-        const actualizada = jornadas.find((j) => j.id === jornadaActual.id) ?? null;
-        if (actualizada) {
-          setJornadaActual(actualizada);
-        }
+        setJornadaActual(cerrada);
       } catch (error) {
         console.error('Error al cerrar clase:', error);
         alert('Error al cerrar la clase. Por favor intenta de nuevo.');
