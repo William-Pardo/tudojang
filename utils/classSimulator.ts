@@ -1,25 +1,20 @@
 
 import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { registrarEntrada } from '../servicios/asistenciaApi';
+import { registrarAsistenciaClase } from '../servicios/academico/asistenciaClaseService';
 
 /**
  * Simula la entrada de 5 alumnos a la clase actual de forma aleatoria.
  * Selecciona alumnos existentes en la base de datos para garantizar que
  * la interfaz muestre nombres y grados reales.
+ *
+ * WS-1: Usa registrarAsistenciaClase (callable) en lugar de guardería.
  */
-export const simularAsistenciasMasivas = async (sedeId: string, tenantId: string) => {
+export const simularAsistenciasMasivas = async (jornadaId: string, tenantId: string) => {
     try {
         // 1. Obtener una muestra de alumnos reales del tenant
         const estudiantesRef = collection(db, 'estudiantes');
-        const q = query(
-            estudiantesRef,
-            where('tenantId', '==', tenantId),
-            orderBy('nombres', 'asc'),
-            limit(20)
-        );
 
-        // Usamos una consulta simple si el tenant tiene pocos alumnos o hay problemas de índice
         const snap = await getDocs(query(estudiantesRef, where('tenantId', '==', tenantId), limit(10)));
 
         if (snap.empty) {
@@ -33,9 +28,9 @@ export const simularAsistenciasMasivas = async (sedeId: string, tenantId: string
             .sort(() => 0.5 - Math.random())
             .slice(0, 5);
 
-        // 2. Registrar entrada para cada uno
+        // 2. Registrar entrada para cada uno via callable de Clase en Vivo
         for (const alumno of seleccionados) {
-            await registrarEntrada(alumno.id, sedeId);
+            await registrarAsistenciaClase({ tenantId, jornadaId, estudianteId: alumno.id });
         }
 
         return seleccionados.length;
