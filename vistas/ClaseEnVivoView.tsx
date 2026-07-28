@@ -37,6 +37,12 @@ import {
   enviarNotificacionCheckout,
   construirMensajeCheckout,
 } from '../servicios/academico/notificacionCheckoutService';
+import {
+  puedeAccederClaseEnVivo,
+  puedeEscanearQR,
+  puedeCerrarClase,
+  construirRegistroAuditoria,
+} from '../servicios/academico/permisosClaseEnVivoService';
 import { obtenerSedes as obtenerSedesPorDefecto } from '../servicios/sedesApi';
 import { getUser as obtenerUsuarioPorDefecto } from '../servicios/usuariosApi';
 import { obtenerEstudiantes as obtenerEstudiantesPorDefecto } from '../servicios/estudiantesApi';
@@ -172,6 +178,9 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
 
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>('cargando');
   const [jornadaActual, setJornadaActual] = useState<JornadaInstruccion | null>(null);
+  // WS-11 (§12): validaciones de permisos.
+  const [tienePermiso, setTienePermiso] = useState(true);
+  const [mensajePermiso, setMensajePermiso] = useState('');
   const [asistencias, setAsistencias] = useState<RegistroAsistencia[]>([]);
   const [escanerAbierto, setEscanerAbierto] = useState(false);
   // WS-4b (§9/§15.D): materiales asignados a la jornada + su checkpoint (si ya se marco).
@@ -308,9 +317,18 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       setJornadaActual(encontrada);
       setEstadoCarga(encontrada ? 'lista' : 'no-encontrada');
 
+      // WS-11 (§12): validar permisos de usuario.
       if (encontrada) {
-        await cargarAsistencias(encontrada);
-        await cargarCheckpoints(encontrada);
+        const permiso = puedeAccederClaseEnVivo(usuario, encontrada);
+        setTienePermiso(permiso.autorizado);
+        if (!permiso.autorizado) {
+          setMensajePermiso(permiso.razon || 'No tienes permiso para acceder a esta clase');
+        }
+
+        if (permiso.autorizado) {
+          await cargarAsistencias(encontrada);
+          await cargarCheckpoints(encontrada);
+        }
       }
     }
 
@@ -448,6 +466,22 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
     );
   }
 
+  // WS-11 (§12): mostrar error si no tiene permisos.
+  if (!tienePermiso) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <div className="bg-rose-500/20 border border-rose-400 rounded-xl p-4 space-y-2">
+          <p className="text-rose-300 font-bold">No tienes permiso para acceder</p>
+          <p className="text-rose-300/80 text-sm">{mensajePermiso}</p>
+        </div>
+        <p className="text-white/50 text-xs">
+          Si crees que esto es un error, contacta al administrador del sistema.
+        </p>
+      </div>
+    );
+  }
+
   if (jornadaActual.estado !== 'en_curso') {
     return (
       <div className="p-8 text-center space-y-2">
@@ -522,14 +556,18 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       <div className="flex gap-2">
         <button
           onClick={() => setEscanerAbierto(true)}
-          className="flex-1 bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest"
+          disabled={!puedeEscanearQR(usuario, jornadaActual)}
+          title={!puedeEscanearQR(usuario, jornadaActual) ? 'No tienes permiso para escanear QR' : ''}
+          className="flex-1 bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Escanear asistencia
         </button>
         {jornadaActual.estado === 'en_curso' && asistencias.length > 0 && (
           <button
             onClick={() => setCierreAbierto(true)}
-            className="flex-1 bg-amber-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-700"
+            disabled={!puedeCerrarClase(usuario, jornadaActual)}
+            title={!puedeCerrarClase(usuario, jornadaActual) ? 'No tienes permiso para cerrar clase' : ''}
+            className="flex-1 bg-amber-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cerrar clase
           </button>
