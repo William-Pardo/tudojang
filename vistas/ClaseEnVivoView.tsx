@@ -29,6 +29,10 @@ import { useAuth } from '../context/AuthContext';
 import EscanerAsistenciaClase from '../components/academico/EscanerAsistenciaClase';
 import { useVentanaClaseEnVivo } from '../hooks/useVentanaClaseEnVivo';
 import { minutosRestantesDeVentana } from '../servicios/academico/ventanaClaseEnVivoService';
+import {
+  determinarEstadoClaseEnVivo,
+  obtenerInfoEstadoClaseEnVivo,
+} from '../servicios/academico/estadoClaseEnVivoService';
 import { obtenerSedes as obtenerSedesPorDefecto } from '../servicios/sedesApi';
 import { getUser as obtenerUsuarioPorDefecto } from '../servicios/usuariosApi';
 import { obtenerEstudiantes as obtenerEstudiantesPorDefecto } from '../servicios/estudiantesApi';
@@ -448,19 +452,30 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
 
   const minutosRestantes = minutosRestantesDeVentana(jornadaActual, ahoraIso);
   const ventanaExpirada = minutosRestantes <= 0;
+  // WS-9 (§14): estados formales visuales de Clase en Vivo.
+  const tieneOperaciones = asistencias.length > 0;
+  const estadoClaseEnVivo = determinarEstadoClaseEnVivo(jornadaActual, ahoraIso, tieneOperaciones);
+  const infoEstado = obtenerInfoEstadoClaseEnVivo(estadoClaseEnVivo);
 
   return (
     <div className="p-8 space-y-6">
       <header className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
-          <span
-            className={`rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest ${
-              ventanaExpirada ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
-            }`}
-          >
-            {ventanaExpirada ? 'Ventana expirada' : `${minutosRestantes} min restantes`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest border ${
+                infoEstado.colorBg
+              } ${infoEstado.colorTexto} ${infoEstado.colorBorde}`}
+            >
+              {infoEstado.etiqueta}
+            </span>
+            {!ventanaExpirada && estadoClaseEnVivo !== 'closed' && (
+              <span className="rounded-full bg-slate-500/20 text-slate-400 px-2 py-1 text-[10px] font-black uppercase tracking-widest">
+                {minutosRestantes} min
+              </span>
+            )}
+          </div>
         </div>
         <p className="text-white/60">
           {jornadaActual.fecha} · {jornadaActual.horaInicio} - {jornadaActual.horaFin}
@@ -472,6 +487,28 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
           </p>
         )}
       </header>
+
+      {estadoClaseEnVivo === 'scheduled' && (
+        <div className={`rounded-lg p-3 ${infoEstado.colorBg} border ${infoEstado.colorBorde}`}>
+          <p className={`text-xs font-bold ${infoEstado.colorTexto}`}>{infoEstado.descripcion}</p>
+        </div>
+      )}
+
+      {estadoClaseEnVivo === 'expired' && (
+        <div className={`rounded-lg p-3 ${infoEstado.colorBg} border ${infoEstado.colorBorde}`}>
+          <p className={`text-xs font-bold ${infoEstado.colorTexto}`}>
+            {infoEstado.descripcion}. Por favor, cierra la clase manualmente si aún no lo has hecho.
+          </p>
+        </div>
+      )}
+
+      {estadoClaseEnVivo === 'cancelled' && (
+        <div className={`rounded-lg p-3 ${infoEstado.colorBg} border ${infoEstado.colorBorde}`}>
+          <p className={`text-xs font-bold ${infoEstado.colorTexto}`}>
+            {infoEstado.descripcion}. {jornadaActual.motivoCancelacion && `Motivo: ${jornadaActual.motivoCancelacion}`}
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <button
