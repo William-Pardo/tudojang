@@ -156,6 +156,9 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   // calcular (repository sin `obtenerEjecucion`, fallo de red, etc.) -- degrada a no mostrar la
   // seccion, no rompe el resto de la pantalla.
   const [rosterEsperado, setRosterEsperado] = useState<Estudiante[]>([]);
+  // Cierre de clase (§15.E): modal de confirmación.
+  const [cierreAbierto, setCierreAbierto] = useState(false);
+  const [cierreCargando, setCierreCargando] = useState(false);
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -196,6 +199,41 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       await cargarCheckpoints(jornadaActual);
     },
     [jornadaActual, checkpointMaterialServicio, notaBorradorPorAsignacionId, usuario, cargarCheckpoints]
+  );
+
+  const cerrarClase = useCallback(
+    async () => {
+      if (!jornadaActual) return;
+      setCierreCargando(true);
+      try {
+        // Registrar cierre: transicionar a 'pendiente_cierre' si estamos en 'en_curso'.
+        // En producción esto iría a Firestore via repository.
+        await repository.actualizarJornada?.(jornadaActual.tenantId, jornadaActual.id, {
+          estado: 'pendiente_cierre' as any,
+          asistenciaRegistrada: true,
+          objetivosImpartidos: ['(Cierre registrado en ' + new Date().toISOString() + ')'],
+          actualizadoEn: new Date().toISOString(),
+        });
+        // Transicionar final a 'cerrada' después.
+        await repository.actualizarJornada?.(jornadaActual.tenantId, jornadaActual.id, {
+          estado: 'cerrada' as any,
+          actualizadoEn: new Date().toISOString(),
+        });
+        setCierreAbierto(false);
+        // Recargar la jornada para reflejar el cierre.
+        const jornadas = await repository.listarJornadasPorTenant(jornadaActual.tenantId);
+        const actualizada = jornadas.find((j) => j.id === jornadaActual.id) ?? null;
+        if (actualizada) {
+          setJornadaActual(actualizada);
+        }
+      } catch (error) {
+        console.error('Error al cerrar clase:', error);
+        alert('Error al cerrar la clase. Por favor intenta de nuevo.');
+      } finally {
+        setCierreCargando(false);
+      }
+    },
+    [jornadaActual, repository]
   );
 
   useEffect(() => {
@@ -396,12 +434,22 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
         )}
       </header>
 
-      <button
-        onClick={() => setEscanerAbierto(true)}
-        className="bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest"
-      >
-        Escanear asistencia
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setEscanerAbierto(true)}
+          className="flex-1 bg-tkd-blue text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest"
+        >
+          Escanear asistencia
+        </button>
+        {jornadaActual.estado === 'en_curso' && asistencias.length > 0 && (
+          <button
+            onClick={() => setCierreAbierto(true)}
+            className="flex-1 bg-amber-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-amber-700"
+          >
+            Cerrar clase
+          </button>
+        )}
+      </div>
 
       <section className="space-y-2">
         <h2 className="text-sm font-black uppercase tracking-wide">
@@ -529,6 +577,115 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
           onClose={() => setEscanerAbierto(false)}
           onRegistrado={() => cargarAsistencias(jornadaActual)}
         />
+      )}
+
+      {cierreAbierto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white/5 rounded-2xl border border-white/10 p-8 max-w-lg space-y-6">
+            <div>
+              <h2 className="text-xl font-black uppercase">Confirmar cierre de clase</h2>
+              <p className="text-sm text-white/60 mt-1">
+                Verifica los datos antes de cerrar. Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="space-y-4 bg-white/5 rounded-xl p-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold uppercase">Resumen de asistencia</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Presentes:</span>
+                    <span className="font-bold">
+                      {asistencias.filter((a) => !a.isLate).length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Tarde:</span>
+                    <span className="font-bold">{asistencias.filter((a) => a.isLate).length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Completados:</span>
+                    <span className="font-bold">{asistencias.filter((a) => a.horaSalida).length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60">Total check-ins:</span>
+                    <span className="font-bold">{asistencias.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              {rosterEsperado.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <h3 className="text-sm font-bold uppercase">Cobertura</h3>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500"
+                        style={{
+                          width: `${(asistencias.length / rosterEsperado.length) * 100}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold">
+                      {asistencias.length}/{rosterEsperado.length}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {materiales.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <h3 className="text-sm font-bold uppercase">Materiales registrados</h3>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Usados:</span>
+                      <span className="font-bold">
+                        {Object.values(checkpointsPorAsignacionId).filter(
+                          (cp) => cp.estado === 'usado'
+                        ).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Parciales:</span>
+                      <span className="font-bold">
+                        {Object.values(checkpointsPorAsignacionId).filter(
+                          (cp) => cp.estado === 'parcial'
+                        ).length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">No usados:</span>
+                      <span className="font-bold">
+                        {Object.values(checkpointsPorAsignacionId).filter(
+                          (cp) => cp.estado === 'no_usado'
+                        ).length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCierreAbierto(false)}
+                disabled={cierreCargando}
+                className="flex-1 px-4 py-2 rounded-lg border border-white/20 text-white text-sm font-bold uppercase disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => cerrarClase()}
+                disabled={cierreCargando}
+                className="flex-1 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-bold uppercase hover:bg-amber-700 disabled:opacity-50"
+              >
+                {cierreCargando ? 'Cerrando…' : 'Confirmar cierre'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
