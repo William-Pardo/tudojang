@@ -787,7 +787,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
                         estudianteId: asistencias[0]?.estudianteId || 'desconocido',
                         estudianteNombre: asistencias[0]?.estudianteId || 'Estudiante',
                         jornadaId: jornadaActual.id,
-                        sedeName,
+                        sedeName: sedeNombre ?? undefined,
                         claseTema: jornadaActual.tema,
                         horaSalida: new Date().toLocaleTimeString('es-CO', {
                           hour: '2-digit',

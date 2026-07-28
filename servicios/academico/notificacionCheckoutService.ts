@@ -116,7 +116,7 @@ export async function enviarNotificacionCheckout(
       tutorNombre: contactoAcudiente.nombre,
       destinatario,
       canal,
-      tipo: TipoNotificacion.Notificacion,
+      tipo: TipoNotificacion.AvanceAcademico,
       mensaje,
       leida: false,
     });
