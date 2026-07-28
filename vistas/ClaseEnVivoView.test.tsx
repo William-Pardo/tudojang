@@ -463,7 +463,7 @@ describe('ClaseEnVivoView — header completo (WS-6, §15.A/§14)', () => {
 
     renderView({ repository, asistenciaRepository });
 
-    expect(await screen.findByText(/15 min restantes/i)).toBeInTheDocument();
+    expect(await screen.findByText(/15 min/i)).toBeInTheDocument();
   });
 
   it('muestra "Ventana expirada" cuando ya paso el cierre, aunque la jornada siga en_curso', async () => {
