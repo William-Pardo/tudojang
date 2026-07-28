@@ -51,6 +51,8 @@ import {
 } from '../servicios/academico/checkpointMaterialService';
 import type { CheckpointMaterialJornada, EstadoCheckpointMaterial } from '../models/academico/checkpointMaterial';
 import { LIMITE_NOTA_CHECKPOINT } from '../models/academico/checkpointMaterial';
+import type { CategoriaObservacionClase } from '../models/academico/jornada';
+import { LIMITE_NOTA_OBSERVACION_CLASE } from '../models/academico/jornada';
 
 // WS-4b (§15.D): flujo GUIADO -- estados fijos, no texto libre. Orden: primero los de
 // "durante" mas usados (usado/explicado/practicado), despues los de cobertura parcial/nula,
@@ -77,6 +79,29 @@ const ETIQUETA_ESTADO_CHECKPOINT: Record<EstadoCheckpointMaterial, string> = {
   no_usado: 'No usado',
   pendiente: 'Pendiente',
   no_aplica: 'No aplica',
+};
+
+// WS-5 (§10): observaciones grupales rápidas -- flujo guiado, no texto libre.
+const CATEGORIAS_OBSERVACION: CategoriaObservacionClase[] = [
+  'buena_energia',
+  'baja_energia',
+  'requiere_refuerzo',
+  'buen_avance',
+  'dificultad',
+  'interrumpida',
+  'material_insuficiente',
+  'excelente_participacion',
+];
+
+const ETIQUETA_CATEGORIA_OBSERVACION: Record<CategoriaObservacionClase, string> = {
+  buena_energia: 'Buena energía',
+  baja_energia: 'Baja energía',
+  requiere_refuerzo: 'Requiere refuerzo',
+  buen_avance: 'Buen avance técnico',
+  dificultad: 'Dificultad general',
+  interrumpida: 'Clase interrumpida',
+  material_insuficiente: 'Material insuficiente',
+  excelente_participacion: 'Excelente participación',
 };
 
 export interface ClaseEnVivoViewProps {
@@ -159,6 +184,9 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   // Cierre de clase (§15.E): modal de confirmación.
   const [cierreAbierto, setCierreAbierto] = useState(false);
   const [cierreCargando, setCierreCargando] = useState(false);
+  // Observaciones grupales rápidas (§10): categorías seleccionadas + nota corta.
+  const [observacionesSeleccionadas, setObservacionesSeleccionadas] = useState<CategoriaObservacionClase[]>([]);
+  const [notaObservacion, setNotaObservacion] = useState('');
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -206,12 +234,21 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
       if (!jornadaActual) return;
       setCierreCargando(true);
       try {
+        // Construir observación si hay categorías seleccionadas (§10: opcional).
+        const observacion = observacionesSeleccionadas.length > 0 ? {
+          categorias: observacionesSeleccionadas,
+          notaCorta: notaObservacion || undefined,
+          registradoPorUid: usuario?.id ?? 'sistema',
+          actualizadoEn: new Date().toISOString(),
+        } : undefined;
+
         // Registrar cierre: transicionar a 'pendiente_cierre' si estamos en 'en_curso'.
         // En producción esto iría a Firestore via repository.
         await repository.actualizarJornada?.(jornadaActual.tenantId, jornadaActual.id, {
           estado: 'pendiente_cierre' as any,
           asistenciaRegistrada: true,
           objetivosImpartidos: ['(Cierre registrado en ' + new Date().toISOString() + ')'],
+          observacionClase: observacion,
           actualizadoEn: new Date().toISOString(),
         });
         // Transicionar final a 'cerrada' después.
@@ -220,6 +257,8 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
           actualizadoEn: new Date().toISOString(),
         });
         setCierreAbierto(false);
+        setObservacionesSeleccionadas([]);
+        setNotaObservacion('');
         // Recargar la jornada para reflejar el cierre.
         const jornadas = await repository.listarJornadasPorTenant(jornadaActual.tenantId);
         const actualizada = jornadas.find((j) => j.id === jornadaActual.id) ?? null;
@@ -233,7 +272,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
         setCierreCargando(false);
       }
     },
-    [jornadaActual, repository]
+    [jornadaActual, repository, observacionesSeleccionadas, notaObservacion, usuario]
   );
 
   useEffect(() => {
@@ -666,10 +705,59 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
               )}
             </div>
 
+            <div className="space-y-3 bg-white/5 rounded-xl p-4">
+              <div>
+                <h3 className="text-sm font-bold uppercase mb-2">Observación grupal (opcional)</h3>
+                <p className="text-xs text-white/50 mb-3">Selecciona las categorías que apliquen a esta clase</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {CATEGORIAS_OBSERVACION.map((categoria) => (
+                    <button
+                      key={categoria}
+                      type="button"
+                      onClick={() =>
+                        setObservacionesSeleccionadas((actual) =>
+                          actual.includes(categoria)
+                            ? actual.filter((c) => c !== categoria)
+                            : [...actual, categoria]
+                        )
+                      }
+                      className={`rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-widest transition-colors ${
+                        observacionesSeleccionadas.includes(categoria)
+                          ? 'bg-sky-500/30 text-sky-300 border border-sky-400'
+                          : 'bg-white/5 text-white/60 border border-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      {ETIQUETA_CATEGORIA_OBSERVACION[categoria]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {observacionesSeleccionadas.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-white/10">
+                  <label className="text-xs font-bold uppercase">Nota adicional (opcional)</label>
+                  <textarea
+                    maxLength={LIMITE_NOTA_OBSERVACION_CLASE}
+                    value={notaObservacion}
+                    onChange={(e) => setNotaObservacion(e.target.value)}
+                    placeholder="Ejemplo: El grupo necesita más práctica de patadas altas..."
+                    className="w-full rounded-lg bg-white/5 border border-white/10 p-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-sky-400"
+                  />
+                  <p className="text-xs text-white/50">
+                    {notaObservacion.length}/{LIMITE_NOTA_OBSERVACION_CLASE}
+                  </p>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setCierreAbierto(false)}
+                onClick={() => {
+                  setCierreAbierto(false);
+                  setObservacionesSeleccionadas([]);
+                  setNotaObservacion('');
+                }}
                 disabled={cierreCargando}
                 className="flex-1 px-4 py-2 rounded-lg border border-white/20 text-white text-sm font-bold uppercase disabled:opacity-50"
               >
