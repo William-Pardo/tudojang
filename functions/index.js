@@ -65,6 +65,7 @@ const {
 } = require("./academico/asignaciones");
 const {
   crearServicioRegistrarAsistencia,
+  debugPerteneceAEjecucion,
 } = require("./academico/asistencia");
 const {
   crearServicioVencerAsignaciones,
@@ -629,6 +630,22 @@ exports.publishAsignacionesBatch = functionsV1.https.onCall(
 
 exports.registrarAsistenciaJornada = functionsV1.https.onCall(
   crearHandlerCallable(servicioRegistrarAsistencia)
+);
+
+exports.debugValidacionAsistencia = functionsV1.https.onCall(
+  async (data, context) => {
+    if (!context?.auth?.uid) {
+      throw new Error('Unauthorized');
+    }
+    const tenantId = data?.tenantId;
+    const jornadaId = data?.jornadaId;
+    const estudianteId = data?.estudianteId;
+    if (!tenantId || !jornadaId || !estudianteId) {
+      throw new Error('tenantId, jornadaId, estudianteId son requeridos');
+    }
+    const tenant = admin.firestore().collection('tenants').doc(tenantId);
+    return debugPerteneceAEjecucion({ firestore: admin.firestore(), tenant, tenantId, jornadaId, estudianteId });
+  }
 );
 
 exports.actualizarUsuarioStaff = functionsV1.https.onCall(

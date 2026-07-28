@@ -26,3 +26,14 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Debug helper: expone función para debuggear validación de asistencia desde la consola
+// Uso: window.debugClaseEnVivo.validarAsistencia('tenantId', 'jornadaId', 'estudianteId')
+if (typeof window !== 'undefined') {
+  (window as any).debugClaseEnVivo = {
+    validarAsistencia: async (tenantId: string, jornadaId: string, estudianteId: string) => {
+      const { debugValidacionAsistencia } = await import('./servicios/academico/asistenciaDebugService');
+      return debugValidacionAsistencia(tenantId, jornadaId, estudianteId);
+    },
+  };
+}

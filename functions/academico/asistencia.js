@@ -305,6 +305,71 @@ async function acumularMetricasAsistencia({ tenant, tenantId, estudianteId, minu
   });
 }
 
+// Debug: validacion de pertenencia detallada
+async function debugPerteneceAEjecucion({ firestore, tenant, tenantId, jornadaId, estudianteId }) {
+  const jornada = await tenant.collection('jornadas').doc(jornadaId).get();
+  if (!jornada.exists) return { error: 'Jornada no encontrada' };
+
+  const resultado = { estudiante: {}, jornada: {}, validaciones: {} };
+
+  const estudianteSnap = await firestore.collection('estudiantes').doc(estudianteId).get();
+  if (!estudianteSnap.exists) return { error: 'Estudiante no encontrado' };
+
+  const estudiante = estudianteSnap.data();
+  resultado.estudiante = {
+    tenantId: estudiante.tenantId,
+    grupo: estudiante.grupo,
+    sedeId: estudiante.sedeId,
+    grado: estudiante.grado,
+    estadoPago: estudiante.estadoPago,
+  };
+
+  resultado.validaciones.tenantMatch = estudiante.tenantId === tenantId;
+  resultado.validaciones.pagoAlDia = estudiante.estadoPago !== 'Vencido';
+  resultado.validaciones.noEnGradosExcluidos = !jornada.data().gradosExcluidos?.includes(estudiante.grado);
+
+  const ejecucionSnap = await tenant.collection('ejecucionesPrograma').doc(jornada.data().ejecucionProgramaId).get();
+  if (!ejecucionSnap.exists) return { ...resultado, error: 'EjecucionPrograma no encontrada' };
+
+  const ejecucion = ejecucionSnap.data();
+  resultado.ejecucion = {
+    grupoId: ejecucion.grupoId,
+    sedeId: ejecucion.sedeId,
+    id: ejecucion.id,
+  };
+
+  const grupoEstudianteSlug = grupoASlug(estudiante.grupo);
+  resultado.validaciones.grupoMatch = grupoEstudianteSlug === ejecucion.grupoId;
+  resultado.validaciones.grupoMatch_detail = {
+    grupoEstudiante: estudiante.grupo,
+    grupoEstudianteSlug,
+    grupoEjecucion: ejecucion.grupoId,
+  };
+
+  resultado.validaciones.sedeMatch = estudiante.sedeId === ejecucion.sedeId;
+
+  const inscripcionSnap = await tenant
+    .collection('ejecucionesPrograma')
+    .doc(jornada.data().ejecucionProgramaId)
+    .collection('inscripciones')
+    .doc(estudianteId)
+    .get();
+
+  resultado.validaciones.inscripcionExplicita = inscripcionSnap.exists
+    ? inscripcionSnap.data().estado === 'activa'
+    : false;
+
+  resultado.pertenece =
+    resultado.validaciones.tenantMatch &&
+    resultado.validaciones.pagoAlDia &&
+    resultado.validaciones.noEnGradosExcluidos &&
+    (resultado.validaciones.inscripcionExplicita ||
+      (resultado.validaciones.grupoMatch && resultado.validaciones.sedeMatch));
+
+  return resultado;
+}
+
 module.exports = {
   crearServicioRegistrarAsistencia,
+  debugPerteneceAEjecucion,
 };
