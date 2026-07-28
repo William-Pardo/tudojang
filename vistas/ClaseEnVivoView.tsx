@@ -33,6 +33,10 @@ import {
   determinarEstadoClaseEnVivo,
   obtenerInfoEstadoClaseEnVivo,
 } from '../servicios/academico/estadoClaseEnVivoService';
+import {
+  enviarNotificacionCheckout,
+  construirMensajeCheckout,
+} from '../servicios/academico/notificacionCheckoutService';
 import { obtenerSedes as obtenerSedesPorDefecto } from '../servicios/sedesApi';
 import { getUser as obtenerUsuarioPorDefecto } from '../servicios/usuariosApi';
 import { obtenerEstudiantes as obtenerEstudiantesPorDefecto } from '../servicios/estudiantesApi';
@@ -191,6 +195,11 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   // Observaciones grupales rápidas (§10): categorías seleccionadas + nota corta.
   const [observacionesSeleccionadas, setObservacionesSeleccionadas] = useState<CategoriaObservacionClase[]>([]);
   const [notaObservacion, setNotaObservacion] = useState('');
+  // Notificaciones a padres (§8): modal para enviar notificaciones.
+  const [notificacionesAbierto, setNotificacionesAbierto] = useState(false);
+  const [notificacionesCargando, setNotificacionesCargando] = useState(false);
+  const [contactoAcudiente, setContactoAcudiente] = useState({ nombre: '', whatsapp: '', email: '' });
+  const [resultadoNotificacion, setResultadoNotificacion] = useState<{ exitoso: boolean; mensaje: string } | null>(null);
 
   const cargarAsistencias = useCallback(
     async (jornadaCargada: JornadaInstruccion) => {
@@ -655,6 +664,124 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
         />
       )}
 
+      {notificacionesAbierto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white/5 rounded-2xl border border-white/10 p-8 max-w-md space-y-6">
+            <div>
+              <h2 className="text-lg font-black uppercase">Notificar a padres/acudientes</h2>
+              <p className="text-xs text-white/60 mt-1">
+                Envía notificación de que {asistencias.length} estudiante{asistencias.length !== 1 ? 's' : ''} terminó la clase y puede ser recogido.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold uppercase text-white/70">Nombre del acudiente</label>
+                <input
+                  type="text"
+                  value={contactoAcudiente.nombre}
+                  onChange={(e) => setContactoAcudiente((a) => ({ ...a, nombre: e.target.value }))}
+                  placeholder="Ej: María Pérez"
+                  className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase text-white/70">WhatsApp (opcional)</label>
+                <input
+                  type="tel"
+                  value={contactoAcudiente.whatsapp}
+                  onChange={(e) => setContactoAcudiente((a) => ({ ...a, whatsapp: e.target.value }))}
+                  placeholder="Ej: 3001234567"
+                  className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase text-white/70">Email (opcional)</label>
+                <input
+                  type="email"
+                  value={contactoAcudiente.email}
+                  onChange={(e) => setContactoAcudiente((a) => ({ ...a, email: e.target.value }))}
+                  placeholder="Ej: maria@example.com"
+                  className="w-full mt-1 rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              <div className="bg-sky-500/10 border border-sky-400/30 rounded-lg p-2">
+                <p className="text-xs text-sky-300">
+                  <strong>Nota:</strong> En producción, esto obtendría automáticamente los contactos de los acudientes del sistema.
+                </p>
+              </div>
+            </div>
+
+            {resultadoNotificacion && (
+              <div
+                className={`rounded-lg p-3 ${
+                  resultadoNotificacion.exitoso
+                    ? 'bg-emerald-500/20 border border-emerald-400 text-emerald-300'
+                    : 'bg-rose-500/20 border border-rose-400 text-rose-300'
+                }`}
+              >
+                <p className="text-xs font-bold">{resultadoNotificacion.mensaje}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNotificacionesAbierto(false);
+                  setContactoAcudiente({ nombre: '', whatsapp: '', email: '' });
+                  setResultadoNotificacion(null);
+                }}
+                disabled={notificacionesCargando}
+                className="flex-1 px-4 py-2 rounded-lg border border-white/20 text-white text-xs font-bold uppercase disabled:opacity-50"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setNotificacionesCargando(true);
+                  try {
+                    const resultado = await enviarNotificacionCheckout(
+                      {
+                        estudianteId: asistencias[0]?.estudianteId || 'desconocido',
+                        estudianteNombre: asistencias[0]?.estudianteId || 'Estudiante',
+                        jornadaId: jornadaActual.id,
+                        sedeName,
+                        claseTema: jornadaActual.tema,
+                        horaSalida: new Date().toLocaleTimeString('es-CO', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                      },
+                      contactoAcudiente
+                    );
+                    setResultadoNotificacion({
+                      exitoso: resultado.exitoso,
+                      mensaje: resultado.mensaje,
+                    });
+                  } catch (error) {
+                    setResultadoNotificacion({
+                      exitoso: false,
+                      mensaje: 'Error al enviar notificación',
+                    });
+                  } finally {
+                    setNotificacionesCargando(false);
+                  }
+                }}
+                disabled={notificacionesCargando || !contactoAcudiente.nombre}
+                className="flex-1 px-4 py-2 rounded-lg bg-sky-600 text-white text-xs font-bold uppercase hover:bg-sky-700 disabled:opacity-50"
+              >
+                {notificacionesCargando ? 'Enviando…' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cierreAbierto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white/5 rounded-2xl border border-white/10 p-8 max-w-lg space-y-6">
@@ -787,26 +914,35 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCierreAbierto(false);
+                    setObservacionesSeleccionadas([]);
+                    setNotaObservacion('');
+                  }}
+                  disabled={cierreCargando}
+                  className="flex-1 px-4 py-2 rounded-lg border border-white/20 text-white text-sm font-bold uppercase disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cerrarClase()}
+                  disabled={cierreCargando}
+                  className="flex-1 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-bold uppercase hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {cierreCargando ? 'Cerrando…' : 'Confirmar cierre'}
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setCierreAbierto(false);
-                  setObservacionesSeleccionadas([]);
-                  setNotaObservacion('');
-                }}
-                disabled={cierreCargando}
-                className="flex-1 px-4 py-2 rounded-lg border border-white/20 text-white text-sm font-bold uppercase disabled:opacity-50"
+                onClick={() => setNotificacionesAbierto(true)}
+                className="w-full px-4 py-2 rounded-lg border border-sky-500/50 text-sky-400 text-xs font-bold uppercase hover:bg-sky-500/10"
               >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => cerrarClase()}
-                disabled={cierreCargando}
-                className="flex-1 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-bold uppercase hover:bg-amber-700 disabled:opacity-50"
-              >
-                {cierreCargando ? 'Cerrando…' : 'Confirmar cierre'}
+                + Notificar a padres/acudientes (opcional)
               </button>
             </div>
           </div>
