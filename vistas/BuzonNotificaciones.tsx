@@ -4,7 +4,7 @@
 // su(s) estudiante(s) (pagos, avances, eventos, bienvenida...) y las lee acá.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { RolUsuario, type NotificacionHistorial } from '../tipos';
+import { RolUsuario, TipoNotificacion, type NotificacionHistorial } from '../tipos';
 import { formatearFecha } from '../utils/formatters';
 import { resolveStudentsForConsultor } from '../servicios/academico/tutorStudentResolver';
 import {
@@ -12,9 +12,12 @@ import {
     marcarNotificacionComoLeida,
 } from '../servicios/notificacionesApi';
 import { IconoCampana } from '../components/Iconos';
+import { useConfiguracion } from '../context/DataContext';
+import MediosPagoResumen from '../components/MediosPagoResumen';
 
 const VistaBuzonNotificaciones: React.FC = () => {
     const { usuario } = useAuth();
+    const { configClub } = useConfiguracion();
     const [notificaciones, setNotificaciones] = useState<NotificacionHistorial[]>([]);
     const [cargando, setCargando] = useState(true);
 
@@ -44,6 +47,11 @@ const VistaBuzonNotificaciones: React.FC = () => {
 
     const noLeidas = useMemo(() => notificaciones.filter((n) => !n.leida).length, [notificaciones]);
 
+    const tienePagoPendiente = useMemo(
+        () => notificaciones.some((n) => n.tipo === TipoNotificacion.RecordatorioPago || n.tipo === TipoNotificacion.AvisoVencimiento),
+        [notificaciones]
+    );
+
     const marcarLeida = async (id: string) => {
         // Optimista: marcamos en UI y persistimos.
         setNotificaciones((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)));
@@ -68,6 +76,19 @@ const VistaBuzonNotificaciones: React.FC = () => {
                     </p>
                 </div>
             </header>
+
+            {tienePagoPendiente &&
+                (configClub?.pagoNequi || configClub?.pagoDaviplata || configClub?.pagoBreB || configClub?.pagoBanco) && (
+                <div className="rounded-[2rem] border border-amber-100 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 p-6 space-y-3">
+                    <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-widest">Medios de Pago Disponibles</p>
+                    <MediosPagoResumen
+                        pagoNequi={configClub?.pagoNequi}
+                        pagoDaviplata={configClub?.pagoDaviplata}
+                        pagoBreB={configClub?.pagoBreB}
+                        pagoBanco={configClub?.pagoBanco}
+                    />
+                </div>
+            )}
 
             {cargando ? (
                 <div className="rounded-[2rem] border border-gray-100 dark:border-white/10 p-8 text-sm text-gray-400">Cargando notificaciones...</div>

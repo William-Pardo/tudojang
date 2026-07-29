@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
 import { obtenerEstudiantePorNumIdentificacion } from '../servicios/estudiantesApi';
+import MediosPagoResumen from '../components/MediosPagoResumen';
 import { reportarPagoEstudiante } from '../servicios/pagosEstudiantesApi';
 import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAprobar, IconoLogoOficial, IconoBillete } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
@@ -161,6 +162,19 @@ const ReportarPagoPublico: React.FC = () => {
                                                 <IconoInformacion className="w-3 h-3 flex-shrink-0" />
                                                 Después de pagar, subí tu comprobante abajo para que se registre tu pago
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {/* Medios de pago manual (Nequi, Daviplata, Bre-B, Banco) */}
+                                    {(tenant?.pagoNequi || tenant?.pagoDaviplata || tenant?.pagoBreB || tenant?.pagoBanco) && (
+                                        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-3">
+                                            <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Medios de Pago Directo</p>
+                                            <MediosPagoResumen
+                                                pagoNequi={tenant?.pagoNequi}
+                                                pagoDaviplata={tenant?.pagoDaviplata}
+                                                pagoBreB={tenant?.pagoBreB}
+                                                pagoBanco={tenant?.pagoBanco}
+                                            />
                                         </div>
                                     )}
 

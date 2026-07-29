@@ -40,6 +40,8 @@ export const generarMensajePersonalizado = async (
 
   const medios = [];
   if (configClub.pagoNequi) medios.push(`Nequi (${configClub.pagoNequi})`);
+  if (configClub.pagoDaviplata) medios.push(`Daviplata (${configClub.pagoDaviplata})`);
+  if (configClub.pagoBreB) medios.push(`Bre-B (${configClub.pagoBreB})`);
   if (configClub.pagoBanco) medios.push(configClub.pagoBanco);
   const mediosPago = medios.join(", ");
 
