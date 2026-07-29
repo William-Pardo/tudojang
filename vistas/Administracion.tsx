@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
-import { IconoDashboard, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial } from '../components/Iconos';
+import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
@@ -20,9 +20,9 @@ const VistaAdministracion: React.FC = () => {
     const [procesandoMora, setProcesandoMora] = useState(false);
 
     const tabs = [
-        { id: 'resumen', label: 'Resumen', icono: IconoDashboard },
+        { id: 'resumen', label: 'Resumen', icono: IconoResumenAdministracion },
         { id: 'tesoreria', label: 'Tesorería', icono: IconoTesoreria },
-        { id: 'validar', label: 'Validar Pagos', icono: IconoLogoOficial },
+        { id: 'validar', label: 'Validar Pagos', icono: IconoValidarPagos },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis },
     ];
@@ -84,7 +84,7 @@ const VistaAdministracion: React.FC = () => {
                                 : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'
                                 }`}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                            <tab.icono className={`w-[30px] h-[30px] md:w-6 md:h-6 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span className="hidden md:inline">{tab.label}</span>
                         </button>
                     ))}

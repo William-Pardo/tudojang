@@ -57,9 +57,10 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoAgenda, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoAgenda, IconoConfiguracion, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
-    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
+    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion,
+    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia
 } from './components/Iconos';
 
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
@@ -89,12 +90,12 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     );
 
     const todosLosEnlaces = [
-        { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
+        { ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
         // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
         // Centro de Estudios (materiales del hijo) + Alertas.
         { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
         // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
         // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
         // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
@@ -105,12 +106,12 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
         // gestión de Alertas del staff.
-        { ruta: "/buzon", texto: "Notificaciones", icono: IconoCampana, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
@@ -149,7 +150,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
             <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
                 {enlacesVisibles.map((enlace) => (
                     <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
-                        <enlace.icono className="w-5 h-5 flex-shrink-0" />
+                        <enlace.icono className="w-10 h-10 flex-shrink-0" />
                         <span className={`${estaAbierta ? 'block' : 'hidden'}`}>{enlace.texto}</span>
                     </ReactRouterDOM.Link>
                 ))}
@@ -162,7 +163,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     </ReactRouterDOM.Link>
                 )}
                 <ReactRouterDOM.Link to="/mi-perfil" onClick={onCerrar} className={getButtonStyle('/mi-perfil')}>
-                    <IconoUsuario className="w-5 h-5 flex-shrink-0" />
+                    <IconoUsuario className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Mi Perfil</span>
                 </ReactRouterDOM.Link>
                 <button onClick={onLogout} className={getButtonStyle('/logout', true)}>

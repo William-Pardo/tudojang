@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconoProgresoEstudiante, IconoFlujoAcademico } from '../components/Iconos';
 import { useAuth } from '../context/AuthContext';
 import { RolUsuario } from '../tipos';
 import { centroEstudiosRepository, prepararAsignacionesCentroEstudios } from '../servicios/academico/centroEstudiosRepository';
@@ -211,7 +212,10 @@ const CentroEstudios: React.FC = () => {
                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            📚 Flujo académico
+            <span className="flex items-center gap-2">
+              <IconoFlujoAcademico className="w-8 h-8" />
+              Flujo académico
+            </span>
           </button>
           <button
             role="tab"
@@ -225,7 +229,10 @@ const CentroEstudios: React.FC = () => {
                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            📊 Progreso estudiantes
+            <span className="flex items-center gap-2">
+              <IconoProgresoEstudiante className="w-8 h-8" />
+              Progreso estudiantes
+            </span>
           </button>
         </div>
       )}

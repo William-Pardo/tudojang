@@ -5,8 +5,9 @@ import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPro
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
     IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar,
-    IconoAgregar, IconoImagen, IconoCampana, IconoUsuario, IconoGuardar,
+    IconoAgregar, IconoImagen, IconoUsuario, IconoGuardar,
     IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar,
+    IconoProgramasExtra, IconoConfiguracionAlertas,
     IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado,
     IconoHistorial, IconoEmail
 } from '../components/Iconos';
@@ -611,8 +612,8 @@ const VistaConfiguracion: React.FC = () => {
                             { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
                             { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
-                            { id: 'programas', label: 'Programas Extra', icon: IconoLogoOficial },
-                            { id: 'alertas', label: 'Alertas', icon: IconoCampana },
+                            { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra },
+                            { id: 'alertas', label: 'Alertas', icon: IconoConfiguracionAlertas },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
                         ].map(tab => (
                             <button
@@ -620,7 +621,7 @@ const VistaConfiguracion: React.FC = () => {
                                 onClick={() => setActiveTab(tab.id as any)}
                                 className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
-                                <tab.icon className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                                <tab.icon className={`w-[30px] h-[30px] md:w-6 md:h-6 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                                 <span className="inline">{tab.label}</span>
                             </button>
                         ))}
@@ -1029,7 +1030,7 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="max-w-4xl space-y-8 animate-fade-in">
                         <section className="bg-white dark:bg-white/5 p-10 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-10">
                             <div className="flex items-center gap-4">
-                                <IconoCampana className="w-10 h-10 text-tkd-blue" />
+                                <IconoConfiguracionAlertas className="w-10 h-10 text-tkd-blue" />
                                 <div>
                                     <h3 className="text-2xl font-black uppercase tracking-tighter">Motor de Notificaciones</h3>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Business Intelligence Rules</p>
