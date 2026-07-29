@@ -46,7 +46,7 @@ const EscanerAsistenciaClase: React.FC<EscanerAsistenciaClaseProps> = ({
         <EscanerQR
             onDetectarEstudiante={manejarDeteccion}
             onClose={onClose}
-            titulo="Clase en Vivo"
+            titulo="Control de Asistencia"
             subtitulo="Check-in / Check-out de asistencia"
         />
     );

@@ -84,6 +84,9 @@ const {
   crearServicioDeleteSede,
 } = require("./academico/sedes");
 const {
+  crearServicioRepararSedesEjecucionPrograma,
+} = require("./academico/repararSedes");
+const {
   crearServicioCrearEstudiante,
 } = require("./academico/estudiantes");
 const {
@@ -395,6 +398,10 @@ const servicioDeleteSede = crearServicioDeleteSede({
   firestore: admin.firestore()
 });
 
+const servicioRepararSedesEjecucionPrograma = crearServicioRepararSedesEjecucionPrograma({
+  firestore: admin.firestore()
+});
+
 const servicioCrearEstudiante = crearServicioCrearEstudiante({
   firestore: admin.firestore()
 });
@@ -663,6 +670,15 @@ exports.updateSede = functionsV1.https.onCall(
 );
 exports.deleteSede = functionsV1.https.onCall(
   crearHandlerCallable(servicioDeleteSede)
+);
+
+// Reparacion de datos legados (causa raiz real del bug "William Roa no puede hacer
+// check-in en Clase en Vivo", sesion 2026-07-28): repara EjecucionPrograma.sedeId que
+// quedaron guardados como slug del nombre de la sede en vez del id real -- ver
+// academico/repararSedes.js para el detalle completo. Callable de mantenimiento, gateada
+// a Admin/SuperAdmin como el resto de operaciones de sedes.
+exports.repararSedesEjecucionPrograma = functionsV1.https.onCall(
+  crearHandlerCallable(servicioRepararSedesEjecucionPrograma)
 );
 
 // Alta segura de estudiantes -- movido a Cloud Function (mismo patron de bug real que

@@ -188,7 +188,7 @@ export const VistaEstudiantes: React.FC = () => {
     const tabs = [
         { id: 'kicho', label: 'Misión KICHO', icono: IconoCampana, visible: usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor },
         { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor },
-        { id: 'asistencia', label: 'Clase en Vivo', icono: LogoDinamico, visible: true },
+        { id: 'asistencia', label: 'Control de Asistencia', icono: LogoDinamico, visible: true },
         { id: 'certificados', label: 'Certificaciones', icono: IconoCertificado, visible: !esTutor },
         { id: 'carnets', label: 'Carnetización', icono: IconoExportar, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente },
     ].filter(t => t.visible);

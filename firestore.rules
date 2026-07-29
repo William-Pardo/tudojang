@@ -195,6 +195,20 @@ service cloud.firestore {
       allow update, delete: if isInstructor();
     }
 
+    // Asistencia de guarderia/entrega a tutores (Sistema C, colección raíz `asistencia`,
+    // singular -- sin relación a `tenants/{t}/jornadas/{j}/asistencias`, plural, esa es
+    // Clase en Vivo/JornadaInstruccion). Nunca tuvo regla propia: caía en el catch-all
+    // final (`allow read, write: if false`), bloqueando el check-in de guardería para
+    // TODOS los roles, siempre (bug real descubierto 2026-07-28, ver ERR-0010 en
+    // bitacora.json). El documento no tiene campo `tenantId` (ver tipos.ts::Asistencia),
+    // así que el aislamiento por tenant queda a nivel de rol (isInstructor()), mismo piso
+    // de seguridad que ya tenía el resto de este flujo -- no se agrega tenantId acá para
+    // no ampliar el alcance de este fix puntual.
+    match /asistencia/{docId} {
+      allow read, create, update: if isInstructor();
+      allow delete: if false;
+    }
+
     match /eventos/{docId} {
       // Fix tutor-role-end-to-end (2026-07-14): los consultores (Tutor/Estudiante) pueden LEER
       // los eventos del club para ver a cuáles aplican. Son anuncios del tenant, no datos

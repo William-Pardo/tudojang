@@ -424,7 +424,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   if (esperandoSeleccionDeVentana && jornadasEnVentana.length > 1) {
     return (
       <div className="p-8 space-y-4">
-        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <h1 className="text-xl font-black uppercase">Control de Asistencia</h1>
         <p className="text-white/60">
           Tenés {jornadasEnVentana.length} clases activas ahora mismo. Elegí cuál:
         </p>
@@ -459,7 +459,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   if (estadoCarga === 'no-encontrada' || !jornadaActual) {
     return (
       <div className="p-8 text-center space-y-2">
-        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <h1 className="text-xl font-black uppercase">Control de Asistencia</h1>
         <p className="text-white/60">No se encontró la jornada solicitada.</p>
       </div>
     );
@@ -469,7 +469,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   if (!tienePermiso) {
     return (
       <div className="p-8 text-center space-y-4">
-        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <h1 className="text-xl font-black uppercase">Control de Asistencia</h1>
         <div className="bg-rose-500/20 border border-rose-400 rounded-xl p-4 space-y-2">
           <p className="text-rose-300 font-bold">No tienes permiso para acceder</p>
           <p className="text-rose-300/80 text-sm">{mensajePermiso}</p>
@@ -484,7 +484,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
   if (jornadaActual.estado !== 'en_curso') {
     return (
       <div className="p-8 text-center space-y-2">
-        <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+        <h1 className="text-xl font-black uppercase">Control de Asistencia</h1>
         <p className="text-white/60">
           La jornada no está en curso. Estado actual: {jornadaActual.estado}.
         </p>
@@ -503,7 +503,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
     <div className="p-8 space-y-6">
       <header className="space-y-1">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-xl font-black uppercase">Clase en Vivo</h1>
+          <h1 className="text-xl font-black uppercase">Control de Asistencia</h1>
           <div className="flex items-center gap-2">
             <span
               className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest border ${

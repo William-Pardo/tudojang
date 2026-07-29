@@ -240,7 +240,7 @@ describe('VistaEstudiantes', () => {
     expect(mockExportarCSV).toHaveBeenCalled();
     await user.click(screen.getByText('Anterior'));
     await user.click(screen.getByText('Siguiente'));
-    await user.click(screen.getByTitle('Clase en Vivo'));
+    await user.click(screen.getByTitle('Control de Asistencia'));
     expect(screen.getByText('Vista Clase')).toBeInTheDocument();
     await user.click(screen.getByTitle('Carnetización'));
     expect(screen.getByText('Vista Carnets')).toBeInTheDocument();

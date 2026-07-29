@@ -105,7 +105,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: rutaClaseEnVivo, texto: "Clase en Vivo", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
         { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
@@ -115,7 +115,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     ];
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => {
-        if (enlace.texto === 'Clase en Vivo') {
+        if (enlace.texto === 'Control de Asistencia') {
             // Fuera de la ventana horaria, el link queda oculto (Módulo Clase en Vivo.txt §3:
             // "Fuera de esa ventana, el acceso debe estar bloqueado, oculto o deshabilitado").
             return enlace.roles.includes(usuario.rol) && !!jornadaActiva;

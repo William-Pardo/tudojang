@@ -120,8 +120,20 @@ const EscanerQR: React.FC<EscanerQRProps> = ({
             }
             await onDetectarEstudiante(idEstudiante);
         } catch (error) {
-            const invalido = error instanceof SyntaxError || (error as Error)?.message === "Código QR inválido";
-            mostrarNotificacion(invalido ? "Código QR inválido" : "Error al procesar el registro", "error");
+            const err = error as { message?: string; code?: string };
+            const invalido = error instanceof SyntaxError || err?.message === "Código QR inválido";
+            // Los errores del callable de Firebase (registrarAsistenciaJornada, etc.) llegan con
+            // code="functions/<code-servidor>" y message = el texto exacto que armamos server-side
+            // (ej. "El estudiante no esta matriculado en la ejecucion de esta jornada") -- ese texto
+            // ya esta escrito para el usuario final, mostrarlo tal cual reemplaza el generico y
+            // permite diagnosticar sin consola. Cualquier otro error (red, fallos de otros servicios
+            // como en el flujo de guarderia) no tiene ese prefijo y sigue mostrando el generico, para
+            // no filtrar mensajes tecnicos crudos.
+            const esErrorDeCallable = typeof err?.code === 'string' && err.code.startsWith('functions/');
+            const texto = invalido
+                ? "Código QR inválido"
+                : (esErrorDeCallable && err.message ? err.message : "Error al procesar el registro");
+            mostrarNotificacion(texto, "error");
         } finally {
             // Se resetea tanto en exito como en error: un consumidor que no
             // cierra el escaner tras un escaneo exitoso (Clase en Vivo, para

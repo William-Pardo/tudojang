@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import AsignacionesView from './AsignacionesView';
+import AsignacionesView, { resolverSedeIdPorNombre } from './AsignacionesView';
 import type { RecursoAcademico } from '../../models/academico/recurso';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { JornadaRepository } from '../../servicios/academico/jornadaRepository';
@@ -604,6 +604,44 @@ describe('Programa academico: crear, validar y editar', () => {
       expect(jornada.sedeId).toBe('sede-real-xyz789');
       expect(jornada.sedeId).not.toBe('sede-norte');
     }
+  });
+
+  // Fix 2026-07-28 (causa raiz real de "William Roa no puede hacer check-in en Clase en
+  // Vivo"): resolverSedeIdPorNombre() dejo de caer a `slugificar(nombreSede)` en silencio
+  // cuando el nombre no matchea. Se testea la funcion pura directamente (no vía el
+  // formulario completo): el <select> de sede se "autocura" contra el mismo catalogo
+  // antes de guardar (abrirCrearPrograma/abrirEditarPrograma), por lo que el camino de
+  // error no es alcanzable de punta a punta con un catalogo estatico de test -- solo se
+  // manifiesta en produccion con una EjecucionPrograma legada cuya sede fue renombrada o
+  // eliminada despues de guardarse.
+  describe('resolverSedeIdPorNombre: fin del fallback silencioso a slug', () => {
+    const catalogo = [{ id: 'sede-real-xyz789', nombre: 'Cocodrilos' }];
+
+    it('resuelve el id real con match exacto', () => {
+      expect(resolverSedeIdPorNombre('Cocodrilos', catalogo)).toBe('sede-real-xyz789');
+    });
+
+    it('resuelve el id real aunque el nombre difiera en mayusculas/espacios', () => {
+      expect(resolverSedeIdPorNombre('  cocodrilos  ', catalogo)).toBe('sede-real-xyz789');
+      expect(resolverSedeIdPorNombre('COCODRILOS', catalogo)).toBe('sede-real-xyz789');
+    });
+
+    it('lanza un error explicito en vez de devolver un slug cuando la sede no existe en el catálogo', () => {
+      expect(() => resolverSedeIdPorNombre('Sede Que Ya No Existe', catalogo)).toThrow(
+        /No se encontró la sede "Sede Que Ya No Existe"/i
+      );
+    });
+
+    it('el error nunca degrada a un valor tipo slug (regresión directa del bug de William Roa)', () => {
+      let mensajeError = '';
+      try {
+        resolverSedeIdPorNombre('Sede Que Ya No Existe', catalogo);
+      } catch (err) {
+        mensajeError = err instanceof Error ? err.message : String(err);
+      }
+      expect(mensajeError).not.toBe('');
+      expect(mensajeError).not.toBe('sede-que-ya-no-existe');
+    });
   });
 
   // Fix 2026-07-16 (bug real reportado por el usuario: "necesito validar que las reglas de

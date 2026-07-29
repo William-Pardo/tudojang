@@ -12,7 +12,6 @@ import { IconoAprobar, IconoCerrar, IconoCasa, IconoAprobar as IconoLab } from '
 import LogoDinamico from '../components/LogoDinamico';
 import EscanerAsistencia from '../components/EscanerAsistencia';
 import Loader from '../components/Loader';
-import { simularAsistenciasMasivas } from '../utils/classSimulator';
 
 const VistaGestionClase: React.FC = () => {
     const { usuario } = useAuth();
@@ -76,19 +75,6 @@ const VistaGestionClase: React.FC = () => {
         }
     };
 
-    const handleSimularClase = async () => {
-        if (!sedeSeleccionadaId || !usuario) return;
-        setProcesandoId('SIM');
-        try {
-            await simularAsistenciasMasivas(sedeSeleccionadaId, usuario.tenantId);
-            mostrarNotificacion("5 Alumnos inyectados a clase", "success");
-        } catch (error: any) {
-            mostrarNotificacion(error.message, "error");
-        } finally {
-            setProcesandoId(null);
-        }
-    };
-
     const handleConfirmarEntrega = async (persona: string) => {
         if (!modalEntrega) return;
         setProcesandoId(modalEntrega.asist.id);
@@ -109,18 +95,11 @@ const VistaGestionClase: React.FC = () => {
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Clase en Vivo</h1>
+                            <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Control de Asistencia</h1>
                             <span className="flex h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" title="Sincronizado en tiempo real"></span>
                         </div>
                         <div className="flex items-center gap-4 mt-1">
                             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">{asistencias.length} Alumnos presentes</p>
-                            <button
-                                onClick={handleSimularClase}
-                                disabled={procesandoId === 'SIM'}
-                                className="text-[9px] font-black text-tkd-blue/40 hover:text-tkd-blue uppercase tracking-tighter transition-colors"
-                            >
-                                {procesandoId === 'SIM' ? 'PROCESANDO...' : '[ SIMULAR ENTRADAS ]'}
-                            </button>
                         </div>
                     </div>
                     <button
