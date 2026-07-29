@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
 import { registrarAspirantePublico } from '../servicios/censoApi';
+import MediosPagoResumen from '../components/MediosPagoResumen';
 import { IconoAprobar, IconoEnviar, IconoExitoAnimado, IconoUsuario, IconoInformacion, IconoCandado } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
@@ -103,18 +104,12 @@ const PasarelaInscripcion: React.FC = () => {
 
                                 <div className="bg-gray-50 dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 space-y-6">
                                     <div className="space-y-4">
-                                        {tenant?.pagoNequi && (
-                                            <div className="flex justify-between items-center text-gray-500">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-[#E71D73]">Nequi</span>
-                                                <span className="font-bold text-tkd-dark dark:text-white">{tenant.pagoNequi}</span>
-                                            </div>
-                                        )}
-                                        {tenant?.pagoBanco && (
-                                            <div className="flex flex-col gap-1 text-gray-500">
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-tkd-blue">Banco / Transferencia</span>
-                                                <span className="font-bold text-tkd-dark dark:text-white text-xs leading-relaxed">{tenant.pagoBanco}</span>
-                                            </div>
-                                        )}
+                                        <MediosPagoResumen
+                                            pagoNequi={tenant?.pagoNequi}
+                                            pagoDaviplata={tenant?.pagoDaviplata}
+                                            pagoBreB={tenant?.pagoBreB}
+                                            pagoBanco={tenant?.pagoBanco}
+                                        />
                                     </div>
 
                                     <div className="h-px bg-gray-200 dark:bg-gray-700 my-4"></div>

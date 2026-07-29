@@ -16,6 +16,7 @@ import {
     IconoContrato, IconoCasa, IconoCampana
 } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
+import MediosPagoResumen from '../components/MediosPagoResumen';
 
 const VistaMiPerfil: React.FC = () => {
     const { usuario } = useAuth();
@@ -310,6 +311,18 @@ const VistaMiPerfil: React.FC = () => {
                                             }`}>{estudianteVinculado.estadoPago}</span></p>
                                         </div>
                                     </div>
+                                    {(estudianteVinculado.saldoDeudor || 0) > 0 &&
+                                        (configClub?.pagoNequi || configClub?.pagoDaviplata || configClub?.pagoBreB || configClub?.pagoBanco) && (
+                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-800 space-y-3">
+                                            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Medios de Pago Disponibles</p>
+                                            <MediosPagoResumen
+                                                pagoNequi={configClub?.pagoNequi}
+                                                pagoDaviplata={configClub?.pagoDaviplata}
+                                                pagoBreB={configClub?.pagoBreB}
+                                                pagoBanco={configClub?.pagoBanco}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="p-8 text-center text-gray-400">

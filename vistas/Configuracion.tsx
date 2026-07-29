@@ -682,6 +682,30 @@ const VistaConfiguracion: React.FC = () => {
                                         Pegá acá el link de pago de tu cuenta en Wompi, PayU o ePayco para que tus alumnos puedan pagar en línea. Tudojang no gestiona ni recibe este dinero — ver Términos de Servicio.
                                     </p>
                                 </div>
+                                <div className="p-6 bg-amber-50 dark:bg-amber-900/10 rounded-3xl border border-amber-100 dark:border-amber-800/20 space-y-4">
+                                    <label className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-widest">Otros Medios de Recaudo (Opcional)</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 ml-1">Número Nequi</label>
+                                            <input type="text" name="pagoNequi" value={localConfigClub.pagoNequi || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 ml-1">Número Daviplata</label>
+                                            <input type="text" name="pagoDaviplata" value={localConfigClub.pagoDaviplata || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 ml-1">Llave BRE-B</label>
+                                        <input type="text" name="pagoBreB" value={localConfigClub.pagoBreB || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Email, Celular o ID..." />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black uppercase text-gray-400 block mb-2 ml-1">Detalles Cuenta Bancaria</label>
+                                        <input type="text" name="pagoBanco" value={localConfigClub.pagoBanco || ''} onChange={(e) => handleConfigChange(e as any, setLocalConfigClub)} className={inputClasses} placeholder="Banco, tipo y número de cuenta..." />
+                                    </div>
+                                    <p className="text-[9px] text-gray-400 font-bold italic">
+                                        Estos datos se muestran a tus alumnos y acudientes en el portal de inscripción y en el reporte de pago, y se incluyen en los recordatorios automáticos de mora.
+                                    </p>
+                                </div>
                                 <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-800/20 space-y-4">
                                     <div className="flex justify-between items-center">
                                         <label className="text-[10px] font-black uppercase text-green-700 dark:text-green-400 tracking-widest">Valor Matrícula / Formulario</label>
