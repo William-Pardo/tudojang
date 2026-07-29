@@ -269,7 +269,7 @@ const VistaHorarios: React.FC = () => {
                                                     className="w-full flex items-center justify-center gap-2 bg-tkd-red text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-tkd-red/90 transition-all"
                                                 >
                                                     <IconoAprobar className="w-3 h-3" />
-                                                    Iniciar Clase en Vivo
+                                                    Iniciar Asistencia
                                                 </button>
                                             )}
                                         </div>

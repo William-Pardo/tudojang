@@ -300,15 +300,47 @@ const DIA_SEMANA_A_INDICE: Record<string, number> = {
 const INDICE_A_DIA_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const slugificar = (valor: string) => valor.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+// Comparacion insensible a mayusculas/espacios repetidos -- mismo criterio que
+// claveComparable() en functions/academico/sedes.js (unicidad de nombre server-side).
+// Evita fallos de match por diferencias triviales de capitalizacion/espacios que antes
+// caian directo al fallback de slug de abajo. Exportada (junto con
+// resolverSedeIdPorNombre) exclusivamente para test unitario directo: el <select> de
+// sede en el formulario se "autocura" contra el mismo catalogo antes de guardar (ver
+// abrirCrearPrograma/abrirEditarPrograma), por lo que el camino de error de
+// resolverSedeIdPorNombre no es alcanzable de punta a punta con un catalogo estatico de
+// test -- solo se manifiesta en produccion con datos legados (sede renombrada/eliminada
+// despues de que el programa ya fue guardado).
+export function normalizarNombreSedeParaComparar(nombre: string): string {
+  return nombre.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 // Fix 2026-07-16 (bug reportado: Tutor/Estudiante nunca ven ninguna clase en su Agenda):
 // jornada.sedeId se guardaba como slugificar(nombreDeSede) -- un slug del NOMBRE ("sede-principal")
 // -- mientras que Estudiante.sedeId (FormularioEstudiante.tsx) es el ID real del documento
 // `sedes/{id}` de Firestore. Nunca podian coincidir en `j.sedeId === hijo.sedeId`
 // (AgendaView.tsx), asi que la Agenda del consultor quedaba SIEMPRE vacia. Se resuelve el
-// ID real buscando la sede por nombre en el catalogo ya cargado (sedesActivas); si por algun
-// motivo no se encuentra (dato inconsistente), cae al slug como ultimo recurso defensivo.
-function resolverSedeIdPorNombre(nombreSede: string, sedesActivas: OpcionJornada[]): string {
-  return sedesActivas.find((sede) => sede.nombre === nombreSede)?.id ?? slugificar(nombreSede);
+// ID real buscando la sede por nombre en el catalogo ya cargado (sedesActivas).
+//
+// Fix 2026-07-28 (causa raiz real del bug reportado "William Roa no puede hacer check-in
+// en Clase en Vivo"): el fallback anterior (`?? slugificar(nombreSede)`) generaba en
+// SILENCIO un sedeId que jamas coincide con el sedeId real de ningun estudiante
+// (Estudiante.sedeId es SIEMPRE el id real del documento `sedes/{id}`, nunca un slug de
+// su nombre) -- EjecucionPrograma quedaba con un sedeId roto sin ningun error visible al
+// guardar el programa, y el bug solo se manifestaba semanas despues, en el check-in, sin
+// pista de la causa real. Se reemplaza el fallback silencioso por un error explicito: si
+// de verdad no hay ninguna sede activa que coincida (renombrada o eliminada), guardarPrograma
+// debe fallar ruidosamente en vez de escribir un valor que rompe el check-in de TODOS los
+// estudiantes de esa sede (el catch de guardarPrograma ya muestra el mensaje como error
+// accionable en la UI, ver linea ~1181).
+export function resolverSedeIdPorNombre(nombreSede: string, sedesActivas: OpcionJornada[]): string {
+  const claveBuscada = normalizarNombreSedeParaComparar(nombreSede);
+  const sede = sedesActivas.find((s) => normalizarNombreSedeParaComparar(s.nombre) === claveBuscada);
+  if (!sede) {
+    throw new Error(
+      `No se encontró la sede "${nombreSede}" en el catálogo activo. Es posible que haya sido renombrada o eliminada -- volvé a seleccionar la sede del programa antes de guardar.`
+    );
+  }
+  return sede.id;
 }
 
 function contarJornadasARealizar(fechaInicio?: string, fechaFin?: string, diasHorario?: { dia: string }[]): number {
@@ -1085,7 +1117,16 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
         ...programaEditando,
         nombre: nombreNormalizado,
         grupoObjetivo: programaEditando.grupoObjetivo || 'Infantil',
-        sede: obtenerNombreSedeActiva(programaEditando.sede, sedesActivas, sedesActivas[0]?.nombre ?? 'Sede principal'),
+        // Fix 2026-07-28 (mismo hallazgo que resolverSedeIdPorNombre, ver comentario ahi):
+        // antes se pasaba por obtenerNombreSedeActiva() aca tambien, que ante un nombre no
+        // encontrado lo reemplazaba EN SILENCIO por sedesActivas[0]?.nombre -- una sede
+        // DISTINTA, posiblemente incorrecta, sin avisar al admin. Eso hacia inalcanzable el
+        // throw de resolverSedeIdPorNombre: para cuando se llamaba, el nombre YA habia sido
+        // forzado a uno que si iba a encontrar. Se deja el nombre tal cual lo tiene el
+        // formulario (ya validado contra el catalogo actual al abrir el modal via
+        // normalizarSedePrograma en abrirEditarPrograma) para que resolverSedeIdPorNombre sea
+        // la unica autoridad real: matchea o falla ruidosamente, nunca reasigna en silencio.
+        sede: programaEditando.sede,
         ...instructorFinal,
         tags: programaEditando.tags.map((tag) => tag.trim()).filter(Boolean),
       };

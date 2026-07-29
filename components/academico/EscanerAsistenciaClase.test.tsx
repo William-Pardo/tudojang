@@ -113,6 +113,20 @@ describe('EscanerAsistenciaClase', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  it('muestra el mensaje real del callable cuando el error viene con code functions/* (ej. estudiante no matriculado)', async () => {
+    detect.mockResolvedValue([{ rawValue: '{"id":"estudiante-4"}' }]);
+    const errorCallable = Object.assign(new Error('El estudiante no esta matriculado en la ejecucion de esta jornada'), {
+      code: 'functions/permission-denied',
+    });
+    (registrarAsistenciaClase as jest.Mock).mockRejectedValue(errorCallable);
+    render(<EscanerAsistenciaClase tenantId="tenant-1" jornadaId="jornada-1" onClose={jest.fn()} />);
+
+    await waitFor(() => expect(scan).toBeDefined());
+    await act(async () => scan?.());
+
+    expect(notify).toHaveBeenCalledWith('El estudiante no esta matriculado en la ejecucion de esta jornada', 'error');
+  });
+
   it('informa QR invalido sin invocar el callable', async () => {
     detect.mockResolvedValue([{ rawValue: '{"x":1}' }]);
     render(<EscanerAsistenciaClase tenantId="tenant-1" jornadaId="jornada-1" onClose={jest.fn()} />);
@@ -127,7 +141,7 @@ describe('EscanerAsistenciaClase', () => {
   it('el boton de cerrar invoca onClose', async () => {
     const close = jest.fn();
     render(<EscanerAsistenciaClase tenantId="tenant-1" jornadaId="jornada-1" onClose={close} />);
-    await screen.findByText('Clase en Vivo');
+    await screen.findByText('Control de Asistencia');
     fireEvent.click(screen.getAllByRole('button')[0]);
     expect(close).toHaveBeenCalled();
   });

@@ -288,7 +288,7 @@ describe('VistaHorarios', () => {
 
       renderHorarios();
 
-      const boton = await screen.findByRole('button', { name: /iniciar clase en vivo/i });
+      const boton = await screen.findByRole('button', { name: /iniciar asistencia/i });
       fireEvent.click(boton);
 
       expect(await screen.findByText('Clase en vivo montada: jornada-real-hoy')).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe('VistaHorarios', () => {
       renderHorarios();
 
       expect(await screen.findByText('Programa comercial')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /iniciar clase en vivo/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /iniciar asistencia/i })).not.toBeInTheDocument();
     });
 
     it('no muestra el boton para una clase academica fuera de la ventana horaria', async () => {
@@ -325,7 +325,7 @@ describe('VistaHorarios', () => {
       renderHorarios();
 
       expect(await screen.findByText('Programa fuera de ventana')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /iniciar clase en vivo/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /iniciar asistencia/i })).not.toBeInTheDocument();
     });
   });
 });
