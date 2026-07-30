@@ -116,6 +116,16 @@ jobs:
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_WOMPI_PUBLIC_KEY: ${{ secrets.VITE_WOMPI_PUBLIC_KEY }}
           VITE_WOMPI_INTEGRITY_SECRET: ${{ secrets.VITE_WOMPI_INTEGRITY_SECRET }}
+          # Flags del asistente virtual (WS, shared/soporte/flags.ts). NO son secretos --
+          # son booleanos publicos que terminan igual en el bundle del cliente -- por eso
+          # van como valor literal aca, no como secrets.*. Sin estas 3 lineas, vite.config.ts
+          # las recibe `undefined` en CI (el runner no tiene .env.local) y
+          # obtenerBanderasAsistente() cae siempre a su default (aiEnabled: false), aunque
+          # la Cloud Function consultarAsistenteIa y la API key de Gemini esten
+          # correctamente desplegadas -- bug real detectado 2026-07-29.
+          VITE_ASSISTANT_CATALOG_V1: 'true'
+          VITE_ASSISTANT_AI_ENABLED: 'true'
+          VITE_ASSISTANT_ESCALATION_ENABLED: 'true'
 
       # El bundle recien existe aca, y compilado CON los secretos reales -- que es la unica
       # condicion en la que este chequeo significa algo. En el job `pruebas` no hay `dist/`

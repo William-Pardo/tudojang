@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
-import { IconoDashboard, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial } from '../components/Iconos';
+import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
@@ -20,10 +20,10 @@ const VistaAdministracion: React.FC = () => {
     const [procesandoMora, setProcesandoMora] = useState(false);
 
     const tabs = [
-        { id: 'resumen', label: 'Resumen', icono: IconoDashboard },
-        { id: 'tesoreria', label: 'Tesorería', icono: IconoTesoreria },
-        { id: 'validar', label: 'Validar Pagos', icono: IconoLogoOficial },
-        { id: 'horarios', label: 'Agenda', icono: IconoAgenda },
+        { id: 'resumen', label: 'Resumen', icono: IconoResumenAdministracion, iconScale: 'scale-[1.34]' },
+        { id: 'tesoreria', label: 'Tesorería', icono: IconoTesoreria, iconScale: 'scale-[1.45]' },
+        { id: 'validar', label: 'Validar Pagos', icono: IconoValidarPagos, iconScale: 'scale-[1.61]' },
+        { id: 'horarios', label: 'Agenda', icono: IconoAgenda, iconScale: 'scale-[1.62]' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis },
     ];
 
@@ -79,12 +79,12 @@ const VistaAdministracion: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as AdminTab)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id
                                 ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10'
                                 : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'
                                 }`}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                            <tab.icono className={`w-[30px] h-[30px] md:w-6 md:h-6 ${tab.iconScale || ''} ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span className="hidden md:inline">{tab.label}</span>
                         </button>
                     ))}

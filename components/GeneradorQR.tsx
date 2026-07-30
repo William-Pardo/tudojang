@@ -43,27 +43,27 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
       <div 
         ref={cardRef}
         style={{ backgroundColor: configClub.colorPrimario }}
-        className="w-[340px] h-[215px] rounded-xl shadow-2xl overflow-hidden flex flex-col relative pt-[19px] px-[19px] pb-[32px] border border-white/20"
+        className="w-[340px] h-[215px] rounded-xl shadow-2xl overflow-hidden flex flex-col relative pt-[19px] px-[19px] pb-[20px] border border-white/20"
       >
         <div className="flex justify-between items-start z-10 mb-3">
             <div className="text-left max-w-[190px]">
                 <h1 className="text-[14px] font-black uppercase tracking-tight text-white leading-[1.2] drop-shadow-md">
                     {configClub.nombreClub}
                 </h1>
-                <p className="text-[9px] font-bold text-white/60 uppercase mt-0.5">
+                <p className="text-[9px] font-bold text-white/60 uppercase mt-0.5 leading-none">
                     {sedeEstudiante?.nombre || 'Sede Principal'}
                 </p>
             </div>
             <div className="bg-white p-1 rounded-lg shadow-md flex-shrink-0">
-                <LogoDinamico className="w-9 h-9" />
+                <LogoDinamico className="w-8 h-8" />
             </div>
         </div>
 
         <div className="flex gap-4 items-center flex-grow z-10">
             <div className="bg-white p-1.5 rounded-xl shadow-lg flex-shrink-0">
-                <QRCodeSVG 
-                    value={estudiante.id} 
-                    size={70}
+                <QRCodeSVG
+                    value={estudiante.id}
+                    size={64}
                     level="H"
                     fgColor={configClub.colorPrimario}
                     bgColor="#FFFFFF"
@@ -71,32 +71,32 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
             </div>
 
             <div className="flex flex-col justify-center text-white">
-                <span className="text-[7px] font-black uppercase tracking-[0.2em] text-white/40 mb-1.5">Identificación Alumno</span>
-                <h2 className="text-[17px] font-black uppercase leading-[1.4]">
+                <span className="text-[7px] font-black uppercase tracking-[0.2em] text-white/40 mb-1.5 leading-none">Identificación Alumno</span>
+                <h2 className="text-[17px] font-black uppercase leading-[1.2]">
                     {estudiante.nombres}
                 </h2>
-                <h2 className="text-[17px] font-black uppercase leading-[1.4] mb-2">
+                <h2 className="text-[17px] font-black uppercase leading-[1.2] mb-2">
                     {estudiante.apellidos}
                 </h2>
                 <div className="h-[2px] w-10 mb-2" style={{ backgroundColor: configClub.colorSecundario }}></div>
-                <p className="text-[10px] font-bold text-white/90">ID: {estudiante.numeroIdentificacion}</p>
+                <p className="text-[10px] font-bold text-white/90 leading-none">ID: {estudiante.numeroIdentificacion}</p>
             </div>
         </div>
 
         <div className="mt-2 pt-2 border-t border-white/10 z-10">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-black text-white/50 uppercase">Grado:</span>
-                    <div 
+                    <span className="text-[8px] font-black text-white/50 uppercase leading-none relative -top-1">Grado:</span>
+                    <div
                         style={{ background: visualGrado.background, color: visualGrado.color }}
-                        className="px-3 py-0.5 rounded-md text-[10px] font-black uppercase shadow-sm border border-black/10 transition-colors"
+                        className="px-3 py-0.5 rounded-md text-[10px] font-black uppercase shadow-sm border border-black/10 transition-colors leading-none"
                     >
-                        {estudiante.grado}
+                        <span className="relative -top-1">{estudiante.grado}</span>
                     </div>
                 </div>
                 <div className="text-right">
-                    <span className="text-[7px] font-black text-white/40 uppercase block">Ingreso</span>
-                    <p className="text-[9px] font-bold text-white/90">{estudiante.fechaIngreso}</p>
+                    <span className="text-[7px] font-black text-white/40 uppercase block leading-none">Ingreso</span>
+                    <p className="text-[9px] font-bold text-white/90 leading-none">{estudiante.fechaIngreso}</p>
                 </div>
             </div>
         </div>

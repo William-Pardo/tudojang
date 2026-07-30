@@ -104,7 +104,7 @@ const VistaTienda: React.FC = () => {
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Gestión de Equipamiento y Suministros</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <button onClick={() => setModalCompartirAbierto(true)} className="flex-1 sm:flex-none bg-white dark:bg-gray-800 border-2 border-tkd-blue/10 text-tkd-blue px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-tkd-blue hover:text-white transition-all flex items-center justify-center gap-2">
+          <button onClick={() => setModalCompartirAbierto(true)} className="flex-1 sm:flex-none bg-white dark:bg-gray-800 border-2 border-tkd-blue/10 dark:border-blue-400/20 text-tkd-blue dark:text-blue-400 px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-tkd-blue hover:text-white transition-all flex items-center justify-center gap-2">
             <IconoCompartir className="w-4 h-4" /> Enlace Público
           </button>
           {esAdmin && (

@@ -6,8 +6,8 @@ import type {
     SensibilidadSoporte,
 } from './tipos';
 
-const VERSION = '1.0.3';
-const VERIFIED_AT = '2026-06-24';
+const VERSION = '1.0.4';
+const VERIFIED_AT = '2026-07-29';
 const OWNER = 'Producto y Soporte Tudojang';
 const DEFAULT_ESCALATION = 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.';
 const AUTH_UI_ONLY = 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.';
@@ -197,10 +197,10 @@ export const CATALOGO_SOPORTE_V1 = {
             ['firmar', 'legalizar', 'inyectar'],
             ['Abre Misión KICHO.', 'Revisa el lote aceptado y su documentación.', 'Firma y legaliza solo con autorización administrativa.'],
             ['vistas/MisionKicho.tsx'], { sensitivity: 'privileged' }),
-        entry('students.live-class', 'estudiantes', 'Clase en vivo y control de salida', ['Admin', 'Editor', 'Asistente', 'Tutor'], '/estudiantes',
-            ['clase en vivo', 'asistencia por qr', 'entrada estudiante', 'salida estudiante', 'verificar recogida'],
+        entry('students.live-class', 'estudiantes', 'Control de Asistencia y control de salida', ['Admin', 'Editor', 'Asistente', 'Tutor'], '/estudiantes',
+            ['control de asistencia', 'asistencia por qr', 'clase en vivo', 'entrada estudiante', 'salida estudiante', 'verificar recogida'],
             ['registrar', 'escanear', 'marcar', 'verificar', 'abrir'],
-            ['Abre Clase en Vivo.', 'Escanea el QR o registra la entrada.', 'Marca al estudiante listo y verifica la persona autorizada al entregar.'],
+            ['Abre Control de Asistencia.', 'Escanea el QR o registra la entrada.', 'Marca al estudiante listo y verifica la persona autorizada al entregar.'],
             ['vistas/GestionClase.tsx'], { sensitivity: 'sensitive' }),
         entry('students.certificates', 'estudiantes', 'Certificados individuales y grupales', AEA, '/estudiantes',
             ['generar certificado', 'certificacion', 'diploma', 'certificado grupal'],

@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { GradoTKD, GrupoEdad, type Estudiante } from '../tipos';
-import { IconoCertificado, IconoBuscar, IconoExportar, IconoInformacion, IconoAprobar, IconoUsuario, IconoHistorial } from '../components/Iconos';
+import { IconoCertificados, IconoBuscar, IconoExportar, IconoInformacion, IconoAprobar, IconoUsuario, IconoHistorial } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarCertificadoPdf } from '../utils/certificateGenerator';
 import Loader from '../components/Loader';
@@ -102,7 +102,7 @@ const VistaCertificaciones: React.FC = () => {
                 <div className="lg:col-span-1 space-y-6">
                     <section className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
                         <div className="flex items-center gap-3 mb-8 border-b dark:border-gray-700 pb-4">
-                            <IconoCertificado className="w-5 h-5 text-tkd-blue" />
+                            <IconoCertificados className="w-5 h-5 text-tkd-blue" />
                             <h2 className="text-sm font-black uppercase tracking-widest dark:text-white">Emisión Oficial</h2>
                         </div>
 
@@ -128,7 +128,7 @@ const VistaCertificaciones: React.FC = () => {
                                 <label className="text-[10px] font-black uppercase text-gray-400 block ml-1 tracking-widest">Dirigido a:</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-tkd-blue">
-                                        <IconoUsuario className="w-5 h-5" />
+                                        <IconoUsuario className="w-6 h-6" />
                                     </div>
                                     <input
                                         type="text"
@@ -249,7 +249,7 @@ const VistaCertificaciones: React.FC = () => {
                                                         className="bg-tkd-dark text-white p-3 rounded-xl hover:bg-tkd-blue transition-all active:scale-95 shadow-md"
                                                         title="Generar Certificado Individual"
                                                     >
-                                                        <IconoCertificado className="w-5 h-5" />
+                                                        <IconoCertificados className="w-5 h-5" />
                                                     </button>
                                                 ) : (
                                                     <div className="p-2.5 text-green-500"><IconoAprobar className="w-5 h-5" /></div>

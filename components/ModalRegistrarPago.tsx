@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Estudiante, TransaccionPago } from '../tipos';
 import { RolUsuario } from '../tipos';
 import { useAuth } from '../context/AuthContext';
@@ -241,7 +242,7 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
 
     if (!abierto || !estudiante) return null;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
             {modalAnularAbierto && (
                 <ModalConfirmacion
@@ -531,7 +532,8 @@ const ModalRegistrarPago: React.FC<Props> = ({ estudiante, abierto, onCerrar, on
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

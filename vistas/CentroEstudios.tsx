@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconoProgresoEstudiante, IconoFlujoAcademico } from '../components/Iconos';
 import { useAuth } from '../context/AuthContext';
 import { RolUsuario } from '../tipos';
 import { centroEstudiosRepository, prepararAsignacionesCentroEstudios } from '../servicios/academico/centroEstudiosRepository';
@@ -198,35 +199,39 @@ const CentroEstudios: React.FC = () => {
           estudiantes", no quede debajo un stepper de un flujo distinto (bug reportado:
           el stepper de Flujo académico seguía visible en la pestaña de Métricas). */}
       {puedeGestionarJornadas && (
-        <div className="flex gap-2 rounded-2xl bg-gray-100 dark:bg-white/10 p-1 w-fit" role="tablist" aria-label="Secciones de gestión">
-          <button
-            role="tab"
-            aria-selected={tabGestion === 'flujo'}
-            id="tab-flujo"
-            aria-controls="panel-flujo"
-            onClick={() => setTabGestion('flujo')}
-            className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
-              tabGestion === 'flujo'
-                ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            📚 Flujo académico
-          </button>
-          <button
-            role="tab"
-            aria-selected={tabGestion === 'metricas'}
-            id="tab-metricas"
-            aria-controls="panel-metricas"
-            onClick={() => setTabGestion('metricas')}
-            className={`rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider transition-all ${
-              tabGestion === 'metricas'
-                ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-sm'
-                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-          >
-            📊 Progreso estudiantes
-          </button>
+        <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-fit" role="tablist" aria-label="Secciones de gestión">
+          <div className="flex flex-row gap-1">
+            <button
+              role="tab"
+              aria-selected={tabGestion === 'flujo'}
+              id="tab-flujo"
+              aria-controls="panel-flujo"
+              onClick={() => setTabGestion('flujo')}
+              className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                tabGestion === 'flujo'
+                  ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10'
+                  : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'
+              }`}
+            >
+              <IconoFlujoAcademico className={`w-[30px] h-[30px] scale-[1.39] ${tabGestion === 'flujo' ? 'text-tkd-red' : ''}`} />
+              <span>Flujo académico</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={tabGestion === 'metricas'}
+              id="tab-metricas"
+              aria-controls="panel-metricas"
+              onClick={() => setTabGestion('metricas')}
+              className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                tabGestion === 'metricas'
+                  ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10'
+                  : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'
+              }`}
+            >
+              <IconoProgresoEstudiante className={`w-[30px] h-[30px] scale-[1.11] ${tabGestion === 'metricas' ? 'text-tkd-red' : ''}`} />
+              <span>Progreso estudiantes</span>
+            </button>
+          </div>
         </div>
       )}
 

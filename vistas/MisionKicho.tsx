@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho } from '../servicios/censoApi';
+import { crearTicketSoporte } from '../servicios/soporteApi';
 import { useEstudiantes, useSedes } from '../context/DataContext';
 import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
 import {
@@ -17,7 +18,6 @@ import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
-import EmptyState from '../components/EmptyState';
 
 // Componente Interno: Reloj de Conteo Regresivo
 const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion }) => {
@@ -74,6 +74,8 @@ const VistaMisionKicho: React.FC = () => {
     const [activando, setActivando] = useState(false);
     const [showExitoModal, setShowExitoModal] = useState(false);
     const [sedeSeleccionada, setSedeSeleccionada] = useState<string>('');
+    const [solicitando, setSolicitando] = useState(false);
+    const [solicitudEnviada, setSolicitudEnviada] = useState(false);
 
     const [mostrarFirma, setMostrarFirma] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -125,6 +127,27 @@ const VistaMisionKicho: React.FC = () => {
             mostrarNotificacion("No se pudo activar el protocolo automático.", "error");
         } finally {
             setActivando(false);
+        }
+    };
+
+    const handleSolicitarKicho = async () => {
+        if (!usuario) return;
+        setSolicitando(true);
+        try {
+            await crearTicketSoporte({
+                tenantId: usuario.tenantId,
+                userId: usuario.id,
+                userNombre: usuario.nombreUsuario,
+                userEmail: usuario.email,
+                asunto: "Solicitud de activación: Misión KICHO",
+                resumenIA: `El club solicita activar el Protocolo KICHO (censo masivo de aspirantes) desde la vista Misión KICHO. Alumnos actuales: ${estudiantes.length}.`
+            });
+            setSolicitudEnviada(true);
+            mostrarNotificacion("Solicitud enviada a Soporte Master", "success");
+        } catch (e) {
+            mostrarNotificacion("No se pudo enviar la solicitud. Intenta de nuevo.", "error");
+        } finally {
+            setSolicitando(false);
         }
     };
 
@@ -230,11 +253,38 @@ const VistaMisionKicho: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <EmptyState
-                        Icono={LogoDinamico}
-                        titulo="Sin Misiones Activas"
-                        mensaje="No tienes un protocolo de captura de datos activo. Si necesitas realizar un censo masivo, contacta con Aliant Master Control."
-                    />
+                    <div className="bg-gradient-to-br from-tkd-blue to-blue-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden border border-white/10">
+                        <div className="relative z-10 space-y-8 max-w-2xl">
+                            <div className="bg-white/20 w-20 h-20 rounded-3xl flex items-center justify-center backdrop-blur-md">
+                                <LogoDinamico className="w-12 h-12" />
+                            </div>
+                            <div className="space-y-4">
+                                <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">¿Qué es la Misión KICHO?</h2>
+                                <p className="text-blue-100 text-lg font-medium leading-relaxed">
+                                    Es un protocolo de carga masiva: genera un link/QR único para que tus alumnos y sus tutores ingresen sus propios datos desde el celular. Tú solo revisas y apruebas cada registro antes de que se inyecte a tu base oficial — te ahorra horas de digitación.
+                                </p>
+                                <p className="text-blue-100 text-lg font-medium leading-relaxed">
+                                    Para escuelas ya en operación, la activación pasa por Soporte Master: así se evita una carga masiva accidental sobre datos reales. Solicítala aquí y un asesor de Aliant la habilita para ti.
+                                </p>
+                            </div>
+                            {solicitudEnviada ? (
+                                <div className="flex items-center gap-3 px-6 py-5 bg-white/10 rounded-2xl border border-white/20 w-fit">
+                                    <IconoAprobar className="w-6 h-6 text-green-300" />
+                                    <span className="text-xs font-black uppercase tracking-widest">Solicitud enviada. Soporte Master te contactará para activarla.</span>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={handleSolicitarKicho}
+                                    disabled={solicitando}
+                                    className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                >
+                                    {solicitando ? <div className="w-5 h-5 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div> : <IconoCampana className="w-6 h-6" />}
+                                    Solicitar Misión KICHO
+                                </button>
+                            )}
+                        </div>
+                        <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-tkd-red/20 rounded-full blur-[100px]"></div>
+                    </div>
                 )}
 
                 {/* MODAL DE ÉXITO AL ACTIVAR */}

@@ -10,8 +10,7 @@ import { obtenerMisionActivaTenant } from '../servicios/censoApi';
 import { PLANES_SAAS } from '../constantes';
 
 // Componentes
-import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificado, IconoInformacion, IconoCampana } from '../components/Iconos';
-import LogoDinamico from '../components/LogoDinamico';
+import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificados, IconoInformacion, IconoCampana, IconoCarnets, IconoControlAsistencia } from '../components/Iconos';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import ModalVerFirma from '../components/ModalVerFirma';
@@ -187,10 +186,10 @@ export const VistaEstudiantes: React.FC = () => {
 
     const tabs = [
         { id: 'kicho', label: 'Misión KICHO', icono: IconoCampana, visible: usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor },
-        { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor },
-        { id: 'asistencia', label: 'Control de Asistencia', icono: LogoDinamico, visible: true },
-        { id: 'certificados', label: 'Certificaciones', icono: IconoCertificado, visible: !esTutor },
-        { id: 'carnets', label: 'Carnetización', icono: IconoExportar, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente },
+        { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor, iconScale: 'scale-[1.28]' },
+        { id: 'asistencia', label: 'Control de Asistencia', icono: IconoControlAsistencia, visible: true, iconScale: 'scale-[1.48]' },
+        { id: 'certificados', label: 'Certificaciones', icono: IconoCertificados, visible: !esTutor, iconScale: 'scale-[1.62]' },
+        { id: 'carnets', label: 'Carnetización', icono: IconoCarnets, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente, iconScale: 'scale-[1.60]' },
     ].filter(t => t.visible);
 
     return (
@@ -286,10 +285,10 @@ export const VistaEstudiantes: React.FC = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as TabId)}
-                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                            className={`flex-shrink-0 flex items-center justify-center gap-3 px-6 py-4 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.02]' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             title={tab.label}
                         >
-                            <tab.icono className={`w-5 h-5 md:w-4 md:h-4 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                            <tab.icono className={`w-[30px] h-[30px] md:w-6 md:h-6 ${tab.iconScale || ''} ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                             <span className="hidden md:inline">{tab.label}</span>
                             {tab.id === 'kicho' && <div className="w-2 h-2 bg-tkd-red rounded-full animate-pulse flex-shrink-0"></div>}
                         </button>

@@ -11,6 +11,9 @@ import { formatearFecha } from '../utils/formatters';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
 
+// Oculto a pedido explícito (2026-07-30): ver nota junto al botón "Procesar Impresión" más abajo.
+const MOSTRAR_BOTON_PROCESAR_IMPRESION = false;
+
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
     const { sedesVisibles } = useSedes();
@@ -86,18 +89,23 @@ const VistaCarnetizacion: React.FC = () => {
                                     </select>
                                 </div>
 
-                                <button
-                                    onClick={handleGenerarLote}
-                                    disabled={pendientes.length === 0 || procesando}
-                                    className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95 disabled:bg-gray-600 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3 mt-4"
-                                >
-                                    {procesando ? (
-                                        <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    ) : (
-                                        <IconoExportar className="w-5 h-5" />
-                                    )}
-                                    {procesando ? 'Procesando Lote...' : 'Procesar Impresión'}
-                                </button>
+                                {/* Oculto a pedido explícito (2026-07-30): el flujo real de impresión pasa por
+                                    "Solicitar Fabricación" (Aliant). Este botón queda en el código, sin eliminar,
+                                    por si se reactiva un flujo de impresión local propio más adelante. */}
+                                {MOSTRAR_BOTON_PROCESAR_IMPRESION && (
+                                    <button
+                                        onClick={handleGenerarLote}
+                                        disabled={pendientes.length === 0 || procesando}
+                                        className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-95 disabled:bg-gray-600 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3 mt-4"
+                                    >
+                                        {procesando ? (
+                                            <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <IconoExportar className="w-5 h-5" />
+                                        )}
+                                        {procesando ? 'Procesando Lote...' : 'Procesar Impresión'}
+                                    </button>
+                                )}
 
                                 <button
                                     onClick={async () => {
@@ -144,10 +152,7 @@ const VistaCarnetizacion: React.FC = () => {
                                 <span className="text-tkd-blue">•</span> Calidad de inyección: 300 DPI
                             </li>
                             <li className="text-[9px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed flex gap-2">
-                                <span className="text-tkd-blue">•</span> Regla de legibilidad WCAG activa
-                            </li>
-                            <li className="text-[9px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed flex gap-2">
-                                <span className="text-tkd-blue">•</span> Inclusión de marcas de corte
+                                <span className="text-tkd-blue">•</span> Impresión a color por una cara
                             </li>
                         </ul>
                     </div>

@@ -11,7 +11,7 @@ describe('soporteService por capas', () => {
         const antes = getRemainingQueries();
         const respuesta = await consultarSabonimVirtual('Como registro la asistencia por QR', '', RolUsuario.Tutor);
 
-        expect(respuesta).toMatch(/Clase en Vivo/i);
+        expect(respuesta).toMatch(/Control de Asistencia/i);
         expect(respuesta).not.toContain('[ESCALAR_SOPORTE_MASTER]');
         expect(getRemainingQueries()).toBe(antes);
     });

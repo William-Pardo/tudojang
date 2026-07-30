@@ -44,6 +44,7 @@ import { driveService } from './services/storage/driveService';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
+import VistaFirmaContratoColaborador from './vistas/FirmaContratoColaborador';
 import VistaFirmaImagen from './vistas/FirmaImagen';
 import CensoPublico from './vistas/CensoPublico';
 import ReportarPagoPublico from './vistas/ReportarPagoPublico';
@@ -57,9 +58,10 @@ import LogoDinamico from './components/LogoDinamico';
 import AsistenteVirtual from './components/AsistenteVirtual';
 import HeatmapOverlay from './components/HeatmapOverlay';
 import {
-    IconoAgenda, IconoCampana, IconoCertificado, IconoConfiguracion, IconoDashboard, IconoEstudiantes, IconoEventos,
+    IconoAgenda, IconoConfiguracion, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
-    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion
+    IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion,
+    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia
 } from './components/Iconos';
 
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
@@ -89,12 +91,12 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     );
 
     const todosLosEnlaces = [
-        { ruta: "/", texto: "Administración", icono: IconoDashboard, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
+        { ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
         // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
         // Centro de Estudios (materiales del hijo) + Alertas.
         { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCertificado, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
         // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
         // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
         // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
@@ -105,12 +107,12 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
         { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
         { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoAprobar, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/notificaciones", texto: "Alertas", icono: IconoCampana, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
         // gestión de Alertas del staff.
-        { ruta: "/buzon", texto: "Notificaciones", icono: IconoCampana, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
         { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
@@ -149,7 +151,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
             <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
                 {enlacesVisibles.map((enlace) => (
                     <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
-                        <enlace.icono className="w-5 h-5 flex-shrink-0" />
+                        <enlace.icono className="w-10 h-10 flex-shrink-0" />
                         <span className={`${estaAbierta ? 'block' : 'hidden'}`}>{enlace.texto}</span>
                     </ReactRouterDOM.Link>
                 ))}
@@ -162,11 +164,11 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     </ReactRouterDOM.Link>
                 )}
                 <ReactRouterDOM.Link to="/mi-perfil" onClick={onCerrar} className={getButtonStyle('/mi-perfil')}>
-                    <IconoUsuario className="w-5 h-5 flex-shrink-0" />
+                    <IconoUsuario className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Mi Perfil</span>
                 </ReactRouterDOM.Link>
                 <button onClick={onLogout} className={getButtonStyle('/logout', true)}>
-                    <IconoLogout className="w-5 h-5 flex-shrink-0" />
+                    <IconoLogout className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
                 </button>
             </div>
@@ -198,6 +200,28 @@ const AppLayout: React.FC = () => {
         document.documentElement.classList.toggle('dark', theme === 'dark');
         localStorage.setItem('theme', theme);
     }, [theme]);
+
+    // Fix scroll-reset-en-navegacion (2026-07-29): el contenido ruteado vive en este div
+    // interno con `overflow-y-auto` (NO document.body/window -- ver BotonVolverArriba, que
+    // ya escucha el scroll de esta misma ref), así que un cambio de ruta no reseteaba el
+    // scroll nativo del navegador. Se reinicia a 0 en cada cambio de `location.pathname`
+    // (SOLO rutas reales, no pestañas internas como el stepper de Centro de Estudios, que
+    // usan `useState` propio y no tocan el pathname).
+    useEffect(() => {
+        scrollableContainerRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [location.pathname]);
+
+    // Fix persistencia-de-ruta (2026-07-29): guarda la última ruta real visitada para poder
+    // restaurarla en un reinicio total de la app (F5, logout+login, cerrar y reabrir el
+    // navegador -- ver `resolverRutaInicial`/lectura en el Route "/" más abajo). Se guarda acá
+    // (dentro de AppLayout, que SOLO monta para rutas autenticadas del interior de la app) para
+    // que /login, /logout y demás rutas públicas/transitorias nunca se persistan sin necesidad
+    // de listarlas a mano.
+    useEffect(() => {
+        if (debePersistirRuta(location.pathname)) {
+            localStorage.setItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY, location.pathname);
+        }
+    }, [location.pathname]);
 
     if (!usuario) return null;
 
@@ -306,6 +330,86 @@ export function obtenerRutaInicioUsuario(usuario: { rol?: RolUsuario } | null | 
     }
     return '/';
 }
+
+// --- Persistencia de la última ruta visitada (fix 2026-07-29) ------------------------
+// Bug reportado: al refrescar la página, cerrar sesión y volver a entrar, o cerrar y
+// reabrir el navegador, el usuario no vuelve a donde estaba -- en el caso observado
+// aterrizaba en /configuracion. Investigación: ese aterrizaje en /configuracion es en
+// muchos casos el GUARD DE ONBOARDING legítimo (líneas ~220-226, más arriba en este
+// archivo), que fuerza a los Admin con onboarding incompleto a /configuracion sin
+// importar la ruta guardada -- eso NO se toca ni se puede saltar acá.
+// El bug real y separado: con HashRouter, cerrar el navegador entero (no solo
+// refrescar) no deja ningún hash en la barra de direcciones, así que la próxima
+// visita cae siempre en el path "/" por defecto -- y ese "/" no tenía memoria de la
+// sección que el usuario venía usando. Se persiste la ruta real en localStorage
+// (sobrevive a un refresh, a un logout/login y a cerrar el navegador -- a diferencia
+// de sessionStorage) y solo se consulta para el caso en que el enrutado aterrizaría en
+// el "/" genérico (ver Route path="/" en AppRoutes, y `resolverRutaInicial` abajo).
+export const ULTIMA_RUTA_VISITADA_STORAGE_KEY = 'tudojang:ultimaRutaVisitada';
+
+// Rutas que nunca son un "destino" real del usuario -- son pasos de autenticación
+// transitorios, así que no deben quedar guardadas como última ruta visitada.
+const RUTAS_NO_PERSISTIBLES = new Set(['/login', '/logout']);
+
+export function debePersistirRuta(pathname: string): boolean {
+    return typeof pathname === 'string' && pathname.length > 0 && !RUTAS_NO_PERSISTIBLES.has(pathname);
+}
+
+// Solo debe restaurar la ultima ruta una vez por carga real de pagina (F5 / reapertura del
+// navegador) -- NO en cada click posterior en "/" durante la misma sesion SPA, porque ese
+// click es una navegacion deliberada del usuario, no un reinicio. Flag de modulo: persiste
+// entre remounts de RutaInicial dentro de la misma sesion, pero se resetea en un reload real.
+let restauracionRutaInicialYaEjecutada = false;
+
+// Pura y testeable (mismo patrón que obtenerRutaInicioUsuario): decide a qué ruta debe
+// aterrizar el usuario cuando el enrutado normal lo mandaría al "/" genérico.
+// - Tutor/Estudiante: sin cambios, siempre van a /centro-estudios (ruta ya "significativa",
+//   no es el caso que este fix cubre).
+// - Resto de roles: si hay una ruta guardada distinta de "/" y persistible, se usa esa en
+//   vez de VistaAdministracion. Si no hay nada guardado (primera visita) o la ruta guardada
+//   no es válida, se mantiene el comportamiento de siempre ("/").
+// Nota de seguridad: si la ruta restaurada ya no es válida para el rol actual (p.ej. quedó
+// guardada /configuracion pero el usuario ya no es Admin), el propio Route de destino tiene
+// su guard de rol y redirige de vuelta -- ver Route path="/configuracion" más abajo. Ese
+// fallback existente es intencional y no se pelea acá.
+export function resolverRutaInicial(
+    usuario: { rol?: RolUsuario } | null | undefined,
+    rutaGuardada: string | null,
+): string {
+    const rutaPorRol = obtenerRutaInicioUsuario(usuario);
+    if (rutaPorRol === '/centro-estudios') return rutaPorRol;
+    if (rutaGuardada && rutaGuardada !== '/' && debePersistirRuta(rutaGuardada)) {
+        return rutaGuardada;
+    }
+    return rutaPorRol;
+}
+
+// Resuelve el Route path="/" leyendo la ruta guardada dentro de un useEffect (no durante el
+// render -- la app corre bajo <React.StrictMode> en index.tsx, que invoca el render de los
+// componentes dos veces en desarrollo; mutar un ref o leer/limpiar localStorage directamente
+// en el render, como en un intento anterior de este fix, produce un resultado distinto entre
+// esa primera invocación descartada y la segunda que sí se comitea, rompiendo la restauración).
+// Se consume (removeItem) la ruta guardada apenas se lee: eso es lo que evita el loop de
+// redirects si la ruta restaurada ya no es válida para el rol actual y su propio Route la
+// rebota de nuevo a "/" (ver resolverRutaInicial) -- en ese rebote, este componente se vuelve a
+// montar pero localStorage ya no tiene nada guardado, así que cae directo en VistaAdministracion.
+const RutaInicial: React.FC<{ usuario: Usuario | null }> = ({ usuario }) => {
+    const navigate = ReactRouterDOM.useNavigate();
+    React.useEffect(() => {
+        if (restauracionRutaInicialYaEjecutada) return;
+        restauracionRutaInicialYaEjecutada = true;
+        const rutaGuardada = window.localStorage.getItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
+        if (rutaGuardada) {
+            window.localStorage.removeItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
+        }
+        const rutaInicial = resolverRutaInicial(usuario, rutaGuardada);
+        if (rutaInicial !== '/') {
+            navigate(rutaInicial, { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return <VistaAdministracion />;
+};
 
 // --- Callback OAuth de Google Drive -------------------------------------------------
 // Reconstruido 2026-07-21: el manejo del callback OAuth de Drive vivía en App.tsx en
@@ -511,6 +615,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
+                <ReactRouterDOM.Route path="/contrato-colaborador/:idUsuario" element={<VistaFirmaContratoColaborador />} />
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
                 <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
@@ -534,7 +639,7 @@ const AppRoutes: React.FC = () => {
                         que este bug le impedía ver -- consistente con la intención de diseño ya
                         documentada en App.routing.test.ts ("Centro de Estudios como inicio
                         operativo" para ambos roles consultor). */}
-                    <ReactRouterDOM.Route path="/" element={obtenerRutaInicioUsuario(usuario) === '/centro-estudios' ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
+                    <ReactRouterDOM.Route path="/" element={<RutaInicial usuario={usuario} />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />

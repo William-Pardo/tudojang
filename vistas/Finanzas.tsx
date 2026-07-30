@@ -140,7 +140,15 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
 
             <div className="flex gap-2">
                 {(['resumen', 'pagos', 'deudores'] as const).map(item => (
-                    <button key={item} onClick={() => setSeccion(item)} className="px-4 py-2 rounded-lg bg-gray-100 capitalize">
+                    <button
+                        key={item}
+                        onClick={() => setSeccion(item)}
+                        className={`px-4 py-2 rounded-lg capitalize text-xs font-black uppercase tracking-wide transition-all ${
+                            seccion === item
+                                ? 'bg-tkd-dark text-white shadow-md'
+                                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/20'
+                        }`}
+                    >
                         {item}
                     </button>
                 ))}
