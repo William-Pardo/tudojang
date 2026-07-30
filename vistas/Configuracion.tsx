@@ -609,19 +609,19 @@ const VistaConfiguracion: React.FC = () => {
                     <div className="flex flex-row flex-wrap gap-1">
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
-                            { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario },
+                            { id: 'equipo', label: 'Equipo Técnico', icon: IconoUsuario, iconScale: 'scale-[1.43]' },
                             { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
-                            { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra },
-                            { id: 'alertas', label: 'Alertas', icon: IconoConfiguracionAlertas },
+                            { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra, iconScale: 'scale-[1.46]' },
+                            { id: 'alertas', label: 'Alertas', icon: IconoConfiguracionAlertas, iconScale: 'scale-[1.72]' },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
                         ].map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
-                                <tab.icon className={`w-[30px] h-[30px] md:w-6 md:h-6 ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
+                                <tab.icon className={`w-[30px] h-[30px] md:w-6 md:h-6 ${tab.iconScale || ''} ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
                                 <span className="inline">{tab.label}</span>
                             </button>
                         ))}
