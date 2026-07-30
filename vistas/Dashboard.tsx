@@ -101,10 +101,6 @@ const VistaDashboard: React.FC<Props> = ({ isSubView = false }) => {
                     </div>
                 </div>
             </div>
-
-            <footer className="pt-10 text-center">
-                <p className="text-[9px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em]">Tudojang Core Visual Engine v4.0</p>
-            </footer>
         </div>
     );
 };
