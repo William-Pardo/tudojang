@@ -7,6 +7,7 @@ import {
     getDoc,
     updateDoc,
     deleteDoc,
+    deleteField,
     query,
     where,
     writeBatch
@@ -139,6 +140,29 @@ export const eliminarEstudiante = async (idEstudiante: string): Promise<void> =>
      if (!isFirebaseConfigured) return;
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await deleteDoc(docRef);
+};
+
+// vincularTutorAEstudiantes / desvincularTutorDeEstudiante (2026-07-30, reemplazo de
+// VinculosView/vinculoService): el vínculo tutor↔estudiante real vive en
+// Estudiante.tutor.correo (fuente de verdad desde el rediseño 2026-07-14), no en la
+// colección tenants/{id}/vinculos. Estas funciones permiten reutilizar el mismo objeto
+// `tutor` de un tutor ya existente en varios estudiantes (hermanos) sin re-tipearlo a mano.
+export const vincularTutorAEstudiantes = async (
+    idsEstudiantes: string[],
+    tutor: NonNullable<Estudiante['tutor']>
+): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const batch = writeBatch(db);
+    idsEstudiantes.forEach((id) => {
+        batch.update(doc(db, 'estudiantes', id), { tutor });
+    });
+    await batch.commit();
+};
+
+export const desvincularTutorDeEstudiante = async (idEstudiante: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    await updateDoc(docRef, { tutor: deleteField() });
 };
 
 export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
