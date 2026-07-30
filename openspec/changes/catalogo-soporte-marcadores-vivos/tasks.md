@@ -41,8 +41,8 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 - [x] 2.1 RED — write `scripts/catalogo-marcadores.test.js` (node --test) over `marcador-simple/`, `marcador-multiple/`, `marcador-duplicado/`, `marcador-dinamico/`, `marcador-jsx-pesado/`, `marcador-sin-selfref/`: asserts `escanearMarcadores()` shape, literal-only AST evaluator (D3), duplicate-id and missing-selfref (D9) hard failures with `archivo:línea:columna`.
 - [x] 2.2 GREEN — implement `escanearMarcadores()` + literal AST evaluator in `catalogo-fuente.mjs` (substring pre-filter, `ts.createSourceFile`, never `transpileModule`/`import` of views). Run `npm run test:node -- scripts/catalogo-marcadores.test.js`.
-- [ ] 2.3 RED — write `scripts/rutas-app.test.js` over `app-rutas/App.tsx`: literal `path`, `"*"` skipped, layout route w/o `path` skipped, ternary `element` (multi-tag), two routes→same file, locally-declared component → `App.tsx`.
-- [ ] 2.4 GREEN — implement `leerRutasApp()` (import map + JSX route walk) in `catalogo-fuente.mjs`. Run `npm run test:node -- scripts/rutas-app.test.js`.
+- [x] 2.3 RED — write `scripts/rutas-app.test.js` over `app-rutas/App.tsx`: literal `path`, `"*"` skipped, layout route w/o `path` skipped, ternary `element` (multi-tag), two routes→same file, locally-declared component → `App.tsx`.
+- [x] 2.4 GREEN — implement `leerRutasApp()` (import map + JSX route walk) in `catalogo-fuente.mjs`. Run `npm run test:node -- scripts/rutas-app.test.js`.
 - [ ] 2.5 RED — extend `catalogo-marcadores.test.js` with `leerNucleoManual()`/`fusionarCatalogo()` cases: merge order, `introducedIn` stamped from `catalogVersion` (D2), manual↔marker and marker↔marker id/inventoryId collisions accumulated and reported together before exit 1.
 - [ ] 2.6 GREEN — implement `leerNucleoManual()` + `fusionarCatalogo()`. Verify: `npm run test:node -- scripts/catalogo-marcadores.test.js scripts/rutas-app.test.js`.
 

@@ -8,13 +8,14 @@
 // solo por AST de TypeScript (`ts.createSourceFile`); nunca `ts.transpileModule` + `import`
 // sobre un archivo de `vistas/`/`components/` -- eso es justo lo que rompe por JSX y globals
 // de navegador (ver fixture marcador-jsx-pesado).
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
 const DIRECTORIOS_IGNORADOS = new Set(['node_modules', '.claude', '__mocks__', '__fixtures__', '.git']);
 const ARCHIVO_CON_MARCADOR = /\.tsx?$/;
 const ARCHIVO_DE_PRUEBA = /\.(test|spec)\./;
+const TAGS_REACT_ROUTER_EXCLUIDOS = new Set(['Route', 'Routes', 'Navigate', 'Outlet']);
 
 function aPosix(rutaSistema) {
   return rutaSistema.split(path.sep).join('/');
@@ -241,4 +242,153 @@ export function escanearMarcadores({ root, dirs } = {}) {
   );
 
   return encontrados;
+}
+
+// --- Escaneo de App.tsx (leerRutasApp) --------------------------------------------------------
+//
+// Dos pasadas sobre el mismo SourceFile: (1) mapa de imports -- para saber a que archivo
+// resuelve cada identificador JSX usado como componente, y cuales identificadores vienen de
+// `react-router-dom`; (2) recorrido de rutas -- cada <Route> real produce pares {route, archivo}.
+
+function resolverEspecificadorRelativo(root, especificador) {
+  const base = path.resolve(root, especificador);
+  const candidatos = [`${base}.tsx`, `${base}.ts`, path.join(base, 'index.tsx'), path.join(base, 'index.ts')];
+  const encontrado = candidatos.find((candidato) => existsSync(candidato));
+  return aPosix(path.relative(root, encontrado ?? `${base}.tsx`));
+}
+
+function construirMapaImports(sourceFile, root) {
+  const componentePorNombre = new Map();
+  let namespaceReactRouter = null;
+  const nombresReactRouter = new Set();
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const especificador = statement.moduleSpecifier.text;
+    const clause = statement.importClause;
+
+    if (especificador === 'react-router-dom') {
+      if (clause.name) nombresReactRouter.add(clause.name.text);
+      if (clause.namedBindings) {
+        if (ts.isNamespaceImport(clause.namedBindings)) {
+          namespaceReactRouter = clause.namedBindings.name.text;
+        } else if (ts.isNamedImports(clause.namedBindings)) {
+          for (const elemento of clause.namedBindings.elements) nombresReactRouter.add(elemento.name.text);
+        }
+      }
+      continue;
+    }
+
+    if (!especificador.startsWith('.')) continue; // solo resolvemos specifiers relativos a archivo
+
+    const rutaResuelta = resolverEspecificadorRelativo(root, especificador);
+    if (clause.name) componentePorNombre.set(clause.name.text, rutaResuelta);
+    if (clause.namedBindings) {
+      if (ts.isNamespaceImport(clause.namedBindings)) {
+        componentePorNombre.set(clause.namedBindings.name.text, rutaResuelta);
+      } else if (ts.isNamedImports(clause.namedBindings)) {
+        for (const elemento of clause.namedBindings.elements) componentePorNombre.set(elemento.name.text, rutaResuelta);
+      }
+    }
+  }
+
+  return { componentePorNombre, namespaceReactRouter, nombresReactRouter };
+}
+
+function nombreSimpleDeTag(tagName) {
+  if (ts.isIdentifier(tagName)) return tagName.text;
+  if (ts.isPropertyAccessExpression(tagName) && ts.isIdentifier(tagName.name)) return tagName.name.text;
+  return null;
+}
+
+function calificadorDeTag(tagName) {
+  return ts.isPropertyAccessExpression(tagName) && ts.isIdentifier(tagName.expression)
+    ? tagName.expression.text
+    : null;
+}
+
+function esTagRoute(tagName) {
+  const nombre = nombreSimpleDeTag(tagName);
+  return typeof nombre === 'string' && nombre.endsWith('Route');
+}
+
+function esTagReactRouterExcluido(tagName, mapaImports) {
+  const nombre = nombreSimpleDeTag(tagName);
+  if (!nombre || !TAGS_REACT_ROUTER_EXCLUIDOS.has(nombre)) return false;
+  const calificador = calificadorDeTag(tagName);
+  if (calificador) return calificador === mapaImports.namespaceReactRouter;
+  return mapaImports.nombresReactRouter.has(nombre);
+}
+
+function archivoDeTag(tagName, mapaImports, archivoPropio) {
+  const nombre = nombreSimpleDeTag(tagName);
+  if (!nombre) return archivoPropio;
+  return mapaImports.componentePorNombre.get(nombre) ?? archivoPropio;
+}
+
+function recolectarTagsJsx(nodo, salida) {
+  if (ts.isJsxSelfClosingElement(nodo) || ts.isJsxOpeningElement(nodo)) {
+    salida.push(nodo.tagName);
+  }
+  ts.forEachChild(nodo, (hijo) => recolectarTagsJsx(hijo, salida));
+}
+
+function obtenerAtributo(nodoRoute, nombre) {
+  return nodoRoute.attributes.properties.find(
+    (attr) => ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === nombre,
+  );
+}
+
+/**
+ * Lee `${root}/${archivo}` (por defecto `App.tsx`) y devuelve los pares {route, archivo} de
+ * cada <Route> real que monta: path literal, "*" excluido, rutas de layout sin `path`
+ * salteadas (pero sus hijas anidadas se siguen recorriendo), y el subarbol COMPLETO de un
+ * `element` ternario (excluyendo tags de react-router-dom).
+ *
+ * @param {{ root: string, archivo?: string }} opciones
+ * @returns {Array<{ route: string, archivo: string }>}
+ */
+export function leerRutasApp({ root, archivo = 'App.tsx' } = {}) {
+  const rutaAbsoluta = path.resolve(root, archivo);
+  const texto = readFileSync(rutaAbsoluta, 'utf8');
+  const sourceFile = ts.createSourceFile(rutaAbsoluta, texto, ts.ScriptTarget.ES2022, false, ts.ScriptKind.TSX);
+  const mapaImports = construirMapaImports(sourceFile, root);
+  const archivoPropio = aPosix(path.relative(root, rutaAbsoluta));
+
+  const pares = [];
+
+  function procesarRoute(nodoRoute) {
+    const atributoPath = obtenerAtributo(nodoRoute, 'path');
+    if (!atributoPath || !atributoPath.initializer || !ts.isStringLiteral(atributoPath.initializer)) return;
+    const rutaTexto = atributoPath.initializer.text;
+    if (rutaTexto === '*') return;
+
+    const atributoElement = obtenerAtributo(nodoRoute, 'element');
+    if (
+      !atributoElement
+      || !atributoElement.initializer
+      || !ts.isJsxExpression(atributoElement.initializer)
+      || !atributoElement.initializer.expression
+    ) {
+      return;
+    }
+
+    const tags = [];
+    recolectarTagsJsx(atributoElement.initializer.expression, tags);
+    for (const tag of tags) {
+      if (esTagReactRouterExcluido(tag, mapaImports)) continue;
+      pares.push({ route: rutaTexto, archivo: archivoDeTag(tag, mapaImports, archivoPropio) });
+    }
+  }
+
+  function recorrer(nodo) {
+    if ((ts.isJsxSelfClosingElement(nodo) || ts.isJsxOpeningElement(nodo)) && esTagRoute(nodo.tagName)) {
+      procesarRoute(nodo);
+    }
+    ts.forEachChild(nodo, recorrer);
+  }
+
+  recorrer(sourceFile);
+  return pares;
 }
