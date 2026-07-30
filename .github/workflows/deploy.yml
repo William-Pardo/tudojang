@@ -116,6 +116,16 @@ jobs:
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_WOMPI_PUBLIC_KEY: ${{ secrets.VITE_WOMPI_PUBLIC_KEY }}
           VITE_WOMPI_INTEGRITY_SECRET: ${{ secrets.VITE_WOMPI_INTEGRITY_SECRET }}
+          # Site key de reCAPTCHA Enterprise (firebase/appCheck.ts::inicializarAppCheck).
+          # Sin esta variable App Check nunca se inicializa en el bundle de produccion
+          # (inicializarAppCheck retorna null si el site key es undefined) -- el callable
+          # consultarAsistenteIa tiene enforceAppCheck:true, asi que TODA llamada real
+          # quedaba rechazada con 401 ("app":"MISSING" en los logs), aunque aiEnabled ya
+          # estuviera en true. Bug real detectado 2026-07-30, misma causa raiz que las
+          # flags de abajo (variable nunca definida en este workflow). Key ya existente en
+          # reCAPTCHA Enterprise (displayName "tudojang-web-appcheck", restringida a
+          # tudojang.web.app) -- no se creo una nueva.
+          VITE_RECAPTCHA_ENTERPRISE_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY }}
           # Flags del asistente virtual (WS, shared/soporte/flags.ts). NO son secretos --
           # son booleanos publicos que terminan igual en el bundle del cliente -- por eso
           # van como valor literal aca, no como secrets.*. Sin estas 3 lineas, vite.config.ts
