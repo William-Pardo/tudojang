@@ -44,6 +44,7 @@ import { driveService } from './services/storage/driveService';
 
 import VistaFirmaConsentimiento from './vistas/FirmaConsentimiento';
 import VistaFirmaContrato from './vistas/FirmaContrato';
+import VistaFirmaContratoColaborador from './vistas/FirmaContratoColaborador';
 import VistaFirmaImagen from './vistas/FirmaImagen';
 import CensoPublico from './vistas/CensoPublico';
 import ReportarPagoPublico from './vistas/ReportarPagoPublico';
@@ -167,7 +168,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Mi Perfil</span>
                 </ReactRouterDOM.Link>
                 <button onClick={onLogout} className={getButtonStyle('/logout', true)}>
-                    <IconoLogout className="w-5 h-5 flex-shrink-0" />
+                    <IconoLogout className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
                 </button>
             </div>
@@ -354,6 +355,12 @@ export function debePersistirRuta(pathname: string): boolean {
     return typeof pathname === 'string' && pathname.length > 0 && !RUTAS_NO_PERSISTIBLES.has(pathname);
 }
 
+// Solo debe restaurar la ultima ruta una vez por carga real de pagina (F5 / reapertura del
+// navegador) -- NO en cada click posterior en "/" durante la misma sesion SPA, porque ese
+// click es una navegacion deliberada del usuario, no un reinicio. Flag de modulo: persiste
+// entre remounts de RutaInicial dentro de la misma sesion, pero se resetea en un reload real.
+let restauracionRutaInicialYaEjecutada = false;
+
 // Pura y testeable (mismo patrón que obtenerRutaInicioUsuario): decide a qué ruta debe
 // aterrizar el usuario cuando el enrutado normal lo mandaría al "/" genérico.
 // - Tutor/Estudiante: sin cambios, siempre van a /centro-estudios (ruta ya "significativa",
@@ -389,6 +396,8 @@ export function resolverRutaInicial(
 const RutaInicial: React.FC<{ usuario: Usuario | null }> = ({ usuario }) => {
     const navigate = ReactRouterDOM.useNavigate();
     React.useEffect(() => {
+        if (restauracionRutaInicialYaEjecutada) return;
+        restauracionRutaInicialYaEjecutada = true;
         const rutaGuardada = window.localStorage.getItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
         if (rutaGuardada) {
             window.localStorage.removeItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
@@ -606,6 +615,7 @@ const AppRoutes: React.FC = () => {
                 <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
                 <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
+                <ReactRouterDOM.Route path="/contrato-colaborador/:idUsuario" element={<VistaFirmaContratoColaborador />} />
                 <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
                 <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
                 <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
