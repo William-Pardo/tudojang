@@ -562,13 +562,6 @@ const VistaConfiguracion: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4">
-                    <button
-                        onClick={reiniciarWizard}
-                        className="px-6 py-3 bg-tkd-red/10 text-tkd-red border border-tkd-red/20 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-tkd-red hover:text-white transition-all shadow-sm active:scale-95"
-                    >
-                        ⚠️ Reiniciar Todo el Proceso
-                    </button>
-
                     {!isWizardMode && (
                         <button onClick={guardarConfiguracionesHandler} disabled={cargandoAccion} className="bg-tkd-blue text-white px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
                             <IconoGuardar className="w-5 h-5" /> Guardar Cambios
@@ -1298,6 +1291,19 @@ const VistaConfiguracion: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Zona de riesgo: acción destructiva movida lejos de "Guardar Cambios" y
+                    reducida a un link discreto para bajar el riesgo de click accidental
+                    (pedido explícito del usuario). El window.confirm() de reiniciarWizard
+                    sigue siendo la protección real. */}
+                <div className="pt-10 flex justify-center border-t border-gray-100 dark:border-white/5">
+                    <button
+                        onClick={reiniciarWizard}
+                        className="text-[9px] font-bold text-gray-300 dark:text-gray-600 uppercase tracking-widest hover:text-tkd-red transition-colors"
+                    >
+                        Reiniciar todo el proceso
+                    </button>
+                </div>
             </div>
 
             {modalUsuarioAbierto && <FormularioUsuario abierto={modalUsuarioAbierto} onCerrar={cerrarFormularioUsuario} onGuardar={guardarUsuarioHandler} usuarioActual={usuarioEnEdicion} cargando={cargandoAccion} />}
