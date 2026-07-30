@@ -9,7 +9,7 @@ import {
     IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar,
     IconoProgramasExtra, IconoConfiguracionAlertas,
     IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado,
-    IconoHistorial, IconoEmail
+    IconoHistorial, IconoEmail, IconoAlertaTriangulo, IconoConfiguracionCuentas
 } from '../components/Iconos';
 import { useGestionConfiguracion } from '../hooks/useGestionConfiguracion';
 import { useNotificacion } from '../context/NotificacionContext';
@@ -24,7 +24,6 @@ import FormularioSede from '../components/FormularioSede';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import InvitacionesView from './admin/InvitacionesView';
-import VinculosView from './admin/VinculosView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 import { obtenerLimiteEquipoTecnico, obtenerLimiteOperativo } from '../utils/limitesSaas';
@@ -400,7 +399,10 @@ const VistaConfiguracion: React.FC = () => {
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
     const [planSeleccionado, setPlanSeleccionado] = useState<string>(localConfigClub?.plan || 'starter');
+    const [modalReiniciarAbierto, setModalReiniciarAbierto] = useState(false);
+    const [cargandoReinicio, setCargandoReinicio] = useState(false);
     const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
+    const [modalCuentasAbierto, setModalCuentasAbierto] = useState(false);
 
     const cerrarModalSede = () => {
         setModalSedeAbierto(false);
@@ -494,28 +496,30 @@ const VistaConfiguracion: React.FC = () => {
         }
     };
 
-    const reiniciarWizard = async () => {
+    const confirmarReinicioWizard = async () => {
         if (!localConfigClub) return;
-        if (window.confirm("¿Estás SEGURO? Se borrarán los datos institucionales y volverás al paso 1.")) {
-            try {
-                const nuevaConfig: ConfiguracionClub = {
-                    ...localConfigClub,
-                    onboardingStep: 1,
-                    nombreClub: '',
-                    nit: '',
-                    representanteLegal: '',
-                    direccionClub: '',
-                    valorMensualidad: 0,
-                    moraPorcentaje: 0,
-                    valorMatricula: 0,
-                    activarMatriculaAnual: false
-                };
-                await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
-                setLocalConfigClub(nuevaConfig);
-                mostrarNotificacion("Onboarding reiniciado con éxito.", "success");
-            } catch (error) {
-                mostrarNotificacion("Error al reiniciar onboarding", "error");
-            }
+        setCargandoReinicio(true);
+        try {
+            const nuevaConfig: ConfiguracionClub = {
+                ...localConfigClub,
+                onboardingStep: 1,
+                nombreClub: '',
+                nit: '',
+                representanteLegal: '',
+                direccionClub: '',
+                valorMensualidad: 0,
+                moraPorcentaje: 0,
+                valorMatricula: 0,
+                activarMatriculaAnual: false
+            };
+            await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
+            setLocalConfigClub(nuevaConfig);
+            mostrarNotificacion("Onboarding reiniciado con éxito.", "success");
+        } catch (error) {
+            mostrarNotificacion("Error al reiniciar onboarding", "error");
+        } finally {
+            setCargandoReinicio(false);
+            setModalReiniciarAbierto(false);
         }
     };
 
@@ -543,6 +547,25 @@ const VistaConfiguracion: React.FC = () => {
     );
     const limiteEquipoTecnico = obtenerLimiteEquipoTecnico(localConfigClub);
     const equipoTecnicoCompleto = limiteEquipoTecnico > 0 && usuariosStaff.length >= limiteEquipoTecnico;
+
+    // Gestionar Vínculo Legal (Equipo Técnico): comparte el link de firma del Contrato
+    // Laboral por Web Share API o portapapeles, mismo patrón que
+    // useGestionEstudiantes.ts::handleShareLink -- no es un modal, solo comparte el enlace.
+    const handleGestionarContrato = async (usuario: Usuario) => {
+        const url = generarUrlAbsoluta(`/contrato-colaborador/${usuario.id}`);
+        const texto = `📄 Hola, por favor firma tu Contrato Laboral en ${localConfigClub.nombreClub}:`;
+        const mensajeCompleto = `${texto}\n\n${url}`;
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: 'Firma de Contrato Laboral', text: texto, url });
+            } else {
+                await navigator.clipboard.writeText(mensajeCompleto);
+                mostrarNotificacion("Enlace copiado al portapapeles.", "success");
+            }
+        } catch (e) {
+            // navigator.share lanza si el usuario cancela el share sheet nativo -- no es un error real, no mostrar notificación.
+        }
+    };
 
     return (
         <div className="p-4 sm:p-10 space-y-10 animate-fade-in pb-32">
@@ -615,7 +638,7 @@ const VistaConfiguracion: React.FC = () => {
                                 className={`flex-shrink-0 flex items-center justify-center gap-3 px-5 py-4 md:px-7 md:py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-tkd-dark text-white shadow-xl scale-[1.01] md:scale-[1.03] z-10' : 'text-gray-400 hover:text-tkd-blue hover:bg-gray-50 dark:hover:bg-white/5'}`}
                             >
                                 <tab.icon className={`w-[30px] h-[30px] md:w-6 md:h-6 ${tab.iconScale || ''} ${activeTab === tab.id ? 'text-tkd-red' : ''}`} />
-                                <span className="inline">{tab.label}</span>
+                                <span className="inline" style={tab.id === 'accesos' ? { color: '#0f4280' } : undefined}>{tab.label}</span>
                             </button>
                         ))}
                     </div>
@@ -969,7 +992,7 @@ const VistaConfiguracion: React.FC = () => {
                             </button>
                         </div>
                         <div className="tkd-card p-0">
-                            <TablaUsuarios usuarios={usuariosStaff} onEditar={abrirFormularioUsuario} onEliminar={abrirConfirmacionEliminar} onGestionarContrato={() => { }} />
+                            <TablaUsuarios usuarios={usuariosStaff} onEditar={abrirFormularioUsuario} onEliminar={abrirConfirmacionEliminar} onGestionarContrato={handleGestionarContrato} />
                         </div>
                         {isWizardMode && currentStep === 4 && (
                             <button
@@ -1053,71 +1076,24 @@ const VistaConfiguracion: React.FC = () => {
                         <section className="bg-white dark:bg-white/5 p-8 rounded-[3rem] border border-gray-100 dark:border-white/10 space-y-6">
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.35em] text-tkd-red mb-2">Perfiles externos</p>
-                                <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-dark dark:text-white">Configuración de login externo</h3>
+                                <div className="flex items-center justify-between gap-4">
+                                    <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-dark dark:text-white" style={{ color: '#0f4280' }}>Configuración de login externo</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModalCuentasAbierto(true)}
+                                        title="Configurar Cuentas Externas"
+                                        className="bg-tkd-blue text-white p-3 rounded-2xl shadow-lg active:scale-95 transition-all flex-shrink-0"
+                                    >
+                                        <IconoConfiguracionCuentas className="w-[30px] h-[30px] md:w-6 md:h-6" />
+                                    </button>
+                                </div>
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2 max-w-3xl">
                                     Controla el acceso de alumnos y tutores que no trabajan dentro del club. Las invitaciones también se pueden enviar desde el registro o edición de cada estudiante.
                                 </p>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {[
-                                    {
-                                        key: 'loginEstudiantesActivo',
-                                        title: 'Activar cuentas externas',
-                                        description: 'Permite crear login para alumnos y tutores.'
-                                    },
-                                    {
-                                        key: 'invitarEstudianteAlCrear',
-                                        title: 'Invitar estudiante al crear',
-                                        description: 'Marca por defecto el envío al correo del alumno.'
-                                    },
-                                    {
-                                        key: 'invitarTutorAlCrear',
-                                        title: 'Invitar tutor al crear',
-                                        description: 'Marca por defecto el envío al acudiente cuando exista correo.'
-                                    }
-                                ].map((item) => {
-                                    const cuentasExternas = localConfigClub.configuracionCuentasExternas || {};
-                                    const checked = !!cuentasExternas[item.key as keyof typeof cuentasExternas];
-
-                                    return (
-                                        <label key={item.key} className={`p-5 rounded-3xl border-2 cursor-pointer transition-all ${checked ? 'border-tkd-blue bg-tkd-blue/5' : 'border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5'}`}>
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div>
-                                                    <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">{item.title}</h4>
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-2 leading-relaxed">{item.description}</p>
-                                                </div>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={(e) => {
-                                                        setLocalConfigClub(prev => prev ? {
-                                                            ...prev,
-                                                            configuracionCuentasExternas: {
-                                                                ...(prev.configuracionCuentasExternas || {}),
-                                                                [item.key]: e.target.checked
-                                                            }
-                                                        } : prev);
-                                                    }}
-                                                    className="w-5 h-5 accent-tkd-blue shrink-0"
-                                                />
-                                            </div>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => guardarConfiguracionesHandler()}
-                                className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
-                            >
-                                Guardar configuración de cuentas
-                            </button>
                         </section>
 
                         <InvitacionesView />
-                        <VinculosView />
                     </div>
                 )}
 
@@ -1292,15 +1268,18 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
-                {/* Zona de riesgo: acción destructiva movida lejos de "Guardar Cambios" y
-                    reducida a un link discreto para bajar el riesgo de click accidental
-                    (pedido explícito del usuario). El window.confirm() de reiniciarWizard
-                    sigue siendo la protección real. */}
+                {/* Zona de riesgo: acción destructiva movida lejos de "Guardar Cambios". Se
+                    marca como botón de advertencia (no un link discreto) porque una acción
+                    irreversible debe ser clara, no fácil de confundir con texto decorativo --
+                    la protección real contra el click accidental es el modal de confirmación
+                    (ModalConfirmacion), que explica el alcance exacto y aclara que no tiene
+                    vuelta atrás, en vez de un window.confirm() genérico. */}
                 <div className="pt-10 flex justify-center border-t border-gray-100 dark:border-white/5">
                     <button
-                        onClick={reiniciarWizard}
-                        className="text-[9px] font-bold text-gray-300 dark:text-gray-600 uppercase tracking-widest hover:text-tkd-red transition-colors"
+                        onClick={() => setModalReiniciarAbierto(true)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-tkd-red/30 text-tkd-red text-[10px] font-black uppercase tracking-widest hover:bg-tkd-red/10 hover:border-tkd-red transition-all active:scale-95"
                     >
+                        <IconoAlertaTriangulo className="w-4 h-4" />
                         Reiniciar todo el proceso
                     </button>
                 </div>
@@ -1308,9 +1287,98 @@ const VistaConfiguracion: React.FC = () => {
 
             {modalUsuarioAbierto && <FormularioUsuario abierto={modalUsuarioAbierto} onCerrar={cerrarFormularioUsuario} onGuardar={guardarUsuarioHandler} usuarioActual={usuarioEnEdicion} cargando={cargandoAccion} />}
             {modalConfirmacionAbierto && usuarioAEliminar && <ModalConfirmacion abierto={modalConfirmacionAbierto} titulo="Eliminar Usuario" mensaje={`¿Confirmas la eliminación definitiva de ${usuarioAEliminar.nombreUsuario}?`} onCerrar={cerrarConfirmacion} onConfirmar={confirmarEliminacion} cargando={cargandoAccion} />}
+            {modalReiniciarAbierto && (
+                <ModalConfirmacion
+                    abierto={modalReiniciarAbierto}
+                    titulo="Reiniciar Todo el Proceso"
+                    mensaje="Esto borra los datos institucionales (nombre del club, NIT, representante legal, dirección, mensualidad, mora y matrícula) y te devuelve al paso 1 del asistente de configuración. No se eliminan alumnos, sedes ni el resto de la configuración. Esta acción NO se puede deshacer."
+                    onCerrar={() => setModalReiniciarAbierto(false)}
+                    onConfirmar={confirmarReinicioWizard}
+                    cargando={cargandoReinicio}
+                    textoBotonConfirmar="Sí, Reiniciar Todo"
+                />
+            )}
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
             {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={cerrarModalSede} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
             {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}
+            {modalCuentasAbierto && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-tkd-dark/95 p-4 animate-fade-in backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-2xl p-10 space-y-8 overflow-y-auto max-h-[90vh] relative border border-gray-100 dark:border-white/5">
+                        <button
+                            type="button"
+                            onClick={() => setModalCuentasAbierto(false)}
+                            className="absolute top-6 right-6 p-2 rounded-full text-gray-400 hover:text-tkd-red hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                            aria-label="Cerrar"
+                        >
+                            <IconoCerrar className="w-5 h-5" />
+                        </button>
+
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-tkd-red mb-2">Perfiles externos</p>
+                            <h3 className="text-2xl font-black uppercase tracking-tight text-tkd-dark dark:text-white" style={{ color: '#0f4280' }}>Configuración de login externo</h3>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-2 max-w-3xl">
+                                Controla el acceso de alumnos y tutores que no trabajan dentro del club. Las invitaciones también se pueden enviar desde el registro o edición de cada estudiante.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                {
+                                    key: 'loginEstudiantesActivo',
+                                    title: 'Activar cuentas externas',
+                                    description: 'Permite crear login para alumnos y tutores.'
+                                },
+                                {
+                                    key: 'invitarEstudianteAlCrear',
+                                    title: 'Invitar estudiante al crear',
+                                    description: 'Marca por defecto el envío al correo del alumno.'
+                                },
+                                {
+                                    key: 'invitarTutorAlCrear',
+                                    title: 'Invitar tutor al crear',
+                                    description: 'Marca por defecto el envío al acudiente cuando exista correo.'
+                                }
+                            ].map((item) => {
+                                const cuentasExternas = localConfigClub.configuracionCuentasExternas || {};
+                                const checked = !!cuentasExternas[item.key as keyof typeof cuentasExternas];
+
+                                return (
+                                    <label key={item.key} className={`p-5 rounded-3xl border-2 cursor-pointer transition-all ${checked ? 'border-tkd-blue bg-tkd-blue/5' : 'border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5'}`}>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <h4 className="text-xs font-black uppercase text-gray-900 dark:text-white">{item.title}</h4>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-2 leading-relaxed">{item.description}</p>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={(e) => {
+                                                    setLocalConfigClub(prev => prev ? {
+                                                        ...prev,
+                                                        configuracionCuentasExternas: {
+                                                            ...(prev.configuracionCuentasExternas || {}),
+                                                            [item.key]: e.target.checked
+                                                        }
+                                                    } : prev);
+                                                }}
+                                                className="w-5 h-5 accent-tkd-blue shrink-0"
+                                            />
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => { guardarConfiguracionesHandler(); setModalCuentasAbierto(false); }}
+                            className="bg-tkd-blue text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                        >
+                            Aceptar
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -17,6 +17,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { Usuario } from '../tipos';
 import { RolUsuario } from '../tipos';
@@ -36,6 +37,27 @@ import {
 
 const MAX_PROFILE_ATTEMPTS = 5;
 const RETRY_DELAY_MS = 2000;
+
+// uploadFirma (contrato-colaborador): espejo de la funcion privada homonima en
+// estudiantesApi.ts, adaptada para firmas de Equipo Tecnico. Se usa el discriminador
+// 'contrato-colaborador' en vez de 'contrato' para no colisionar rutas de Storage con
+// el flujo de firma de estudiantes (tenants/{tenantId}/firmas/{id}/...).
+const uploadFirma = async (
+  tenantId: string,
+  idUsuario: string,
+  firmaBase64: string,
+  tipo: 'contrato-colaborador',
+): Promise<string> => {
+  if (!isFirebaseConfigured) {
+    console.warn('MODO SIMULADO: Saltando subida de firma a Firebase Storage.');
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  }
+  const storageRef = ref(getStorage(), `tenants/${tenantId}/firmas/${idUsuario}/${tipo}_${Date.now()}.png`);
+  const finalBase64 = firmaBase64.startsWith('data:') ? firmaBase64 : `data:image/png;base64,${firmaBase64}`;
+  const snapshot = await uploadString(storageRef, finalBase64, 'data_url');
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
+};
 
 let usuariosMock: UsuarioContrasena[] = [
   {
@@ -221,6 +243,22 @@ export const enviarCorreoRecuperacion = async (email: string): Promise<void> => 
 
 export const guardarTokenNotificacionUsuario = async (idUsuario: string, token: string): Promise<void> => {
   if (isFirebaseConfigured) await firestoreRepository.appendNotificationToken(idUsuario, token);
+};
+
+// guardarFirmaContratoUsuario: flujo de firma de Contrato Laboral para Equipo Tecnico,
+// espejo de estudiantesApi.ts::guardarFirmaContrato pero sobre la coleccion 'usuarios'
+// (el colaborador firma para si mismo, sin concepto de tutor).
+export const guardarFirmaContratoUsuario = async (
+  idUsuario: string,
+  tenantId: string,
+  firmaDigital: string,
+): Promise<void> => {
+  if (!isFirebaseConfigured) return;
+  const urlFirma = await uploadFirma(tenantId, idUsuario, firmaDigital, 'contrato-colaborador');
+  await updateDoc(doc(db, 'usuarios', idUsuario), {
+    'contrato.firmado': true,
+    'contrato.firmaDigital': urlFirma,
+  });
 };
 
 export { isUserDeleted };

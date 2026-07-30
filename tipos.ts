@@ -415,6 +415,7 @@ export interface Usuario {
         fechaInicio: string;
         lugarEjecucion: string;
         firmado: boolean;
+        firmaDigital?: string;
     };
     deletedAt?: string; // Soft delete: fecha de eliminación (ISO string)
     // Matriz de roles de Agenda (extension posterior al cierre del modulo 12, ver
