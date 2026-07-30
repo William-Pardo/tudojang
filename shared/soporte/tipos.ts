@@ -2,6 +2,7 @@ export type RolSoporte =
     | 'Admin'
     | 'Editor'
     | 'Asistente'
+    | 'Maestro'
     | 'Tutor'
     | 'SuperAdmin'
     | 'Estudiante'

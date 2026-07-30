@@ -11,11 +11,22 @@ const INVENTARIO_ESPERADO = [
     'finance.payment-validation',
     'agenda.read',
     'agenda.manage',
+    'agenda.standalone',
     'students.directory',
     'students.manage',
     'students.kicho',
     'students.kicho-legalize',
     'students.live-class',
+    'centro-estudios.material',
+    'centro-estudios.biblioteca',
+    'centro-estudios.progreso',
+    'centro-estudios.consultor',
+    'clase-en-vivo.checkpoint',
+    'buzon.consultor',
+    'public.activation',
+    'public.password-reset',
+    'public.collaborator-contract-signature',
+    'master.access',
     'students.certificates',
     'students.cards',
     'store.catalog',
@@ -52,11 +63,11 @@ const INVENTARIO_ESPERADO = [
 ] as const;
 
 describe('CATALOGO_SOPORTE_V1', () => {
-    it('cubre las 48 entradas resultantes de separar rutas y permisos incompatibles', () => {
+    it('cubre las 59 entradas resultantes de separar rutas y permisos incompatibles', () => {
         expect(CATALOGO_SOPORTE_V1.entries.map(entry => entry.inventoryId).sort()).toEqual(
             [...INVENTARIO_ESPERADO].sort(),
         );
-        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(48);
+        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(59);
     });
 
     it.each(INVENTARIO_ESPERADO)('declara metadatos verificables para %s', inventoryId => {
@@ -82,10 +93,18 @@ describe('CATALOGO_SOPORTE_V1', () => {
         entry!.roles.forEach(role => expect(ROLES_SOPORTE[role].status).toBe('active'));
     });
 
-    it('mantiene Tutor activo y Estudiante reservado sin publicar contenido futuro', () => {
+    it('mantiene Tutor y Estudiante activos -- matcher.ts descarta el catalogo entero para roles no-activos', () => {
+        // Corregido 2026-07-30: Estudiante estaba en 'reserved' pese a ser un rol real y en
+        // produccion -- matcher.ts:82 hace que CUALQUIER rol no-activo reciba cero resultados
+        // del catalogo local, siempre. Ver ademas 'agrega el rol Maestro activo' mas abajo.
         expect(ROLES_SOPORTE.Tutor.status).toBe('active');
-        expect(ROLES_SOPORTE.Estudiante.status).toBe('reserved');
-        expect(CATALOGO_SOPORTE_V1.entries.some(entry => entry.roles.includes('Estudiante'))).toBe(false);
+        expect(ROLES_SOPORTE.Estudiante.status).toBe('active');
+        expect(CATALOGO_SOPORTE_V1.entries.some(entry => entry.roles.includes('Estudiante'))).toBe(true);
+    });
+
+    it('agrega el rol Maestro activo (rol docente real, faltaba por completo en el catalogo)', () => {
+        expect(ROLES_SOPORTE.Maestro.status).toBe('active');
+        expect(CATALOGO_SOPORTE_V1.entries.some(entry => entry.roles.includes('Maestro'))).toBe(true);
     });
 
     it('modela por separado contrato, consentimiento e imagen con las rutas de App.tsx', () => {
