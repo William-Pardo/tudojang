@@ -106,7 +106,7 @@ const VistaSalidaPublica: React.FC = () => {
 
                 <div className="text-center pt-4">
                     <p className="text-[10px] text-gray-400 italic">
-                        Sistema de seguridad TaekwondoGa Jog. <br /> Datos encriptados y válidos solo por sesión.
+                        Sistema de seguridad TuDojang. <br /> Datos encriptados y válidos solo por sesión.
                     </p>
                 </div>
             </div>

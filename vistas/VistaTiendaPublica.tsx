@@ -116,7 +116,7 @@ const VistaTiendaPublica: React.FC = () => {
         {renderContent()}
 
         <footer className="text-center mt-12 text-xs text-gray-500 dark:text-gray-400">
-          <p>Gestionado por TaekwondoGa Jog. <ReactRouterDOM.Link to="/login" className="hover:underline">Acceso de Administrador</ReactRouterDOM.Link></p>
+          <p>Gestionado por TuDojang. <ReactRouterDOM.Link to="/login" className="hover:underline">Acceso de Administrador</ReactRouterDOM.Link></p>
         </footer>
       </div>
 
