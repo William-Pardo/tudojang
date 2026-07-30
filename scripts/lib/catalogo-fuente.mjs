@@ -8,8 +8,11 @@
 // solo por AST de TypeScript (`ts.createSourceFile`); nunca `ts.transpileModule` + `import`
 // sobre un archivo de `vistas/`/`components/` -- eso es justo lo que rompe por JSX y globals
 // de navegador (ver fixture marcador-jsx-pesado).
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
 const DIRECTORIOS_IGNORADOS = new Set(['node_modules', '.claude', '__mocks__', '__fixtures__', '.git']);
@@ -391,4 +394,83 @@ export function leerRutasApp({ root, archivo = 'App.tsx' } = {}) {
 
   recorrer(sourceFile);
   return pares;
+}
+
+// --- Nucleo manual (leerNucleoManual) -----------------------------------------------------
+//
+// A diferencia de las vistas (D3: solo AST, nunca ejecutar), el nucleo manual
+// (`shared/soporte/catalogo.v1.ts`) es codigo de datos puro sin JSX ni globals de navegador
+// -- transpilarlo y ejecutarlo es seguro, y es la MISMA infraestructura que ya usaba
+// `generar-catalogo.mjs` antes de este change (`ts.transpileModule` + `import()` dinamico via
+// un archivo temporal). La factorizamos aca, parametrizada por `root`, para que el generador
+// y el gate consuman siempre la misma lectura (nunca pueden ver catalogos distintos).
+
+/**
+ * @param {{ root: string, archivo?: string }} opciones
+ * @returns {Promise<object>} El objeto `CATALOGO_SOPORTE_V1` tal cual lo exporta el nucleo.
+ */
+export async function leerNucleoManual({ root, archivo = 'shared/soporte/catalogo.v1.ts' } = {}) {
+  const rutaAbsoluta = path.resolve(root, archivo);
+  const fuente = readFileSync(rutaAbsoluta, 'utf8');
+  const transpilado = ts.transpileModule(fuente, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    fileName: rutaAbsoluta,
+  });
+
+  const sufijo = createHash('sha256').update(rutaAbsoluta).digest('hex').slice(0, 8);
+  const rutaTemporal = path.join(tmpdir(), `catalogo-nucleo-${process.pid}-${Date.now()}-${sufijo}.mjs`);
+  writeFileSync(rutaTemporal, transpilado.outputText, 'utf8');
+  try {
+    const modulo = await import(`${pathToFileURL(rutaTemporal).href}?v=${Date.now()}`);
+    return modulo.CATALOGO_SOPORTE_V1;
+  } finally {
+    rmSync(rutaTemporal, { force: true });
+  }
+}
+
+// --- Fusion (fusionarCatalogo) --------------------------------------------------------------
+//
+// Funcion pura: no toca disco. Nucleo primero en su orden de declaracion actual (minimiza el
+// diff del JSON emitido); marcadores despues, ordenados por archivo y luego por indice de
+// declaracion. Todo entry (nucleo Y marcador) queda re-estampado con `introducedIn =
+// nucleo.catalogVersion` (D2) -- para el nucleo es un no-op (ya trae ese valor), para los
+// marcadores es el sello que `MarcadorSoporte` (Omit<..., 'introducedIn'>) deliberadamente no
+// exige escribir a mano. `routes` se copia tal cual del nucleo, sin union automatica (D8).
+
+/**
+ * @param {object} nucleo El objeto devuelto por `leerNucleoManual()`.
+ * @param {Array<{ archivo: string, entrada: object, linea: number, columna: number }>} marcadores
+ *   El array devuelto por `escanearMarcadores()` (o una concatenacion de varias llamadas).
+ * @returns {object} El catalogo fusionado, con la misma forma que `nucleo`.
+ */
+export function fusionarCatalogo(nucleo, marcadores) {
+  const marcadoresOrdenados = [...marcadores].sort((a, b) => (a.archivo < b.archivo ? -1 : a.archivo > b.archivo ? 1 : 0));
+
+  const candidatosColision = [
+    ...nucleo.entries.map((entrada) => ({
+      id: entrada.id,
+      inventoryId: entrada.inventoryId,
+      ubicacion: 'shared/soporte/catalogo.v1.ts (núcleo manual)',
+    })),
+    ...marcadoresOrdenados.map((m) => ({
+      id: m.entrada.id,
+      inventoryId: m.entrada.inventoryId,
+      ubicacion: `${m.archivo}:${m.linea}:${m.columna}`,
+    })),
+  ];
+  detectarColisiones(candidatosColision);
+
+  const entries = [...nucleo.entries, ...marcadoresOrdenados.map((m) => m.entrada)].map((entrada) => ({
+    ...entrada,
+    introducedIn: nucleo.catalogVersion,
+  }));
+
+  return {
+    schemaVersion: nucleo.schemaVersion,
+    catalogVersion: nucleo.catalogVersion,
+    lastVerifiedAt: nucleo.lastVerifiedAt,
+    roles: nucleo.roles,
+    routes: [...nucleo.routes],
+    entries,
+  };
 }
