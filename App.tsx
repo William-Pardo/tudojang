@@ -200,6 +200,28 @@ const AppLayout: React.FC = () => {
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+    // Fix scroll-reset-en-navegacion (2026-07-29): el contenido ruteado vive en este div
+    // interno con `overflow-y-auto` (NO document.body/window -- ver BotonVolverArriba, que
+    // ya escucha el scroll de esta misma ref), así que un cambio de ruta no reseteaba el
+    // scroll nativo del navegador. Se reinicia a 0 en cada cambio de `location.pathname`
+    // (SOLO rutas reales, no pestañas internas como el stepper de Centro de Estudios, que
+    // usan `useState` propio y no tocan el pathname).
+    useEffect(() => {
+        scrollableContainerRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }, [location.pathname]);
+
+    // Fix persistencia-de-ruta (2026-07-29): guarda la última ruta real visitada para poder
+    // restaurarla en un reinicio total de la app (F5, logout+login, cerrar y reabrir el
+    // navegador -- ver `resolverRutaInicial`/lectura en el Route "/" más abajo). Se guarda acá
+    // (dentro de AppLayout, que SOLO monta para rutas autenticadas del interior de la app) para
+    // que /login, /logout y demás rutas públicas/transitorias nunca se persistan sin necesidad
+    // de listarlas a mano.
+    useEffect(() => {
+        if (debePersistirRuta(location.pathname)) {
+            localStorage.setItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY, location.pathname);
+        }
+    }, [location.pathname]);
+
     if (!usuario) return null;
 
     const { tenant, estaCargado } = useTenant();
@@ -307,6 +329,78 @@ export function obtenerRutaInicioUsuario(usuario: { rol?: RolUsuario } | null | 
     }
     return '/';
 }
+
+// --- Persistencia de la última ruta visitada (fix 2026-07-29) ------------------------
+// Bug reportado: al refrescar la página, cerrar sesión y volver a entrar, o cerrar y
+// reabrir el navegador, el usuario no vuelve a donde estaba -- en el caso observado
+// aterrizaba en /configuracion. Investigación: ese aterrizaje en /configuracion es en
+// muchos casos el GUARD DE ONBOARDING legítimo (líneas ~220-226, más arriba en este
+// archivo), que fuerza a los Admin con onboarding incompleto a /configuracion sin
+// importar la ruta guardada -- eso NO se toca ni se puede saltar acá.
+// El bug real y separado: con HashRouter, cerrar el navegador entero (no solo
+// refrescar) no deja ningún hash en la barra de direcciones, así que la próxima
+// visita cae siempre en el path "/" por defecto -- y ese "/" no tenía memoria de la
+// sección que el usuario venía usando. Se persiste la ruta real en localStorage
+// (sobrevive a un refresh, a un logout/login y a cerrar el navegador -- a diferencia
+// de sessionStorage) y solo se consulta para el caso en que el enrutado aterrizaría en
+// el "/" genérico (ver Route path="/" en AppRoutes, y `resolverRutaInicial` abajo).
+export const ULTIMA_RUTA_VISITADA_STORAGE_KEY = 'tudojang:ultimaRutaVisitada';
+
+// Rutas que nunca son un "destino" real del usuario -- son pasos de autenticación
+// transitorios, así que no deben quedar guardadas como última ruta visitada.
+const RUTAS_NO_PERSISTIBLES = new Set(['/login', '/logout']);
+
+export function debePersistirRuta(pathname: string): boolean {
+    return typeof pathname === 'string' && pathname.length > 0 && !RUTAS_NO_PERSISTIBLES.has(pathname);
+}
+
+// Pura y testeable (mismo patrón que obtenerRutaInicioUsuario): decide a qué ruta debe
+// aterrizar el usuario cuando el enrutado normal lo mandaría al "/" genérico.
+// - Tutor/Estudiante: sin cambios, siempre van a /centro-estudios (ruta ya "significativa",
+//   no es el caso que este fix cubre).
+// - Resto de roles: si hay una ruta guardada distinta de "/" y persistible, se usa esa en
+//   vez de VistaAdministracion. Si no hay nada guardado (primera visita) o la ruta guardada
+//   no es válida, se mantiene el comportamiento de siempre ("/").
+// Nota de seguridad: si la ruta restaurada ya no es válida para el rol actual (p.ej. quedó
+// guardada /configuracion pero el usuario ya no es Admin), el propio Route de destino tiene
+// su guard de rol y redirige de vuelta -- ver Route path="/configuracion" más abajo. Ese
+// fallback existente es intencional y no se pelea acá.
+export function resolverRutaInicial(
+    usuario: { rol?: RolUsuario } | null | undefined,
+    rutaGuardada: string | null,
+): string {
+    const rutaPorRol = obtenerRutaInicioUsuario(usuario);
+    if (rutaPorRol === '/centro-estudios') return rutaPorRol;
+    if (rutaGuardada && rutaGuardada !== '/' && debePersistirRuta(rutaGuardada)) {
+        return rutaGuardada;
+    }
+    return rutaPorRol;
+}
+
+// Resuelve el Route path="/" leyendo la ruta guardada dentro de un useEffect (no durante el
+// render -- la app corre bajo <React.StrictMode> en index.tsx, que invoca el render de los
+// componentes dos veces en desarrollo; mutar un ref o leer/limpiar localStorage directamente
+// en el render, como en un intento anterior de este fix, produce un resultado distinto entre
+// esa primera invocación descartada y la segunda que sí se comitea, rompiendo la restauración).
+// Se consume (removeItem) la ruta guardada apenas se lee: eso es lo que evita el loop de
+// redirects si la ruta restaurada ya no es válida para el rol actual y su propio Route la
+// rebota de nuevo a "/" (ver resolverRutaInicial) -- en ese rebote, este componente se vuelve a
+// montar pero localStorage ya no tiene nada guardado, así que cae directo en VistaAdministracion.
+const RutaInicial: React.FC<{ usuario: Usuario | null }> = ({ usuario }) => {
+    const navigate = ReactRouterDOM.useNavigate();
+    React.useEffect(() => {
+        const rutaGuardada = window.localStorage.getItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
+        if (rutaGuardada) {
+            window.localStorage.removeItem(ULTIMA_RUTA_VISITADA_STORAGE_KEY);
+        }
+        const rutaInicial = resolverRutaInicial(usuario, rutaGuardada);
+        if (rutaInicial !== '/') {
+            navigate(rutaInicial, { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    return <VistaAdministracion />;
+};
 
 // --- Callback OAuth de Google Drive -------------------------------------------------
 // Reconstruido 2026-07-21: el manejo del callback OAuth de Drive vivía en App.tsx en
@@ -535,7 +629,7 @@ const AppRoutes: React.FC = () => {
                         que este bug le impedía ver -- consistente con la intención de diseño ya
                         documentada en App.routing.test.ts ("Centro de Estudios como inicio
                         operativo" para ambos roles consultor). */}
-                    <ReactRouterDOM.Route path="/" element={obtenerRutaInicioUsuario(usuario) === '/centro-estudios' ? <ReactRouterDOM.Navigate to="/centro-estudios" /> : <VistaAdministracion />} />
+                    <ReactRouterDOM.Route path="/" element={<RutaInicial usuario={usuario} />} />
                     <ReactRouterDOM.Route path="/estudiantes" element={<VistaEstudiantes />} />
                     <ReactRouterDOM.Route path="/centro-estudios" element={<VistaCentroEstudios />} />
                     <ReactRouterDOM.Route path="/jornadas" element={usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.Editor ? <VistaJornadas /> : <ReactRouterDOM.Navigate to="/" />} />
