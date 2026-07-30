@@ -15,7 +15,7 @@ const cloneCatalog = (): CatalogoSoporte => JSON.parse(JSON.stringify(CATALOGO_S
 describe('validación y generación del catálogo', () => {
     it('acepta el catálogo canónico completo', () => {
         expect(validarCatalogoSoporte(CATALOGO_SOPORTE_V1)).toEqual([]);
-        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(48);
+        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(59);
     });
 
     it('informa todas las ausencias obligatorias de una entrada incompleta', () => {

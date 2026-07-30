@@ -47,9 +47,9 @@ function assertCatalog(catalog) {
         || !catalog.roles
         || !Array.isArray(catalog.routes)
         || !Array.isArray(catalog.entries)
-        || catalog.entries.length !== 48
+        || catalog.entries.length !== 59
     ) {
-        throw new Error('Catálogo inválido: se esperaban schemaVersion 1 y 48 entradas.');
+        throw new Error('Catálogo inválido: se esperaban schemaVersion 1 y 59 entradas.');
     }
     const ids = new Set();
     for (const entry of catalog.entries) {
