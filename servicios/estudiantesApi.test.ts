@@ -16,6 +16,8 @@ import {
     guardarFirmaConsentimiento,
     guardarFirmaContrato,
     guardarFirmaImagen,
+    vincularTutorAEstudiantes,
+    desvincularTutorDeEstudiante,
 } from './estudiantesApi';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import {
@@ -25,6 +27,7 @@ import {
     getDoc,
     updateDoc,
     deleteDoc,
+    deleteField,
     query,
     where,
     writeBatch,
@@ -42,6 +45,7 @@ jest.mock('firebase/firestore', () => ({
     getDoc: jest.fn(),
     updateDoc: jest.fn(),
     deleteDoc: jest.fn(),
+    deleteField: jest.fn(() => 'DELETE_FIELD_SENTINEL'),
     query: jest.fn(),
     where: jest.fn(),
     writeBatch: jest.fn(),
@@ -652,6 +656,85 @@ describe('estudiantesApi — Suite completa (unitarios + integración + excepci�
             await expect(guardarFirmaImagen('est-3', 't-1', 'firma', true)).rejects.toThrow(
                 'updateDoc falló'
             );
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 11. vincularTutorAEstudiantes
+    // ════════════════════════════════════════════════════════════════════════
+    describe('vincularTutorAEstudiantes', () => {
+        const tutor = {
+            nombres: 'Ana',
+            apellidos: 'García',
+            numeroIdentificacion: '999888',
+            telefono: '3009998877',
+            correo: 'ana.garcia@test.com',
+        };
+
+        it('[Integración] llama a batch.update por cada id con el tutor y hace commit', async () => {
+            const mockRef1 = { id: 'est-1' };
+            const mockRef2 = { id: 'est-2' };
+            (doc as jest.Mock)
+                .mockReturnValueOnce(mockRef1)
+                .mockReturnValueOnce(mockRef2);
+
+            await vincularTutorAEstudiantes(['est-1', 'est-2'], tutor);
+
+            expect(doc).toHaveBeenCalledWith(db, 'estudiantes', 'est-1');
+            expect(doc).toHaveBeenCalledWith(db, 'estudiantes', 'est-2');
+            expect(mockBatch.update).toHaveBeenCalledTimes(2);
+            expect(mockBatch.update).toHaveBeenCalledWith(mockRef1, { tutor });
+            expect(mockBatch.update).toHaveBeenCalledWith(mockRef2, { tutor });
+            expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+        });
+
+        it('[Unitario — Modo simulado] no ejecuta batch cuando Firebase no está configurado', async () => {
+            (require('../firebase/config') as any).isFirebaseConfigured = false;
+
+            await vincularTutorAEstudiantes(['est-1'], tutor);
+
+            expect(writeBatch).not.toHaveBeenCalled();
+            expect(mockBatch.update).not.toHaveBeenCalled();
+        });
+
+        it('[Excepción] propaga error si el batch falla', async () => {
+            (doc as jest.Mock).mockReturnValue({ id: 'est-1' });
+            mockBatch.commit.mockRejectedValue(new Error('Fallo batch'));
+
+            await expect(vincularTutorAEstudiantes(['est-1'], tutor)).rejects.toThrow('Fallo batch');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 12. desvincularTutorDeEstudiante
+    // ════════════════════════════════════════════════════════════════════════
+    describe('desvincularTutorDeEstudiante', () => {
+        it('[Integración] llama a updateDoc con tutor: deleteField()', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockResolvedValue(undefined);
+
+            await desvincularTutorDeEstudiante('est-1');
+
+            expect(doc).toHaveBeenCalledWith(db, 'estudiantes', 'est-1');
+            expect(deleteField).toHaveBeenCalledTimes(1);
+            expect(updateDoc).toHaveBeenCalledWith(mockRef, { tutor: 'DELETE_FIELD_SENTINEL' });
+        });
+
+        it('[Unitario — Modo simulado] no llama a updateDoc', async () => {
+            (require('../firebase/config') as any).isFirebaseConfigured = false;
+
+            await desvincularTutorDeEstudiante('est-1');
+
+            expect(updateDoc).not.toHaveBeenCalled();
+        });
+
+        it('[Excepción] propaga error si updateDoc falla', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockRejectedValue(new Error('Permiso denegado'));
+
+            await expect(desvincularTutorDeEstudiante('est-1')).rejects.toThrow('Permiso denegado');
         });
     });
 });
