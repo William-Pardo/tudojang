@@ -47,6 +47,7 @@
     "cypress",
     "cypress.config.ts",
     "functions",
-    "scripts/**/*.test.js"
+    "scripts/**/*.test.js",
+    "scripts/__fixtures__"
   ]
 }

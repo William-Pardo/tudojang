@@ -38,6 +38,16 @@ export interface EntradaCatalogoSoporte {
     status: 'active' | 'reserved';
 }
 
+// Contrato del marcador co-locado (`export const soporteMeta`) que una vista declara
+// junto a su propio código. Es un `Omit` deliberado de `introducedIn`: ese campo es un
+// "sello" que `validacion.ts` exige igual a `catalog.catalogVersion` -- si el marcador
+// lo hardcodeara, cada bump de versión del catálogo obligaría a editar N vistas, que es
+// exactamente la deriva que este mecanismo existe para curar. El generador lo estampa
+// desde el núcleo al fusionar (ver `scripts/lib/catalogo-fuente.mjs`). La ENTRADA
+// EMITIDA en el catálogo fusionado sigue satisfaciendo `EntradaCatalogoSoporte`
+// completo -- este tipo solo relaja lo que la vista está obligada a escribir a mano.
+export type MarcadorSoporte = Omit<EntradaCatalogoSoporte, 'introducedIn'>;
+
 export interface CatalogoSoporte {
     schemaVersion: number;
     catalogVersion: string;
