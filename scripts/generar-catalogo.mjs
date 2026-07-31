@@ -1,16 +1,14 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import ts from 'typescript';
+import { escanearMarcadores, fusionarCatalogo, leerNucleoManual } from './lib/catalogo-fuente.mjs';
 
 const args = process.argv.slice(2);
 const checkOnly = args.includes('--check');
 const outputRootIndex = args.indexOf('--output-root');
 const outputRoot = outputRootIndex >= 0 ? path.resolve(args[outputRootIndex + 1]) : process.cwd();
-const sourcePath = path.resolve('shared/soporte/catalogo.v1.ts');
-const tempPath = path.join(tmpdir(), `catalogo-v1-${process.pid}-${Date.now()}.mjs`);
+const sourceRootIndex = args.indexOf('--source-root');
+const sourceRoot = sourceRootIndex >= 0 ? path.resolve(args[sourceRootIndex + 1]) : process.cwd();
 
 function serialize(catalog) {
     return `${JSON.stringify(catalog)}\n`;
@@ -21,21 +19,12 @@ function checksum(serialized) {
 }
 
 async function loadCatalog() {
-    const source = readFileSync(sourcePath, 'utf8');
-    const transpiled = ts.transpileModule(source, {
-        compilerOptions: {
-            module: ts.ModuleKind.ESNext,
-            target: ts.ScriptTarget.ES2022,
-        },
-        fileName: sourcePath,
-    });
-    writeFileSync(tempPath, transpiled.outputText, 'utf8');
-    try {
-        const module = await import(`${pathToFileURL(tempPath).href}?v=${Date.now()}`);
-        return module.CATALOGO_SOPORTE_V1;
-    } finally {
-        rmSync(tempPath, { force: true });
-    }
+    // Escanea marcadores primero: es sincronico y falla rapido (D3/D9). El nucleo manual se lee
+    // despues, via `catalogo-fuente.mjs` (la MISMA lectura que consume el gate de rutas), para
+    // que generador y gate jamas puedan ver catalogos distintos (design.md, "Technical Approach").
+    const marcadores = escanearMarcadores({ root: sourceRoot });
+    const nucleo = await leerNucleoManual({ root: sourceRoot });
+    return fusionarCatalogo(nucleo, marcadores);
 }
 
 function assertCatalog(catalog) {
@@ -47,9 +36,9 @@ function assertCatalog(catalog) {
         || !catalog.roles
         || !Array.isArray(catalog.routes)
         || !Array.isArray(catalog.entries)
-        || catalog.entries.length !== 59
+        || catalog.entries.length === 0
     ) {
-        throw new Error('Catálogo inválido: se esperaban schemaVersion 1 y 59 entradas.');
+        throw new Error('Catálogo inválido: se esperaban schemaVersion 1 y al menos una entrada.');
     }
     const ids = new Set();
     for (const entry of catalog.entries) {
