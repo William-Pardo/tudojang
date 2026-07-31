@@ -9,9 +9,6 @@ const INVENTARIO_ESPERADO = [
     'finance.student-payments',
     'finance.student-payment-undo',
     'finance.payment-validation',
-    'agenda.read',
-    'agenda.manage',
-    'agenda.standalone',
     'students.directory',
     'students.manage',
     'students.kicho',
@@ -22,7 +19,6 @@ const INVENTARIO_ESPERADO = [
     'centro-estudios.progreso',
     'centro-estudios.consultor',
     'clase-en-vivo.checkpoint',
-    'buzon.consultor',
     'public.activation',
     'public.password-reset',
     'public.collaborator-contract-signature',
@@ -63,11 +59,11 @@ const INVENTARIO_ESPERADO = [
 ] as const;
 
 describe('CATALOGO_SOPORTE_V1', () => {
-    it('cubre las 59 entradas resultantes de separar rutas y permisos incompatibles', () => {
+    it('cubre las 55 entradas resultantes de separar rutas y permisos incompatibles', () => {
         expect(CATALOGO_SOPORTE_V1.entries.map(entry => entry.inventoryId).sort()).toEqual(
             [...INVENTARIO_ESPERADO].sort(),
         );
-        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(59);
+        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(55);
     });
 
     it.each(INVENTARIO_ESPERADO)('declara metadatos verificables para %s', inventoryId => {

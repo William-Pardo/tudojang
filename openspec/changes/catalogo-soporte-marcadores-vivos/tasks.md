@@ -54,12 +54,12 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 ## Phase 4: PoC migration — 3 views
 
-- [ ] 4.1 Add `soporteMeta: MarcadorSoporte[]` to `vistas/BuzonNotificaciones.tsx` (1 entry `buzon.consultor`) and `vistas/admin/JornadasView.tsx` (1 new entry `jornadas.manage`, route `/jornadas`, roles `['Admin','Editor']`), per design.md insertion points.
-- [ ] 4.2 Add `soporteMeta: MarcadorSoporte[]` to `vistas/admin/AgendaView.tsx` (3 entries: `agenda.read`+`agenda.manage` route `/`, `agenda.standalone` route `/agenda`).
-- [ ] 4.3 Remove the 4 migrated `entry(...)` calls from `shared/soporte/catalogo.v1.ts`; add `/jornadas` to `RUTAS_SOPORTE_CONOCIDAS`.
-- [ ] 4.4 Update `shared/soporte/catalogo.v1.test.ts` (`INVENTARIO_ESPERADO` minus 4 ids, both `toHaveLength(59)`→`55`) and finalize `validar-catalogo.test.ts` l.18 `59`→`55`.
-- [ ] 4.5 Regenerate committed artifacts (`node scripts/generar-catalogo.mjs`); verify `node scripts/generar-catalogo.mjs --check` passes against repo root with no flags.
-- [ ] 4.6 Verify: `npm test -- --runInBand shared/soporte/catalogo.v1.test.ts scripts/validar-catalogo.test.ts vistas/BuzonNotificaciones.test.tsx vistas/admin/AgendaView.test.tsx`; `npx tsc --noEmit`.
+- [x] 4.1 Add `soporteMeta: MarcadorSoporte[]` to `vistas/BuzonNotificaciones.tsx` (1 entry `buzon.consultor`) and `vistas/admin/JornadasView.tsx` (1 new entry `jornadas.manage`, route `/jornadas`, roles `['Admin','Editor']`), per design.md insertion points.
+- [x] 4.2 Add `soporteMeta: MarcadorSoporte[]` to `vistas/admin/AgendaView.tsx` (3 entries: `agenda.read`+`agenda.manage` route `/`, `agenda.standalone` route `/agenda`).
+- [x] 4.3 Remove the 4 migrated `entry(...)` calls from `shared/soporte/catalogo.v1.ts`; add `/jornadas` to `RUTAS_SOPORTE_CONOCIDAS`.
+- [x] 4.4 Update `shared/soporte/catalogo.v1.test.ts` (`INVENTARIO_ESPERADO` minus 4 ids, both `toHaveLength(59)`→`55`) and finalize `validar-catalogo.test.ts` l.18 `59`→`55`.
+- [x] 4.5 Regenerate committed artifacts (`node scripts/generar-catalogo.mjs`); verify `node scripts/generar-catalogo.mjs --check` passes against repo root with no flags.
+- [x] 4.6 Verify: `npm test -- --runInBand shared/soporte/catalogo.v1.test.ts scripts/validar-catalogo.test.ts vistas/BuzonNotificaciones.test.tsx vistas/admin/AgendaView.test.tsx`; `npx tsc --noEmit`.
 
 ## Phase 5: Fusion golden + regression
 
