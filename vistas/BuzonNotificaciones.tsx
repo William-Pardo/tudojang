@@ -14,6 +14,33 @@ import {
 import { IconoCampana } from '../components/Iconos';
 import { useConfiguracion } from '../context/DataContext';
 import MediosPagoResumen from '../components/MediosPagoResumen';
+import type { MarcadorSoporte } from '../shared/soporte/tipos';
+
+// Marcador vivo del catalogo de soporte (openspec/changes/catalogo-soporte-marcadores-vivos):
+// migrado 1:1 desde `shared/soporte/catalogo.v1.ts` (entry `buzon.consultor`). `introducedIn`
+// lo estampa el generador desde `catalogVersion` -- ver `MarcadorSoporte` en shared/soporte/tipos.ts.
+export const soporteMeta: MarcadorSoporte[] = [
+    {
+        id: 'buzon.consultor',
+        inventoryId: 'buzon.consultor',
+        module: 'buzon',
+        label: 'Buzón de notificaciones (Tutor/Estudiante)',
+        intent: 'Orientar sobre buzón de notificaciones (tutor/estudiante).',
+        aliases: ['buzon de notificaciones', 'mis notificaciones', 'notificaciones de pago', 'marcar como leida'],
+        actions: ['consultar', 'marcar'],
+        negativeTerms: [],
+        roles: ['Tutor', 'Estudiante'],
+        steps: ['Abre el buzón desde el menú lateral.', 'Revisa notificaciones de pagos, avances y eventos.', 'Márcalas como leídas.'],
+        route: '/buzon',
+        sensitivity: 'internal',
+        escalationReason: 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.',
+        sourceFiles: ['vistas/BuzonNotificaciones.tsx'],
+        authorizationRef: 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.',
+        owner: 'Producto y Soporte Tudojang',
+        lastVerifiedAt: '2026-07-30',
+        status: 'active',
+    },
+];
 
 const VistaBuzonNotificaciones: React.FC = () => {
     const { usuario } = useAuth();

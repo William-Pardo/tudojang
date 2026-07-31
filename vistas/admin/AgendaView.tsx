@@ -27,6 +27,78 @@ import {
 } from '../../servicios/academico/ventanaClaseEnVivoService';
 import { IconoEditar, IconoEliminar } from '../../components/Iconos';
 import ModalEdicionJornada from '../../components/academico/ModalEdicionJornada';
+import type { MarcadorSoporte } from '../../shared/soporte/tipos';
+
+// Marcador vivo del catalogo de soporte (openspec/changes/catalogo-soporte-marcadores-vivos):
+// migrado 1:1 desde `shared/soporte/catalogo.v1.ts` (entries `agenda.read`, `agenda.manage`,
+// `agenda.standalone`). `introducedIn` lo estampa el generador desde `catalogVersion` -- ver
+// `MarcadorSoporte` en shared/soporte/tipos.ts.
+export const soporteMeta: MarcadorSoporte[] = [
+    {
+        id: 'agenda.read',
+        inventoryId: 'agenda.read',
+        module: 'agenda',
+        label: 'Consulta de horario semanal',
+        intent: 'Orientar sobre consulta de horario semanal.',
+        aliases: ['horario semanal', 'agenda de clases', 'carga instructor', 'filtrar horario'],
+        actions: ['consultar', 'filtrar', 'revisar'],
+        negativeTerms: [],
+        roles: ['Admin', 'Editor', 'Asistente', 'SuperAdmin'],
+        steps: ['Abre Administración > Agenda.', 'Navega entre semanas.', 'Revisa las clases (jornadas) programadas.'],
+        route: '/',
+        sensitivity: 'internal',
+        escalationReason: 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.',
+        sourceFiles: ['vistas/admin/AgendaView.tsx'],
+        authorizationRef: 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.',
+        owner: 'Producto y Soporte Tudojang',
+        lastVerifiedAt: '2026-07-30',
+        status: 'active',
+    },
+    {
+        id: 'agenda.manage',
+        inventoryId: 'agenda.manage',
+        module: 'agenda',
+        label: 'Gestión de clases (jornadas)',
+        intent: 'Orientar sobre gestión de clases (jornadas).',
+        aliases: ['crear bloque de clase', 'editar horario', 'eliminar clase', 'agendar clase', 'reprogramar clase', 'cancelar clase'],
+        actions: ['crear', 'editar', 'eliminar', 'agendar', 'reprogramar', 'cancelar'],
+        negativeTerms: [],
+        roles: ['Admin', 'SuperAdmin'],
+        steps: ['Abre Administración > Agenda.', 'Selecciona una clase de la parrilla semanal.', 'Edita, reprograma o cancela desde el modal de edición.'],
+        route: '/',
+        sensitivity: 'privileged',
+        escalationReason: 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.',
+        sourceFiles: ['vistas/admin/AgendaView.tsx'],
+        authorizationRef: 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.',
+        owner: 'Producto y Soporte Tudojang',
+        lastVerifiedAt: '2026-07-30',
+        status: 'active',
+    },
+    {
+        id: 'agenda.standalone',
+        inventoryId: 'agenda.standalone',
+        module: 'agenda',
+        label: 'Agenda personal (Maestro/Estudiante/Tutor)',
+        intent: 'Orientar sobre agenda personal (maestro/estudiante/tutor).',
+        aliases: ['mi agenda', 'ver mi horario', 'agenda de maestro', 'mis clases de la semana'],
+        actions: ['consultar', 'revisar'],
+        negativeTerms: [],
+        roles: ['Maestro', 'Estudiante', 'Tutor'],
+        steps: [
+            'Abre el enlace "Agenda" del menú lateral.',
+            'Navega entre semanas.',
+            'El Maestro puede editar su propia clase asignada; Estudiante/Tutor ven en solo lectura.',
+        ],
+        route: '/agenda',
+        sensitivity: 'internal',
+        escalationReason: 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.',
+        sourceFiles: ['vistas/admin/AgendaView.tsx'],
+        authorizationRef: 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.',
+        owner: 'Producto y Soporte Tudojang',
+        lastVerifiedAt: '2026-07-30',
+        status: 'active',
+    },
+];
 
 // Subtarea 12.9: contexto vacio por defecto para el modal de edicion (mismo shape que
 // devuelve obtenerContextoJornada), usado antes de que la carga real resuelva.

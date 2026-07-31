@@ -1,0 +1,11 @@
+{
+  "note": "Fixture de baseline-crece (head): agrega 'vistas/FixtureDeudaC.tsx' respecto de base/deuda-catalogo.json -- la lista de deuda solo puede achicarse (D6), asi que este crecimiento debe hacer fallar al gate nombrando el elemento agregado.",
+  "deuda": [
+    "vistas/FixtureDeudaA.tsx",
+    "vistas/FixtureDeudaB.tsx",
+    "vistas/FixtureDeudaC.tsx"
+  ],
+  "exentosPermanentes": [
+    "App.tsx"
+  ]
+}

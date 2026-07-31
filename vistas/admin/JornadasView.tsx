@@ -33,6 +33,49 @@ import {
   publishPrograma,
 } from '../../servicios/academico/programaService';
 import PestanaProgramaJornada from '../../components/academico/PestanaProgramaJornada';
+import type { MarcadorSoporte } from '../../shared/soporte/tipos';
+
+// Marcador vivo del catalogo de soporte (openspec/changes/catalogo-soporte-marcadores-vivos):
+// entrada nueva -- JornadasView no tenia cobertura previa en `shared/soporte/catalogo.v1.ts`.
+// Distinta de `agenda.manage` (parrilla semanal, crear/editar/eliminar/reprogramar clases desde
+// `AgendaView.tsx`): esta vista opera UNA jornada puntual a lo largo de su ciclo de vida
+// (confirmar -> iniciar -> cerrar), con asistencia y objetivos impartidos. `introducedIn` lo
+// estampa el generador desde `catalogVersion` -- ver `MarcadorSoporte` en shared/soporte/tipos.ts.
+export const soporteMeta: MarcadorSoporte[] = [
+    {
+        id: 'jornadas.manage',
+        inventoryId: 'jornadas.manage',
+        module: 'jornadas',
+        label: 'Plan y cierre de clase (Jornadas)',
+        intent: 'Orientar sobre plan y cierre de clase (jornadas).',
+        aliases: [
+            'confirmar jornada',
+            'iniciar jornada',
+            'cerrar jornada',
+            'cerrar clase',
+            'plan de clase',
+            'registrar asistencia jornada',
+            'objetivos impartidos',
+        ],
+        actions: ['confirmar', 'iniciar', 'cerrar', 'registrar'],
+        negativeTerms: ['editar horario', 'eliminar clase', 'reprogramar clase', 'cancelar clase'],
+        roles: ['Admin', 'Editor'],
+        steps: [
+            'Abre Jornadas desde el menú lateral.',
+            'Revisa el programa, sede, espacio e instructor asignados y confirma la jornada.',
+            'Al llegar la hora, inicia la jornada y marca el objetivo saludo impartido.',
+            'Cierra la jornada al finalizar la clase; los check-ins de asistencia se cuentan automáticamente.',
+        ],
+        route: '/jornadas',
+        sensitivity: 'privileged',
+        escalationReason: 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.',
+        sourceFiles: ['vistas/admin/JornadasView.tsx'],
+        authorizationRef: 'App.tsx#/jornadas requiere RolUsuario.Admin o RolUsuario.Editor',
+        owner: 'Producto y Soporte Tudojang',
+        lastVerifiedAt: '2026-07-30',
+        status: 'active',
+    },
+];
 
 function crearProgramaBase(tenantId: string): ProgramaAcademico {
   return publishPrograma(createPrograma({

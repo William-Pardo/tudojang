@@ -1,0 +1,11 @@
+{
+  "note": "Fixture del gate: estado ACTUAL (equivalente a head/deuda-catalogo.json) leido del disco por defecto por scripts/verificar-rutas-soporte.mjs. Comparado contra --baseline-base=base/deuda-catalogo.json (D6, escenario 'f': agrega 'vistas/FixtureDeudaC.tsx' respecto de la base, lo que debe hacer fallar el gate nombrando el elemento agregado).",
+  "deuda": [
+    "vistas/FixtureDeudaA.tsx",
+    "vistas/FixtureDeudaB.tsx",
+    "vistas/FixtureDeudaC.tsx"
+  ],
+  "exentosPermanentes": [
+    "App.tsx"
+  ]
+}

@@ -31,6 +31,17 @@ coverage/
 # se caian con MODULE_NOT_FOUND en cold start. El frontend lo importa hacia adentro
 # (`./functions/planes-config.json`), que si funciona porque Vite construye desde la raiz.
 !functions/planes-config.json
+# Linea base congelada de deuda del catalogo de soporte (openspec/changes/
+# catalogo-soporte-marcadores-vivos, Fase 6, D4). Fuente hand-curated que consume
+# scripts/verificar-rutas-soporte.mjs -- NO es un reporte generado, la regla `*.json` de
+# arriba la dejaba fuera de git.
+!shared/soporte/deuda-catalogo.json
+# Fixtures JSON reales en disco del gate de catalogo de soporte (Fases 1 y 7 del mismo
+# change). Bug detectado en Fase 7: la regla `*.json` de arriba ya se habia comido en
+# silencio los fixtures `baseline-crece/{base,head}/deuda-catalogo.json` de la Fase 1
+# (nunca quedaron commiteados, aunque el commit de esa fase los listaba como agregados en
+# el arbol de trabajo) -- `git status` no avisa de un untracked+ignored por defecto.
+!scripts/__fixtures__/**/*.json
 !**/package-lock.json
 !tsconfig.json
 !tsconfig.*.json
