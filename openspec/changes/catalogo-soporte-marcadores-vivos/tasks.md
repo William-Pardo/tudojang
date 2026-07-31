@@ -86,9 +86,9 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 ## Phase 9: Docs + spec correction
 
-- [ ] 9.1 Rewrite `docs/asistente/catalogo.md`: manual checklist → description of the automated mechanism (marcador → escaneo → fusión → gate); fix l.40 (`Estudiante` is `active`, not `reserved`); note `RutaInicial`-mounted `vistas/Administracion.tsx` (+8 entries) stays out of gate scope.
-- [ ] 9.2 Update `specs/catalogo-soporte-antideriva/spec.md` Requirement "Contrato del marcador co-locado": one-line clarification that the **emitted** entry satisfies the full contract while the marker type is `Omit<…,'introducedIn'>` (D2; resolves design.md open question).
-- [ ] 9.3 Verify: doc/spec-only, manual proofread against D2/D9.
+- [x] 9.1 Rewrite `docs/asistente/catalogo.md`: manual checklist → description of the automated mechanism (marcador → escaneo → fusión → gate); fix l.40 (`Estudiante` is `active`, not `reserved`); note `RutaInicial`-mounted `vistas/Administracion.tsx` stays out of gate scope. **Correction found during precision review**: design.md's open question said "8 entradas" reference `Administracion.tsx`; verified against `shared/soporte/catalogo.v1.ts` directly (grep for every `admin.*`/`finance.*` entry id + every literal occurrence of `Administracion.tsx`/`Dashboard.tsx`/`Finanzas.tsx`/`FilaEstudiante.tsx`/`PanelValidacionPagos.tsx` in `sourceFiles`) — the real count is **7** (`admin.summary`, `admin.late-fees`, `finance.ledger`, `finance.delete`, `finance.student-payments`, `finance.student-payment-undo`, `finance.payment-validation`); docs use the verified number, not the estimate.
+- [x] 9.2 Update `specs/catalogo-soporte-antideriva/spec.md` Requirement "Contrato del marcador co-locado": one-line clarification that the **emitted** entry satisfies the full contract while the marker type is `Omit<…,'introducedIn'>` (D2; resolves design.md open question).
+- [x] 9.3 Verify: doc/spec-only, manual proofread against D2/D9. Cross-checked `docs/asistente/catalogo.md` and the spec clarification against `shared/soporte/tipos.ts` (`MarcadorSoporte` + its inline comment), `scripts/lib/catalogo-fuente.mjs` (`escanearMarcadores`/`verificarAutorreferencia`/`fusionarCatalogo`), `scripts/verificar-rutas-soporte.mjs`, `shared/soporte/deuda-catalogo.json` (real 25/35 + 2/5 counts), and `vistas/admin/AgendaView.tsx` (cited example). No command exists to lint prose; verification is this manual cross-check.
 
 ## Phase 10: Follow-up change scaffold (closure condition — Decision #7)
 
