@@ -1,0 +1,5 @@
+{
+  "note": "Fixture del gate: cobertura nominal cuyo unico rol esta 'reserved' (ninguno activo) -- debe fallar aunque el archivo tenga una entrada en el catalogo (escenario 'c').",
+  "deuda": [],
+  "exentosPermanentes": []
+}
