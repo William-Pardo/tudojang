@@ -48,9 +48,9 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 ## Phase 3: Generator wiring
 
-- [ ] 3.1 RED — update `scripts/validar-catalogo.test.ts`: replace golden `expectedJson` diff with invariants (`public/` ≡ `functions/` byte-identical, `.sha256` matches, `validarCatalogoSoporte(JSON.parse(json)) === []`); add fixture-driven cases for id-duplicado and marcador-dinamico via `--source-root`.
-- [ ] 3.2 GREEN — modify `scripts/generar-catalogo.mjs`: delegate `loadCatalog()` to `catalogo-fuente.mjs` (núcleo + marcadores fusionados), add `--source-root <dir>` (default `cwd`), drop the fixed `entries.length !== 59` check from `assertCatalog`.
-- [ ] 3.3 Verify: `npm test -- --runInBand scripts/validar-catalogo.test.ts`.
+- [x] 3.1 RED — update `scripts/validar-catalogo.test.ts`: replace golden `expectedJson` diff with invariants (`public/` ≡ `functions/` byte-identical, `.sha256` matches, `validarCatalogoSoporte(JSON.parse(json)) === []`); add fixture-driven cases for id-duplicado and marcador-dinamico via `--source-root`.
+- [x] 3.2 GREEN — modify `scripts/generar-catalogo.mjs`: delegate `loadCatalog()` to `catalogo-fuente.mjs` (núcleo + marcadores fusionados), add `--source-root <dir>` (default `cwd`), drop the fixed `entries.length !== 59` check from `assertCatalog`.
+- [x] 3.3 Verify: `npm test -- --runInBand scripts/validar-catalogo.test.ts`.
 
 ## Phase 4: PoC migration — 3 views
 

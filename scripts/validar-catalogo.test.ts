@@ -1,14 +1,23 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { CATALOGO_SOPORTE_V1 } from '../shared/soporte/catalogo.v1';
-import {
-    calcularChecksumCatalogo,
-    serializarCatalogoSoporte,
-    validarCatalogoSoporte,
-} from '../shared/soporte/validacion';
+import { validarCatalogoSoporte } from '../shared/soporte/validacion';
 import type { CatalogoSoporte } from '../shared/soporte/tipos';
+
+const fixturesRoot = path.resolve('scripts/__fixtures__/catalogo-gate');
+const script = path.resolve('scripts/generar-catalogo.mjs');
+
+const conOutputRootTemporal = <T>(prefijo: string, ejecutar: (outputRoot: string) => T): T => {
+    const outputRoot = mkdtempSync(path.join(tmpdir(), prefijo));
+    try {
+        return ejecutar(outputRoot);
+    } finally {
+        rmSync(outputRoot, { recursive: true, force: true });
+    }
+};
 
 const cloneCatalog = (): CatalogoSoporte => JSON.parse(JSON.stringify(CATALOGO_SOPORTE_V1));
 
@@ -53,10 +62,7 @@ describe('validación y generación del catálogo', () => {
     });
 
     it('genera copias idénticas y detecta drift por checksum', () => {
-        const outputRoot = mkdtempSync(path.join(tmpdir(), 'catalogo-soporte-'));
-        const script = path.resolve('scripts/generar-catalogo.mjs');
-
-        try {
+        conOutputRootTemporal('catalogo-soporte-', (outputRoot) => {
             const generate = spawnSync(process.execPath, [script, '--output-root', outputRoot], {
                 encoding: 'utf8',
             });
@@ -65,27 +71,65 @@ describe('validación y generación del catálogo', () => {
             const clientJson = path.join(outputRoot, 'public/generated/soporte/catalogo.v1.json');
             const functionJson = path.join(outputRoot, 'functions/generated/soporte/catalogo.v1.json');
             const checksumFile = path.join(outputRoot, 'public/generated/soporte/catalogo.v1.sha256');
-            const expectedJson = serializarCatalogoSoporte(CATALOGO_SOPORTE_V1);
 
-            expect(readFileSync(clientJson, 'utf8')).toBe(expectedJson);
-            expect(readFileSync(functionJson, 'utf8')).toBe(expectedJson);
+            const clientContent = readFileSync(clientJson, 'utf8');
+            const functionContent = readFileSync(functionJson, 'utf8');
+
+            // Invariante: public/ y functions/ son copias byte a byte del mismo catálogo fusionado
+            // (ya no un diff contra un golden estático, porque el catálogo emitido ahora es la
+            // fusión núcleo+marcadores, no una copia directa de CATALOGO_SOPORTE_V1).
+            expect(functionContent).toBe(clientContent);
+            // Invariante: el .sha256 committeado coincide con el sha256 real del JSON emitido.
             expect(readFileSync(checksumFile, 'utf8').trim()).toBe(
-                calcularChecksumCatalogo(CATALOGO_SOPORTE_V1),
+                createHash('sha256').update(clientContent).digest('hex'),
             );
+            // Invariante: el catálogo fusionado emitido sigue siendo un CatalogoSoporte válido.
+            expect(validarCatalogoSoporte(JSON.parse(clientContent) as CatalogoSoporte)).toEqual([]);
 
             const check = spawnSync(process.execPath, [script, '--check', '--output-root', outputRoot], {
                 encoding: 'utf8',
             });
             expect(check.status).toBe(0);
 
-            writeFileSync(clientJson, `${expectedJson}\n{"drift":true}`, 'utf8');
+            writeFileSync(clientJson, `${clientContent}\n{"drift":true}`, 'utf8');
             const drift = spawnSync(process.execPath, [script, '--check', '--output-root', outputRoot], {
                 encoding: 'utf8',
             });
             expect(drift.status).toBe(1);
             expect(drift.stderr).toContain('drift');
-        } finally {
-            rmSync(outputRoot, { recursive: true, force: true });
-        }
+        });
+    });
+
+    it('--source-root: falla duro por id duplicado entre dos marcadores (fixture marcador-duplicado)', () => {
+        conOutputRootTemporal('catalogo-soporte-duplicado-', (outputRoot) => {
+            const sourceRoot = path.join(fixturesRoot, 'marcador-duplicado');
+
+            const result = spawnSync(
+                process.execPath,
+                [script, '--source-root', sourceRoot, '--output-root', outputRoot],
+                { encoding: 'utf8' },
+            );
+
+            expect(result.status).toBe(1);
+            expect(result.stderr).toContain('fixture.duplicado');
+            expect(result.stderr).toContain('VistaDuplicadoA.tsx');
+            expect(result.stderr).toContain('VistaDuplicadoB.tsx');
+        });
+    });
+
+    it('--source-root: falla duro por marcador dinámico no evaluable estáticamente (fixture marcador-dinamico, D3)', () => {
+        conOutputRootTemporal('catalogo-soporte-dinamico-', (outputRoot) => {
+            const sourceRoot = path.join(fixturesRoot, 'marcador-dinamico');
+
+            const result = spawnSync(
+                process.execPath,
+                [script, '--source-root', sourceRoot, '--output-root', outputRoot],
+                { encoding: 'utf8' },
+            );
+
+            expect(result.status).toBe(1);
+            expect(result.stderr).toMatch(/VistaDinamica\.tsx:\d+:\d+/);
+            expect(result.stderr).toMatch(/Spread/);
+        });
     });
 });
