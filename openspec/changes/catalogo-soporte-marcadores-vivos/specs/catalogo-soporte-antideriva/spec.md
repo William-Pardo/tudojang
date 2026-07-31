@@ -10,6 +10,8 @@ Evitar que una vista enrutada nazca, se mueva o pierda su archivo sin que el cat
 
 El archivo fuente de una vista enrutada SHALL poder declarar un export nombrado `soporteMeta`, con una o más entradas que satisfacen íntegramente el contrato `EntradaCatalogoSoporte` de `shared/soporte/tipos.ts` (id, inventoryId, module, label, intent, aliases, actions, negativeTerms, roles, steps, route, sensitivity, escalationReason, sourceFiles, authorizationRef, owner, introducedIn, lastVerifiedAt, status). El tipo usado para anotar `soporteMeta` MUST derivar de `EntradaCatalogoSoporte` de modo que el compilador rechace un rol, una sensibilidad, un `status` o cualquier otro campo inexistente o mal tipado.
 
+Aclaración: la entrada **emitida** en el catálogo fusionado satisface el contrato `EntradaCatalogoSoporte` completo, incluido `introducedIn`; el TIPO usado para anotar `soporteMeta` en el código fuente es `MarcadorSoporte = Omit<EntradaCatalogoSoporte, 'introducedIn'>` (design.md D2), porque ese campo lo estampa el generador desde `catalog.catalogVersion` al fusionar, no la vista.
+
 #### Scenario: Marcador válido compila
 
 - GIVEN una vista con `export const soporteMeta` anotado con un tipo derivado de `EntradaCatalogoSoporte`
