@@ -1,0 +1,5 @@
+{
+  "note": "Fixture del gate: marcador con route inexistente en App.tsx -- debe fallar nombrando la ruta declarada y el archivo del marcador (escenario 'b').",
+  "deuda": [],
+  "exentosPermanentes": []
+}

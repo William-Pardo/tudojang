@@ -1,0 +1,5 @@
+{
+  "note": "Fixture del gate: camino feliz. vistas/VistaCubierta.tsx vive en la linea base de deuda (cobertura manual); vistas/VistaConMarcador.tsx queda fuera (cobertura por marcador soporteMeta).",
+  "deuda": ["vistas/VistaCubierta.tsx"],
+  "exentosPermanentes": []
+}

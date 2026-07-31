@@ -1,0 +1,5 @@
+{
+  "note": "Fixture del gate: archivo enrutado fuera de la linea base y sin ninguna cobertura -- debe fallar (escenario 'a').",
+  "deuda": [],
+  "exentosPermanentes": []
+}
