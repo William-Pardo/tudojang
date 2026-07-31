@@ -63,9 +63,9 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 ## Phase 5: Fusion golden + regression
 
-- [ ] 5.1 Create `scripts/catalogo-fusion.test.js` (node --test): builds the real fused catalog against repo root, asserts the 60 expected `inventoryId`s (55 manual + 4 migrated + `jornadas.manage`).
-- [ ] 5.2 Verify no regression: `npm test -- --runInBand servicios/soporte/matcher.test.ts servicios/soporte/contexto.test.ts App.routing.test.ts`.
-- [ ] 5.3 Coverage: `npm run test:coverage -- shared/soporte scripts/lib`.
+- [x] 5.1 Create `scripts/catalogo-fusion.test.js` (node --test): builds the real fused catalog against repo root, asserts the 60 expected `inventoryId`s (55 manual + 4 migrated + `jornadas.manage`).
+- [x] 5.2 Verify no regression: `npm test -- --runInBand servicios/soporte/matcher.test.ts servicios/soporte/contexto.test.ts App.routing.test.ts`.
+- [x] 5.3 Coverage: `npm run test:coverage -- shared/soporte scripts/lib` (adapted — `test:coverage` is jest-only and does not instrument `.mjs`; ran `npm run test:coverage -- shared/soporte` for the jest side (100% statements on `catalogo.v1.ts`) plus `node --experimental-test-coverage --test-coverage-include="scripts/lib/**" --test scripts/*.test.js` for `scripts/lib` (94.33% line / 80.63% branch / 100% funcs on `catalogo-fuente.mjs`)).
 
 ## Phase 6: Debt baseline
 
