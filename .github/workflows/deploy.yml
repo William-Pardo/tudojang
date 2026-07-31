@@ -41,7 +41,13 @@ jobs:
   pruebas:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 (agregado openspec/changes/catalogo-soporte-marcadores-vivos, Fase 8):
+      # con el default (fetch-depth: 1) el runner no tiene historia, asi que `git merge-base` y
+      # `git show <base>:...` mas abajo no tienen nada contra que resolver. Sin esto, el gate de
+      # rutas del catalogo de soporte no puede calcular ni el diff ni la linea base anterior.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,6 +73,25 @@ jobs:
       # entorno, que es justo lo que las pruebas esperan.
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
+
+      # Los 3 pasos siguientes (openspec/changes/catalogo-soporte-marcadores-vivos, Fase 8) van
+      # DESPUES del typecheck y ANTES de las suites largas (~8 minutos): son de segundos y deben
+      # fallar temprano si una vista enrutada quedo sin cobertura en el catalogo de soporte.
+      - name: Base del diff para el catálogo de soporte
+        run: |
+          BASE="$(git merge-base origin/${GITHUB_BASE_REF:-main} HEAD || echo '')"
+          git diff --name-only "$BASE" HEAD > /tmp/soporte-cambios.txt
+          git show "$BASE:shared/soporte/deuda-catalogo.json" > /tmp/soporte-deuda-base.json || true
+
+      - name: Gate de rutas del catálogo de soporte
+        run: >-
+          node scripts/verificar-rutas-soporte.mjs
+          --changed-files /tmp/soporte-cambios.txt
+          --baseline-base /tmp/soporte-deuda-base.json
+          --strict-baseline
+
+      - name: Catálogo generado en sincronía
+        run: node scripts/generar-catalogo.mjs --check
 
       - name: Pruebas de la app
         run: npm run test:app

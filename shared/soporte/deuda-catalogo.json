@@ -1,0 +1,34 @@
+{
+  "note": "Linea base congelada de deuda del catalogo de soporte (openspec/changes/catalogo-soporte-marcadores-vivos, Fase 6, D4/D5). `deuda` = archivos enrutados por App.tsx que hoy solo tienen cobertura MANUAL en shared/soporte/catalogo.v1.ts (no un marcador soporteMeta co-locado); se calculo cruzando cada par {route, archivo} real de App.tsx (via leerRutasApp) contra los `sourceFiles` de cada entrada manual restante -- 25 archivos, 35 entradas manuales. `exentosPermanentes` = nucleo estructural fuera de alcance del gate (App.tsx via RutaInicial/shell.session; vistas/MasterDashboard.tsx via master.support/master.tenants/master.kicho/master.analytics) -- 2 archivos, 5 entradas manuales. Los 15 entries manuales restantes (admin.*, finance.*, students.kicho*, students.live-class, centro-estudios.material/biblioteca/progreso, students.certificates, students.cards) cubren archivos que App.tsx NO enruta directamente (se alcanzan via pestanas/tabs de Administracion.tsx o Estudiantes.tsx), asi que quedan fuera del alcance del gate por completo -- ni deuda ni exento. 25+2 == 27 archivos clasificados == 30 archivos enrutados distintos menos los 3 ya migrados en el PoC (BuzonNotificaciones.tsx, admin/AgendaView.tsx, admin/JornadasView.tsx). Regla shrink-only (D6): ambos arrays solo pueden achicarse; agregar un elemento en vez de migrarlo a marcador hace fallar scripts/verificar-rutas-soporte.mjs. El seguimiento de migracion vive en openspec/changes/catalogo-soporte-migracion-deuda (Fase 10 de este change).",
+  "deuda": [
+    "vistas/ActivarCuenta.tsx",
+    "vistas/AyudaPqrs.tsx",
+    "vistas/CensoPublico.tsx",
+    "vistas/CentroEstudios.tsx",
+    "vistas/ClaseEnVivoView.tsx",
+    "vistas/Configuracion.tsx",
+    "vistas/Estudiantes.tsx",
+    "vistas/EventoPublico.tsx",
+    "vistas/Eventos.tsx",
+    "vistas/FirmaConsentimiento.tsx",
+    "vistas/FirmaContrato.tsx",
+    "vistas/FirmaContratoColaborador.tsx",
+    "vistas/FirmaImagen.tsx",
+    "vistas/LicenciaSuspendida.tsx",
+    "vistas/Login.tsx",
+    "vistas/MasterAccess.tsx",
+    "vistas/MiPerfil.tsx",
+    "vistas/Notificaciones.tsx",
+    "vistas/PasarelaInscripcion.tsx",
+    "vistas/PublicLanding.tsx",
+    "vistas/RegistroEscuela.tsx",
+    "vistas/ReportarPagoPublico.tsx",
+    "vistas/RestablecerClave.tsx",
+    "vistas/SalidaPublica.tsx",
+    "vistas/Tienda.tsx"
+  ],
+  "exentosPermanentes": [
+    "App.tsx",
+    "vistas/MasterDashboard.tsx"
+  ]
+}

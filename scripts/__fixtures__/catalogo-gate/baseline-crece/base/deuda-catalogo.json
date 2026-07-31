@@ -1,0 +1,10 @@
+{
+  "note": "Fixture de baseline-crece (base): usado por scripts/verificar-rutas-soporte.test.js para probar el enforcement shrink-only de D6 (comparacion contra `git show <base>:...deuda-catalogo.json`). No editar a mano fuera de este proposito.",
+  "deuda": [
+    "vistas/FixtureDeudaA.tsx",
+    "vistas/FixtureDeudaB.tsx"
+  ],
+  "exentosPermanentes": [
+    "App.tsx"
+  ]
+}
