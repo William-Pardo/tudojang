@@ -24,7 +24,7 @@ export const enviarNotificacion = (canal: 'WhatsApp' | 'Email', destinatario: st
                 const telefonoLimpio = destinatario.replace(/\s+/g, '');
                 window.open(`https://wa.me/57${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
             } else if (canal === 'Email') {
-                window.open(`mailto:${destinatario}?subject=Notificación de TaekwondoGa Jog&body=${encodeURIComponent(mensaje)}`, '_blank');
+                window.open(`mailto:${destinatario}?subject=Notificación de TuDojang&body=${encodeURIComponent(mensaje)}`, '_blank');
             }
             // La notificación al usuario (Toast) se maneja ahora en el componente que llama a esta función.
             resolve();
@@ -67,7 +67,7 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
                 destinatario: 'carlos.gomez@email.com',
                 canal: 'Email',
                 tipo: TipoNotificacion.RecordatorioPago,
-                mensaje: 'Hola Carlos, te recordamos amablemente que el pago de la mensualidad para Sofia por un valor de $180.000 está próximo a vencer. Agradecemos tu puntualidad. Equipo TaekwondoGa Jog.',
+                mensaje: 'Hola Carlos, te recordamos amablemente que el pago de la mensualidad para Sofia por un valor de $180.000 está próximo a vencer. Agradecemos tu puntualidad. Equipo TuDojang.',
                 leida: false,
             },
             {
@@ -79,7 +79,7 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
                 destinatario: '3001112233',
                 canal: 'WhatsApp',
                 tipo: TipoNotificacion.Bienvenida,
-                mensaje: '¡Bienvenido a TaekwondoGa Jog, Juan! Estamos muy felices de tenerte con nosotros. Esperamos que disfrutes cada clase y aprendas mucho. ¡Nos vemos en el dojang!',
+                mensaje: '¡Bienvenido a TuDojang, Juan! Estamos muy felices de tenerte con nosotros. Esperamos que disfrutes cada clase y aprendas mucho. ¡Nos vemos en el dojang!',
                 leida: true,
             }
         ];

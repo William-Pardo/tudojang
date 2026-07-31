@@ -38,16 +38,16 @@ const ModalCompartirTienda: React.FC<Props> = ({ abierto, onCerrar }) => {
   if (!abierto) return null;
 
   const url = generarUrlAbsoluta('/tienda-publica');
-  const texto = `¡Hola! Te invitamos a visitar la tienda de implementos de TaekwondoGa Jog. Encuentra todo lo que necesitas para tu entrenamiento:`;
+  const texto = `¡Hola! Te invitamos a visitar la tienda de implementos de TuDojang. Encuentra todo lo que necesitas para tu entrenamiento:`;
   const textoEncoded = encodeURIComponent(texto);
   const urlEncoded = encodeURIComponent(url);
 
   const opciones = [
     { red: 'WhatsApp', icono: IconoWhatsApp, url: `https://wa.me/?text=${textoEncoded}%20${urlEncoded}`, color: 'text-green-500' },
-    { red: 'Email', icono: IconoEmail, url: `mailto:?subject=${encodeURIComponent("Tienda de Implementos - TaekwondoGa Jog")}&body=${textoEncoded}%0A%0A${urlEncoded}`, color: 'text-gray-600' },
+    { red: 'Email', icono: IconoEmail, url: `mailto:?subject=${encodeURIComponent("Tienda de Implementos - TuDojang")}&body=${textoEncoded}%0A%0A${urlEncoded}`, color: 'text-gray-600' },
     { red: 'Facebook', icono: IconoFacebook, url: `https://www.facebook.com/sharer/sharer.php?u=${urlEncoded}`, color: 'text-blue-600' },
     { red: 'X (Twitter)', icono: IconoXTwitter, url: `https://twitter.com/intent/tweet?text=${textoEncoded}&url=${urlEncoded}`, color: 'text-black dark:text-white' },
-    { red: 'LinkedIn', icono: IconoLinkedIn, url: `https://www.linkedin.com/shareArticle?mini=true&url=${urlEncoded}&title=${encodeURIComponent("Tienda de Implementos - TaekwondoGa Jog")}&summary=${textoEncoded}`, color: 'text-blue-700' },
+    { red: 'LinkedIn', icono: IconoLinkedIn, url: `https://www.linkedin.com/shareArticle?mini=true&url=${urlEncoded}&title=${encodeURIComponent("Tienda de Implementos - TuDojang")}&summary=${textoEncoded}`, color: 'text-blue-700' },
   ];
 
   const handleCopy = () => {

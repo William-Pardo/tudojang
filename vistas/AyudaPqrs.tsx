@@ -60,7 +60,7 @@ const VistaAyudaPqrs: React.FC = () => {
                 </div>
 
                 <footer className="text-center text-[10px] text-gray-400 uppercase font-bold tracking-widest">
-                    TaekwondoGa Jog • Gestión Transparente • 2024
+                    TuDojang • Gestión Transparente • 2024
                 </footer>
             </div>
         </div>

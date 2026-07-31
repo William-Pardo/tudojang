@@ -59,7 +59,7 @@ const TarjetaEventoPublico: React.FC<Props> = ({ evento, onSolicitarInscripcion 
         </div>
       </div>
       <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
-        Gestionado por TaekwondoGa Jog. <ReactRouterDOM.Link to="/login" className="hover:underline">Acceso de Administrador</ReactRouterDOM.Link>
+        Gestionado por TuDojang. <ReactRouterDOM.Link to="/login" className="hover:underline">Acceso de Administrador</ReactRouterDOM.Link>
       </p>
     </div>
   );

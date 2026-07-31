@@ -1,7 +1,7 @@
 {
-  "short_name": "TKDGa Jog",
-  "name": "TaekwondoGa Jog - Módulo de Gestión",
-  "description": "Módulo integral para la gestión de la escuela de TaekwondoGa Jog.",
+  "short_name": "TuDojang",
+  "name": "TuDojang",
+  "description": "Módulo integral para la gestión de escuelas de Taekwondo.",
   "icons": [
     {
       "src": "/Logo_TuDojang.svg",
