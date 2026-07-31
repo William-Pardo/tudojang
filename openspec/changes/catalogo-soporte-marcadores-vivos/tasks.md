@@ -92,9 +92,9 @@ Phase 11 (full regression) is not a PR; it is the final gate run once PR5/PR6/PR
 
 ## Phase 10: Follow-up change scaffold (closure condition — Decision #7)
 
-- [ ] 10.1 Create `openspec/changes/catalogo-soporte-migracion-deuda/proposal.md`: intent = migrate remaining manual entries to `soporteMeta`; scope = every file in `shared/soporte/deuda-catalogo.json`'s `deuda[]`; out of scope = `exentosPermanentes[]`.
-- [ ] 10.2 Create `openspec/changes/catalogo-soporte-migracion-deuda/tasks.md`: one checklist item per file in `deuda[]` (file path + entry id(s)), sourced directly from `shared/soporte/deuda-catalogo.json`.
-- [ ] 10.3 Verify: `tasks.md` item count equals `deuda-catalogo.json`'s `deuda[]` length exactly (spec requirement "Condición de cierre").
+- [x] 10.1 Create `openspec/changes/catalogo-soporte-migracion-deuda/proposal.md`: intent = migrate remaining manual entries to `soporteMeta`; scope = every file in `shared/soporte/deuda-catalogo.json`'s `deuda[]`; out of scope = `exentosPermanentes[]`.
+- [x] 10.2 Create `openspec/changes/catalogo-soporte-migracion-deuda/tasks.md`: one checklist item per file in `deuda[]` (file path + entry id(s)), sourced directly from `shared/soporte/deuda-catalogo.json`.
+- [x] 10.3 Verify: `tasks.md` item count equals `deuda-catalogo.json`'s `deuda[]` length exactly (spec requirement "Condición de cierre"). Verified: 25 checklist items == `deuda[].length` (25).
 
 ## Phase 11: Full regression (post-merge gate, not its own PR)
 
