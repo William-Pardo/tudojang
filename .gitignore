@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Variables de entorno con secretos reales. *.local (arriba) ya cubria .env.local, pero
+# un .env PLANO (sin sufijo) no estaba cubierto -- asi paso el leak real de Secret Scanning
+# alerts #1/#2 (.env commiteado con API keys de Google). Nunca debe existir un .env real
+# trackeado en este repo.
+.env
+.env.*
+!.env.example
+
 # Cobertura Jest
 coverage/
 
