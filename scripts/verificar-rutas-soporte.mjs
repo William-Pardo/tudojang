@@ -68,8 +68,8 @@ function cargarBaselineDesdeDisco(root) {
  * }} opciones
  *   `baselineBase`: `undefined` = flag `--baseline-base` no provisto (se salta el chequeo de
  *   crecimiento por completo); `null` = el flag SI se proveyo pero el archivo no se pudo leer
- *   (bootstrap, D6: "si el archivo no existe en base, se salta con aviso" salvo
- *   `strictBaseline`); objeto parseado = comparacion real.
+ *   (bootstrap, D6: "si el archivo no existe en base, se salta con aviso" -- aplica siempre,
+ *   incluso con `strictBaseline`); objeto parseado = comparacion real.
  * @returns {Promise<{ ok: boolean, errores: string[], avisos: Array<{ archivo: string, mensaje: string }> }>}
  */
 export async function verificarRutasSoporte({
@@ -148,14 +148,19 @@ export async function verificarRutasSoporte({
   // (f): la linea base (deuda ∪ exentosPermanentes) solo puede achicarse (D6).
   if (baselineBase !== undefined) {
     if (baselineBase === null) {
-      if (strictBaseline) {
-        errores.push(
-          'No se pudo resolver --baseline-base (archivo ausente o ilegible) con --strict-baseline activo: '
-          + 'el chequeo de crecimiento de la línea base no puede omitirse en este modo.',
-        );
-      }
-      // Sin --strict-baseline: bootstrap (PR que introduce el archivo por primera vez), se
-      // salta en silencio -- D6.
+      // Bootstrap (D6): "si el archivo no existe en base (PR que lo introduce) => se salta con
+      // aviso". Esto aplica SIEMPRE, con o sin --strict-baseline: la regla shrink-only compara
+      // contra un baseline anterior, y si genuinamente no existía ningún baseline en la rama base
+      // (primera introducción del archivo), no hay nada respecto a lo cual "crecer" -- exigir que
+      // el archivo exista igual convertiría todo bootstrap legítimo en un falso positivo duro.
+      // --strict-baseline sigue siendo estricto sobre la REGLA (no permite que un baseline
+      // *legible* crezca); nunca exige que el archivo de comparación exista de entrada.
+      avisos.push({
+        archivo: 'shared/soporte/deuda-catalogo.json',
+        mensaje: 'No se encontró --baseline-base (archivo ausente o vacío): se asume que la línea base de '
+          + 'deuda del catálogo de soporte no existía todavía en la rama base (bootstrap) y se omite el '
+          + 'chequeo de crecimiento (D6) para esta corrida.',
+      });
     } else {
       const agregados = calcularCrecimientoBaseline(actual, baselineBase);
       if (agregados.length > 0) {

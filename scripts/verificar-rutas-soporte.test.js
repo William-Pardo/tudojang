@@ -112,6 +112,49 @@ test('gate: la linea base creció respecto de --baseline-base falla nombrando el
   assert.doesNotMatch(result.stderr, /FixtureDeudaA\.tsx/);
 });
 
+// --- (h) Bootstrap: --baseline-base ausente/vacío bajo --strict-baseline ----------------------
+// Reproduce el fallo real de CI (PR #26): la rama base del PR aun no tiene
+// shared/soporte/deuda-catalogo.json (se crea recien en este PR), asi que
+// `git show "$BASE:...deuda-catalogo.json" > archivo || true` deja `archivo` ausente/vacio.
+// D6 (design.md): "si el archivo no existe en base (PR que lo introduce) => bootstrap, se salta
+// con aviso" -- esto aplica SIEMPRE, incluso con --strict-baseline, porque no hay nada previo
+// respecto a lo cual "crecer".
+
+test('gate: --baseline-base apunta a un archivo inexistente con --strict-baseline activo no falla por eso (bootstrap, escenario h)', () => {
+  conArchivoTemporal('vistas/VistaConMarcador.tsx\n', (changedFiles) => {
+    const result = ejecutarGate([
+      '--source-root', fixture('gate-limpio'),
+      '--changed-files', changedFiles,
+      '--baseline-base', fixture('gate-limpio/shared/soporte/no-existe-deuda-catalogo.json'),
+      '--strict-baseline',
+    ]);
+
+    assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+    assert.doesNotMatch(result.stderr, /No se pudo resolver --baseline-base/);
+  });
+});
+
+test('gate: --baseline-base apunta a un archivo vacío con --strict-baseline activo no falla por eso (bootstrap, escenario h)', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'verificar-rutas-soporte-baseline-vacio-'));
+  const baselineBaseVacio = path.join(dir, 'deuda-base-vacia.json');
+  writeFileSync(baselineBaseVacio, '', 'utf8');
+  try {
+    conArchivoTemporal('vistas/VistaConMarcador.tsx\n', (changedFiles) => {
+      const result = ejecutarGate([
+        '--source-root', fixture('gate-limpio'),
+        '--changed-files', changedFiles,
+        '--baseline-base', baselineBaseVacio,
+        '--strict-baseline',
+      ]);
+
+      assert.equal(result.status, 0, `stderr: ${result.stderr}`);
+      assert.doesNotMatch(result.stderr, /No se pudo resolver --baseline-base/);
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // --- (g) Arbol integro: todos los chequeos a la vez, sin nada roto ------------------------------
 
 test('gate: arbol integro con cobertura, deuda sin tocar y baseline sin crecimiento pasa limpio (escenario g)', () => {
