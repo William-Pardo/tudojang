@@ -48,6 +48,26 @@ test("clients cannot create students directly -- update/delete stay gated by isI
   );
 });
 
+// SDD pricing-cupo-real (D7, design.md "Protecting billing-affecting tenant fields"):
+// sedeBonusOtorgada/sedeBonusOtorgadaEn/sedesExtraContratadas/equipoTecnicoExtraContratado
+// ya NO son escribibles por el cliente en un `update` de tenants/{tenantId} -- antes
+// cualquier Admin del club podia otorgarse una sede o un cupo de equipo tecnico extra
+// gratis con un `updateDoc(increment(...))` directo. El Admin SDK (Cloud Functions,
+// functions/academico/capacidad.js::actualizarExtrasContratados) sigue pudiendo escribir
+// esos campos porque bypasea las reglas -- comportamiento real (bloqueo del cliente +
+// bypass server-side) probado con el emulador en firestore-rules.behavior.test.js; este es
+// un assert liviano sobre el TEXTO de las reglas, mismo criterio que el resto de este archivo.
+test("clients cannot write billing-affecting tenant fields directly -- camposFacturacionInmutables guards tenants update", () => {
+  assert.match(
+    rules,
+    /match \/tenants\/\{tenantId\}[\s\S]*allow create: if isAdmin\(\)[\s\S]*allow update: if isAdmin\(\)[\s\S]*camposFacturacionInmutables\(\)/
+  );
+  assert.match(
+    rules,
+    /function camposFacturacionInmutables\(\) \{[\s\S]*sedeBonusOtorgada['"][\s\S]*sedeBonusOtorgadaEn['"][\s\S]*sedesExtraContratadas['"][\s\S]*equipoTecnicoExtraContratado['"][\s\S]*\}/
+  );
+});
+
 // ERR-0011: aislamiento por tenant en las 7 colecciones raiz que se leian/escribian sin
 // filtro de tenant (ver bitacora.json). Cada assert.match confirma que la condicion de
 // tenant esta presente en el bloque de la coleccion correspondiente -- estos son
