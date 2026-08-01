@@ -1857,3 +1857,54 @@ test("Cloud Function (Admin SDK) can still write the 4 billing-protected fields 
     assert.equal(snapshot.data().equipoTecnicoExtraContratado, 1);
   });
 });
+
+// =========================================================================
+// SDD pricing-cupo-real (D6, design.md "Guardrail history storage"): historial diario de
+// estudiantes facturables por tenant que usa functions/vigilanciaFacturacion.js para detectar
+// crecimiento anomalo (o una caida sospechosa cerca del corte, señal S3) -- server-only SIN
+// excepcion, a diferencia de tickets_soporte (que sí deja leer a SuperAdmin/owner). Guardar
+// esto en tenants/{tenantId}/privado/facturacion (Admin read/write desde el cliente, D7)
+// dejaria que el propio tenant manipule la serie que se usa para detectar SU PROPIA anomalia.
+// Ningun seed de beforeEach crea facturacion_vigilancia/tenant-1 -- no hace falta: `if false`
+// rechaza la lectura incluso de un documento inexistente (mismo comportamiento ya probado
+// para asistente_cuotas arriba).
+// =========================================================================
+
+test("no client can read the billing growth watchdog history, not even the tenant's own admin", async () => {
+  await assertFails(
+    getDoc(doc(client("user-1", "tenant-1", "Admin"), "facturacion_vigilancia", "tenant-1"))
+  );
+});
+
+test("SuperAdmin cannot read the billing growth watchdog history either -- unlike tickets_soporte, this collection has no read exception", async () => {
+  await assertFails(
+    getDoc(doc(client("master-1", "master", "SuperAdmin"), "facturacion_vigilancia", "tenant-1"))
+  );
+});
+
+test("clients cannot write the billing growth watchdog history, not even the tenant's own admin", async () => {
+  await assertFails(
+    setDoc(doc(client("user-1", "tenant-1", "Admin"), "facturacion_vigilancia", "tenant-1"), {
+      historial: [{ fecha: "2026-07-31", facturables: 70 }],
+      ultimaAlertaEnviada: null,
+    })
+  );
+});
+
+test("Cloud Function (Admin SDK) can still read and write the watchdog history -- rules bypass, same mechanism vigilarCrecimientoFacturable uses", async () => {
+  // functions/vigilanciaFacturacion.js corre con el Admin SDK real (admin.firestore()), que
+  // SIEMPRE bypasea firestore.rules -- por eso este caso no ejercita las reglas en si
+  // (withSecurityRulesDisabled las apaga por completo). Documenta el otro lado del contrato
+  // D6: el guard de arriba bloquea SOLO al cliente, nunca al Admin SDK. La cobertura de
+  // comportamiento REAL del guardrail (señales S1/S2/S3, dedupe, tope de 30) vive en
+  // functions/vigilanciaFacturacion.test.js, contra un fake de Firestore, no este emulador.
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "facturacion_vigilancia", "tenant-1"), {
+      historial: [{ fecha: "2026-07-31", facturables: 70 }],
+      ultimaAlertaEnviada: null,
+    });
+
+    const snapshot = await getDoc(doc(context.firestore(), "facturacion_vigilancia", "tenant-1"));
+    assert.deepEqual(snapshot.data().historial, [{ fecha: "2026-07-31", facturables: 70 }]);
+  });
+});
