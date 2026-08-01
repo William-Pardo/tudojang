@@ -59,21 +59,29 @@ export const crearFuentePagoWompi = async (
     return response.data.wompiPaymentSourceId;
 };
 
+// SDD pricing-cupo-real (Bloque 4b, tarea 4.11 -- "review copy"): sin planes fijos, el
+// registro de una escuela nueva ya no pasa por este checkout (vistas/RegistroEscuela.tsx --
+// el trial de 7 días activa directo) y comprar sede/equipo técnico extra tampoco (Configuracion.tsx
+// llama directo a la Cloud Function actualizarExtrasContratados, efecto inmediato). Los
+// únicos llamadores que quedan son vistas/PasarelaPagos.tsx y vistas/LicenciaSuspendida.tsx
+// -- ambos reactivan una suscripción vencida con `itemType:'alta', itemId:'renovacion'` y un
+// monto calculado en vivo (calcularFacturacionMensual, no un precio de plan). `'plan'`/
+// `'addon'` se retiran del union type: ya no hay un flujo que los produzca.
 interface ConstruirUrlCheckoutWompiParams {
     tenantId: string;
-    itemType: 'alta' | 'plan' | 'addon';
-    itemId: string; // 'starter'|'growth'|'pro' o 'estudiantes'|'instructor'|'sede', o '' para alta
+    itemType: 'alta';
+    itemId: string;
     periodo: 'mensual' | 'anual';
     montoEnPesos: number;
     redirectUrl: string;
 }
 
 /**
- * Punto único de armado del Web Checkout de Wompi para TODOS los flujos de cobro
- * (alta de tenant, cambio/renovación de plan, compra de addon). Unifica el formato
- * de `reference` (siempre `SUSC_<tenantId>_<itemType>_<itemId>_<periodo>_<timestamp>`,
- * con el tenantId siempre en la misma posición) y garantiza que la URL SIEMPRE vaya
- * firmada con `signature:integrity` — nunca se debe armar esta URL a mano en otro lugar.
+ * Punto único de armado del Web Checkout de Wompi para reactivar una suscripción vencida.
+ * Unifica el formato de `reference` (siempre
+ * `SUSC_<tenantId>_<itemType>_<itemId>_<periodo>_<timestamp>`, con el tenantId siempre en la
+ * misma posición) y garantiza que la URL SIEMPRE vaya firmada con `signature:integrity` --
+ * nunca se debe armar esta URL a mano en otro lugar.
  */
 export const construirUrlCheckoutWompi = async (
     params: ConstruirUrlCheckoutWompiParams
