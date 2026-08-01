@@ -1,4 +1,5 @@
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { db } from '../firebase/config';
 import {
   obtenerConfiguracionNotificaciones,
@@ -20,8 +21,17 @@ jest.mock('firebase/firestore', () => ({
   getDocs: jest.fn(() => ({ empty: true, docs: [] })), getDoc: jest.fn(), updateDoc: jest.fn(),
   deleteDoc: jest.fn(), setDoc: jest.fn(),
   doc: jest.fn((db, name, id) => ({ args: [db, name, id] })), Timestamp: {},
-  increment: jest.fn(value => ({ _methodName: 'FieldValue.increment', operand: value })),
 }));
+
+// SDD pricing-cupo-real (D7, design.md): actualizarCapacidadClub ya no escribe Firestore
+// directo -- ahora es un wrapper delgado sobre httpsCallable('actualizarExtrasContratados').
+// Mismo patron de mock que sedesApi.test.ts (agregarSede/actualizarSede/eliminarSede).
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => 'functions-mock'),
+  httpsCallable: jest.fn(() => mockCallable),
+}));
+
 jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
 
 describe('configuracionApi', () => {
@@ -274,18 +284,28 @@ describe('obtenerConfiguracionClub', () => {
   });
 
   describe('actualizarCapacidadClub', () => {
-    it('debería actualizar la capacidad del club en Firestore', async () => {
-      await actualizarCapacidadClub('tenant123', 'limiteEstudiantes', 5);
-      expect(updateDoc).toHaveBeenCalledWith(
-        doc(db, 'tenants', 'tenant123'),
-        { limiteEstudiantes: increment(5) }
-      );
+    it('invoca la Cloud Function actualizarExtrasContratados con tenantId/campo/cantidad, en vez de updateDoc directo', async () => {
+      mockCallable.mockResolvedValueOnce({ data: { tenantId: 'tenant123', campo: 'sedesExtraContratadas', valor: 5 } });
+
+      await actualizarCapacidadClub('tenant123', 'sedesExtraContratadas', 5);
+
+      expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'actualizarExtrasContratados');
+      expect(mockCallable).toHaveBeenCalledWith({ tenantId: 'tenant123', campo: 'sedesExtraContratadas', cantidad: 5 });
+      expect(updateDoc).not.toHaveBeenCalled();
+    });
+
+    it('propaga el error si la Cloud Function rechaza (ej. resultado negativo)', async () => {
+      mockCallable.mockRejectedValueOnce(new Error('La operación dejaría "equipoTecnicoExtraContratado" en un valor negativo (-1)'));
+
+      await expect(
+        actualizarCapacidadClub('tenant123', 'equipoTecnicoExtraContratado', -1)
+      ).rejects.toThrow(/valor negativo/i);
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
-      await actualizarCapacidadClub('tenant123', 'limiteEstudiantes', 5);
-      expect(updateDoc).not.toHaveBeenCalled();
+      await actualizarCapacidadClub('tenant123', 'sedesExtraContratadas', 5);
+      expect(mockCallable).not.toHaveBeenCalled();
     });
   });
 

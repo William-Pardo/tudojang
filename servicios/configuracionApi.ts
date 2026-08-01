@@ -1,6 +1,7 @@
 
 // servicios/configuracionApi.ts
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
@@ -114,18 +115,35 @@ export const guardarConfiguracionClub = async (config: ConfiguracionClub): Promi
     await setDoc(doc(db, 'tenants', config.tenantId), limpiarObjeto(config), { merge: true });
 };
 
+// SDD pricing-cupo-real (D7, design.md "Protecting billing-affecting tenant fields"):
+// antes hacia `updateDoc(docRef, {[campo]: increment(cantidad)})` directo -- firestore.rules
+// ya no permite que el cliente escriba `sedesExtraContratadas`/`equipoTecnicoExtraContratado`
+// (camposFacturacionInmutables() en el `allow update` de tenants/{tenantId}), asi que
+// cualquier Admin del club podia antes otorgarse un extra gratis con un solo `updateDoc`
+// desde la consola del navegador. Ahora es un wrapper delgado sobre la Cloud Function
+// `actualizarExtrasContratados` (functions/academico/capacidad.js), que re-valida rol/tenant
+// y persiste server-side -- mismo patron ya usado en sedesApi.ts/estudiantesApi.ts.
 export const actualizarCapacidadClub = async (
     tenantId: string,
-    campo: 'limiteEstudiantes' | 'limiteUsuarios' | 'limiteSedes',
+    campo: 'sedesExtraContratadas' | 'equipoTecnicoExtraContratado',
     cantidad: number
 ): Promise<void> => {
     if (!isFirebaseConfigured) return;
-    const docRef = doc(db, 'tenants', tenantId);
-    await updateDoc(docRef, {
-        [campo]: increment(cantidad)
-    });
+    const callable = httpsCallable<
+        { tenantId: string; campo: 'sedesExtraContratadas' | 'equipoTecnicoExtraContratado'; cantidad: number },
+        { tenantId: string; campo: string; valor: number }
+    >(getFunctions(), 'actualizarExtrasContratados');
+    await callable({ tenantId, campo, cantidad });
 };
 
+// SDD pricing-cupo-real (D7/D8, design.md): ya no hay planes que actualizar -- `plan`/
+// `limite*` quedan reemplazados por `calcularCapacidad`/`calcularFacturacionMensual`
+// (utils/facturacion.ts). Esta funcion NO se borra todavia: `vistas/Configuracion.tsx`
+// (Bloque 4 de este cambio, fuera de alcance de este batch) sigue importandola -- borrarla
+// aca rompería `npm run typecheck` en un archivo que este batch tiene instrucción explícita
+// de NO tocar. Queda sin uso real (el import en Configuracion.tsx no la invoca) hasta que
+// Bloque 4 reemplace las tarjetas de plan/addon por el panel de uso + extras y retire este
+// import junto con el resto del corte final (tasks.md 4.13).
 export const actualizarPlanClub = async (
     tenantId: string,
     nuevoPlan: any

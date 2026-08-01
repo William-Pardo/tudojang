@@ -98,6 +98,23 @@ service cloud.firestore {
         || link.matches('https://(checkout\\.wompi\\.co|checkout\\.payulatam\\.com|checkout\\.epayco\\.co|secure\\.payco\\.co)/.*');
     }
 
+    // SDD pricing-cupo-real (D7, design.md "Protecting billing-affecting tenant fields"):
+    // estos 4 campos determinan directamente cuanto se le cobra a un tenant (bono de sede +
+    // extras contratados de sede/equipo tecnico) -- antes cualquier Admin del club podia
+    // otorgarse una sede o un cupo extra gratis con un `updateDoc(increment(...))` directo
+    // desde la consola del navegador (bug real cerrado por este guard, ver
+    // servicios/configuracionApi.ts::actualizarCapacidadClub). Solo deben cambiar via Cloud
+    // Function (Admin SDK, que bypasea estas reglas por completo -- ver
+    // functions/academico/capacidad.js::actualizarExtrasContratados), nunca via un `update`
+    // directo del cliente. `diff().affectedKeys()` -- mismo patron ya usado en
+    // historialNotificaciones (rules:586) -- devuelve el set de claves agregadas/quitadas/
+    // modificadas entre el documento nuevo y el existente; si ninguna de las 4 protegidas
+    // esta en ese set, el resto de la condicion de `update` decide.
+    function camposFacturacionInmutables() {
+      let camposProtegidos = ['sedeBonusOtorgada', 'sedeBonusOtorgadaEn', 'sedesExtraContratadas', 'equipoTecnicoExtraContratado'];
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposProtegidos);
+    }
+
     // =========================================================================
     // Colecciones existentes
     // =========================================================================
@@ -138,9 +155,15 @@ service cloud.firestore {
       allow get: if authenticated()
         && (currentTenantId() == tenantId || isSuperAdmin());
       allow list: if authenticated();
-      allow create, update: if isAdmin()
+      allow create: if isAdmin()
         && currentTenantId() == tenantId
         && linkPagoMensualidadValido();
+      // camposFacturacionInmutables() solo aplica a `update` (necesita `resource.data`, el
+      // documento YA existente, contra el que diffear -- en `create` no hay documento previo).
+      allow update: if isAdmin()
+        && currentTenantId() == tenantId
+        && linkPagoMensualidadValido()
+        && camposFacturacionInmutables();
       allow delete: if false;
     }
 
