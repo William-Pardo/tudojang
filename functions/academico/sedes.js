@@ -13,20 +13,21 @@
 // limpiada. Ademas, nada impedia nombres duplicados ("Sede B" x2, "Nueva Sede" x2),
 // que hacian ambiguos los selectores de sede en el resto de la app (Programa
 // academico, Agenda). Estas funciones cierran ambos huecos server-side.
+//
+// SDD pricing-cupo-real (Bloque 3b, capacidad-tenant "Fuente unica de verdad"): el limite ya
+// NO se deriva de `LIMITE_SEDES_POR_PLAN[tenant.plan] + tenant.cuposSedesAdicionales` (ese
+// segundo campo nunca se escribia en produccion -- ERR-0011/ERR-0013, bitacora.json; ver
+// design.md "Notes on Constraints" -- este archivo era uno de los 2 lectores del campo roto,
+// asi que la divergencia desaparece como efecto estructural de este cambio, no como una tarea
+// propia). Ahora delega en `calcularCapacidad` (functions/facturacion.js, Bloque 2, pura, no
+// reabierta aca) -- la misma funcion que usan `capacidad.js` y (mas adelante) el frontend, tal
+// como exige "todos los lectores deben obtener el mismo numero, por venir de la misma fuente".
 
 'use strict';
 
-const { planes: PLANES_SAAS } = require('../planes-config.json');
+const { calcularCapacidad } = require('../facturacion');
 
 const crearError = (code, message) => Object.assign(new Error(message), { code });
-
-// Derivado de planes-config.json (fuente unica de verdad, compartida con constantes.ts
-// del frontend y con wompiCobroAutomatico.js) -- se extrae solo el campo `limiteSedes`
-// porque es el unico que esta funcion necesita validar server-side. El resto del plan
-// (precio, caracteristicas, etc.) es informativo y vive solo en el frontend.
-const LIMITE_SEDES_POR_PLAN = Object.fromEntries(
-  Object.entries(PLANES_SAAS).map(([plan, datos]) => [plan, datos.limiteSedes])
-);
 
 const CAMPOS_PERMITIDOS = ['nombre', 'direccion', 'ciudad', 'telefono', 'valorMensualidad'];
 
@@ -71,9 +72,7 @@ async function obtenerSedesActivas(firestore, tenantId) {
 async function obtenerLimiteSedes(firestore, tenantId) {
   const tenantSnap = await firestore.collection('tenants').doc(tenantId).get();
   const tenantData = tenantSnap.exists ? tenantSnap.data() : {};
-  const limitePlan = LIMITE_SEDES_POR_PLAN[tenantData.plan] || 0;
-  const cuposAdicionales = Number(tenantData.cuposSedesAdicionales) || 0;
-  return limitePlan + cuposAdicionales;
+  return calcularCapacidad(tenantData).sedes;
 }
 
 function sanitizarCampos(cambios = {}) {
