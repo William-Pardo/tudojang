@@ -18,6 +18,8 @@ import {
     guardarFirmaImagen,
     vincularTutorAEstudiantes,
     desvincularTutorDeEstudiante,
+    retirarEstudiante,
+    reactivarEstudiante,
 } from './estudiantesApi';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import {
@@ -736,6 +738,85 @@ describe('estudiantesApi — Suite completa (unitarios + integración + excepci�
             (updateDoc as jest.Mock).mockRejectedValue(new Error('Permiso denegado'));
 
             await expect(desvincularTutorDeEstudiante('est-1')).rejects.toThrow('Permiso denegado');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 13. retirarEstudiante / reactivarEstudiante (SDD pricing-cupo-real, Bloque 1)
+    // ════════════════════════════════════════════════════════════════════════
+    //
+    // Unicos writers de `estadoMatricula` fuera del alta (crearEstudiante). Spec
+    // matricula-estado-estudiante: "Retirar un estudiante conserva su historial" y
+    // "Reactivar un estudiante retirado". `updateDoc` con SOLO estos 2 campos es lo que
+    // garantiza que historialPagos/progreso/asistencia no se toquen -- Firestore hace merge
+    // parcial, no reemplaza el documento entero.
+    describe('retirarEstudiante', () => {
+        it('[Integración] marca estadoMatricula:"retirado" y estampa fechaRetiro, sin tocar otros campos (Scenario: Retirar conserva historial)', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockResolvedValue(undefined);
+
+            await retirarEstudiante('est-1');
+
+            expect(doc).toHaveBeenCalledWith(db, 'estudiantes', 'est-1');
+            expect(updateDoc).toHaveBeenCalledWith(
+                mockRef,
+                expect.objectContaining({ estadoMatricula: 'retirado', fechaRetiro: expect.any(String) })
+            );
+            // Solo estos 2 campos van en el payload -- historialPagos/progreso/asistencia
+            // quedan intactos por construccion (updateDoc es merge parcial).
+            const payload = (updateDoc as jest.Mock).mock.calls[0][1];
+            expect(Object.keys(payload).sort()).toEqual(['estadoMatricula', 'fechaRetiro']);
+        });
+
+        it('[Unitario — Modo simulado] no llama a updateDoc', async () => {
+            (require('../firebase/config') as any).isFirebaseConfigured = false;
+
+            await retirarEstudiante('est-1');
+
+            expect(updateDoc).not.toHaveBeenCalled();
+        });
+
+        it('[Excepción] propaga error de Firestore', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockRejectedValue(new Error('Permiso denegado'));
+
+            await expect(retirarEstudiante('est-1')).rejects.toThrow('Permiso denegado');
+        });
+    });
+
+    describe('reactivarEstudiante', () => {
+        it('[Integración] marca estadoMatricula:"activo" y estampa fechaReactivacion (Scenario: Reactivar un estudiante retirado)', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockResolvedValue(undefined);
+
+            await reactivarEstudiante('est-1');
+
+            expect(doc).toHaveBeenCalledWith(db, 'estudiantes', 'est-1');
+            expect(updateDoc).toHaveBeenCalledWith(
+                mockRef,
+                expect.objectContaining({ estadoMatricula: 'activo', fechaReactivacion: expect.any(String) })
+            );
+            const payload = (updateDoc as jest.Mock).mock.calls[0][1];
+            expect(Object.keys(payload).sort()).toEqual(['estadoMatricula', 'fechaReactivacion']);
+        });
+
+        it('[Unitario — Modo simulado] no llama a updateDoc', async () => {
+            (require('../firebase/config') as any).isFirebaseConfigured = false;
+
+            await reactivarEstudiante('est-1');
+
+            expect(updateDoc).not.toHaveBeenCalled();
+        });
+
+        it('[Excepción] propaga error de Firestore', async () => {
+            const mockRef = { id: 'est-1' };
+            (doc as jest.Mock).mockReturnValue(mockRef);
+            (updateDoc as jest.Mock).mockRejectedValue(new Error('No autorizado'));
+
+            await expect(reactivarEstudiante('est-1')).rejects.toThrow('No autorizado');
         });
     });
 });

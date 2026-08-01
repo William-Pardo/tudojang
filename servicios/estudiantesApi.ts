@@ -171,6 +171,26 @@ export const desvincularTutorDeEstudiante = async (idEstudiante: string): Promis
     await updateDoc(docRef, { tutor: deleteField() });
 };
 
+// retirarEstudiante / reactivarEstudiante (SDD pricing-cupo-real, Bloque 1 --
+// matricula-estado-estudiante): unicos writers de `estadoMatricula` fuera del alta
+// (crearEstudiante, functions/academico/estudiantes.js). `updateDoc` toca SOLO estos 2
+// campos -- Firestore hace merge parcial, asi que historialPagos, progreso y asistencia
+// quedan intactos por construccion (Scenario: "Retirar un estudiante conserva su
+// historial"). `facturacion-metered` (bloque posterior) lee `estadoMatricula` para decidir
+// que estudiante es facturable; retirar/reactivar es la unica forma de cambiarlo despues
+// del alta.
+export const retirarEstudiante = async (idEstudiante: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    await updateDoc(docRef, { estadoMatricula: 'retirado', fechaRetiro: new Date().toISOString() });
+};
+
+export const reactivarEstudiante = async (idEstudiante: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    await updateDoc(docRef, { estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() });
+};
+
 export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
     const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'consentimiento');
