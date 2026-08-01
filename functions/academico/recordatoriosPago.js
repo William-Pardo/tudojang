@@ -60,6 +60,8 @@ function crearServicioRecordatoriosPago({
       const estudianteNombre = [estudiante.nombres, estudiante.apellidos].filter(Boolean).join(' ');
 
       await crearNotificacion({
+        // ERR-0011: tenantId requerido por firestore.rules para aislar historialNotificaciones por tenant.
+        tenantId: estudiante.tenantId,
         estudianteId: estudiante.id,
         estudianteNombre,
         tutorNombre,

@@ -49,6 +49,7 @@ const estudianteMock: Partial<Estudiante> = { id: 'est-1', tenantId: 'test-tenan
 
 const crearNotificacion = (overrides: Partial<NotificacionHistorial> = {}): NotificacionHistorial => ({
     id: 'n1',
+    tenantId: 'test-tenant',
     fecha: new Date().toISOString(),
     estudianteId: 'est-1',
     estudianteNombre: 'Ana García',

@@ -42,13 +42,16 @@ const procesarImagenEvento = async (imagenUrl: string | undefined, eventoId: str
     return imagenUrl || '';
 };
 
-export const obtenerEventos = async (): Promise<Evento[]> => {
+// ERR-0011: obtenerEventos() leia la coleccion COMPLETA sin filtro de tenant.
+export const obtenerEventos = async (tenantId?: string): Promise<Evento[]> => {
     /* istanbul ignore next -- rama exclusiva de demo sin Firebase */
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de eventos vacía.");
         return [];
     }
-    const q = query(eventosCollection, orderBy('fechaEvento', 'desc'));
+    const q = tenantId
+        ? query(eventosCollection, where('tenantId', '==', tenantId), orderBy('fechaEvento', 'desc'))
+        : query(eventosCollection, orderBy('fechaEvento', 'desc'));
     const eventosSnap = await getDocs(q);
 
     // Fix (bug reportado: a Tutor "le falta la vista Evento"): el conteo de solicitudes

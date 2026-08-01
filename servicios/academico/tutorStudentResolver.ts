@@ -28,14 +28,23 @@ export const clearMockData = () => {
  * IDs generados independientemente que nunca coincidían).
  *
  * Estrategia:
- * 1. Query root `/estudiantes` donde `tutor.correo == tutorEmail` (una sola
- *    condición de igualdad — Firestore la auto-indexa, no requiere índice compuesto).
- * 2. Filtrar por `tenantId` en cliente (evita índice compuesto).
+ * 1. Query root `/estudiantes` donde `tenantId == tenantId AND tutor.correo == tutorEmail`
+ *    (dos condiciones de igualdad — no requiere índice compuesto, Firestore permite
+ *    combinar `==` sobre distintos campos sin indexar explícitamente).
+ * 2. Filtrar por `tenantId` en cliente también (defensa extra, cinturón y tirantes).
  * 3. Retornar los Estudiante docs. Si no hay ninguno, array vacío (nunca throw).
  *
+ * ERR-0011: el filtro de tenant ANTES se aplicaba SOLO del lado del cliente (después de
+ * traer los docs), porque la regla vieja no lo exigía. Al cerrar ERR-0011 la regla pasó a
+ * requerir `resource.data.tenantId == currentTenantId()` también en esta rama -- y para un
+ * `list`, Firestore Rules necesita que ese campo forme parte del filtro de la query para
+ * poder probarlo (si no, rechaza el `list` completo con "Property tenantId is undefined",
+ * no un permission-denied por documento). Por eso el filtro se agregó TAMBIÉN al query
+ * (server-side, obligatorio); el filtro en cliente se mantiene como defensa extra.
+ *
  * La regla de Firestore para `/estudiantes` autoriza esta lectura al Tutor solo
- * cuando `resource.data.tutor.correo == request.auth.token.email` (ver firestore.rules),
- * así que un Tutor solo puede leer los estudiantes donde figura como acudiente.
+ * cuando `resource.data.tenantId == currentTenantId() && resource.data.tutor.correo ==
+ * request.auth.token.email` (ver firestore.rules).
  *
  * @param tenantId ID del tenant del tutor
  * @param tutorEmail Email de login del tutor (usuario.email). Se compara en minúsculas.
@@ -59,7 +68,11 @@ export async function resolveLinkedStudent(
 
     const estudiantesRef = collection(db, 'estudiantes');
     const snap = await getDocs(
-      query(estudiantesRef, where('tutor.correo', '==', emailNormalizado))
+      query(
+        estudiantesRef,
+        where('tenantId', '==', tenantId),
+        where('tutor.correo', '==', emailNormalizado)
+      )
     );
 
     if (snap.empty) {
@@ -67,7 +80,6 @@ export async function resolveLinkedStudent(
       return [];
     }
 
-    // Filtrar por tenant en cliente (defensa extra; la regla ya aísla por acudiente)
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() } as Estudiante))
       .filter(e => e.tenantId === tenantId);
@@ -119,7 +131,13 @@ export async function resolveStudentsForConsultor(
     }
 
     const estudiantesRef = collection(db, 'estudiantes');
-    const snap = await getDocs(query(estudiantesRef, where(campo, '==', emailNormalizado)));
+    const snap = await getDocs(
+      query(
+        estudiantesRef,
+        where('tenantId', '==', tenantId),
+        where(campo, '==', emailNormalizado)
+      )
+    );
     if (snap.empty) return [];
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() } as Estudiante))

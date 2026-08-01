@@ -13,7 +13,12 @@ let movimientosMock: MovimientoFinanciero[] = [
     { id: '2', tenantId: 'escuela-gajog-001', tipo: TipoMovimiento.Egreso, categoria: CategoriaFinanciera.Arriendo, monto: 1200000, descripcion: 'Pago local Junio', fecha: new Date().toISOString().split('T')[0], sedeId: '1' }
 ];
 
-export const obtenerMovimientos = async (sedeId?: string): Promise<MovimientoFinanciero[]> => {
+// ERR-0011: obtenerMovimientos() nunca filtraba por tenant (solo por sedeId) -- cualquier
+// Instructor autenticado leia movimientos financieros de TODOS los tenants. `tenantId` va
+// primero para no romper la firma existente de `sedeId` como segundo parametro posicional
+// (context/DataContext.tsx la sigue exponiendo como `cargarMovimientos(sedeId)` hacia los
+// componentes, y solo internamente pasa el tenantId ya conocido).
+export const obtenerMovimientos = async (tenantId?: string, sedeId?: string): Promise<MovimientoFinanciero[]> => {
     if (!isFirebaseConfigured) {
         let filtrados = [...movimientosMock];
         if (sedeId && sedeId !== 'todas') {
@@ -21,12 +26,16 @@ export const obtenerMovimientos = async (sedeId?: string): Promise<MovimientoFin
         }
         return filtrados.sort((a, b) => b.fecha.localeCompare(a.fecha));
     }
-    
-    let q = query(finanzasCollection, orderBy('fecha', 'desc'));
+
+    let q = tenantId
+        ? query(finanzasCollection, where('tenantId', '==', tenantId), orderBy('fecha', 'desc'))
+        : query(finanzasCollection, orderBy('fecha', 'desc'));
     if (sedeId && sedeId !== 'todas') {
-        q = query(finanzasCollection, where('sedeId', '==', sedeId), orderBy('fecha', 'desc'));
+        q = tenantId
+            ? query(finanzasCollection, where('tenantId', '==', tenantId), where('sedeId', '==', sedeId), orderBy('fecha', 'desc'))
+            : query(finanzasCollection, where('sedeId', '==', sedeId), orderBy('fecha', 'desc'));
     }
-    
+
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MovimientoFinanciero));
 };

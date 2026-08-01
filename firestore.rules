@@ -117,9 +117,20 @@ service cloud.firestore {
 
     // Perfil de usuario autenticado usado durante login.
     match /usuarios/{uid} {
+      // NOTA (ERR-0011): `get` queda sin condicion de tenant a proposito -- requiere
+      // conocer el uid EXACTO de otro usuario (no hay enumeracion posible), y asi lo
+      // determino el analisis previo de este fix. Es un piso mas bajo que `list`, que
+      // exponia la coleccion ENTERA sin conocer ningun id -- ese es el hueco real que
+      // cierra esta regla.
       allow get: if authenticated()
         && (request.auth.uid == uid || isAdmin());
-      allow list: if isAdmin();
+      // ERR-0011: `list` no validaba tenant -- cualquier Admin podia listar TODOS los
+      // usuarios de TODOS los tenants. Para `list`, Firestore evalua la regla contra el
+      // resultado potencial de la query completa: si el cliente no filtra explicitamente
+      // con where('tenantId','==', ...) (ver usuariosApi.ts::obtenerUsuarios), la query
+      // completa se rechaza en cuanto exista un solo documento de otro tenant en la
+      // coleccion -- exactamente el comportamiento fail-closed que buscamos.
+      allow list: if isAdmin() && resource.data.tenantId == currentTenantId();
       allow create, update, delete: if false;
     }
 
@@ -162,9 +173,14 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // ERR-0011: ninguna condicion validaba tenant -- cualquier Instructor/Admin leia y
+    // escribia programas de OTROS tenants. Mismo patron ya usado en tickets_soporte
+    // (ownsTicket()): comparar resource.data.tenantId/request.resource.data.tenantId
+    // contra currentTenantId(), sumado (no reemplazando) al chequeo de rol existente.
     match /programas/{docId} {
-      allow read: if isInstructor();
-      allow create, update, delete: if isAdmin();
+      allow read: if isInstructor() && resource.data.tenantId == currentTenantId();
+      allow create: if isAdmin() && request.resource.data.tenantId == currentTenantId();
+      allow update, delete: if isAdmin() && resource.data.tenantId == currentTenantId();
     }
 
     match /estudiantes/{docId} {
@@ -178,9 +194,13 @@ service cloud.firestore {
       // esTutor=false) consulta where('correo', '==', email) para que el propio Estudiante
       // resuelva su registro -- esa query SIEMPRE fallaba con permission-denied porque esta
       // regla solo contemplaba isInstructor()/Tutor, nunca al propio Estudiante.
-      allow read: if isInstructor()
-        || (isTutor() && resource.data.tutor.correo == request.auth.token.email)
-        || (isEstudiante() && resource.data.correo == request.auth.token.email);
+      // ERR-0011: ninguna de las 3 ramas de lectura validaba tenant -- un Instructor (o,
+      // en teoria, un Tutor/Estudiante cuyo correo coincidiera por casualidad) de OTRO
+      // tenant podia leer estudiantes ajenos. Se agrega resource.data.tenantId ==
+      // currentTenantId() a las 3 ramas, sin tocar la logica de rol/vinculo existente.
+      allow read: if (isInstructor() && resource.data.tenantId == currentTenantId())
+        || (isTutor() && resource.data.tenantId == currentTenantId() && resource.data.tutor.correo == request.auth.token.email)
+        || (isEstudiante() && resource.data.tenantId == currentTenantId() && resource.data.correo == request.auth.token.email);
       // Fix 2026-07-18 (bug real: puerta trasera del limite de estudiantes del plan -- el
       // limite (`limiteEstudiantes`, plan base + addons) SOLO se validaba en el boton de
       // la UI (hooks/useGestionEstudiantes.ts), nunca aca. Cualquier Instructor podia crear
@@ -192,7 +212,9 @@ service cloud.firestore {
       // de estado de pago, edicion de datos) y no tienen ningun hallazgo de limite asociado
       // -- mover esos tambien a Cloud Functions es un cambio de alcance mayor al bug real.
       allow create: if false;
-      allow update, delete: if isInstructor();
+      // ERR-0011: update/delete tampoco validaban tenant -- un Instructor de OTRO tenant
+      // podia editar/borrar estudiantes ajenos conociendo (o adivinando) el docId.
+      allow update, delete: if isInstructor() && resource.data.tenantId == currentTenantId();
     }
 
     // Asistencia de guarderia/entrega a tutores (Sistema C, colección raíz `asistencia`,
@@ -213,8 +235,12 @@ service cloud.firestore {
       // Fix tutor-role-end-to-end (2026-07-14): los consultores (Tutor/Estudiante) pueden LEER
       // los eventos del club para ver a cuáles aplican. Son anuncios del tenant, no datos
       // sensibles. Escritura sigue restringida a staff.
-      allow read: if isInstructor() || isTutor() || isEstudiante();
-      allow create, update, delete: if isInstructor();
+      // ERR-0011: ninguna condicion validaba tenant -- Instructor/Tutor/Estudiante de OTRO
+      // tenant leian y (staff) escribian eventos ajenos.
+      allow read: if (isInstructor() || isTutor() || isEstudiante())
+        && resource.data.tenantId == currentTenantId();
+      allow create: if isInstructor() && request.resource.data.tenantId == currentTenantId();
+      allow update, delete: if isInstructor() && resource.data.tenantId == currentTenantId();
     }
 
     match /implementos/{docId} {
@@ -224,10 +250,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // ERR-0011: ninguna condicion validaba tenant -- un Instructor/Admin de OTRO tenant
+    // leia y escribia solicitudes de compra ajenas. `tenantId` se agrego recien al modelo
+    // (tipos.ts::SolicitudCompra, tiendaApi.ts::crearSolicitudCompra, derivado del propio
+    // estudiante) -- antes no existia ningun campo para aislar esta coleccion por tenant.
     match /solicitudesCompra/{docId} {
-      allow read: if isInstructor();
-      allow create, update: if isInstructor();
-      allow delete: if isAdmin();
+      allow read: if isInstructor() && resource.data.tenantId == currentTenantId();
+      allow create, update: if isInstructor() && request.resource.data.tenantId == currentTenantId();
+      allow delete: if isAdmin() && resource.data.tenantId == currentTenantId();
     }
 
     match /solicitudesInscripcion/{docId} {
@@ -242,9 +272,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ERR-0011: ninguna condicion validaba tenant -- un Instructor/Admin de OTRO tenant
+    // leia y escribia movimientos financieros ajenos (dato especialmente sensible).
     match /finanzas/{docId} {
-      allow read: if isInstructor();
-      allow create, update, delete: if isAdmin();
+      allow read: if isInstructor() && resource.data.tenantId == currentTenantId();
+      allow create: if isAdmin() && request.resource.data.tenantId == currentTenantId();
+      allow update, delete: if isAdmin() && resource.data.tenantId == currentTenantId();
     }
 
     // =========================================================================
@@ -528,15 +561,25 @@ service cloud.firestore {
     // `historialNotificaciones`: cada doc referencia un `estudianteId`. Staff ve todo; un
     // consultor (Tutor/Estudiante) ve SOLO las de su(s) estudiante(s), validando contra el
     // doc del estudiante (tutor.correo para Tutor, correo para Estudiante == token.email).
+    // ERR-0011: ninguna rama validaba tenant -- Staff (isInstructor) de OTRO tenant leia el
+    // buzon COMPLETO de notificaciones de todos los tenants (el bug de mayor volumen: se
+    // dispara en cada carga del buzon, sin filtro). `tenantId` se agrego al modelo
+    // (tipos.ts::NotificacionHistorial) y a TODOS los puntos de escritura -- client-side
+    // (notificacionesApi.ts, notificacionCheckoutService.ts) y Cloud Functions cron
+    // (recordatoriosPago.js, recordatoriosEstudio.js, notificarEvento.js,
+    // functions/index.js::notificarAvance; asistencia.js y recogidaScheduler.js ya lo
+    // escribian) -- por eso aca se usa el patron simple resource.data.tenantId, igual que
+    // el resto de colecciones, en vez de derivarlo por get() sobre el estudiante.
     match /historialNotificaciones/{notifId} {
-      allow read: if isInstructor()
-        || (isTutor() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
-        || (isEstudiante() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.correo == request.auth.token.email);
-      allow create: if isInstructor();
+      allow read: if (isInstructor() && resource.data.tenantId == currentTenantId())
+        || (isTutor() && resource.data.tenantId == currentTenantId() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
+        || (isEstudiante() && resource.data.tenantId == currentTenantId() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.correo == request.auth.token.email);
+      allow create: if isInstructor() && request.resource.data.tenantId == currentTenantId();
       // Marcar como leída: staff, o el consultor dueño — y solo puede tocar el campo `leida`.
-      allow update: if isInstructor()
+      allow update: if (isInstructor() && resource.data.tenantId == currentTenantId())
         || (
-          (
+          resource.data.tenantId == currentTenantId()
+          && (
             (isTutor() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
             || (isEstudiante() && get(/databases/$(database)/documents/estudiantes/$(resource.data.estudianteId)).data.correo == request.auth.token.email)
           )

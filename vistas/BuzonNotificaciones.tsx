@@ -59,7 +59,7 @@ const VistaBuzonNotificaciones: React.FC = () => {
         try {
             const estudiantes = await resolveStudentsForConsultor(usuario.tenantId, usuario.email, esTutor);
             const ids = estudiantes.map((e) => e.id);
-            const notis = await obtenerNotificacionesPorEstudiantes(ids);
+            const notis = await obtenerNotificacionesPorEstudiantes(ids, usuario.tenantId);
             setNotificaciones(notis);
         } catch (err) {
             console.error('Error cargando buzón de notificaciones:', err);

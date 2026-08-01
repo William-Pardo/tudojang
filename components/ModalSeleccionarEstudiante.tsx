@@ -14,9 +14,13 @@ interface Props {
   onCerrar: () => void;
   onConfirmar: (estudiante: Estudiante) => void;
   cargandoConfirmacion: boolean;
+  // ERR-0011: obtenerEstudiantes() ahora exige tenantId para que firestore.rules pueda
+  // validar el `read` de lista -- sin esto, la busqueda de este modal quedaba con
+  // permission-denied en cuanto la coleccion tuviera datos de mas de un tenant.
+  tenantId?: string;
 }
 
-const ModalSeleccionarEstudiante: React.FC<Props> = ({ abierto, titulo, textoBotonConfirmar, onCerrar, onConfirmar, cargandoConfirmacion }) => {
+const ModalSeleccionarEstudiante: React.FC<Props> = ({ abierto, titulo, textoBotonConfirmar, onCerrar, onConfirmar, cargandoConfirmacion, tenantId }) => {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [estudianteSeleccionado, setEstudianteSeleccionado] = useState<Estudiante | null>(null);
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
@@ -38,15 +42,15 @@ const ModalSeleccionarEstudiante: React.FC<Props> = ({ abierto, titulo, textoBot
   useEffect(() => {
     if (abierto) {
       setCargando(true);
-      obtenerEstudiantes()
+      obtenerEstudiantes(tenantId)
         .then(setEstudiantes)
         .catch(err => console.error("Error al cargar estudiantes", err))
         .finally(() => setCargando(false));
-      
+
       setEstudianteSeleccionado(null);
       setTerminoBusqueda('');
     }
-  }, [abierto]);
+  }, [abierto, tenantId]);
 
   const estudiantesFiltrados = useMemo(() => {
     if (!terminoBusqueda) return estudiantes;
