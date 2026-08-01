@@ -1,6 +1,6 @@
-import { Estudiante, GradoTKD, GrupoEdad, EstadoPago, ConfiguracionClub } from '../tipos';
+import { Estudiante, GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, limit, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const MIN_EDAD = 4;
 const MAX_EDAD = 18;
@@ -64,29 +64,13 @@ const generarGrupoPorEdad = (fechaNacimiento: string): GrupoEdad => {
     return GrupoEdad.NoAsignado;
 };
 
+// SDD pricing-cupo-real (Bloque 4, capacidad-tenant: "Alta nunca se bloquea por
+// capacidad"): se elimina la validación previa de límite de plan -- ya no existe un tope
+// duro de estudiantes (el backend tampoco lo aplica desde el Bloque 3,
+// functions/academico/estudiantes.js). Generar data ficticia de prueba ya no puede
+// rechazarse por cupo.
 export const generarEstudiantesFicticios = async (cantidad: number, sedeId: string, tenantId: string) => {
     if (!isFirebaseConfigured) return;
-
-    // 1. Verificar límites de la membresía
-    try {
-        const configRef = doc(db, 'configuracion_club', tenantId);
-        const configSnap = await getDoc(configRef);
-        const config = configSnap.exists() ? configSnap.data() as ConfiguracionClub : null;
-
-        if (config) {
-            const limite = config.limiteEstudiantes || 50; // Fallback por defecto
-            const estSnap = await getDocs(query(collection(db, 'estudiantes'), where('tenantId', '==', tenantId)));
-            const actual = estSnap.size;
-
-            if (actual + cantidad > limite) {
-                const mensaje = `Límite superado. El plan actual permite ${limite} alumnos. Tienes ${actual} y quieres agregar ${cantidad}.`;
-                console.error(mensaje);
-                throw new Error(mensaje);
-            }
-        }
-    } catch (e: any) {
-        throw new Error(e.message || "Error al validar límites de suscripción");
-    }
 
     const estudiantesGenerados = [];
 
