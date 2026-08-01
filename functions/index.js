@@ -1116,7 +1116,7 @@ exports.cobroAutomaticoMensual = paymentFunctions.pubsub
   .onRun(async () => servicioCobroAutomaticoMensual(new Date()));
 
 /**
- * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)
+ * TRIGGER: Analizar comprobante de pago con IA (Gemini 2.5 Flash-Lite)
  * Se activa cuando un estudiante sube un reporte de pago.
  */
 exports.analizarComprobanteEstudiante = geminiFunctions.firestore
@@ -1139,8 +1139,10 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
       if (!apiKey) {
         throw new Error("No se encontró la API Key de Gemini en los secrets de Firebase. Ejecuta: firebase functions:secrets:set gemini_api_key");
       }
+      // ERR-0012: gemini-1.5-flash fue deprecado por Google el 2025-09-24 y devuelve 404
+      // -- mismo modelo ya usado (y funcionando) en servicioAsistenteIa mas arriba.
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
       // 3. Descargar la imagen
       const response = await axios.get(data.comprobanteUrl, { responseType: 'arraybuffer' });
