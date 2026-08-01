@@ -183,6 +183,37 @@ test('crearEstudiante: ignora cualquier id/tenantId que venga en el payload del 
   assert.equal(creado.tenantId, 'tenant-1');
 });
 
+// --- estadoMatricula (SDD pricing-cupo-real, Bloque 1 -- matricula-estado-estudiante) ----
+//
+// `facturacion-metered` (bloque posterior, no implementado aca) necesita un campo
+// persistido para decidir que estudiante es facturable. `crearEstudiante` es el UNICO
+// punto de alta (ver comentario de cabecera del archivo), asi que es el lugar donde se
+// estampa el valor inicial. Scenario "Estudiante nuevo nace activo" (spec
+// matricula-estado-estudiante).
+test('crearEstudiante: estampa estadoMatricula:"activo" en el estudiante nuevo (Scenario: Estudiante nuevo nace activo)', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    { tenantId: 'tenant-1', nombres: 'Juan' },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.estadoMatricula, 'activo');
+});
+
+test('crearEstudiante: ignora cualquier estadoMatricula que venga en el payload del cliente (estampado incondicional, D3)', async () => {
+  const firestore = crearFirestoreFake();
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  const creado = await servicio(
+    { tenantId: 'tenant-1', nombres: 'Juan', estadoMatricula: 'retirado' },
+    crearContextoInstructor(),
+  );
+
+  assert.equal(creado.estadoMatricula, 'activo');
+});
+
 test('crearEstudiante: SuperAdmin puede crear estudiantes en cualquier tenant', async () => {
   const firestore = crearFirestoreFake({ tenantData: { plan: 'pro', limiteEstudiantes: 350 } });
   const servicio = crearServicioCrearEstudiante({ firestore });

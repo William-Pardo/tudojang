@@ -35,6 +35,7 @@ const estudianteBase: Estudiante = {
     telefono: '3001234567',
     correo: 'ana@test.com',
     carnetGenerado: false,
+    estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
     tutor: {
         nombres: 'Carlos García',
     } as Estudiante['tutor'],

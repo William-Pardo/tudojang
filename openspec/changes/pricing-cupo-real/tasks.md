@@ -1,0 +1,115 @@
+# Tasks: Pricing por cupo real (metered)
+
+## Review Workload Forecast
+
+| Field | Value |
+|---|---|
+| Estimated changed lines | ~2,070–3,020 (sum of per-block estimates below) |
+| 400-line budget risk | High |
+| Chained PRs recommended | Yes |
+| Suggested split | PR 1 → PR 2 → PR 3 → PR 4 |
+| Delivery strategy | ask-on-risk |
+| Chain strategy | pending |
+
+Decision needed before apply: Yes
+Chained PRs recommended: Yes
+Chain strategy: pending
+400-line budget risk: High
+
+### Per-Block Estimate
+
+Grounded in current file sizes (`functions/wompiCobroAutomatico.js` 421 ln, `.test.js` 748 ln · `vistas/Configuracion.tsx` 1,386 ln · `firestore.rules` 599 ln · `tipos.ts` 561 ln · `functions/index.js` 1,256 ln, etc. — diffs estimated, not full-file rewrites).
+
+| Block | Capability(-ies) | Files touched | Est. changed lines | Risk alone |
+|---|---|---|---|---|
+| 1. `estadoMatricula` + backfill | matricula-estado-estudiante | 7 (2 new) | 220–320 | Medium |
+| 2. Shared calc contract | facturacion-metered, capacidad-tenant, matricula-estado-estudiante (facturable) | 7 (6 new) | 600–920 | High |
+| 3. Backend consumers + `firestore.rules` | capacidad-tenant, facturacion-metered | 16 (4 new) | 700–1,000 | High |
+| 4. Frontend + calculadora pública | precio-publico-calculadora, capacidad-tenant (D8) | ~23 (3 new, 3 deleted) | 550–780 | High |
+
+### Suggested Work Units
+
+| Unit | Goal | Depends on | Likely PR / base |
+|---|---|---|---|
+| 1 | `estadoMatricula` field, `crearEstudiante` stamp, retire/reactivate writers, idempotent backfill | — | PR 1; base = `feat/pricing-cupo-real` (tracker) if `feature-branch-chain`, or `main` if `stacked-to-main` |
+| 2 | Shared pure calc contract: `facturacion-config.json` + golden vectors + CJS/TS mirrors | Unit 1 | PR 2; base = PR 1 branch or `main` |
+| 3 | `capacidad.js` callable → client repoint → `firestore.rules` guard → billing/capacity consumers → guardrail | Unit 1 + 2 | PR 3; base = PR 2 branch or `main` |
+| 4 | `PrecioCalculadora` + landing + Configuración panel + mechanical cleanup + `tipos.ts`/`planes-config.json` final cutover | Unit 1 + 2 + 3 | PR 4; base = PR 3 branch or `main` |
+
+Note: Unit 3 alone is the largest, most sensitive block (money + security rules) and may still exceed 400 lines. If the chosen chain strategy needs tighter PRs, sub-split it: **3a** = capacidad.js callable + client repoint + rules guard (tasks 3.1–3.6, ~260–370 ln, the ordering-constrained cluster) and **3b** = billing/capacity consumers + guardrail (tasks 3.7–3.14, ~450–650 ln). 3a MUST still land before 3b.
+
+### Spec Coverage by Phase
+
+| Phase | Capability | Requirements covered |
+|---|---|---|
+| 1 | matricula-estado-estudiante | Campo de estado de matrícula; Retiro explícito, sin borrado físico |
+| 2 | matricula-estado-estudiante, facturacion-metered, capacidad-tenant | Definición de facturable (D3); Cálculo marginal por tramos; Extras se suman; Fuente única de capacidad |
+| 3 | capacidad-tenant, facturacion-metered | Fuente única de verdad; Sin tope duro + guardrail; Bono de sede permanente; Corte sin prorrateo |
+| 4 | precio-publico-calculadora, capacidad-tenant | Misma función que backend; Entrada estudiantes/sedes/equipo; Reemplazo del grid de planes; D8 owner seat |
+
+## Phase 1: `estadoMatricula` + backfill — PR 1
+
+Satisfies: matricula-estado-estudiante (all requirements). Depends on: nothing — first block; per proposal Risk table this "blocks metered billing," nothing else in this change can start without it.
+
+- [x] 1.1 RED: `functions/academico/estudiantes.test.js` — assert `crearEstudiante` persists `estadoMatricula:'activo'` on the created doc (Scenario: Estudiante nuevo nace activo). Confirm it fails against current code.
+- [x] 1.2 GREEN: `tipos.ts` — add `estadoMatricula:'activo'|'retirado'`, `fechaRetiro?`, `fechaReactivacion?` to `Estudiante` (D2). `functions/academico/estudiantes.js` payload (~148-154) stamps `estadoMatricula:'activo'` unconditionally. Make 1.1 pass. *(Deviation note: making the field required per D2's literal notation broke `npm run typecheck` in 10 files outside this phase's file list that construct full `Estudiante` literals — mock/test fixtures in `components/`, `vistas/`, `servicios/academico/`, plus production seed helpers `servicios/censoApi.ts` and `utils/userSeeder.ts`. Fixed mechanically with `estadoMatricula: 'activo'` per file, same pattern the repo already used for prior required-field additions (see `// Fix 2026-07-21` comments in `TablaEstudiantes.test.tsx`/`Estudiantes.test.tsx`). No Block 2-4 feature logic touched.)*
+- [x] 1.3 RED: `scripts/backfillEstadoMatricula.test.js` (new, `node --test`, auto-picked up by `npm run test:node`'s `scripts/*.test.js` glob) — docs without `estadoMatricula` get `'activo'`; docs with any existing value are untouched; re-running twice is a no-op.
+- [x] 1.4 GREEN: `scripts/backfillEstadoMatricula.js` (new) — idempotent backfill over `estudiantes` (D3). Make 1.3 pass. *(Parallel with 1.5/1.6 — no shared file.)*
+- [x] 1.5 RED: `servicios/estudiantesApi.test.ts` — `retirarEstudiante(id)` sets `estadoMatricula:'retirado'` + `fechaRetiro` (ISO) without touching `historialPagos`/progreso/asistencia (Scenario: Retirar conserva historial); `reactivarEstudiante(id)` sets `'activo'` + `fechaReactivacion` (Scenario: Reactivar un estudiante retirado).
+- [x] 1.6 GREEN: `servicios/estudiantesApi.ts` — implement both as the only writers of `estadoMatricula`. Make 1.5 pass. *(Parallel with 1.3/1.4.)*
+- [x] 1.7 Verify (grep audit, not a fabricated test): confirm no write path other than `crearEstudiante`/`retirarEstudiante`/`reactivarEstudiante` touches `estadoMatricula` — Scenarios "Estado de pago no afecta la matrícula" / "Falta de asistencia no afecta" hold by construction. *(Result: `estadoMatricula` appears in exactly 17 files, all from this phase's own diff. Only 3 runtime write sites set it based on an application decision: `functions/academico/estudiantes.js::crearEstudiante` (unconditional stamp on create) and `servicios/estudiantesApi.ts::retirarEstudiante`/`reactivarEstudiante`. `scripts/backfillEstadoMatricula.js` is a 4th write site but is the D3-sanctioned one-time/idempotent backfill for pre-existing docs, not a competing application path. `servicios/censoApi.ts`/`utils/userSeeder.ts` only set the literal default `'activo'` while constructing brand-new `Estudiante` objects (mechanical typecheck fixups from task 1.2, not feature logic). No code touching `estadoPago` or `asistencia` references `estadoMatricula` anywhere — the two guarded scenarios hold by construction. Caveat: a grep audit cannot catch a hypothetical generic `updateDoc(ref, {...fullObject})` that incidentally carries a stale `estadoMatricula` through object spread without the literal token appearing in that call site; none was found in the touched write paths, but this is a structural limitation of grep-based verification, not a claim of exhaustive proof.)*
+- [x] 1.8 Verify: `npm --prefix functions test` (estudiantes) + `npx jest --runInBand estudiantesApi` + `npm run test:node` (backfill) all green. *(Also ran the full block-relevant set: `npm run typecheck` exit 0; `npm run test:functions` = 324/324 node:test + 111/111 jest academico; `npm run test:node` = 70/70; `npx jest --runInBand estudiantesApi.test.ts` = 61/61. See apply-progress / final report for exact output.)*
+
+## Phase 2: Shared calculation contract — PR 2
+
+Satisfies: facturacion-metered (tier math, extras, único punto de cálculo — shared side), capacidad-tenant (fuente única, pure calc), matricula-estado-estudiante (Definición de facturable, D3). Depends on: Phase 1 (`Estudiante.estadoMatricula` type). Both functions stay pure — never touch Firestore (D1) — that purity is what lets the cron and the public calculator share one contract.
+
+- [ ] 2.1 `functions/facturacion-config.json` (new) — author version-1 data: `incluido{sedes:1,equipoTecnico:3}`, 4 `tramosEstudiantes`, `extras{sede:89900,equipoTecnico:36000}`, `bonoSede{umbralEstudiantes:70,sedesOtorgadas:1}` per design's Interfaces/Contracts block.
+- [ ] 2.2 `functions/facturacion-vectores.json` (new) — author golden vectors FIRST: tier boundaries 0/1/50/51/150/151/350/351 with exact marginal deltas ($3.400/$3.000/$2.600); extras combos; `calcularCapacidad` bonus×extras; `esFacturable`/`normalizarEstadoMatricula` absent-case. This is the cross-runtime parity contract (D1) both suites below iterate — written before either implementation, not after.
+- [ ] 2.3 RED: `functions/facturacion.test.js` (new, `node --test`) — iterate 2.2's vectors against `calcularFacturacionMensual`/`calcularCapacidad`/`esFacturable`/`normalizarEstadoMatricula`. Confirm RED (module doesn't exist yet).
+- [ ] 2.4 RED: `utils/facturacion.test.ts` (new, Jest) — same vectors, same assertions, TS mirror. Confirm RED.
+- [ ] 2.5 GREEN: `functions/facturacion.js` (new, CJS) — implement all four exports reading 2.1's JSON. Make 2.3 pass with full branch coverage on tier boundaries + bonus transitions. *(Parallel with 2.6 — independent implementation of the same frozen contract.)*
+- [ ] 2.6 GREEN: `utils/facturacion.ts` (new) — TS mirror (`EntradaFacturacion`, `ResultadoFacturacion`, `CapacidadTenant` interfaces per design). Make 2.4 pass. *(Parallel with 2.5.)*
+- [ ] 2.7 `tipos.ts` — add `ConfiguracionClub.sedeBonusOtorgada`, `sedeBonusOtorgadaEn`, `sedesExtraContratadas`, `equipoTecnicoExtraContratado` as ADDITIVE/optional fields. Do NOT remove `plan`/`limite*`/`cupos*` yet — final cutover is task 4.13, once every consumer (Phase 3 backend + Phase 4 frontend) is repointed, so `npm run typecheck`/`npm run build` stay green at every PR boundary.
+- [ ] 2.8 REFACTOR: dedupe vector-iteration helpers between the two suites if warranted; confirm both hit full branch coverage on tier boundaries/bonus transitions — design's explicit target, "the one unit where an error bills a real customer wrongly."
+- [ ] 2.9 Verify: `npm --prefix functions test` (facturacion.test.js) + `npx jest --runInBand facturacion.test.ts --coverage`; both green against the identical vector file (facturacion-metered: Único punto de cálculo; precio-publico-calculadora: Misma función que el backend).
+
+## Phase 3: Backend consumers + `firestore.rules` — PR 3
+
+Satisfies: capacidad-tenant (fuente única, sin tope duro + guardrail, bono de sede), facturacion-metered (corte sin prorrateo, extras). Depends on: Phase 1 + Phase 2. **Internal ordering is load-bearing**: 3.1–3.2 (capacidad.js callable) → 3.3–3.4 (client repoint) → 3.5–3.6 (firestore.rules guard) MUST land in that order — locking `firestore.rules` before the callable + client repoint exist breaks the live "buy an extra sede/seat" write with no replacement.
+
+- [ ] 3.1 RED: `functions/academico/capacidad.test.js` (new, `node --test`, DI style mirrors `estudiantes.test.js`/`sedes.test.js`) — `actualizarExtrasContratados` requires auth + Admin/SuperAdmin, enforces tenant match (SuperAdmin cross-tenant, Admin same-tenant), increments `sedesExtraContratadas`/`equipoTecnicoExtraContratado` by a valid `campo`, rejects unknown `campo`.
+- [ ] 3.2 GREEN: `functions/academico/capacidad.js` (new) — `crearServicioActualizarExtrasContratados({firestore})` factory (D7, mirrors `crearServicioCrearEstudiante`). Register `actualizarExtrasContratados` as `onCall` in `functions/index.js`; append `academico/capacidad.test.js` to `functions/package.json`'s `"test"` script enumerated list (line 5 — NOT covered by any existing glob, unlike root-level `*.test.js` files). Make 3.1 pass.
+- [ ] 3.3 RED: `servicios/configuracionApi.test.ts` — `actualizarCapacidadClub` now calls `httpsCallable(...,'actualizarExtrasContratados')` instead of `updateDoc(increment)`; `actualizarPlanClub` test removed (function deleted).
+- [ ] 3.4 GREEN: `servicios/configuracionApi.ts` — `actualizarCapacidadClub` (117-127) becomes a thin callable wrapper (D7); delete `actualizarPlanClub` (129-141) entirely. Make 3.3 pass.
+- [ ] 3.5 RED: `functions/test/firestore-rules.behavior.test.js` (emulator) — Admin `update` on `tenants/{tenantId}` fails when payload touches `sedeBonusOtorgada`/`sedeBonusOtorgadaEn`/`sedesExtraContratadas`/`equipoTecnicoExtraContratado` (assertFails); a benign field update still succeeds (assertSucceeds); `facturacion_vigilancia/{tenantId}` denies read/write to every client (mirrors `tickets_soporte`, rules:105-108).
+- [ ] 3.6 GREEN: `firestore.rules` — add `camposFacturacionInmutables()` guard on `tenants/{tenantId}`'s `allow update` (~line 141, D7); add `match /facturacion_vigilancia/{tenantId} { allow read, write: if false; }` (D6). Make 3.5 pass via `npm run test:firestore-rules`.
+- [ ] 3.7 RED: `functions/wompiCobroAutomatico.test.js` — `cobroAutomaticoMensual` sources the amount from `calcularFacturacionMensual` via an injected facturable-count reader; a `retirado` student is excluded (Scenario: Estudiante retirado antes del corte no se factura).
+- [ ] 3.8 GREEN: `functions/wompiCobroAutomatico.js` — delete `calcularMontoMensualPesos` (80-101); `crearServicioCobroAutomaticoMensual` (263) gains an injected facturable-count dependency using Firestore `.count()` aggregation (not `.get()`, per design) keyed on `estadoMatricula==='activo'`; feed it + `sedesExtraContratadas`/`equipoTecnicoExtraContratado` into `calcularFacturacionMensual`. Make 3.7 pass. *(Parallel with 3.9/3.10 and 3.11/3.12 — different files, both consume Phase 2 only.)*
+- [ ] 3.9 RED: `functions/academico/estudiantes.test.js` — `crearEstudiante` no longer throws `resource-exhausted` at any count (capacidad-tenant: "Alta nunca se bloquea"); crossing 70 active enrollments grants the bonus exactly once (69→70 grants; 70→69→70 no re-grant; two concurrent calls at 70 converge to one grant).
+- [ ] 3.10 GREEN: `functions/academico/estudiantes.js` — delete `LIMITE_ESTUDIANTES_POR_PLAN`/`obtenerLimiteEstudiantes` (26-38, 77-84) and the `resource-exhausted` throw (135-142); post-create, evaluate the bonus guarded by `sedeBonusOtorgada !== true` (D4). Make 3.9 pass. *(Parallel with 3.7/3.8 and 3.11/3.12.)*
+- [ ] 3.11 RED: `functions/academico/sedes.test.js` — replace the `{plan:'starter',cuposSedesAdicionales:1}` fixture (line 132); `obtenerLimiteSedes` returns `calcularCapacidad(tenantData).sedes`.
+- [ ] 3.12 GREEN: `functions/academico/sedes.js` — `obtenerLimiteSedes` (71-77) delegates to `calcularCapacidad`; delete `LIMITE_SEDES_POR_PLAN`. Make 3.11 pass. *(Parallel with 3.7/3.8 and 3.9/3.10.)*
+- [ ] 3.13 RED: `functions/vigilanciaFacturacion.test.js` (new, factory-DI mirrors `crearServicioCobroAutomaticoMensual`) — signals S1 (`n_hoy>=max(30,n_hace_7d×2)`), S2 (`n_hoy-n_ayer>=100`), S3 (retiro-spike near cutoff) fire and never throw; thresholds read from config, NOT hardcoded (capacidad-tenant: "Umbral configurable"); 24h dedupe on `ultimaAlertaEnviada`; empty/short history is inert.
+- [ ] 3.14 GREEN: `functions/vigilanciaFacturacion.js` (new) — implement `vigilarCrecimientoFacturable` (D5); reads/writes `facturacion_vigilancia/{tenantId}` (`historial` capped at 30); reuses `functions/email.js::enviarCorreo`+`getResend()`. Register as `pubsub.schedule("every day 07:00").timeZone("America/Bogota")` in `functions/index.js`. Make 3.13 pass.
+- [ ] 3.15 Verify: `npm --prefix functions test` (full suite) + `npm run test:firestore-rules` + `npx jest --runInBand configuracionApi` + `npx tsc --noEmit`.
+
+## Phase 4: Frontend + calculadora pública — PR 4
+
+Satisfies: precio-publico-calculadora (all requirements), capacidad-tenant (D8 owner seat), final anti-ERR-0013 cutover. Depends on: Phase 1 + 2 + 3 (needs the callable + `calcularFacturacionMensual`/`calcularCapacidad` + tightened rules already in place).
+
+- [ ] 4.1 RED: `components/PrecioCalculadora.test.tsx` (new) — given a `ResultadoFacturacion`, renders tier breakdown + extras + total (Scenario: Simulación con extras); slider/steppers for estudiantes/sedesExtra/equipoTecnicoExtra call back with raw counts only — component owns no math.
+- [ ] 4.2 GREEN: `components/PrecioCalculadora.tsx` (new) — presentational implementation. Make 4.1 pass. *(Parallel with 4.5-4.10 — independent file.)*
+- [ ] 4.3 RED: `vistas/PublicLanding.test.tsx` (new — no test file exists today) — landing mounts `PrecioCalculadora` wired to `calcularFacturacionMensual`; no second pricing formula exists in the file (precio-publico-calculadora: "Reemplazo del grid de planes").
+- [ ] 4.4 GREEN: `vistas/PublicLanding.tsx` — remove plan grid (~line 164); mount `PrecioCalculadora`, feeding input straight into `calcularFacturacionMensual` (`utils/facturacion.ts`). Make 4.3 pass. *(Depends on 4.1/4.2.)*
+- [ ] 4.5 RED: `vistas/Configuracion.test.tsx` — plan cards (~1182)/addon cards (~1260) gone; usage + extras panel renders `calcularCapacidad()` output and calls `actualizarCapacidadClub` (Phase 3 callable wrapper).
+- [ ] 4.6 GREEN: `vistas/Configuracion.tsx` (1,386 ln) — replace plan/addon cards with the usage + extras panel. Make 4.5 pass. *(Parallel with 4.1-4.4 and 4.7-4.10.)*
+- [ ] 4.7 RED: `vistas/Estudiantes.test.tsx` — drop the raw-plan capacity block (line 85, `porcentajeCapacidad`); add retire/reactivate actions calling Phase 1's `retirarEstudiante`/`reactivarEstudiante` without deleting the row.
+- [ ] 4.8 GREEN: `vistas/Estudiantes.tsx` — implement 4.7. Make it pass. *(Parallel with 4.1-4.6 and 4.9-4.10.)*
+- [ ] 4.9 RED/GREEN: `components/ModalImportacionMasiva.test.tsx` — bulk import no longer expects a capacity-blocked rejection (hard cap removed, 3.10); imported rows still get `estadoMatricula:'activo'` via `crearEstudiante` (Phase 1).
+- [ ] 4.10 RED/GREEN: `hooks/useGestionConfiguracion.ts` (96-128) — `limiteUsuariosPermitido` reads `calcularCapacidad().equipoTecnico`; confirm the old owner `+1` does NOT survive (D8 — owner counted inside the 3).
+- [ ] 4.11 Mechanical (covered by suites already touched in 4.1-4.10, no new dedicated RED needed): `constantes.ts` — delete `PLANES_SAAS` (drop the `./functions/planes-config.json` import, line 4), reshape `COSTOS_ADICIONALES` as display-only (math stays in `utils/facturacion.ts`, D1), strip plan/limit keys from `CONFIGURACION_CLUB_POR_DEFECTO` (75-79) · `utils/limitesSaas.ts` (delete file) · `hooks/useGestionEstudiantes.ts` (86-87, drop client-side cap warning) · `hooks/useEstadoLicencia.ts` (15,33,58, stop returning `plan`) · `vistas/LicenciaSuspendida.tsx` (6,17,115, copy only) · `vistas/PasarelaPagos.tsx`, `vistas/RegistroEscuela.tsx` (remove plan selection; 7-day `demo` trial untouched) · `vistas/MasterDashboard.tsx:271` (badge) · `utils/userSeeder.ts:77` (fallback) · `servicios/wompiApi.ts` (review copy).
+- [ ] 4.12 Verify: `npx jest --runInBand` across all 9 impacted suites (`Configuracion`, `PublicLanding`, `PrecioCalculadora`, `Estudiantes`, `estudiantesApi`, `ModalImportacionMasiva`, `configuracionApi`, plus any touched by 4.11) + `npx tsc --noEmit`.
+- [ ] 4.13 Final cutover (sequential — last code task, depends on every prior Phase 3/4 consumer being repointed): `tipos.ts` — delete `plan`/`limiteEstudiantes`/`limiteUsuarios`/`limiteSedes`/`cupos*Adicionales` from `ConfiguracionClub`. Delete `functions/planes-config.json` + `functions/planes-config.test.js` (fully replaced by `facturacion-config.json`/`facturacion.test.js`, Phase 2) now that `constantes.ts` no longer imports it. `npx tsc --noEmit` MUST show zero new errors — any surviving error marks a missed consumer (the anti-ERR-0013 gate this design exists for).
+- [ ] 4.14 RED/GREEN: `cypress/e2e/onboarding.cy.ts` — signup no longer selects a plan; 7-day `demo` trial still activates. Run `npx cypress run` (flagged unreliable in this environment per design — best effort).
+- [ ] 4.15 Verify (full regression, change close-out): `npm run test:all` (typecheck + test:app + test:functions:full + test:node + test:firestore-rules) + `npm run build`. Confirms proposal Success Criteria: no `starter`/`growth`/`pro` reference remains; tier math continuity at every boundary; calculator↔billing parity; bono granted exactly once and survives a drop below 70; single capacity reader; a retired student stops being billed without deleting the record.

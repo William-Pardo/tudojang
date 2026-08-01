@@ -45,18 +45,18 @@ export const obtenerEstudiantes = async (tenantId?: string): Promise<Estudiante[
         console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
         return [
             {
-                id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10', 
-                grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001', 
+                id: '1', tenantId: 'escuela-gajog-001', nombres: 'Juan', apellidos: 'Pérez', numeroIdentificacion: '10101', fechaNacimiento: '2015-05-10',
+                grado: GradoTKD.Amarillo, grupo: GrupoEdad.Infantil, horasAcumuladasGrado: 20, sedeId: '1', telefono: '3001',
                 correo: 'juan@test.com', fechaIngreso: '2024-01-10', estadoPago: EstadoPago.AlDia, historialPagos: [], saldoDeudor: 0,
                 consentimientoInformado: true, contratoServiciosFirmado: true, consentimientoImagenFirmado: true, consentimientoFotosVideos: true,
-                carnetGenerado: false
+                carnetGenerado: false, estadoMatricula: 'activo' // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
             },
             {
-                id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15', 
-                grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002', 
+                id: '2', tenantId: 'escuela-gajog-001', nombres: 'Maria', apellidos: 'Lopez', numeroIdentificacion: '20202', fechaNacimiento: '2012-08-15',
+                grado: GradoTKD.Verde, grupo: GrupoEdad.Precadetes, horasAcumuladasGrado: 45, sedeId: '1', telefono: '3002',
                 correo: 'maria@test.com', fechaIngreso: '2024-05-15', estadoPago: EstadoPago.Pendiente, historialPagos: [], saldoDeudor: 180000,
                 consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false, consentimientoFotosVideos: false,
-                carnetGenerado: false
+                carnetGenerado: false, estadoMatricula: 'activo' // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
             }
         ];
     }
@@ -169,6 +169,26 @@ export const desvincularTutorDeEstudiante = async (idEstudiante: string): Promis
     if (!isFirebaseConfigured) return;
     const docRef = doc(db, 'estudiantes', idEstudiante);
     await updateDoc(docRef, { tutor: deleteField() });
+};
+
+// retirarEstudiante / reactivarEstudiante (SDD pricing-cupo-real, Bloque 1 --
+// matricula-estado-estudiante): unicos writers de `estadoMatricula` fuera del alta
+// (crearEstudiante, functions/academico/estudiantes.js). `updateDoc` toca SOLO estos 2
+// campos -- Firestore hace merge parcial, asi que historialPagos, progreso y asistencia
+// quedan intactos por construccion (Scenario: "Retirar un estudiante conserva su
+// historial"). `facturacion-metered` (bloque posterior) lee `estadoMatricula` para decidir
+// que estudiante es facturable; retirar/reactivar es la unica forma de cambiarlo despues
+// del alta.
+export const retirarEstudiante = async (idEstudiante: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    await updateDoc(docRef, { estadoMatricula: 'retirado', fechaRetiro: new Date().toISOString() });
+};
+
+export const reactivarEstudiante = async (idEstudiante: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    await updateDoc(docRef, { estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() });
 };
 
 export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
