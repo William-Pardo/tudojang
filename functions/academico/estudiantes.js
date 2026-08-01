@@ -1,17 +1,17 @@
 // functions/academico/estudiantes.js
-// Callable `crearEstudiante`: alta segura de estudiantes con validacion server-side del
-// limite del plan (+ addons). Reemplaza el write directo de cliente a `estudiantes/{id}`
-// para `create` (bloqueado sin excepcion por firestore.rules a partir de este cambio,
-// mismo criterio ya usado para `sedes/{id}` -- ver academico/sedes.js).
+// Callable `crearEstudiante`: alta segura de estudiantes (auth/rol/tenant server-side).
+// Reemplaza el write directo de cliente a `estudiantes/{id}` para `create` (bloqueado sin
+// excepcion por firestore.rules a partir de este cambio, mismo criterio ya usado para
+// `sedes/{id}` -- ver academico/sedes.js).
 //
-// Motivo (bug real, mismo patron que sedes 2026-07-16): el limite `limiteEstudiantes` del
-// plan SOLO se validaba en el boton de la UI (hooks/useGestionEstudiantes.ts,
-// abrirFormulario). firestore.rules permitia `create` a cualquier Instructor
-// (Admin/Editor/Asistente/Maestro/SuperAdmin) sin chequear cantidad -- un write directo a
-// Firestore (dev tools del navegador, o cualquier codigo que llamara a
-// servicios/estudiantesApi.ts::agregarEstudiante) creaba estudiantes sin limite, incluida
-// la importacion masiva (components/ModalImportacionMasiva.tsx), que invoca ese mismo
-// punto de entrada en loop, uno por fila.
+// SDD pricing-cupo-real (Bloque 3b, capacidad-tenant): el tope duro por plan que este archivo
+// tenia (`resource-exhausted` al superar `tenant.limiteEstudiantes`) SE ELIMINA -- ya no hay
+// planes fijos, y capacidad-tenant exige "Alta nunca se bloquea por limite de capacidad o
+// plan". En su lugar, DESPUES de escribir el doc del estudiante nuevo (D4, design.md: el
+// estudiante 70 debe contarse a si mismo), se evalua si el tenant acaba de cruzar 70
+// estudiantes ACTIVOS por primera vez y, si es asi, se otorga +1 sede incluida de forma
+// PERMANENTE (`sedeBonusOtorgada`), nunca revocada ni recalculada en vivo -- ver
+// evaluarBonoSedePorCrecimiento mas abajo.
 //
 // A diferencia de sedes, `update`/`delete` de estudiantes NO se tocan aca (uso mucho mas
 // frecuente que en sedes -- cambios de estado de pago, edicion de datos -- fuera de
@@ -19,23 +19,9 @@
 
 'use strict';
 
-const { planes: PLANES_SAAS } = require('../planes-config.json');
+const { bonoSede: BONO_SEDE_CONFIG } = require('../facturacion-config.json');
 
 const crearError = (code, message) => Object.assign(new Error(message), { code });
-
-// Derivado de planes-config.json (fuente unica de verdad, compartida con constantes.ts
-// del frontend y con wompiCobroAutomatico.js) -- se usa SOLO como fallback defensivo si
-// el doc del tenant no tuviera `limiteEstudiantes` seteado (no deberia ocurrir en
-// produccion: registrarNuevaEscuela/actualizarPlanClub siempre lo setean). El limite real
-// a validar es `tenant.limiteEstudiantes` tal cual vive en el doc -- YA incluye plan base
-// + addons comprados (ver constantes.ts::COSTOS_ADICIONALES.estudiantes y
-// servicios/configuracionApi.ts::actualizarCapacidadClub, que hace `increment(cantidad)`
-// directo sobre ese mismo campo al comprar el addon "+10 Alumnos"). A diferencia de sedes
-// (que no tiene ese mecanismo de addon acumulativo), NO se recalcula plan + cupos aca: se
-// lee el campo ya consolidado.
-const LIMITE_ESTUDIANTES_POR_PLAN = Object.fromEntries(
-  Object.entries(PLANES_SAAS).map(([plan, datos]) => [plan, datos.limiteEstudiantes])
-);
 
 // Mismo rol operativo que `isInstructor()` en firestore.rules: Admin/Editor/Asistente/
 // Maestro/SuperAdmin. Editor/Asistente/Maestro pueden dar de alta estudiantes hoy (no solo
@@ -66,21 +52,54 @@ function assertTenantAutorizado(tenantId, auth) {
   }
 }
 
-// Estudiante no tiene concepto de soft-delete (a diferencia de Sede/`deletedAt`) -- las
-// bajas son borrado fisico (`eliminarEstudiante` -> deleteDoc). Se cuentan todos los docs
-// del tenant sin filtrar.
-async function contarEstudiantesDelTenant(firestore, tenantId) {
-  const snap = await firestore.collection('estudiantes').where('tenantId', '==', tenantId).get();
-  return snap.docs.length;
+// Cuenta estudiantes FACTURABLES (estadoMatricula=='activo') del tenant via una agregacion
+// `.count()` de Firestore -- NO un `.get()` completo. `crearEstudiante` es un hot path
+// (ModalImportacionMasiva.tsx lo llama una vez por fila de CSV, D5's rationale en design.md),
+// asi que evaluar el bono de sede en CADA alta no puede pagar el costo de traer todos los
+// documentos del tenant solo para contarlos. Mismo patron de query (independiente, sin modulo
+// compartido -- ver la nota equivalente en wompiCobroAutomatico.js) que
+// crearContadorEstudiantesFacturablesFirestore en ese archivo y en vigilanciaFacturacion.js.
+async function contarEstudiantesFacturablesDelTenant(firestore, tenantId) {
+  const snapshot = await firestore
+    .collection('estudiantes')
+    .where('tenantId', '==', tenantId)
+    .where('estadoMatricula', '==', 'activo')
+    .count()
+    .get();
+  return snapshot.data().count;
 }
 
-async function obtenerLimiteEstudiantes(firestore, tenantId) {
-  const tenantSnap = await firestore.collection('tenants').doc(tenantId).get();
-  const tenantData = tenantSnap.exists ? tenantSnap.data() : {};
-  if (typeof tenantData.limiteEstudiantes === 'number') {
-    return tenantData.limiteEstudiantes;
-  }
-  return LIMITE_ESTUDIANTES_POR_PLAN[tenantData.plan] || 0;
+/**
+ * SDD pricing-cupo-real (D4, design.md "Sede bonus persistence"): la PRIMERA vez que un
+ * tenant cruza `BONO_SEDE_CONFIG.umbralEstudiantes` (70) estudiantes matriculados activos, se
+ * otorga +1 sede incluida de forma PERMANENTE -- write-once, guardado por
+ * `sedeBonusOtorgada !== true`. Nunca se revoca ni se recalcula en vivo:
+ * `calcularCapacidad` (functions/facturacion.js, no reabierta aca) solo LEE este flag, jamas
+ * un conteo. El boolean hace que la carrera concurrente 69->70 sea inofensiva por
+ * construccion -- dos llamadas que racean escriben el MISMO valor (`true`), no hay
+ * doble-otorgamiento posible, asi que esto NO necesita una transaccion Firestore.
+ *
+ * Se cuenta SIEMPRE (no solo cuando el tenant aun no tiene el bono) -- mismo orden que el
+ * diagrama de flujo de design.md ("Data Flow"): la agregacion `.count()` es lo bastante barata
+ * (no un `.get()`) como para que este orden simple sea aceptable incluso para un tenant que ya
+ * paso el umbral hace tiempo.
+ */
+async function evaluarBonoSedePorCrecimiento(firestore, tenantId) {
+  const cantidadFacturable = await contarEstudiantesFacturablesDelTenant(firestore, tenantId);
+  if (cantidadFacturable < BONO_SEDE_CONFIG.umbralEstudiantes) return;
+
+  const tenantRef = firestore.collection('tenants').doc(tenantId);
+  const tenantSnap = await tenantRef.get();
+  const yaOtorgado = tenantSnap.exists && tenantSnap.data()?.sedeBonusOtorgada === true;
+  if (yaOtorgado) return;
+
+  // set + merge (no update): mismo criterio ya usado en academico/capacidad.js -- funciona
+  // igual si el doc del tenant ya existe (siempre deberia, en produccion) o si un fake de
+  // test no lo sembro de antemano.
+  await tenantRef.set(
+    { sedeBonusOtorgada: true, sedeBonusOtorgadaEn: new Date().toISOString() },
+    { merge: true }
+  );
 }
 
 // Normaliza a minusculas y sin espacios los DOS correos con los que despues se resuelve
@@ -120,9 +139,10 @@ function normalizarCorreos(campos) {
 }
 
 /**
- * Crea un estudiante nuevo. Re-valida server-side lo que antes solo chequeaba el boton de
- * la UI (hooks/useGestionEstudiantes.ts::abrirFormulario): que no se supere
- * `tenant.limiteEstudiantes` (plan base + addons ya acumulados en ese mismo campo).
+ * Crea un estudiante nuevo. SDD pricing-cupo-real (Bloque 3b, capacidad-tenant): ya NO
+ * re-valida un limite de plan -- "Alta nunca se bloquea por limite de capacidad". Despues de
+ * escribir el doc (D4: el estudiante 70 debe contarse a si mismo), evalua si el tenant acaba
+ * de cruzar el umbral del bono de sede.
  */
 function crearServicioCrearEstudiante({ firestore }) {
   return async function crearEstudiante(data, context) {
@@ -131,15 +151,6 @@ function crearServicioCrearEstudiante({ firestore }) {
 
     const tenantId = String(data?.tenantId || '').trim();
     assertTenantAutorizado(tenantId, auth);
-
-    const cantidadActual = await contarEstudiantesDelTenant(firestore, tenantId);
-    const limite = await obtenerLimiteEstudiantes(firestore, tenantId);
-    if (cantidadActual >= limite) {
-      throw crearError(
-        'resource-exhausted',
-        `Límite del plan superado (${limite} alumnos). Por favor, suba de plan o agregue un addon para agregar más estudiantes.`
-      );
-    }
 
     // `id` nunca se toma del cliente (lo asigna Firestore); `tenantId` se fija al validado
     // arriba, no al que venga en el payload, para que nadie pueda crear un estudiante en
@@ -152,15 +163,31 @@ function crearServicioCrearEstudiante({ firestore }) {
       carnetGenerado: false,
       // SDD pricing-cupo-real (Bloque 1, matricula-estado-estudiante, D3): estampado
       // incondicional -- ignora cualquier estadoMatricula que venga en el payload del
-      // cliente, igual que carnetGenerado/tenantId arriba. `facturacion-metered` (bloque
-      // posterior) lee este campo para decidir que estudiante es facturable; todo alta
-      // nueva nace 'activo', nunca 'retirado' por defecto.
+      // cliente, igual que carnetGenerado/tenantId arriba. `facturacion-metered` lee este
+      // campo para decidir que estudiante es facturable; todo alta nueva nace 'activo',
+      // nunca 'retirado' por defecto.
       estadoMatricula: 'activo',
       tenantId,
     };
 
     const ref = await firestore.collection('estudiantes').add(payload);
     const creado = await ref.get();
+
+    // El estudiante YA esta creado en este punto -- esa es la operacion primaria y no debe
+    // fallar por un problema transitorio en el efecto secundario del bono (mismo criterio ya
+    // usado para enviarCorreoFalloPago en wompiCobroAutomatico.js: un try/catch aislado evita
+    // que un error de infraestructura en el "extra" tumbe el flujo principal). Si esta
+    // evaluacion falla una vez, se auto-corrige en la proxima alta del mismo tenant (se
+    // evalua en cada `crearEstudiante`, no solo la primera vez que se cruza el umbral).
+    try {
+      await evaluarBonoSedePorCrecimiento(firestore, tenantId);
+    } catch (error) {
+      console.error(
+        `[crearEstudiante] No fue posible evaluar el bono de sede para el tenant ${tenantId}:`,
+        error
+      );
+    }
+
     return { id: ref.id, ...creado.data() };
   };
 }

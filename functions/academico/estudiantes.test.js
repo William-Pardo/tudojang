@@ -11,10 +11,19 @@ function crearContextoInstructor(overrides = {}) {
   };
 }
 
-// Fake minimo de Firestore: estudiantes en memoria + doc de tenant (limiteEstudiantes),
-// suficiente para las dos colecciones que esta funcion toca (`estudiantes`, `tenants`).
-function crearFirestoreFake({ estudiantesExistentes = [], tenantData = { plan: 'starter', limiteEstudiantes: 50 } } = {}) {
+// Fake minimo de Firestore: estudiantes en memoria + doc de tenant (mutable, para el flag
+// sedeBonusOtorgada -- D4), suficiente para las dos colecciones que esta funcion toca
+// (`estudiantes`, `tenants`). SDD pricing-cupo-real (Bloque 3b): ya no hay `limiteEstudiantes`
+// -- `tenantData` por defecto es `{}` (sin bono, sin extras). El `.where().where().count().get()`
+// encadenado replica la agregacion real que usa `contarEstudiantesFacturablesDelTenant`
+// (estadoMatricula=='activo'), NO un `.get()` completo -- si el codigo real llamara `.get()`
+// en la rama de conteo, este fake lo delataria.
+function crearFirestoreFake({ estudiantesExistentes = [], tenantData = {} } = {}) {
   const estudiantes = new Map(estudiantesExistentes.map((e) => [e.id, { ...e }]));
+  const tenants = new Map([
+    ['tenant-1', { ...tenantData }],
+    ['tenant-ajeno', { ...tenantData }],
+  ]);
   let contadorIds = 0;
 
   const estudiantesCollection = {
@@ -27,23 +36,30 @@ function crearFirestoreFake({ estudiantesExistentes = [], tenantData = { plan: '
         get: async () => ({ exists: true, data: () => estudiantes.get(id) }),
       };
     },
-    where: (campo, _op, valor) => ({
-      get: async () => ({
-        docs: Array.from(estudiantes.entries())
-          .filter(([, data]) => data[campo] === valor)
-          .map(([id, data]) => ({ id, data: () => data })),
+    where: (campo1, _op1, valor1) => ({
+      where: (campo2, _op2, valor2) => ({
+        count: () => ({
+          get: async () => ({
+            data: () => ({
+              count: Array.from(estudiantes.values()).filter(
+                (data) => data[campo1] === valor1 && data[campo2] === valor2
+              ).length,
+            }),
+          }),
+        }),
       }),
     }),
   };
 
-  const tenantsCollection = {
-    doc: (id) => ({
-      get: async () => ({
-        exists: id === 'tenant-1' || id === 'tenant-ajeno',
-        data: () => tenantData,
-      }),
-    }),
-  };
+  const tenantDocRef = (id) => ({
+    get: async () => ({ exists: tenants.has(id), data: () => tenants.get(id) }),
+    set: async (data, options) => {
+      const actual = tenants.get(id) || {};
+      tenants.set(id, options?.merge ? { ...actual, ...data } : data);
+    },
+  });
+
+  const tenantsCollection = { doc: (id) => tenantDocRef(id) };
 
   return {
     collection: (nombre) => {
@@ -52,6 +68,7 @@ function crearFirestoreFake({ estudiantesExistentes = [], tenantData = { plan: '
       throw new Error(`Coleccion no mockeada: ${nombre}`);
     },
     _estudiantes: estudiantes,
+    _tenants: tenants,
   };
 }
 
@@ -97,60 +114,126 @@ test('crearEstudiante: rechaza tenant no autorizado (Admin de otro tenant)', asy
   );
 });
 
-// ─── limite del plan ────────────────────────────────────────────────────────
+// --- sin tope duro + bono de sede (SDD pricing-cupo-real, Bloque 3b -- capacidad-tenant) ----
+//
+// El tope duro (`resource-exhausted` cuando se superaba `tenant.limiteEstudiantes`) se
+// elimina: ya no hay planes fijos, capacidad-tenant exige "Alta nunca se bloquea". En su
+// lugar, `crearEstudiante` evalua DESPUES de escribir el doc nuevo (D4: el estudiante 70 debe
+// contarse a si mismo) si el tenant acaba de cruzar 70 estudiantes ACTIVOS por primera vez, y
+// si es asi otorga +1 sede incluida de forma permanente (`sedeBonusOtorgada`), guardado por
+// `sedeBonusOtorgada !== true` para que la carrera concurrente 69->70 sea idempotente.
 
-test('crearEstudiante: rechaza si ya se alcanzo el limite del plan (bug real: antes solo se chequeaba en el boton de la UI)', async () => {
+test('crearEstudiante: ya NO rechaza por limite de capacidad sin importar cuantos estudiantes activos existan (capacidad-tenant: "Alta nunca se bloquea")', async () => {
   const firestore = crearFirestoreFake({
-    estudiantesExistentes: [
-      { id: 'e1', tenantId: 'tenant-1', nombres: 'Uno' },
-      { id: 'e2', tenantId: 'tenant-1', nombres: 'Dos' },
-    ],
-    tenantData: { plan: 'starter', limiteEstudiantes: 2 },
+    estudiantesExistentes: Array.from({ length: 500 }, (_, i) => ({
+      id: `e${i}`,
+      tenantId: 'tenant-1',
+      estadoMatricula: 'activo',
+    })),
   });
   const servicio = crearServicioCrearEstudiante({ firestore });
 
-  await assert.rejects(
-    () => servicio({ tenantId: 'tenant-1', nombres: 'Tres' }, crearContextoInstructor()),
-    /l[íi]mite del plan superado/i,
-  );
+  const creado = await servicio({ tenantId: 'tenant-1', nombres: 'Quinientos Uno' }, crearContextoInstructor());
+
+  assert.equal(creado.nombres, 'Quinientos Uno');
 });
 
-test('crearEstudiante: usa tenant.limiteEstudiantes ya consolidado (plan + addons), no recalcula addons', async () => {
+test('crearEstudiante: no otorga el bono de sede por debajo del umbral (69 estudiantes activos tras el alta)', async () => {
   const firestore = crearFirestoreFake({
-    estudiantesExistentes: [
-      { id: 'e1', tenantId: 'tenant-1', nombres: 'Uno' },
-      { id: 'e2', tenantId: 'tenant-1', nombres: 'Dos' },
-    ],
-    // Plan starter (limite base 50) + addon "+10 Alumnos" ya sumado por
-    // actualizarCapacidadClub -- el campo consolidado es lo unico que se lee.
-    tenantData: { plan: 'starter', limiteEstudiantes: 3 },
+    estudiantesExistentes: Array.from({ length: 68 }, (_, i) => ({
+      id: `e${i}`,
+      tenantId: 'tenant-1',
+      estadoMatricula: 'activo',
+    })),
   });
   const servicio = crearServicioCrearEstudiante({ firestore });
 
-  const creado = await servicio({ tenantId: 'tenant-1', nombres: 'Tres' }, crearContextoInstructor());
+  await servicio({ tenantId: 'tenant-1', nombres: 'Sesenta y Nueve' }, crearContextoInstructor());
 
-  assert.equal(creado.nombres, 'Tres');
+  const tenant = firestore._tenants.get('tenant-1');
+  assert.notEqual(tenant.sedeBonusOtorgada, true);
 });
 
-test('crearEstudiante: cae al limite fijo del plan (fallback) si el tenant no tiene limiteEstudiantes seteado', async () => {
+test('crearEstudiante: otorga el bono de sede la PRIMERA vez que el tenant cruza 70 estudiantes activos (Scenario: Cruce del umbral otorga el bono de inmediato)', async () => {
   const firestore = crearFirestoreFake({
-    estudiantesExistentes: Array.from({ length: 50 }, (_, i) => ({ id: `e${i}`, tenantId: 'tenant-1', nombres: `E${i}` })),
-    tenantData: { plan: 'starter' }, // sin limiteEstudiantes -> fallback LIMITE_ESTUDIANTES_POR_PLAN.starter = 50
+    estudiantesExistentes: Array.from({ length: 69 }, (_, i) => ({
+      id: `e${i}`,
+      tenantId: 'tenant-1',
+      estadoMatricula: 'activo',
+    })),
   });
   const servicio = crearServicioCrearEstudiante({ firestore });
 
-  await assert.rejects(
-    () => servicio({ tenantId: 'tenant-1', nombres: 'Extra' }, crearContextoInstructor()),
-    /l[íi]mite del plan superado/i,
-  );
+  await servicio({ tenantId: 'tenant-1', nombres: 'Setenta' }, crearContextoInstructor());
+
+  const tenant = firestore._tenants.get('tenant-1');
+  assert.equal(tenant.sedeBonusOtorgada, true);
+  assert.equal(typeof tenant.sedeBonusOtorgadaEn, 'string');
+  assert.ok(!Number.isNaN(Date.parse(tenant.sedeBonusOtorgadaEn)));
+});
+
+test('crearEstudiante: NO revoca ni recalcula el bono si el conteo actual ya esta por debajo de 70 (D4: nunca se recalcula en vivo)', async () => {
+  // El estudiante 71 nace 'activo' -- el conteo tras el alta es 1, muy por debajo de 70 --
+  // pero el tenant YA tenia el bono otorgado de antes (por ejemplo, tras haber bajado de 70
+  // por retiros). evaluarBonoSedePorCrecimiento debe dejarlo intacto, nunca revocarlo.
+  const firestore = crearFirestoreFake({
+    tenantData: { sedeBonusOtorgada: true, sedeBonusOtorgadaEn: '2026-01-01T00:00:00.000Z' },
+  });
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  await servicio({ tenantId: 'tenant-1', nombres: 'Setenta y Uno' }, crearContextoInstructor());
+
+  const tenant = firestore._tenants.get('tenant-1');
+  assert.equal(tenant.sedeBonusOtorgada, true);
+  assert.equal(tenant.sedeBonusOtorgadaEn, '2026-01-01T00:00:00.000Z');
+});
+
+test('crearEstudiante: el bono se otorga una sola vez -- volver a cruzar 70 tras haber bajado y vuelto a subir NO re-otorga (Scenario: El bono se otorga una sola vez)', async () => {
+  const firestore = crearFirestoreFake({
+    estudiantesExistentes: Array.from({ length: 69 }, (_, i) => ({
+      id: `e${i}`,
+      tenantId: 'tenant-1',
+      estadoMatricula: 'activo',
+    })),
+    tenantData: { sedeBonusOtorgada: true, sedeBonusOtorgadaEn: '2026-01-01T00:00:00.000Z' },
+  });
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  await servicio({ tenantId: 'tenant-1', nombres: 'Setenta Otra Vez' }, crearContextoInstructor());
+
+  const tenant = firestore._tenants.get('tenant-1');
+  // La fecha de otorgamiento original no cambia -- no hay un segundo otorgamiento.
+  assert.equal(tenant.sedeBonusOtorgadaEn, '2026-01-01T00:00:00.000Z');
+});
+
+test('crearEstudiante: el bono de sede es idempotente ante una carrera concurrente -- dos altas simultaneas del estudiante 70 convergen al mismo valor sin corromper el estado', async () => {
+  const firestore = crearFirestoreFake({
+    estudiantesExistentes: Array.from({ length: 69 }, (_, i) => ({
+      id: `e${i}`,
+      tenantId: 'tenant-1',
+      estadoMatricula: 'activo',
+    })),
+  });
+  const servicio = crearServicioCrearEstudiante({ firestore });
+
+  // Ninguna de las dos llamadas espera a la otra antes de decidir si otorga el bono --
+  // evaluarBonoSedePorCrecimiento no usa una transaccion Firestore (D4: el boolean hace que
+  // esto sea seguro por construccion, dos escrituras racing convergen al mismo valor `true`).
+  await Promise.all([
+    servicio({ tenantId: 'tenant-1', nombres: 'Setenta-A' }, crearContextoInstructor()),
+    servicio({ tenantId: 'tenant-1', nombres: 'Setenta-B' }, crearContextoInstructor()),
+  ]);
+
+  const tenant = firestore._tenants.get('tenant-1');
+  assert.equal(tenant.sedeBonusOtorgada, true);
+  assert.equal(typeof tenant.sedeBonusOtorgadaEn, 'string');
 });
 
 // ─── creacion exitosa / payload ─────────────────────────────────────────────
 
-test('crearEstudiante: crea correctamente dentro del limite y devuelve id + datos', async () => {
+test('crearEstudiante: crea correctamente y devuelve id + datos', async () => {
   const firestore = crearFirestoreFake({
     estudiantesExistentes: [{ id: 'e1', tenantId: 'tenant-1', nombres: 'Uno' }],
-    tenantData: { plan: 'growth', limiteEstudiantes: 150 },
   });
   const servicio = crearServicioCrearEstudiante({ firestore });
 
@@ -168,10 +251,7 @@ test('crearEstudiante: crea correctamente dentro del limite y devuelve id + dato
 });
 
 test('crearEstudiante: ignora cualquier id/tenantId que venga en el payload del cliente', async () => {
-  const firestore = crearFirestoreFake({
-    estudiantesExistentes: [],
-    tenantData: { plan: 'starter', limiteEstudiantes: 50 },
-  });
+  const firestore = crearFirestoreFake({ estudiantesExistentes: [] });
   const servicio = crearServicioCrearEstudiante({ firestore });
 
   const creado = await servicio(
@@ -215,7 +295,7 @@ test('crearEstudiante: ignora cualquier estadoMatricula que venga en el payload 
 });
 
 test('crearEstudiante: SuperAdmin puede crear estudiantes en cualquier tenant', async () => {
-  const firestore = crearFirestoreFake({ tenantData: { plan: 'pro', limiteEstudiantes: 350 } });
+  const firestore = crearFirestoreFake();
   const servicio = crearServicioCrearEstudiante({ firestore });
 
   const creado = await servicio(
