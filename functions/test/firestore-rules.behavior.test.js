@@ -1766,3 +1766,94 @@ test("ERR-0011 historialNotificaciones: staff del mismo tenant lee, staff de OTR
     })
   );
 });
+
+// =========================================================================
+// SDD pricing-cupo-real (D7, design.md "Protecting billing-affecting tenant fields"):
+// sedeBonusOtorgada/sedeBonusOtorgadaEn/sedesExtraContratadas/equipoTecnicoExtraContratado
+// ya NO son escribibles por el cliente en un `update` de tenants/{tenantId} -- antes
+// cualquier Admin del club podia otorgarse una sede o un cupo de equipo tecnico extra
+// gratis con un `updateDoc(increment(...))` directo desde la consola del navegador (bug
+// real cerrado por este cambio, ver servicios/configuracionApi.ts::actualizarCapacidadClub
+// pre-fix). Solo el Admin SDK (Cloud Functions,
+// functions/academico/capacidad.js::actualizarExtrasContratados) puede seguir
+// escribiendolos, porque bypasea las reglas de Firestore por completo --
+// withSecurityRulesDisabled() simula exactamente ese bypass, el mismo mecanismo que usa el
+// SDK Admin en produccion. beforeEach ya siembra tenants/tenant-1 (tenantId/slug/nombreClub,
+// sin ninguno de los 4 campos protegidos).
+// =========================================================================
+
+const CAMPOS_FACTURACION_INMUTABLES = [
+  ["sedeBonusOtorgada", true],
+  ["sedeBonusOtorgadaEn", "2026-07-31T00:00:00.000Z"],
+  ["sedesExtraContratadas", 1],
+  ["equipoTecnicoExtraContratado", 1],
+];
+
+for (const [campo, valor] of CAMPOS_FACTURACION_INMUTABLES) {
+  test(`admin cannot write tenants/{tenantId}.${campo} directly from the client (camposFacturacionInmutables)`, async () => {
+    const adminDb = client("user-1", "tenant-1", "Admin");
+
+    await assertFails(
+      updateDoc(doc(adminDb, "tenants", "tenant-1"), { [campo]: valor })
+    );
+  });
+}
+
+test("admin cannot write two billing-protected fields at once, even mixed with a benign field", async () => {
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  await assertFails(
+    updateDoc(doc(adminDb, "tenants", "tenant-1"), {
+      nombreClub: "Tudojang Renombrado",
+      sedesExtraContratadas: 3,
+    })
+  );
+});
+
+test("admin CAN still update a benign tenant field -- camposFacturacionInmutables does not block unrelated updates", async () => {
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "tenants", "tenant-1"), { nombreClub: "Tudojang Renombrado" })
+  );
+});
+
+test("SuperAdmin (acting as tenant-1's own admin) cannot bypass camposFacturacionInmutables from the client either", async () => {
+  // El match /tenants/{tenantId} exige isAdmin() && currentTenantId()==tenantId para
+  // TODOS los roles admin (a diferencia de otras colecciones donde SuperAdmin opera
+  // cross-tenant sin esa restriccion) -- camposFacturacionInmutables() no distingue rol,
+  // asi que bloquea igual. Se prueba con el propio tenant del SuperAdmin para aislar la
+  // variable bajo prueba (el guard de campos), no el chequeo de tenant.
+  const superAdminDb = client("master-1", "tenant-1", "SuperAdmin");
+
+  await assertFails(
+    updateDoc(doc(superAdminDb, "tenants", "tenant-1"), { sedesExtraContratadas: 2 })
+  );
+});
+
+test("Cloud Function (Admin SDK) can still write the 4 billing-protected fields -- rules bypass, same mechanism the real callable uses", async () => {
+  // functions/academico/capacidad.js::actualizarExtrasContratados corre con el Admin SDK
+  // real (admin.firestore()), que SIEMPRE bypasea firestore.rules -- por eso este caso no
+  // ejercita las reglas en si (withSecurityRulesDisabled las apaga por completo). Documenta
+  // el otro lado del contrato D7: el guard de arriba bloquea SOLO al cliente, nunca al
+  // Admin SDK. La cobertura de comportamiento REAL del callable (auth/rol/tenant/campo
+  // valido/D8) vive en functions/academico/capacidad.test.js, contra un fake de Firestore,
+  // no contra este emulador.
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", "tenant-1"),
+      {
+        sedeBonusOtorgada: true,
+        sedeBonusOtorgadaEn: "2026-07-31T00:00:00.000Z",
+        sedesExtraContratadas: 2,
+        equipoTecnicoExtraContratado: 1,
+      },
+      { merge: true }
+    );
+
+    const snapshot = await getDoc(doc(context.firestore(), "tenants", "tenant-1"));
+    assert.equal(snapshot.data().sedeBonusOtorgada, true);
+    assert.equal(snapshot.data().sedesExtraContratadas, 2);
+    assert.equal(snapshot.data().equipoTecnicoExtraContratado, 1);
+  });
+});

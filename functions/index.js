@@ -90,6 +90,9 @@ const {
   crearServicioCrearEstudiante,
 } = require("./academico/estudiantes");
 const {
+  crearServicioActualizarExtrasContratados,
+} = require("./academico/capacidad");
+const {
   crearServicioIniciarJornadasPorHorario,
   crearListadoJornadasConfirmadasFirestore,
 } = require("./academico/jornadasScheduler");
@@ -406,6 +409,10 @@ const servicioCrearEstudiante = crearServicioCrearEstudiante({
   firestore: admin.firestore()
 });
 
+const servicioActualizarExtrasContratados = crearServicioActualizarExtrasContratados({
+  firestore: admin.firestore()
+});
+
 const servicioGenerarDatosDemoProgreso = crearServicioGenerarDatosDemoProgreso({
   firestore: admin.firestore()
 });
@@ -691,6 +698,15 @@ exports.repararSedesEjecucionPrograma = functionsV1.https.onCall(
 // Function (uso mucho mas frecuente que sedes, fuera de alcance de este fix puntual).
 exports.crearEstudiante = functionsV1.https.onCall(
   crearHandlerCallable(servicioCrearEstudiante)
+);
+
+// SDD pricing-cupo-real (D7, design.md): unico writer de sedesExtraContratadas/
+// equipoTecnicoExtraContratado en tenants/{tenantId} -- antes un updateDoc(increment(...))
+// directo del cliente (servicios/configuracionApi.ts::actualizarCapacidadClub), ahora
+// bloqueado sin excepcion por firestore.rules (camposFacturacionInmutables()). Ver
+// academico/capacidad.js para el detalle completo.
+exports.actualizarExtrasContratados = functionsV1.https.onCall(
+  crearHandlerCallable(servicioActualizarExtrasContratados)
 );
 
 // Sembrado/limpieza de datos DEMO para el panel "Progreso por Estudiante" (pedido
