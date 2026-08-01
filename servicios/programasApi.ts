@@ -38,9 +38,13 @@ let programasMock: Programa[] = [
     }
 ];
 
-export const obtenerProgramas = async (): Promise<Programa[]> => {
+// ERR-0011: obtenerProgramas() leia la coleccion COMPLETA sin filtro de tenant.
+export const obtenerProgramas = async (tenantId?: string): Promise<Programa[]> => {
     if (!isFirebaseConfigured) return [...programasMock];
-    const snapshot = await getDocs(programasCollection);
+    const q = tenantId
+        ? query(programasCollection, where('tenantId', '==', tenantId))
+        : programasCollection;
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Programa));
 };
 

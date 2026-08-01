@@ -56,6 +56,8 @@ function crearServicioNotificarEventoNuevo({
 
       const tutor = est.tutor || {};
       await crearNotificacion({
+        // ERR-0011: tenantId requerido por firestore.rules para aislar historialNotificaciones por tenant.
+        tenantId: evento.tenantId,
         estudianteId: est.id,
         estudianteNombre: [est.nombres, est.apellidos].filter(Boolean).join(' '),
         tutorNombre: [tutor.nombres, tutor.apellidos].filter(Boolean).join(' '),

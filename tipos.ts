@@ -314,6 +314,11 @@ export interface ConfiguracionNotificaciones {
 
 export interface NotificacionHistorial {
     id: string;
+    // ERR-0011: agregado para poder filtrar `historialNotificaciones` por tenant en
+    // lectura (servicios/notificacionesApi.ts) y en firestore.rules. Antes ningun
+    // documento lo tenia -- todos los generadores (client-side y Cloud Functions
+    // cron) ahora lo escriben.
+    tenantId: string;
     fecha: string;
     estudianteId: string;
     estudianteNombre: string;
@@ -491,6 +496,9 @@ export interface Implemento {
 // Added fix: Exported SolicitudCompra interface.
 export interface SolicitudCompra {
     id: string;
+    // ERR-0011: agregado para filtrar `solicitudesCompra` por tenant (antes solo se
+    // filtraba por `estado`, sin aislamiento de tenant en lectura ni en reglas).
+    tenantId: string;
     estudiante: {
         id: string;
         nombres: string;

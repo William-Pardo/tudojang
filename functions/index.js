@@ -550,6 +550,8 @@ const servicioConsolidateProgress = crearServicioConsolidateProgress({
         if (est.tenantId && est.tenantId !== tenantId) continue;
         if (yaNotificados.has(estudianteId)) continue;
         await fs.collection("historialNotificaciones").add({
+          // ERR-0011: tenantId requerido por firestore.rules para aislar historialNotificaciones por tenant.
+          tenantId,
           estudianteId,
           estudianteNombre: [est.nombres, est.apellidos].filter(Boolean).join(" "),
           tutorNombre: est.tutor ? [est.tutor.nombres, est.tutor.apellidos].filter(Boolean).join(" ") : "",

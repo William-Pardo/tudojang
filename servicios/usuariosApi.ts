@@ -108,8 +108,11 @@ const firestoreRepository: UsuariosRepository = {
   async create(id, usuario) {
     await setDoc(doc(db, 'usuarios', id), usuario);
   },
-  async list() {
-    const snapshot = await getDocs(collection(db, 'usuarios'));
+  async list(tenantId) {
+    const q = tenantId
+      ? query(collection(db, 'usuarios'), where('tenantId', '==', tenantId))
+      : collection(db, 'usuarios');
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(item => ({ id: item.id, ...item.data() } as Usuario));
   },
   async update(id, cambios) {
@@ -185,11 +188,14 @@ export const cerrarSesion = async (): Promise<void> => {
   if (isFirebaseConfigured) await signOut(getAuth());
 };
 
-export const obtenerUsuarios = async (): Promise<Usuario[]> => {
+// ERR-0011: obtenerUsuarios() leia la coleccion COMPLETA de 'usuarios' sin filtro de
+// tenant -- cualquier Admin autenticado recibia usuarios de TODOS los tenants en cada
+// login (context/DataContext.tsx::cargarTodo).
+export const obtenerUsuarios = async (tenantId?: string): Promise<Usuario[]> => {
   if (!isFirebaseConfigured) {
     return usuariosMock.map(({ contrasena: _, ...usuario }) => usuario);
   }
-  return listActiveUsers(await firestoreRepository.list());
+  return listActiveUsers(await firestoreRepository.list(tenantId));
 };
 
 // DT-0020: firestore.rules bloquea sin excepcion "usuarios/{uid}" (allow create,

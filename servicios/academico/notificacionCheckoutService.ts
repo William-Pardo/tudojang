@@ -17,6 +17,8 @@ import { TipoNotificacion } from '../../tipos';
  */
 
 export interface ConfigNotificacionCheckout {
+  // ERR-0011: requerido para poblar NotificacionHistorial.tenantId (ver notificacionesApi.ts).
+  tenantId: string;
   estudianteId: string;
   estudianteNombre: string;
   jornadaId: string;
@@ -110,6 +112,7 @@ export async function enviarNotificacionCheckout(
 
     // Guardar en historial.
     await guardarNotificacionEnHistorial({
+      tenantId: config.tenantId,
       fecha: timestamp,
       estudianteId: config.estudianteId,
       estudianteNombre: config.estudianteNombre,

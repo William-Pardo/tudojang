@@ -44,6 +44,42 @@ test("clients cannot read or write quotas and telemetry", () => {
 test("clients cannot create students directly -- update/delete stay gated by isInstructor()", () => {
   assert.match(
     rules,
-    /match \/estudiantes\/\{docId\}[\s\S]*allow create: if false;[\s\S]*allow update, delete: if isInstructor\(\);/
+    /match \/estudiantes\/\{docId\}[\s\S]*allow create: if false;[\s\S]*allow update, delete: if isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+});
+
+// ERR-0011: aislamiento por tenant en las 7 colecciones raiz que se leian/escribian sin
+// filtro de tenant (ver bitacora.json). Cada assert.match confirma que la condicion de
+// tenant esta presente en el bloque de la coleccion correspondiente -- estos son
+// asserts livianos sobre el TEXTO de las reglas; la cobertura de comportamiento real
+// (permitir mismo tenant / negar otro tenant) vive en firestore-rules.behavior.test.js.
+test("ERR-0011: usuarios list, estudiantes, programas, finanzas, eventos, solicitudesCompra e historialNotificaciones validan tenant", () => {
+  assert.match(
+    rules,
+    /match \/usuarios\/\{uid\}[\s\S]*allow list: if isAdmin\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/estudiantes\/\{docId\}[\s\S]*allow read: if \(isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\)\)/
+  );
+  assert.match(
+    rules,
+    /match \/programas\/\{docId\}[\s\S]*allow read: if isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/finanzas\/\{docId\}[\s\S]*allow read: if isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/eventos\/\{docId\}[\s\S]*allow read: if \(isInstructor\(\) \|\| isTutor\(\) \|\| isEstudiante\(\)\)\s*\n\s*&& resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/solicitudesCompra\/\{docId\}[\s\S]*allow read: if isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/historialNotificaciones\/\{notifId\}[\s\S]*allow read: if \(isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\)\)/
   );
 });

@@ -784,6 +784,7 @@ export const ClaseEnVivoView: React.FC<ClaseEnVivoViewProps> = ({
                   try {
                     const resultado = await enviarNotificacionCheckout(
                       {
+                        tenantId,
                         estudianteId: asistencias[0]?.estudianteId || 'desconocido',
                         estudianteNombre: asistencias[0]?.estudianteId || 'Estudiante',
                         jornadaId: jornadaActual.id,

@@ -37,7 +37,10 @@ const uploadFirma = async (
     return downloadURL;
 };
 
-export const obtenerEstudiantes = async (): Promise<Estudiante[]> => {
+// ERR-0011: obtenerEstudiantes() leia la coleccion COMPLETA sin filtro de tenant --
+// cualquier Instructor/Admin autenticado recibia estudiantes de TODOS los tenants.
+// Mismo patron ya usado en sedesApi.ts::obtenerSedes (unico caso ya corregido).
+export const obtenerEstudiantes = async (tenantId?: string): Promise<Estudiante[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo lista de estudiantes mock.");
         return [
@@ -57,7 +60,10 @@ export const obtenerEstudiantes = async (): Promise<Estudiante[]> => {
             }
         ];
     }
-    const snapshot = await getDocs(estudiantesCollection);
+    const q = tenantId
+        ? query(estudiantesCollection, where('tenantId', '==', tenantId))
+        : estudiantesCollection;
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, carnetGenerado: false, ...doc.data() } as Estudiante));
 };
 

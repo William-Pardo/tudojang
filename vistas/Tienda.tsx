@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useTienda } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../components/BrandingProvider';
 import { RolUsuario, Implemento, VariacionImplemento } from '../tipos';
 
 // Componentes
@@ -19,6 +20,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 
 const VistaTienda: React.FC = () => {
   const { usuario } = useAuth();
+  const { tenant } = useTenant();
   const { mostrarNotificacion } = useNotificacion();
   const {
     implementos, cargando, registrarCompra,
@@ -211,8 +213,8 @@ const VistaTienda: React.FC = () => {
       )}
 
       {modalCompraAbierto && itemSeleccionado && (
-        <ModalSeleccionarEstudiante 
-            abierto={modalCompraAbierto} titulo="Cargar Venta a Estudiante" 
+        <ModalSeleccionarEstudiante
+            abierto={modalCompraAbierto} titulo="Cargar Venta a Estudiante" tenantId={tenant?.tenantId}
             textoBotonConfirmar="Finalizar Venta" onCerrar={() => setModalCompraAbierto(false)} 
             onConfirmar={(est) => {
                 const variacion = itemSeleccionado.variaciones.find(v => v.id === variacionSeleccionadaId);

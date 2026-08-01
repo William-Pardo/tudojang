@@ -36,7 +36,9 @@ interface JornadaContextDeps {
   // tenant, siempre: el fallback a `jornada.programaId` crudo nunca dejaba de activarse.
   obtenerProgramas: (tenantId: string) => Promise<ProgramaAcademico[]>;
   obtenerSedes: (tenantId?: string) => Promise<Sede[]>;
-  obtenerUsuarios: () => Promise<Usuario[]>;
+  // ERR-0011: usuariosApi.obtenerUsuarios ahora exige tenantId para que firestore.rules
+  // pueda validar el `list` (ver firestore.rules, match /usuarios/{uid}).
+  obtenerUsuarios: (tenantId?: string) => Promise<Usuario[]>;
   obtenerConfiguracionClub: (tenantId?: string) => Promise<ConfiguracionClub>;
   // Subtarea 12.7 (Parte 3): fuente real de espacios por tenant. Reemplaza el array
   // hardcodeado `[{ id: 'tatami-1', nombre: 'Tatami principal' }]` que devolvia esta funcion
@@ -98,7 +100,7 @@ export async function obtenerContextoJornada(
   const [programas, sedes, usuarios, configClub, espacios] = await Promise.all([
     resolved.obtenerProgramas(tenantId),
     resolved.obtenerSedes(tenantId),
-    resolved.obtenerUsuarios(),
+    resolved.obtenerUsuarios(tenantId),
     resolved.obtenerConfiguracionClub(tenantId),
     resolved.listarEspaciosPorTenant(tenantId),
   ]);

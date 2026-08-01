@@ -9,7 +9,10 @@ export interface UsuariosRepository {
   getById(id: string): Promise<Usuario | null>;
   getByEmail(email: string): Promise<Usuario | null>;
   create(id: string, usuario: Omit<Usuario, 'id'>): Promise<void>;
-  list(): Promise<Usuario[]>;
+  // ERR-0011: list() leia la coleccion completa sin tenant -- firestore.rules ahora
+  // exige que el `list` de `usuarios` venga acompanado de un where('tenantId', ...)
+  // (ver firestore.rules, match /usuarios/{uid}, allow list).
+  list(tenantId?: string): Promise<Usuario[]>;
   update(id: string, cambios: Partial<Usuario>): Promise<Usuario>;
   softDelete(id: string, deletedAt: string): Promise<void>;
   appendNotificationToken(id: string, token: string): Promise<void>;

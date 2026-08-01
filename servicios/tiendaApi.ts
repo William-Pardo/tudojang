@@ -250,9 +250,12 @@ export const registrarCompra = async (idEstudiante: string, implemento: Implemen
     return { ...estudiante, saldoDeudor: nuevoSaldo, estadoPago: nuevoEstadoPago };
 };
 
+// ERR-0011: SolicitudCompra no tenia tenantId -- se deriva del estudiante ya resuelto
+// (misma fuente que ya usa esta funcion) en vez de exigir un parametro nuevo.
 export const crearSolicitudCompra = async (numIdentificacion: string, implemento: Implemento, variacion: VariacionImplemento): Promise<SolicitudCompra> => {
     const estudiante = await obtenerEstudiantePorNumIdentificacion(numIdentificacion);
     const nuevaSolicitudData = {
+        tenantId: estudiante.tenantId,
         estudiante: {
             id: estudiante.id, nombres: estudiante.nombres, apellidos: estudiante.apellidos,
             tutor: estudiante.tutor ? { nombres: estudiante.tutor.nombres, apellidos: estudiante.tutor.apellidos, telefono: estudiante.tutor.telefono, correo: estudiante.tutor.correo } : null
@@ -267,9 +270,13 @@ export const crearSolicitudCompra = async (numIdentificacion: string, implemento
     return { id: docRef.id, ...nuevaSolicitudData } as any;
 };
 
-export const obtenerSolicitudesCompra = async (): Promise<SolicitudCompra[]> => {
+// ERR-0011: obtenerSolicitudesCompra() solo filtraba por `estado`, sin aislamiento de
+// tenant -- cualquier Instructor autenticado veia solicitudes de compra de otros tenants.
+export const obtenerSolicitudesCompra = async (tenantId?: string): Promise<SolicitudCompra[]> => {
     if (!isFirebaseConfigured) return [];
-    const q = query(solicitudesCompraCollection, where("estado", "==", EstadoSolicitudCompra.Pendiente));
+    const q = tenantId
+        ? query(solicitudesCompraCollection, where("tenantId", "==", tenantId), where("estado", "==", EstadoSolicitudCompra.Pendiente))
+        : query(solicitudesCompraCollection, where("estado", "==", EstadoSolicitudCompra.Pendiente));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SolicitudCompra));
 };

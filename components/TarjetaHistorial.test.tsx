@@ -19,6 +19,7 @@ jest.mock('./Iconos', () => ({
 
 const baseItem: NotificacionHistorial = {
   id: 'notification-1',
+  tenantId: 'tenant-1',
   estudianteId: 'student-1',
   estudianteNombre: 'Ana Pérez',
   tutorNombre: 'Carlos Pérez',

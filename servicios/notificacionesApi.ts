@@ -54,12 +54,17 @@ export const guardarNotificacionEnHistorial = async (notificacion: Omit<Notifica
  * Obtiene el historial de notificaciones enviadas.
  * @returns Una lista de notificaciones, ordenadas por fecha descendente.
  */
-export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHistorial[]> => {
+// ERR-0011: obtenerHistorialNotificaciones() leia la coleccion COMPLETA sin filtro de
+// tenant -- cualquier staff autenticado veia el buzon de notificaciones de TODOS los
+// tenants. Requiere que cada doc tenga `tenantId` (ver tipos.ts::NotificacionHistorial
+// y los puntos de escritura actualizados junto con este fix).
+export const obtenerHistorialNotificaciones = async (tenantId?: string): Promise<NotificacionHistorial[]> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Devolviendo historial de notificaciones de prueba.");
         return [
             {
                 id: '2',
+                tenantId: 'escuela-gajog-001',
                 fecha: new Date().toISOString(),
                 estudianteId: '2',
                 estudianteNombre: 'Sofia Gómez',
@@ -72,6 +77,7 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
             },
             {
                 id: '1',
+                tenantId: 'escuela-gajog-001',
                 fecha: new Date(Date.now() - 86400000).toISOString(),
                 estudianteId: '1',
                 estudianteNombre: 'Juan Pérez',
@@ -84,21 +90,30 @@ export const obtenerHistorialNotificaciones = async (): Promise<NotificacionHist
             }
         ];
     }
-    const q = query(historialCollection, orderBy('fecha', 'desc'));
+    const q = tenantId
+        ? query(historialCollection, where('tenantId', '==', tenantId), orderBy('fecha', 'desc'))
+        : query(historialCollection, orderBy('fecha', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NotificacionHistorial));
 };
 
 /**
  * Buzón del consultor (Tutor/Estudiante): notificaciones de un conjunto de estudiantes.
- * Query por `estudianteId in [...]` (single-field, auto-indexado; se trocea de a 10 por el
- * límite de Firestore) y se ordena por fecha desc en cliente para evitar índice compuesto.
+ * Query por `estudianteId in [...]` (se trocea de a 10 por el límite de Firestore) y se
+ * ordena por fecha desc en cliente para evitar índice compuesto.
+ *
+ * ERR-0011: se agrega `where('tenantId', '==', tenantId)` -- la regla de Firestore para
+ * `historialNotificaciones` ahora exige `resource.data.tenantId == currentTenantId()`, y
+ * para un `list` ese campo debe formar parte del filtro de la query o Firestore rechaza
+ * la lectura completa (no puede probar la condición documento a documento). `in` + `==`
+ * sobre campos distintos sigue sin requerir índice compuesto (ambos son equality).
  */
 export const obtenerNotificacionesPorEstudiantes = async (
-  estudianteIds: string[]
+  estudianteIds: string[],
+  tenantId: string
 ): Promise<NotificacionHistorial[]> => {
   const idsUnicos = Array.from(new Set(estudianteIds.filter(Boolean)));
-  if (idsUnicos.length === 0) return [];
+  if (idsUnicos.length === 0 || !tenantId) return [];
 
   if (!isFirebaseConfigured) {
     const todas = await obtenerHistorialNotificaciones();
@@ -113,7 +128,11 @@ export const obtenerNotificacionesPorEstudiantes = async (
 
   const resultados = await Promise.all(
     lotes.map(async (lote) => {
-      const q = query(historialCollection, where('estudianteId', 'in', lote));
+      const q = query(
+        historialCollection,
+        where('tenantId', '==', tenantId),
+        where('estudianteId', 'in', lote)
+      );
       const snapshot = await getDocs(q);
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as NotificacionHistorial));
     })
@@ -140,12 +159,14 @@ export const marcarNotificacionComoLeida = async (idNotificacion: string): Promi
 /**
  * Marca todas las notificaciones no leídas como leídas.
  */
-export const marcarTodasComoLeidas = async (): Promise<void> => {
+export const marcarTodasComoLeidas = async (tenantId?: string): Promise<void> => {
     if (!isFirebaseConfigured) {
         console.warn("MODO SIMULADO: Marcando todas las notificaciones como leídas.");
         return;
     }
-    const q = query(historialCollection, where('leida', '==', false));
+    const q = tenantId
+        ? query(historialCollection, where('tenantId', '==', tenantId), where('leida', '==', false))
+        : query(historialCollection, where('leida', '==', false));
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {

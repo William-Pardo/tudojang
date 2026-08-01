@@ -90,13 +90,18 @@ test("student cannot read another user profile", async () => {
   );
 });
 
+// ERR-0011: "usuarios" ahora exige que el `list` venga filtrado por tenantId (ver
+// firestore.rules, match /usuarios/{uid}, allow list) -- un `collection(db,'usuarios')`
+// SIN where es rechazado en cuanto la coleccion tenga datos de otro tenant (como aca,
+// beforeEach siembra user-1/tenant-1 y user-2/tenant-2), por eso el query real
+// (usuariosApi.ts::obtenerUsuarios) ahora SIEMPRE agrega where('tenantId', '==', ...).
 test("admin can list legacy root collections needed by DataContext startup", async () => {
   const db = client("user-1", "tenant-1", "Admin");
 
-  await assertSucceeds(getDocs(collection(db, "usuarios")));
+  await assertSucceeds(getDocs(query(collection(db, "usuarios"), where("tenantId", "==", "tenant-1"))));
   await assertSucceeds(getDocs(collection(db, "sedes")));
-  await assertSucceeds(getDocs(collection(db, "estudiantes")));
-  await assertSucceeds(getDocs(collection(db, "programas")));
+  await assertSucceeds(getDocs(query(collection(db, "estudiantes"), where("tenantId", "==", "tenant-1"))));
+  await assertSucceeds(getDocs(query(collection(db, "programas"), where("tenantId", "==", "tenant-1"))));
 });
 
 test("student cannot list legacy admin collections", async () => {
@@ -1161,9 +1166,15 @@ test("tutor can read the student where they are the acudiente (tutor.correo == s
 
   const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
 
-  // Query como lo hace el resolver real: filtra por tutor.correo == su email.
+  // Query como lo hace el resolver real (tutorStudentResolver.ts, post-ERR-0011): filtra
+  // por tenantId Y tutor.correo -- el `list` requiere que tenantId sea parte del filtro
+  // para que la regla pueda probarlo, no solo compararlo por documento.
   await assertSucceeds(
-    getDocs(query(collection(tutorDb, "estudiantes"), where("tutor.correo", "==", "papa@test.com")))
+    getDocs(query(
+      collection(tutorDb, "estudiantes"),
+      where("tenantId", "==", "tenant-1"),
+      where("tutor.correo", "==", "papa@test.com")
+    ))
   );
 });
 
@@ -1183,9 +1194,14 @@ test("tutor cannot read a student where they are NOT the acudiente", async () =>
   await assertFails(getDoc(doc(otroTutorDb, "estudiantes", "est-ajeno")));
 
   // Y tampoco puede burlar la regla consultando por el correo ajeno (el query no
-  // coincide con su token.email, la regla lo rechaza).
+  // coincide con su token.email, la regla lo rechaza) -- mismo patron con tenantId en
+  // el filtro que usa el resolver real (ver test anterior).
   await assertFails(
-    getDocs(query(collection(otroTutorDb, "estudiantes"), where("tutor.correo", "==", "papa@test.com")))
+    getDocs(query(
+      collection(otroTutorDb, "estudiantes"),
+      where("tenantId", "==", "tenant-1"),
+      where("tutor.correo", "==", "papa@test.com")
+    ))
   );
 });
 
@@ -1205,9 +1221,14 @@ test("student can read their own student record (correo == su email)", async () 
 
   const estudianteDb = client("est-user-1", "tenant-1", "Estudiante", { email: "ale@test.com" });
 
-  // Query como lo hace el resolver real: filtra por correo == su propio email.
+  // Query como lo hace el resolver real (post-ERR-0011): filtra por tenantId y correo ==
+  // su propio email -- tenantId debe estar en el filtro para que el `list` sea probable.
   await assertSucceeds(
-    getDocs(query(collection(estudianteDb, "estudiantes"), where("correo", "==", "ale@test.com")))
+    getDocs(query(
+      collection(estudianteDb, "estudiantes"),
+      where("tenantId", "==", "tenant-1"),
+      where("correo", "==", "ale@test.com")
+    ))
   );
 });
 
@@ -1225,7 +1246,11 @@ test("student cannot read another student's record", async () => {
 
   await assertFails(getDoc(doc(otroEstudianteDb, "estudiantes", "est-ajeno-2")));
   await assertFails(
-    getDocs(query(collection(otroEstudianteDb, "estudiantes"), where("correo", "==", "ale@test.com")))
+    getDocs(query(
+      collection(otroEstudianteDb, "estudiantes"),
+      where("tenantId", "==", "tenant-1"),
+      where("correo", "==", "ale@test.com")
+    ))
   );
 });
 
@@ -1271,19 +1296,25 @@ test("tutor can read notifications of their child, estudiante of their own, not 
       tenantId: "tenant-1", nombres: "Otro", correo: "otro-est@test.com",
       tutor: { correo: "otropapa@test.com" },
     });
+    // ERR-0011: tenantId agregado al modelo -- ver tipos.ts::NotificacionHistorial.
     await setDoc(doc(db, "historialNotificaciones", "notif-hijo"), {
-      estudianteId: "est-hijo", mensaje: "Pago al día", tipo: "RecordatorioPago", leida: false, fecha: "2026-07-14",
+      tenantId: "tenant-1", estudianteId: "est-hijo", mensaje: "Pago al día", tipo: "RecordatorioPago", leida: false, fecha: "2026-07-14",
     });
     await setDoc(doc(db, "historialNotificaciones", "notif-ajeno"), {
-      estudianteId: "est-ajeno", mensaje: "Otra", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
+      tenantId: "tenant-1", estudianteId: "est-ajeno", mensaje: "Otra", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
     });
   });
 
   const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
   // Lee la de su hijo (get)
   await assertSucceeds(getDoc(doc(tutorDb, "historialNotificaciones", "notif-hijo")));
-  // Query de lista scoped a su hijo
-  await assertSucceeds(getDocs(query(collection(tutorDb, "historialNotificaciones"), where("estudianteId", "==", "est-hijo"))));
+  // Query de lista scoped a su hijo (post-ERR-0011: tenantId debe estar en el filtro,
+  // igual que en obtenerNotificacionesPorEstudiantes -- ver servicios/notificacionesApi.ts).
+  await assertSucceeds(getDocs(query(
+    collection(tutorDb, "historialNotificaciones"),
+    where("tenantId", "==", "tenant-1"),
+    where("estudianteId", "==", "est-hijo")
+  )));
   // NO la del estudiante ajeno
   await assertFails(getDoc(doc(tutorDb, "historialNotificaciones", "notif-ajeno")));
 
@@ -1299,7 +1330,7 @@ test("tutor can mark notification as read (only 'leida' field)", async () => {
       tenantId: "tenant-1", nombres: "Ale2", correo: "ale2@test.com", tutor: { correo: "papa2@test.com" },
     });
     await setDoc(doc(db, "historialNotificaciones", "notif-2"), {
-      estudianteId: "est-hijo2", mensaje: "x", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
+      tenantId: "tenant-1", estudianteId: "est-hijo2", mensaje: "x", tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
     });
   });
   const tutorDb = client("tutor-2", "tenant-1", "Tutor", { email: "papa2@test.com" });
@@ -1571,5 +1602,167 @@ test("tutor cannot write student visualizaciones but can read it in same tenant"
       visualizacionPath(tutorDb, "tenant-1", "recurso-video-1", "est-1"),
       { ...VISUALIZACION_DATA, porcentajeVisto: 99, completado: true, vecesIniciado: 2 }
     )
+  );
+});
+
+// =========================================================================
+// ERR-0011 -- aislamiento por tenant en 7 colecciones raiz que se leian SIN filtro de
+// tenant en cada login (context/DataContext.tsx::cargarTodo): estudiantes, usuarios,
+// finanzas, eventos, programas, historialNotificaciones, solicitudesCompra. Cada bloque
+// prueba (a) que el mismo tenant SIGUE funcionando (regresion) y (b) que un tenant
+// distinto queda bloqueado -- el caso (b) es el que fallaria contra las reglas viejas
+// (isInstructor()/isAdmin() sin comparar tenantId), asi que confirma que el fix realmente
+// cierra el hueco y no es un test que hubiera pasado igual antes.
+// =========================================================================
+
+test("ERR-0011 estudiantes: mismo tenant lee, otro tenant NO puede leer/actualizar/borrar", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-t1"), {
+      tenantId: "tenant-1", nombres: "Del Tenant 1", correo: "t1@test.com",
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  // Regresion: mismo tenant sigue pudiendo leer (get y list scoped).
+  await assertSucceeds(getDoc(doc(staffT1, "estudiantes", "est-t1")));
+  await assertSucceeds(getDocs(query(collection(staffT1, "estudiantes"), where("tenantId", "==", "tenant-1"))));
+
+  // Fix real: Admin de OTRO tenant no puede leer, actualizar ni borrar (con las reglas
+  // viejas, isInstructor() alcanzaba sin importar el tenant -- estas 3 llamadas hubieran
+  // pasado con assertSucceeds antes del fix).
+  await assertFails(getDoc(doc(staffT2, "estudiantes", "est-t1")));
+  await assertFails(updateDoc(doc(staffT2, "estudiantes", "est-t1"), { nombres: "Hackeado" }));
+  await assertFails(deleteDoc(doc(staffT2, "estudiantes", "est-t1")));
+});
+
+test("ERR-0011 usuarios: list scoped al propio tenant funciona, list sin filtro (con datos de otro tenant) es rechazado", async () => {
+  // beforeEach ya siembra user-1/tenant-1 y user-2/tenant-2.
+  const adminT1 = client("user-1", "tenant-1", "Admin");
+
+  // Regresion: list CON where('tenantId', ...) sigue funcionando.
+  const snap = await assertSucceeds(
+    getDocs(query(collection(adminT1, "usuarios"), where("tenantId", "==", "tenant-1")))
+  );
+  assert.equal(snap.size, 1);
+
+  // Fix real: list SIN filtro es rechazado por completo en cuanto hay datos de otro
+  // tenant en la coleccion (antes: isAdmin() a secas dejaba pasar la coleccion entera).
+  await assertFails(getDocs(collection(adminT1, "usuarios")));
+});
+
+test("ERR-0011 programas: mismo tenant lee/escribe, otro tenant NO puede leer ni escribir", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "programas", "prog-t1"), {
+      tenantId: "tenant-1", nombre: "Poomsae", activo: true,
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  await assertSucceeds(getDoc(doc(staffT1, "programas", "prog-t1")));
+
+  await assertFails(getDoc(doc(staffT2, "programas", "prog-t1")));
+  await assertFails(updateDoc(doc(staffT2, "programas", "prog-t1"), { nombre: "Hackeado" }));
+  await assertFails(deleteDoc(doc(staffT2, "programas", "prog-t1")));
+  await assertFails(
+    setDoc(doc(staffT2, "programas", "prog-otro-tenant"), { tenantId: "tenant-1", nombre: "Intento", activo: true })
+  );
+});
+
+test("ERR-0011 finanzas: mismo tenant lee/escribe, otro tenant NO puede leer ni escribir movimientos ajenos", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "finanzas", "mov-t1"), {
+      tenantId: "tenant-1", tipo: "Ingreso", categoria: "Mensualidad", monto: 100000,
+      descripcion: "Pago", fecha: "2026-07-01", sedeId: "sede-1",
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  await assertSucceeds(getDoc(doc(staffT1, "finanzas", "mov-t1")));
+
+  await assertFails(getDoc(doc(staffT2, "finanzas", "mov-t1")));
+  await assertFails(updateDoc(doc(staffT2, "finanzas", "mov-t1"), { monto: 999 }));
+  await assertFails(deleteDoc(doc(staffT2, "finanzas", "mov-t1")));
+});
+
+test("ERR-0011 eventos: mismo tenant lee/escribe, otro tenant NO puede leer ni escribir", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "eventos", "evt-t1"), {
+      tenantId: "tenant-1", nombre: "Torneo", lugar: "Sede 1",
+      fechaEvento: "2026-09-01", fechaInicioInscripcion: "2026-08-01", fechaFinInscripcion: "2026-08-20", valor: 0,
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  await assertSucceeds(getDoc(doc(staffT1, "eventos", "evt-t1")));
+
+  await assertFails(getDoc(doc(staffT2, "eventos", "evt-t1")));
+  await assertFails(updateDoc(doc(staffT2, "eventos", "evt-t1"), { nombre: "Hackeado" }));
+  await assertFails(deleteDoc(doc(staffT2, "eventos", "evt-t1")));
+});
+
+test("ERR-0011 solicitudesCompra: mismo tenant lee/escribe, otro tenant NO puede leer ni escribir", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "solicitudesCompra", "sc-t1"), {
+      tenantId: "tenant-1",
+      estudiante: { id: "est-1", nombres: "Ana", apellidos: "Gomez" },
+      implemento: { id: "imp-1", nombre: "Dobok", categoria: "Uniformes" },
+      variacion: { id: "v-1", descripcion: "Talla 1", precio: 100000 },
+      fechaSolicitud: "2026-07-01",
+      estado: "Pendiente",
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  await assertSucceeds(getDoc(doc(staffT1, "solicitudesCompra", "sc-t1")));
+
+  await assertFails(getDoc(doc(staffT2, "solicitudesCompra", "sc-t1")));
+  await assertFails(updateDoc(doc(staffT2, "solicitudesCompra", "sc-t1"), { estado: "Aprobada" }));
+  await assertFails(deleteDoc(doc(staffT2, "solicitudesCompra", "sc-t1")));
+  // Crear una solicitud "propia" (tenantId: tenant-1) autenticado como staff de tenant-2 --
+  // debe rechazarse por request.resource.data.tenantId != currentTenantId().
+  await assertFails(
+    setDoc(doc(staffT2, "solicitudesCompra", "sc-cross"), {
+      tenantId: "tenant-1",
+      estudiante: { id: "est-1", nombres: "Ana", apellidos: "Gomez" },
+      implemento: { id: "imp-1", nombre: "Dobok", categoria: "Uniformes" },
+      variacion: { id: "v-1", descripcion: "Talla 1", precio: 100000 },
+      fechaSolicitud: "2026-07-01",
+      estado: "Pendiente",
+    })
+  );
+});
+
+test("ERR-0011 historialNotificaciones: staff del mismo tenant lee, staff de OTRO tenant NO puede leer ni crear", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "historialNotificaciones", "notif-t1"), {
+      tenantId: "tenant-1", estudianteId: "est-cualquiera", mensaje: "Recordatorio",
+      tipo: "RecordatorioPago", leida: false, fecha: "2026-07-14",
+    });
+  });
+
+  const staffT1 = client("staff-t1", "tenant-1", "Admin");
+  const staffT2 = client("staff-t2", "tenant-2", "Admin");
+
+  // Regresion: staff del propio tenant sigue viendo el buzon completo (antes, con las
+  // reglas viejas, isInstructor() alcanzaba SIN validar tenant -- este era el hueco de
+  // mayor volumen: se dispara en cada carga del buzon de notificaciones).
+  await assertSucceeds(getDoc(doc(staffT1, "historialNotificaciones", "notif-t1")));
+
+  await assertFails(getDoc(doc(staffT2, "historialNotificaciones", "notif-t1")));
+  await assertFails(
+    setDoc(doc(staffT2, "historialNotificaciones", "notif-cross"), {
+      tenantId: "tenant-1", estudianteId: "est-cualquiera", mensaje: "Intento",
+      tipo: "Bienvenida", leida: false, fecha: "2026-07-14",
+    })
   );
 });

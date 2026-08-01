@@ -81,6 +81,8 @@ function crearServicioRecordatoriosEstudio({
     const mensaje = elegirComentario(situacion, tituloMaterial, ultimoComentario);
 
     await crearNotificacion({
+      // ERR-0011: tenantId requerido por firestore.rules para aislar historialNotificaciones por tenant.
+      tenantId: estudiante.tenantId,
       estudianteId: estudiante.id,
       estudianteNombre: nombreCompleto(estudiante),
       tutorNombre: estudiante.tutor ? nombreCompleto(estudiante.tutor) : '',

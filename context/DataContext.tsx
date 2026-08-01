@@ -161,22 +161,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             // sin colecciones staff (usuarios/sedes/estudiantes).
                             api.obtenerConfiguracionNotificaciones(tenant.tenantId),
                             api.obtenerImplementos(),
-                            api.obtenerSolicitudesCompra(),
-                            api.obtenerMovimientos(),
-                            api.obtenerProgramas(),
-                            api.obtenerEventos()
+                            api.obtenerSolicitudesCompra(tenant.tenantId),
+                            api.obtenerMovimientos(tenant.tenantId),
+                            api.obtenerProgramas(tenant.tenantId),
+                            api.obtenerEventos(tenant.tenantId)
                         ]
                         : [
                             // Admin/Instructor/otros: cargar TODO (behavior anterior)
-                            api.obtenerUsuarios(),
+                            api.obtenerUsuarios(tenant.tenantId),
                             api.obtenerConfiguracionNotificaciones(tenant.tenantId),
                             api.obtenerSedes(tenant.tenantId).then(sanearSedes),
-                            api.obtenerEstudiantes(),
-                            api.obtenerEventos(),
+                            api.obtenerEstudiantes(tenant.tenantId),
+                            api.obtenerEventos(tenant.tenantId),
                             api.obtenerImplementos(),
-                            api.obtenerSolicitudesCompra(),
-                            api.obtenerMovimientos(),
-                            api.obtenerProgramas()
+                            api.obtenerSolicitudesCompra(tenant.tenantId),
+                            api.obtenerMovimientos(tenant.tenantId),
+                            api.obtenerProgramas(tenant.tenantId)
                         ]
                 ),
                 syncTimeout
@@ -318,7 +318,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                     movimientos, cargando, error, cargarMovimientos: useCallback(async (sedeId?: string) => {
                                         setCargando(true);
                                         try {
-                                            const m = await api.obtenerMovimientos(sedeId);
+                                            const m = await api.obtenerMovimientos(tenant?.tenantId, sedeId);
                                             setMovimientos(m);
                                         } catch (err) {
                                             console.error("Error al cargar movimientos:", err);
@@ -326,7 +326,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                                         } finally {
                                             setCargando(false);
                                         }
-                                    }, []),
+                                    }, [tenant]),
                                     agregarMovimiento: async (m) => {
                                         if (!tenant) throw new Error("Acción bloqueada: Identificación de escuela pendiente.");
                                         const res = await api.agregarMovimiento({ ...m, tenantId: tenant.tenantId });

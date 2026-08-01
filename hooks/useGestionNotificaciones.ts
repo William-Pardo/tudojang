@@ -23,14 +23,14 @@ export const useGestionNotificaciones = () => {
         setCargandoHistorial(true);
         setErrorHistorial(null);
         try {
-            const data = await api.obtenerHistorialNotificaciones();
+            const data = await api.obtenerHistorialNotificaciones(configClub.tenantId);
             setHistorial(data);
         } catch (err) {
             setErrorHistorial('No se pudo cargar el historial de notificaciones.');
         } finally {
             setCargandoHistorial(false);
         }
-    }, []);
+    }, [configClub.tenantId]);
 
     useEffect(() => {
         cargarHistorial();
@@ -53,12 +53,12 @@ export const useGestionNotificaciones = () => {
         const original = [...historial];
         setHistorial(prev => prev.map(n => ({ ...n, leida: true })));
         try {
-            await api.marcarTodasComoLeidas();
+            await api.marcarTodasComoLeidas(configClub.tenantId);
         } catch (error) {
             mostrarNotificacion('Error al marcar todas las notificaciones como leídas.', 'error');
             setHistorial(original);
         }
-    }, [historial, noLeidasCount, mostrarNotificacion]);
+    }, [historial, noLeidasCount, mostrarNotificacion, configClub.tenantId]);
 
     const handleEnviarRecordatorios = async () => {
         setEnviando(true);
@@ -98,6 +98,7 @@ export const useGestionNotificaciones = () => {
                 await api.enviarNotificacion(canal, destinatario, mensaje);
                 
                 await api.guardarNotificacionEnHistorial({
+                    tenantId: configClub.tenantId,
                     fecha: new Date().toISOString(),
                     estudianteId: estudiante.id,
                     estudianteNombre: `${estudiante.nombres} ${estudiante.apellidos}`,
