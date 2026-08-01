@@ -72,16 +72,6 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     emailClub: 'soporte@tudojang.com',
     estadoSuscripcion: 'demo' as const,
     fechaVencimiento: '2029-12-31',
-    // SDD pricing-cupo-real (Bloque 4b): estos 4 campos ya no son leídos por código nuevo
-    // (reemplazados por calcularCapacidad, utils/facturacion.ts) -- se mantienen acá SOLO
-    // hasta el corte final (tasks.md 4.13), que los borra de `ConfiguracionClub` en
-    // tipos.ts. Mientras ese campo siga siendo obligatorio en el tipo, este objeto debe
-    // seguir satisfaciéndolo para que `npm run typecheck` se mantenga verde en cada punto
-    // intermedio (design.md, Migration/Rollout: "no data migration" hasta el cutover).
-    plan: 'starter',
-    limiteEstudiantes: 50,
-    limiteUsuarios: 2,
-    limiteSedes: 2,
     onboardingStep: 0
 };
 

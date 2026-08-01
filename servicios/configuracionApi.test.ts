@@ -205,22 +205,20 @@ describe('configuracionApi', () => {
       expect(tenantId).toEqual(expect.any(String));
     });
 
-    it('ignora datos.plan por completo -- ya no deriva limiteEstudiantes/limiteUsuarios/limiteSedes de un plan seleccionado', async () => {
+    // SDD pricing-cupo-real (Bloque 4b, corte final tasks.md 4.13): plan/limiteEstudiantes/
+    // limiteUsuarios/limiteSedes ya NO existen en ConfiguracionClub -- este caso reemplaza
+    // al anterior (que solo probaba que no se derivaban de datos.plan mientras el campo
+    // seguía vivo como legado); ahora prueba que ni siquiera viajan en el payload.
+    it('el payload nunca incluye plan/limiteEstudiantes/limiteUsuarios/limiteSedes -- retirados de ConfiguracionClub', async () => {
       (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
 
-      await registrarNuevaEscuela({ nombreClub: 'A', slug: 'a', plan: 'pro' } as any);
-      const [, payloadPro] = (setDoc as jest.Mock).mock.calls[0];
+      await registrarNuevaEscuela({ nombreClub: 'A', slug: 'a' });
+      const [, payload] = (setDoc as jest.Mock).mock.calls[0];
 
-      (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
-      await registrarNuevaEscuela({ nombreClub: 'B', slug: 'b' });
-      const [, payloadSinPlan] = (setDoc as jest.Mock).mock.calls[1];
-
-      // Con o sin `datos.plan`, los límites resultantes son EXACTAMENTE los del default --
-      // ninguna rama del código los deriva de un plan distinto.
-      expect(payloadPro.limiteEstudiantes).toBe(CONFIGURACION_CLUB_POR_DEFECTO.limiteEstudiantes);
-      expect(payloadPro.limiteUsuarios).toBe(CONFIGURACION_CLUB_POR_DEFECTO.limiteUsuarios);
-      expect(payloadPro.limiteSedes).toBe(CONFIGURACION_CLUB_POR_DEFECTO.limiteSedes);
-      expect(payloadSinPlan.limiteEstudiantes).toBe(payloadPro.limiteEstudiantes);
+      expect(payload).not.toHaveProperty('plan');
+      expect(payload).not.toHaveProperty('limiteEstudiantes');
+      expect(payload).not.toHaveProperty('limiteUsuarios');
+      expect(payload).not.toHaveProperty('limiteSedes');
     });
 
     it('debería generar un tenantId si no se proporciona uno', async () => {

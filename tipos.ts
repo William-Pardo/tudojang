@@ -138,10 +138,6 @@ export interface ConfiguracionClub {
     emailClub?: string;
     estadoSuscripcion: 'activo' | 'suspendido' | 'demo';
     fechaVencimiento: string;
-    plan: string;
-    limiteEstudiantes: number;
-    limiteUsuarios: number;
-    limiteSedes: number;
     logoUrl?: string;
     logoOriginalUrl?: string; // Para backups
     passwordTemporal?: string;
@@ -159,10 +155,13 @@ export interface ConfiguracionClub {
     cobroAutomaticoIntentosFallidos?: number; // se resetea a 0 tras un cobro exitoso
     linkPagoMensualidad?: string; // URL de Payment Link externo (Wompi/PayU/ePayco) de la CUENTA de la academia, para que sus alumnos paguen mensualidad en línea. Tudojang no procesa ni recibe este dinero -- ver Términos de Servicio. Debe pertenecer a un dominio de DOMINIOS_PASARELAS_PAGO_PERMITIDOS (constantes.ts).
     // Campos de pricing por cupo real (SDD pricing-cupo-real, Bloque 2 -- capacidad-tenant /
-    // facturacion-metered). ADITIVOS/opcionales a proposito: `plan`/`limite*`/`cupos*` de
-    // arriba siguen vivos hasta el corte final (Bloque 4, tasks.md 4.13) para que
-    // npm run typecheck/build sigan verdes en cada frontera de PR. Ausentes en un tenant
-    // legacy => false/0 (ver utils/facturacion.ts::calcularCapacidad, D3/Migracion).
+    // facturacion-metered). Corte final (Bloque 4, tasks.md 4.13): `plan`/`limiteEstudiantes`/
+    // `limiteUsuarios`/`limiteSedes` fueron RETIRADOS de esta interfaz -- cualquier lector que
+    // sobreviviera se vuelve un fallo de `npm run typecheck` a propósito (el antídoto
+    // estructural al patrón write-here/read-there de ERR-0013, ver design.md "Notes on
+    // Constraints"). La fuente única de capacidad/facturación ahora es
+    // utils/facturacion.ts::calcularCapacidad/calcularFacturacionMensual sobre estos 4
+    // campos aditivos/opcionales. Ausentes en un tenant legacy => false/0 (D3/Migración).
     sedeBonusOtorgada?: boolean; // D4: otorgado UNA vez al cruzar el umbral, nunca se recalcula ni se revoca
     sedeBonusOtorgadaEn?: string; // ISO -- auditoria de cuando se otorgo el bono
     sedesExtraContratadas?: number; // mas alla de incluido.sedes + el bono

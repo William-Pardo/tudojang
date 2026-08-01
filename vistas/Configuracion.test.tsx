@@ -74,10 +74,6 @@ const configClubBase: ConfiguracionClub = {
     colorAcento: '#CD2E3A',
     estadoSuscripcion: 'activo',
     fechaVencimiento: '2027-01-01',
-    plan: 'starter',
-    limiteEstudiantes: 100,
-    limiteUsuarios: 5,
-    limiteSedes: 1,
     onboardingStep: 5,
     activarFormularioInscripcion: true,
 };
