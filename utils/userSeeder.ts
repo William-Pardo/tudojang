@@ -121,6 +121,7 @@ export const generarEstudiantesFicticios = async (cantidad: number, sedeId: stri
             consentimientoImagenFirmado: true,
             consentimientoFotosVideos: true,
             carnetGenerado: false,
+            estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
             programasInscritos: [],
             tutor: {
                 nombres: `${obtenerElementoAleatorio(NOMBRES_MASCULINOS)} ${apellido1}`,

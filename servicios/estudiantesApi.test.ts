@@ -96,6 +96,7 @@ const buildEstudiante = (overrides: Partial<Estudiante> = {}): Estudiante => ({
     consentimientoImagenFirmado: false,
     consentimientoFotosVideos: false,
     carnetGenerado: false,
+    estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
     ...overrides,
 });
 

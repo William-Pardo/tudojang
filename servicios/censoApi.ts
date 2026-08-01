@@ -137,6 +137,7 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
             consentimientoImagenFirmado: true,
             consentimientoFotosVideos: true,
             carnetGenerado: false,
+            estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
             eps: datos.eps || '',
             rh: datos.rh || '',
             direccion: datos.direccion || '',

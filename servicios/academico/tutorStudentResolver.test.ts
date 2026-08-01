@@ -41,6 +41,7 @@ const baseEstudiante = (over: Partial<Estudiante>): Estudiante => ({
   consentimientoImagenFirmado: true,
   consentimientoFotosVideos: true,
   carnetGenerado: false,
+  estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
   tutor: {
     nombres: 'Padre',
     apellidos: 'Tester',

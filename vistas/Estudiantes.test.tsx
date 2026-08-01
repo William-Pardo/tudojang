@@ -36,6 +36,7 @@ const crearEstudiante = (
   fechaIngreso: '2024-01-01', estadoPago, saldoDeudor: 0, historialPagos: [],
   consentimientoInformado: false, contratoServiciosFirmado: false, consentimientoImagenFirmado: false,
   consentimientoFotosVideos: false, carnetGenerado: false,
+  estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
 });
 
 const estudiantesBase = [

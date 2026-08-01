@@ -150,6 +150,12 @@ function crearServicioCrearEstudiante({ firestore }) {
       ...normalizarCorreos(camposEstudiante),
       historialPagos: Array.isArray(camposEstudiante.historialPagos) ? camposEstudiante.historialPagos : [],
       carnetGenerado: false,
+      // SDD pricing-cupo-real (Bloque 1, matricula-estado-estudiante, D3): estampado
+      // incondicional -- ignora cualquier estadoMatricula que venga en el payload del
+      // cliente, igual que carnetGenerado/tenantId arriba. `facturacion-metered` (bloque
+      // posterior) lee este campo para decidir que estudiante es facturable; todo alta
+      // nueva nace 'activo', nunca 'retirado' por defecto.
+      estadoMatricula: 'activo',
       tenantId,
     };
 

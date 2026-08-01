@@ -55,6 +55,7 @@ const crearEstudiante = (overrides: Partial<Estudiante> = {}): Estudiante => ({
   consentimientoImagenFirmado: true,
   consentimientoFotosVideos: true,
   carnetGenerado: false,
+  estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
   tutor: {
     // Fix 2026-07-21 (`npm run typecheck`): `nombreCompleto` y `parentesco` NO EXISTEN en
     // el tipo `Estudiante['tutor']` (los campos reales son nombres/apellidos/

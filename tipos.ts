@@ -221,6 +221,9 @@ export interface Estudiante {
     };
     metodoPago?: 'efectivo' | 'link';
     cobrarMesSiguiente?: boolean;
+    estadoMatricula: 'activo' | 'retirado';
+    fechaRetiro?: string;
+    fechaReactivacion?: string;
 }
 
 export interface InscripcionPrograma {
