@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { actualizarCapacidadClub } from '../servicios/configuracionApi';
 import { calcularCapacidad } from '../utils/facturacion';
+import { COSTOS_ADICIONALES } from '../constantes';
 import type { ConfiguracionClub } from '../tipos';
 
 jest.mock('../servicios/configuracionApi', () => ({
@@ -223,6 +224,15 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
         expect(panelUso.textContent).toContain(`de ${capacidadEsperada.equipoTecnico}`);
         const panelSedes = screen.getByText('Sedes (Principal + Adicionales)').closest('div.space-y-4') as HTMLElement;
         expect(panelSedes.textContent).toContain(`de ${capacidadEsperada.sedes}`);
+    });
+
+    it('muestra el precio unitario de cada extra (COSTOS_ADICIONALES, D1: única fuente de precios)', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        expect(screen.getByText(new RegExp(`${COSTOS_ADICIONALES.sede.precio}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')))).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(`${COSTOS_ADICIONALES.equipoTecnico.precio}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')))).toBeInTheDocument();
     });
 
     it('el botón "+1 Sede Adicional" llama actualizarCapacidadClub con delta +1 sobre sedesExtraContratadas', async () => {

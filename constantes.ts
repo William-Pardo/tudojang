@@ -1,7 +1,7 @@
 
 // constantes.ts
 import { ConfiguracionClub } from './tipos';
-import planesConfig from './functions/planes-config.json';
+import facturacionConfig from './functions/facturacion-config.json';
 
 export const PLANTILLAS_NOTIFICACIONES = {
     BIENVENIDA: [
@@ -72,10 +72,16 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     emailClub: 'soporte@tudojang.com',
     estadoSuscripcion: 'demo' as const,
     fechaVencimiento: '2029-12-31',
+    // SDD pricing-cupo-real (Bloque 4b): estos 4 campos ya no son leídos por código nuevo
+    // (reemplazados por calcularCapacidad, utils/facturacion.ts) -- se mantienen acá SOLO
+    // hasta el corte final (tasks.md 4.13), que los borra de `ConfiguracionClub` en
+    // tipos.ts. Mientras ese campo siga siendo obligatorio en el tipo, este objeto debe
+    // seguir satisfaciéndolo para que `npm run typecheck` se mantenga verde en cada punto
+    // intermedio (design.md, Migration/Rollout: "no data migration" hasta el cutover).
     plan: 'starter',
     limiteEstudiantes: 50,
     limiteUsuarios: 2,
-    limiteSedes: 2, // 1 Principal + 1 Adicional por defecto
+    limiteSedes: 2,
     onboardingStep: 0
 };
 
@@ -92,40 +98,18 @@ export const BASE_CONOCIMIENTO_PQRS = [
     { id: "pagos-1", pregunta: "¿Cuáles son los medios de pago?", respuesta: "Aceptamos transferencias por Nequi, Daviplata o Bancolombia. Por favor, enviar siempre el comprobante para legalizar el pago." }
 ];
 
-// Los valores numéricos (precio, límites) viven en planes-config.json (raíz del repo),
-// única fuente de verdad compartida con functions/wompiCobroAutomatico.js,
-// functions/academico/sedes.js y functions/academico/estudiantes.js. Acá solo se agregan
-// los campos de presentación (id, nombre, características, popular) que son exclusivos
-// del frontend.
-export const PLANES_SAAS = {
-    starter: {
-        id: 'starter',
-        nombre: 'Plan Starter',
-        ...planesConfig.planes.starter, // 1 Principal + 1 Adicional
-        caracteristicas: ['Hasta 50 alumnos', '2 Instructores', '1 Sede Adicional', 'Gestión de Tienda', 'Eventos Básicos'],
-        popular: false
-    },
-    growth: {
-        id: 'growth',
-        nombre: 'Plan Growth',
-        ...planesConfig.planes.growth, // 1 Principal + 2 Adicionales
-        caracteristicas: ['Hasta 150 alumnos', '5 Instructores', '2 Sedes Adicionales', 'Firma Digital Ilimitada', 'Analíticas Avanzadas'],
-        popular: true
-    },
-    pro: {
-        id: 'pro',
-        nombre: 'Plan Pro',
-        ...planesConfig.planes.pro, // 1 Principal + 5 Adicionales
-        caracteristicas: ['Hasta 350 alumnos', '10 Instructores', '5 Sedes Adicionales', 'Soporte Sabonim AI', 'Exportación Pro'],
-        popular: false
-    }
-};
-
-
+// SDD pricing-cupo-real (Bloque 4b, D1 design.md): PLANES_SAAS (starter/growth/pro) se
+// elimina -- ya no hay planes fijos, se factura por cupo real (calcularFacturacionMensual,
+// utils/facturacion.ts). COSTOS_ADICIONALES queda SOLO como vitrina de precio unitario
+// (display-only, tarea 4.11) para mostrar "cuánto cuesta +1" en el panel de "Ampliar
+// Capacidad" (vistas/Configuracion.tsx) antes de confirmar -- el valor sale de
+// functions/facturacion-config.json (`extras`), la única fuente de precios (D1); este
+// objeto NO calcula ni persiste nada, solo formatea la misma cifra para mostrarla.
+// Estudiantes ya no tiene un costo "por addon" -- se factura por conteo real, sin comprar
+// cupos (ver PrecioCalculadora.tsx / la calculadora pública).
 export const COSTOS_ADICIONALES = {
-    estudiantes: { ...planesConfig.addons.estudiantes, label: '+10 Alumnos', key: 'estudiantes' },
-    instructor: { ...planesConfig.addons.instructor, label: '+1 Miembro Equipo', key: 'instructor' },
-    sede: { ...planesConfig.addons.sede, label: '+1 Sede Adicional', key: 'sede' }
+    sede: { precio: facturacionConfig.extras.sede, label: 'Sede Adicional' },
+    equipoTecnico: { precio: facturacionConfig.extras.equipoTecnico, label: 'Cupo de Equipo Técnico' },
 };
 
 export const CONFIGURACION_WOMPI = {

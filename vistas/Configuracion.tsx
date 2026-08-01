@@ -16,7 +16,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
 import { actualizarCapacidadClub } from '../servicios/configuracionApi';
-import { CONFIGURACION_WOMPI } from '../constantes';
+import { CONFIGURACION_WOMPI, COSTOS_ADICIONALES } from '../constantes';
 import { crearFuentePagoWompi } from '../servicios/wompiApi';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
@@ -1131,6 +1131,7 @@ const VistaConfiguracion: React.FC = () => {
                                     <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">
                                         {capacidad.sedes} sede(s) contratadas actualmente
                                     </p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.sede.precio)} / mes por sede extra</p>
                                     <button
                                         onClick={() => handleComprarExtra('sedesExtraContratadas')}
                                         disabled={comprandoExtra === 'sedesExtraContratadas'}
@@ -1147,6 +1148,7 @@ const VistaConfiguracion: React.FC = () => {
                                     <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">
                                         {capacidad.equipoTecnico} cupo(s) contratados actualmente
                                     </p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.equipoTecnico.precio)} / mes por cupo extra</p>
                                     <button
                                         onClick={() => handleComprarExtra('equipoTecnicoExtraContratado')}
                                         disabled={comprandoExtra === 'equipoTecnicoExtraContratado'}
