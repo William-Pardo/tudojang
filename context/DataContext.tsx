@@ -50,6 +50,11 @@ interface EstudiantesContextType {
     agregarEstudiante: (e: Omit<Estudiante, 'id' | 'historialPagos' | 'carnetGenerado'>) => Promise<Estudiante>;
     actualizarEstudiante: (e: Estudiante) => Promise<Estudiante>;
     eliminarEstudiante: (id: string) => Promise<void>;
+    // SDD pricing-cupo-real (Bloque 4): conecta la UI a los writers de estadoMatricula ya
+    // implementados y probados en el Bloque 1 (servicios/estudiantesApi.ts) -- retiro
+    // explícito, sin borrado físico (matricula-estado-estudiante).
+    retirarEstudiante: (id: string) => Promise<void>;
+    reactivarEstudiante: (id: string) => Promise<void>;
 }
 const EstudiantesContext = createContext<EstudiantesContextType | undefined>(undefined);
 
@@ -292,7 +297,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             return res;
                         },
                         actualizarEstudiante: async (e) => { const res = await api.actualizarEstudiante(e); setEstudiantes(prev => prev.map(item => item.id === e.id ? res : item)); return res; },
-                        eliminarEstudiante: async (id) => { await api.eliminarEstudiante(id); setEstudiantes(prev => prev.filter(e => e.id !== id)); }
+                        eliminarEstudiante: async (id) => { await api.eliminarEstudiante(id); setEstudiantes(prev => prev.filter(e => e.id !== id)); },
+                        retirarEstudiante: async (id) => {
+                            await api.retirarEstudiante(id);
+                            setEstudiantes(prev => prev.map(e => e.id === id ? { ...e, estadoMatricula: 'retirado', fechaRetiro: new Date().toISOString() } : e));
+                        },
+                        reactivarEstudiante: async (id) => {
+                            await api.reactivarEstudiante(id);
+                            setEstudiantes(prev => prev.map(e => e.id === id ? { ...e, estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() } : e));
+                        }
                     }}>
                         <EventosContext.Provider value={{
                             eventos, cargando, error, cargarEventos: cargarTodo,

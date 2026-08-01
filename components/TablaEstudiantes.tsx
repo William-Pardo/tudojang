@@ -10,6 +10,8 @@ interface Props {
   onEliminar: (estudiante: Estudiante) => void;
   onVerFirma: (firma: string, tutor: Estudiante['tutor']) => void;
   onCompartirLink: (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => void;
+  onRetirar: (estudiante: Estudiante) => void;
+  onReactivar: (estudiante: Estudiante) => void;
 }
 
 const TablaEstudiantes: React.FC<Props> = ({
@@ -18,6 +20,8 @@ const TablaEstudiantes: React.FC<Props> = ({
   onEliminar,
   onVerFirma,
   onCompartirLink,
+  onRetirar,
+  onReactivar,
 }) => {
   return (
     <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg">
@@ -43,6 +47,8 @@ const TablaEstudiantes: React.FC<Props> = ({
                     onEliminar={onEliminar}
                     onVerFirma={onVerFirma}
                     onCompartirLink={onCompartirLink}
+                    onRetirar={onRetirar}
+                    onReactivar={onReactivar}
                     isCard={false}
                   />
                 ))}
@@ -62,6 +68,8 @@ const TablaEstudiantes: React.FC<Props> = ({
                 onEliminar={onEliminar}
                 onVerFirma={onVerFirma}
                 onCompartirLink={onCompartirLink}
+                onRetirar={onRetirar}
+                onReactivar={onReactivar}
                 isCard={true}
               />
             ))}

@@ -20,7 +20,11 @@ type DatosEstudianteFormulario = Estudiante & {
 };
 
 export const useGestionEstudiantes = () => {
-    const { estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante, cargarEstudiantes } = useEstudiantes();
+    const {
+        estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante,
+        retirarEstudiante: retirarEstudianteApi, reactivarEstudiante: reactivarEstudianteApi,
+        cargarEstudiantes,
+    } = useEstudiantes();
     const { configClub } = useConfiguracion();
     const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
@@ -82,11 +86,11 @@ export const useGestionEstudiantes = () => {
         setCurrentPage(prev => Math.max(prev - 1, 1));
     };
 
+    // SDD pricing-cupo-real (Bloque 4, capacidad-tenant: "Alta nunca se bloquea por
+    // capacidad"): el aviso de límite de plan del lado del cliente se elimina -- ya no
+    // existe un tope duro (el backend, functions/academico/estudiantes.js, tampoco lo
+    // aplica desde el Bloque 3). Facturación es por conteo real, no por cupos comprados.
     const abrirFormulario = (estudiante: Estudiante | null = null) => {
-        if (!estudiante && estudiantes.length >= configClub.limiteEstudiantes) {
-            mostrarNotificacion(`Límite del Plan superado (${configClub.limiteEstudiantes} alumnos). Por favor, suba de plan para agregar más estudiantes.`, "warning");
-            return;
-        }
         setEstudianteEnEdicion(estudiante);
         setModalFormularioAbierto(true);
     };
@@ -212,6 +216,34 @@ export const useGestionEstudiantes = () => {
         } catch (error) {
             mostrarNotificacion("No se pudo guardar el estudiante.", "error");
             throw error;
+        } finally {
+            setCargandoAccion(false);
+        }
+    };
+
+    // SDD pricing-cupo-real (Bloque 4, matricula-estado-estudiante: "Retiro explícito, sin
+    // borrado físico"): retirarEstudiante/reactivarEstudiante (Bloque 1,
+    // servicios/estudiantesApi.ts) ya son los únicos writers de estadoMatricula -- este hook
+    // solo conecta la UI, no reabre esa lógica.
+    const retirarEstudiante = async (estudiante: Estudiante) => {
+        setCargandoAccion(true);
+        try {
+            await retirarEstudianteApi(estudiante.id);
+            mostrarNotificacion(`${estudiante.nombres} fue retirado. Su historial se conserva.`, "success");
+        } catch (error) {
+            mostrarNotificacion("No se pudo retirar el estudiante.", "error");
+        } finally {
+            setCargandoAccion(false);
+        }
+    };
+
+    const reactivarEstudiante = async (estudiante: Estudiante) => {
+        setCargandoAccion(true);
+        try {
+            await reactivarEstudianteApi(estudiante.id);
+            mostrarNotificacion(`${estudiante.nombres} fue reactivado.`, "success");
+        } catch (error) {
+            mostrarNotificacion("No se pudo reactivar el estudiante.", "error");
         } finally {
             setCargandoAccion(false);
         }
@@ -411,6 +443,8 @@ export const useGestionEstudiantes = () => {
         abrirConfirmacionEliminar,
         cerrarConfirmacion,
         confirmarEliminacion,
+        retirarEstudiante,
+        reactivarEstudiante,
         modalFirmaAbierto,
         firmaParaVer,
         abrirModalFirma,

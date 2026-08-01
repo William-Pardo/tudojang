@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import type { Estudiante } from '../tipos';
 import { RolUsuario } from '../tipos';
 import { useAuth } from '../context/AuthContext';
+import { normalizarEstadoMatricula } from '../utils/facturacion';
 import EstadoPagoBadge from './EstadoPagoBadge';
 import ModalRegistrarPago from './ModalRegistrarPago';
 import {
@@ -15,6 +16,8 @@ import {
     IconoFirma,
     IconoLogoOficial,
     IconoBillete,
+    IconoLogout,
+    IconoAprobar,
 } from './Iconos';
 import GeneradorQR from './GeneradorQR';
 
@@ -24,6 +27,12 @@ interface Props {
     onEliminar: (estudiante: Estudiante) => void;
     onVerFirma: (firma: string, tutor: Estudiante['tutor']) => void;
     onCompartirLink: (tipo: 'firma' | 'contrato' | 'imagen', idEstudiante: string) => void;
+    // SDD pricing-cupo-real (Bloque 4, matricula-estado-estudiante): retiro/reactivación de
+    // matrícula -- conecta la UI a servicios/estudiantesApi.ts::retirarEstudiante/
+    // reactivarEstudiante (ya implementadas y probadas en el Bloque 1, no se reabre esa
+    // lógica acá).
+    onRetirar: (estudiante: Estudiante) => void;
+    onReactivar: (estudiante: Estudiante) => void;
     isCard: boolean;
 }
 
@@ -33,12 +42,19 @@ export const FilaEstudiante: React.FC<Props> = ({
     onEliminar,
     onVerFirma,
     onCompartirLink,
+    onRetirar,
+    onReactivar,
     isCard,
 }) => {
     const { usuario } = useAuth();
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
     const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
     const esAdmin = usuario?.rol === RolUsuario.Admin;
+    // normalizarEstadoMatricula (utils/facturacion.ts, Bloque 2/D3): ausencia total ⇒
+    // 'activo' -- único lugar del repo donde vive esa regla de default, reusada acá para no
+    // reintroducir un chequeo disperso (`!== 'retirado'`) del mismo tipo que D8/task 1.7 ya
+    // marcaron como el patrón a evitar.
+    const estaRetirado = normalizarEstadoMatricula(estudiante) === 'retirado';
 
     // Helper para renderizar el estado de cada documento
     const renderEstadoDoc = (
@@ -127,6 +143,13 @@ export const FilaEstudiante: React.FC<Props> = ({
             </button>
             <button onClick={() => onEditar(estudiante)} className="p-2 text-tkd-blue hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors" title="Editar"><IconoEditar className="w-5 h-5" /></button>
             {esAdmin && (
+                estaRetirado ? (
+                    <button onClick={() => onReactivar(estudiante)} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors" title="Reactivar matrícula"><IconoAprobar className="w-5 h-5" /></button>
+                ) : (
+                    <button onClick={() => onRetirar(estudiante)} className="p-2 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg transition-colors" title="Retirar (conserva historial)"><IconoLogout className="w-5 h-5" /></button>
+                )
+            )}
+            {esAdmin && (
                 <button onClick={() => onEliminar(estudiante)} className="p-2 text-tkd-red hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors" title="Eliminar"><IconoEliminar className="w-5 h-5" /></button>
             )}
         </div>
@@ -153,7 +176,10 @@ export const FilaEstudiante: React.FC<Props> = ({
                 >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-lg font-black text-tkd-dark dark:text-white uppercase leading-tight">{estudiante.nombres} {estudiante.apellidos}</p>
+                            <p className="text-lg font-black text-tkd-dark dark:text-white uppercase leading-tight">
+                                {estudiante.nombres} {estudiante.apellidos}
+                                {estaRetirado && <span className="ml-2 align-middle px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">Retirado</span>}
+                            </p>
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">{estudiante.numeroIdentificacion}</p>
                         </div>
                         {contenidoAcciones}
@@ -190,7 +216,10 @@ export const FilaEstudiante: React.FC<Props> = ({
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                 >
                     <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-black text-tkd-dark dark:text-white uppercase">{estudiante.nombres} {estudiante.apellidos}</div>
+                        <div className="text-sm font-black text-tkd-dark dark:text-white uppercase">
+                            {estudiante.nombres} {estudiante.apellidos}
+                            {estaRetirado && <span className="ml-2 align-middle px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">Retirado</span>}
+                        </div>
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-bold uppercase">{estudiante.numeroIdentificacion}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

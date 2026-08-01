@@ -11,6 +11,8 @@ const mockMostrarNotificacion = jest.fn();
 const mockCargarEstudiantes = jest.fn();
 const mockExportarCSV = jest.fn();
 const mockGenerar = jest.fn();
+const mockRetirarEstudiante = jest.fn();
+const mockReactivarEstudiante = jest.fn();
 
 jest.mock('../context/AuthContext', () => ({ useAuth: () => ({ usuario: mockUsuario }) }));
 jest.mock('../context/NotificacionContext', () => ({ useNotificacion: () => ({ mostrarNotificacion: mockMostrarNotificacion }) }));
@@ -83,7 +85,9 @@ jest.mock('../hooks/useGestionEstudiantes', () => ({
       currentPage: mockEscenario.currentPage ?? 1, totalPages: mockEscenario.totalPages ?? 1,
       startIndex: mockEscenario.startIndex ?? 0, endIndex: mockEscenario.endIndex ?? estudiantesFiltrados.length,
       goToNextPage: jest.fn(), goToPreviousPage: jest.fn(), exportarCSV: mockExportarCSV,
-      configClub: mockEscenario.configClub ?? { plan: 'basico', limiteEstudiantes: 50 },
+      configClub: mockEscenario.configClub ?? { tenantId: 'tenant-1' },
+      retirarEstudiante: mockRetirarEstudiante,
+      reactivarEstudiante: mockReactivarEstudiante,
     };
   },
 }));
@@ -108,7 +112,16 @@ jest.mock('../components/FiltrosEstudiantes', () => (props: any) => (
 
 jest.mock('../components/TablaEstudiantes', () => (props: any) => (
   <div data-testid="tabla">
-    {props.estudiantes.map((e: Estudiante) => <div key={e.id} data-testid={`est-${e.id}`}>{e.nombres}</div>)}
+    {props.estudiantes.map((e: Estudiante) => (
+      <div key={e.id} data-testid={`est-${e.id}`}>
+        {e.nombres} ({e.estadoMatricula})
+        {e.estadoMatricula === 'retirado' ? (
+          <button onClick={() => props.onReactivar(e)}>Reactivar {e.nombres}</button>
+        ) : (
+          <button onClick={() => props.onRetirar(e)}>Retirar {e.nombres}</button>
+        )}
+      </div>
+    ))}
     {props.estudiantes[0] && <>
       <button onClick={() => props.onEditar(props.estudiantes[0])}>Editar fila</button>
       <button onClick={() => props.onEliminar(props.estudiantes[0])}>Eliminar fila</button>
@@ -293,29 +306,47 @@ describe('VistaEstudiantes', () => {
     await waitFor(() => expect(mockMostrarNotificacion).toHaveBeenCalledWith('Sin cupo', 'error'));
   });
 
-  it('cubre capacidad excedida y fallbacks de generación', async () => {
+  it('cubre el fallo de generación de data ficticia (ya no hay tope de capacidad que validar)', async () => {
     const user = userEvent.setup();
     mockUsuario = { tenantId: 'tenant-1', rol: 'SuperAdmin' };
-    mockEscenario = { configClub: { plan: 'inexistente', limiteEstudiantes: 2 } };
     jest.spyOn(window, 'confirm').mockReturnValue(true);
     mockGenerar.mockRejectedValueOnce('fallo');
     render(<VistaEstudiantes />);
 
-    expect(screen.getByText('5 / 2')).toBeInTheDocument();
     await user.click(screen.getByText('Generar Data Test'));
     await waitFor(() => expect(mockMostrarNotificacion).toHaveBeenCalledWith('Error al generar data de prueba', 'error'));
     expect(mockGenerar).toHaveBeenCalledWith(10, '1', 'tenant-1');
   });
 
-  it('usa el límite por defecto y cancela la generación', async () => {
+  it('cancela la generación de data ficticia si el operador no confirma', async () => {
     const user = userEvent.setup();
     mockUsuario = { tenantId: 'tenant-1', rol: 'SuperAdmin' };
-    mockEscenario = { configClub: { plan: 'inexistente' } };
     jest.spyOn(window, 'confirm').mockReturnValue(false);
     render(<VistaEstudiantes />);
 
-    expect(screen.getByText('5 / 50')).toBeInTheDocument();
     await user.click(screen.getByText('Generar Data Test'));
     expect(mockGenerar).not.toHaveBeenCalled();
+  });
+
+  it('Scenario "matricula-estado-estudiante": retira un estudiante activo sin eliminar la fila (conserva historial)', async () => {
+    const user = userEvent.setup();
+    render(<VistaEstudiantes />);
+
+    await user.click(screen.getByText('Retirar Ana'));
+
+    expect(mockRetirarEstudiante).toHaveBeenCalledWith(estudiantesBase[0]);
+    // La fila sigue en pantalla -- retirar NO borra el registro.
+    expect(screen.getByTestId('est-1')).toBeInTheDocument();
+  });
+
+  it('reactiva un estudiante retirado', async () => {
+    const user = userEvent.setup();
+    const retirado = { ...estudiantesBase[1], estadoMatricula: 'retirado' as const };
+    mockEscenario = { estudiantes: [retirado] };
+    render(<VistaEstudiantes />);
+
+    await user.click(screen.getByText(`Reactivar ${retirado.nombres}`));
+
+    expect(mockReactivarEstudiante).toHaveBeenCalledWith(retirado);
   });
 });
