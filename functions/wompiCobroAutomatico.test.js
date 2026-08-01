@@ -8,61 +8,83 @@ const {
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
   crearLectorWompiPaymentSourceIdFirestore,
+  crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
-  calcularMontoMensualPesos,
-  calcularMontoMensualCentavos,
+  calcularMontoFacturableCentavos,
   construirReferenciaCobroAutomatico,
   normalizarFecha,
 } = require('./wompiCobroAutomatico');
 
 // ---------------------------------------------------------------------------
-// calcularMontoMensualPesos / calcularMontoMensualCentavos
+// calcularMontoFacturableCentavos
+//
+// SDD pricing-cupo-real (Bloque 3b, facturacion-metered): el monto YA NO se infiere de
+// tenant.limite*/plan (calcularMontoMensualPesos, eliminada) -- se MIDE via
+// calcularFacturacionMensual (functions/facturacion.js, Bloque 2, no reabierto aca). Esta
+// funcion es el unico paso que falta: convertir `totalPesos` (el output de esa funcion pura)
+// a centavos para Wompi, misma conversion que construirUrlCheckoutWompi (*100).
 // ---------------------------------------------------------------------------
 
-test('calcularMontoMensualPesos: plan starter sin addons cobra solo el precio base', () => {
-  const monto = calcularMontoMensualPesos({
-    plan: 'starter',
-    limiteEstudiantes: 50,
-    limiteUsuarios: 2,
-    limiteSedes: 2,
-  });
-  assert.equal(monto, 200000);
-});
-
-test('calcularMontoMensualPesos: suma addons de estudiantes, usuarios y sedes inferidos por diferencia de límites', () => {
-  const monto = calcularMontoMensualPesos({
-    plan: 'growth',
-    limiteEstudiantes: 160, // 150 base + 1 bloque de 10
-    limiteUsuarios: 6, // 5 base + 1
-    limiteSedes: 4, // 3 base + 1
-  });
-  // 540000 (growth) + 36000 (addon estudiantes) + 36000 (addon usuario) + 89900 (addon sede)
-  assert.equal(monto, 540000 + 36000 + 36000 + 89900);
-});
-
-test('calcularMontoMensualPesos: plan desconocido cae a starter', () => {
-  const monto = calcularMontoMensualPesos({ plan: 'inexistente', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2 });
-  assert.equal(monto, 200000);
-});
-
-test('calcularMontoMensualPesos: límites por debajo del plan base no generan addon negativo', () => {
-  const monto = calcularMontoMensualPesos({
-    plan: 'pro',
-    limiteEstudiantes: 100, // menos que el base (350) -- no debe restar
-    limiteUsuarios: 1,
-    limiteSedes: 1,
-  });
-  assert.equal(monto, 1200000);
-});
-
-test('calcularMontoMensualCentavos: convierte pesos a centavos igual que construirUrlCheckoutWompi (*100)', () => {
-  const centavos = calcularMontoMensualCentavos({
-    plan: 'starter',
-    limiteEstudiantes: 50,
-    limiteUsuarios: 2,
-    limiteSedes: 2,
-  });
+test('calcularMontoFacturableCentavos: convierte totalPesos (ResultadoFacturacion de calcularFacturacionMensual) a centavos (*100)', () => {
+  const centavos = calcularMontoFacturableCentavos({ totalPesos: 200000 });
   assert.equal(centavos, 20000000);
+});
+
+test('calcularMontoFacturableCentavos: redondea igual que construirUrlCheckoutWompi (Math.round)', () => {
+  const centavos = calcularMontoFacturableCentavos({ totalPesos: 1999.5 });
+  assert.equal(centavos, 199950);
+});
+
+// ---------------------------------------------------------------------------
+// crearContadorEstudiantesFacturablesFirestore
+//
+// Cuenta estudiantes facturables (estadoMatricula=='activo') de un tenant via una agregacion
+// .count() de Firestore -- NO un .get() completo (design.md: este cron corre a diario por
+// cada tenant vencido, un .get() completo seria N lecturas de documento innecesarias solo
+// para saber CUANTOS hay). El predicado estadoMatricula=='activo' es tambien el mecanismo por
+// el que un estudiante retirado deja de contar (Scenario "Estudiante retirado antes del corte
+// no se factura", spec facturacion-metered) -- Firestore filtra server-side, no hay logica JS
+// de exclusion que probar aca aparte de la forma exacta de la query.
+// ---------------------------------------------------------------------------
+
+test('crearContadorEstudiantesFacturablesFirestore: usa una agregacion .count() filtrando tenantId + estadoMatricula=="activo" (Scenario: Estudiante retirado antes del corte no se factura)', async () => {
+  const wheresLlamados = [];
+  let countLlamado = false;
+
+  const firestoreFake = {
+    collection: (nombre) => {
+      assert.equal(nombre, 'estudiantes');
+      return {
+        where: (campo1, op1, valor1) => {
+          wheresLlamados.push([campo1, op1, valor1]);
+          return {
+            where: (campo2, op2, valor2) => {
+              wheresLlamados.push([campo2, op2, valor2]);
+              return {
+                count: () => {
+                  countLlamado = true;
+                  return { get: async () => ({ data: () => ({ count: 3 }) }) };
+                },
+                // Si el codigo real llamara .get() en vez de .count().get(), este fake debe
+                // delatarlo -- es exactamente lo que design.md pide evitar.
+                get: async () => { throw new Error('No debe usarse un .get() completo -- usar .count()'); },
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  const resultado = await contar('tnt-1');
+
+  assert.equal(resultado, 3);
+  assert.ok(countLlamado);
+  assert.deepEqual(wheresLlamados, [
+    ['tenantId', '==', 'tnt-1'],
+    ['estadoMatricula', '==', 'activo'],
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -392,11 +414,23 @@ function crearDepsScheduler({ tenants, resultadoCobro, wompiPaymentSourceIds }) 
     wompiPaymentSourceIds ||
     Object.fromEntries(tenants.map((t) => [t.id, t.wompiPaymentSourceId ?? null]));
 
+  // SDD pricing-cupo-real (Bloque 3b): el monto ya no depende de tenant.limite*/plan -- se
+  // cuenta cuantos estudiantes facturables tiene HOY el tenant (contarEstudiantesFacturables,
+  // inyectada, produccion real = .count() aggregation). Estos tests de reintento/suspension
+  // no ejercitan el monto en si (solo inspeccionan actualizaciones/correos), asi que el
+  // default (0, sin extras) es suficiente salvo que el test lo pase explicito via
+  // `tenant.estudiantesFacturables`.
+  const llamadasContarEstudiantesFacturables = [];
+
   const deps = {
     listarTenantsPendientesDeCobro: async () => docs,
     obtenerWompiPaymentSourceId: async (tenantId) => {
       llamadasObtenerPaymentSourceId.push(tenantId);
       return mapaPaymentSourceIds[tenantId] ?? null;
+    },
+    contarEstudiantesFacturables: async (tenantId) => {
+      llamadasContarEstudiantesFacturables.push(tenantId);
+      return tenants.find((t) => t.id === tenantId)?.estudiantesFacturables ?? 0;
     },
     crearTransaccionWompi:
       typeof resultadoCobro === 'function' ? resultadoCobro : async () => resultadoCobro,
@@ -405,12 +439,18 @@ function crearDepsScheduler({ tenants, resultadoCobro, wompiPaymentSourceIds }) 
     enviarCorreoFalloPago: async (tenant) => correosEnviados.push(tenant.id),
   };
 
-  return { deps, actualizaciones, correosEnviados, llamadasObtenerPaymentSourceId };
+  return {
+    deps,
+    actualizaciones,
+    correosEnviados,
+    llamadasObtenerPaymentSourceId,
+    llamadasContarEstudiantesFacturables,
+  };
 }
 
 test('cobroAutomaticoMensual: un cobro APPROVED no toca Firestore (lo reconcilia el webhook)', async () => {
   const { deps, actualizaciones } = crearDepsScheduler({
-    tenants: [{ id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com' }],
+    tenants: [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com' }],
     resultadoCobro: { estado: 'APPROVED', transactionId: 'txn-1' },
   });
 
@@ -423,7 +463,7 @@ test('cobroAutomaticoMensual: un cobro APPROVED no toca Firestore (lo reconcilia
 
 test('cobroAutomaticoMensual: DECLINED en el primer intento solo incrementa el contador (no suspende)', async () => {
   const { deps, actualizaciones, correosEnviados } = crearDepsScheduler({
-    tenants: [{ id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 }],
+    tenants: [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 }],
     resultadoCobro: { estado: 'DECLINED', mensaje: 'fondos insuficientes' },
   });
 
@@ -439,7 +479,7 @@ test('cobroAutomaticoMensual: DECLINED en el primer intento solo incrementa el c
 
 test('cobroAutomaticoMensual: al tercer fallo consecutivo suspende la suscripción y envía el email', async () => {
   const { deps, actualizaciones, correosEnviados } = crearDepsScheduler({
-    tenants: [{ id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 2 }],
+    tenants: [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 2 }],
     resultadoCobro: { estado: 'DECLINED', mensaje: 'fondos insuficientes' },
   });
 
@@ -466,7 +506,7 @@ test('cobroAutomaticoMensual: al tercer fallo consecutivo suspende la suscripci�
 
 test('cobroAutomaticoMensual: un error de red se trata igual que un DECLINED', async () => {
   const { deps, actualizaciones } = crearDepsScheduler({
-    tenants: [{ id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 }],
+    tenants: [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 }],
     resultadoCobro: { estado: 'ERROR', mensaje: 'timeout' },
   });
 
@@ -480,7 +520,7 @@ test('cobroAutomaticoMensual: un error de red se trata igual que un DECLINED', a
 test('cobroAutomaticoMensual: omite tenants sin wompiPaymentSourceId sin llamar a Wompi', async () => {
   let llamadas = 0;
   const { deps, actualizaciones } = crearDepsScheduler({
-    tenants: [{ id: 'tnt-1', plan: 'starter', emailClub: 'a@a.com' }], // sin wompiPaymentSourceId
+    tenants: [{ id: 'tnt-1', emailClub: 'a@a.com' }], // sin wompiPaymentSourceId
     resultadoCobro: async () => { llamadas += 1; return { estado: 'APPROVED' }; },
   });
 
@@ -494,8 +534,8 @@ test('cobroAutomaticoMensual: omite tenants sin wompiPaymentSourceId sin llamar 
 
 test('cobroAutomaticoMensual: si crearTransaccionWompi lanza en vez de resolver, se trata como ERROR y no aborta el batch', async () => {
   const tenants = [
-    { id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
-    { id: 'tnt-2', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 2, emailClub: 'b@b.com', cobroAutomaticoIntentosFallidos: 0 },
+    { id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
+    { id: 'tnt-2', wompiPaymentSourceId: 2, emailClub: 'b@b.com', cobroAutomaticoIntentosFallidos: 0 },
   ];
   const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
   const actualizaciones = [];
@@ -504,6 +544,7 @@ test('cobroAutomaticoMensual: si crearTransaccionWompi lanza en vez de resolver,
     listarTenantsPendientesDeCobro: async () => docs,
     obtenerWompiPaymentSourceId: async (tenantId) =>
       tenants.find((t) => t.id === tenantId)?.wompiPaymentSourceId ?? null,
+    contarEstudiantesFacturables: async () => 10,
     crearTransaccionWompi: async ({ paymentSourceId }) => {
       if (paymentSourceId === 1) throw new Error('fallo inesperado de red');
       return { estado: 'DECLINED', mensaje: 'fondos insuficientes' };
@@ -524,8 +565,8 @@ test('cobroAutomaticoMensual: si crearTransaccionWompi lanza en vez de resolver,
 
 test('cobroAutomaticoMensual: si actualizarTenant rechaza inesperadamente para un tenant, el resto del batch se sigue procesando', async () => {
   const tenants = [
-    { id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
-    { id: 'tnt-2', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, wompiPaymentSourceId: 2, emailClub: 'b@b.com', cobroAutomaticoIntentosFallidos: 0 },
+    { id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
+    { id: 'tnt-2', wompiPaymentSourceId: 2, emailClub: 'b@b.com', cobroAutomaticoIntentosFallidos: 0 },
   ];
   const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
   const actualizaciones = [];
@@ -534,6 +575,7 @@ test('cobroAutomaticoMensual: si actualizarTenant rechaza inesperadamente para u
     listarTenantsPendientesDeCobro: async () => docs,
     obtenerWompiPaymentSourceId: async (tenantId) =>
       tenants.find((t) => t.id === tenantId)?.wompiPaymentSourceId ?? null,
+    contarEstudiantesFacturables: async () => 10,
     crearTransaccionWompi: async () => ({ estado: 'DECLINED', mensaje: 'fondos insuficientes' }),
     actualizarTenant: async (tenantId, datos) => {
       if (tenantId === 'tnt-1') throw new Error('Firestore no disponible');
@@ -558,7 +600,7 @@ test('cobroAutomaticoMensual: lee wompiPaymentSourceId del subdocumento privado 
   // fix de seguridad 2026-07-18), fallaría con undefined y el tenant se omitiría. Este test
   // prueba que en cambio se usa exclusivamente `obtenerWompiPaymentSourceId`.
   const tenants = [
-    { id: 'tnt-1', plan: 'starter', limiteEstudiantes: 50, limiteUsuarios: 2, limiteSedes: 2, emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
+    { id: 'tnt-1', emailClub: 'a@a.com', cobroAutomaticoIntentosFallidos: 0 },
   ];
   const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
   const llamadasPaymentSourceId = [];
@@ -570,6 +612,7 @@ test('cobroAutomaticoMensual: lee wompiPaymentSourceId del subdocumento privado 
       llamadasPaymentSourceId.push(tenantId);
       return 42; // simula tenants/{tenantId}/privado/facturacion.wompiPaymentSourceId
     },
+    contarEstudiantesFacturables: async () => 10,
     crearTransaccionWompi: async ({ paymentSourceId }) => {
       paymentSourceIdUsado = paymentSourceId;
       return { estado: 'APPROVED', transactionId: 'txn-1' };
@@ -588,7 +631,7 @@ test('cobroAutomaticoMensual: lee wompiPaymentSourceId del subdocumento privado 
 
 test('cobroAutomaticoMensual: si el subdocumento privado no existe o no tiene wompiPaymentSourceId, se omite igual que un tenant sin fuente de pago', async () => {
   let llamadas = 0;
-  const tenants = [{ id: 'tnt-1', plan: 'starter', emailClub: 'a@a.com' }];
+  const tenants = [{ id: 'tnt-1', emailClub: 'a@a.com' }];
   const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
 
   const servicio = crearServicioCobroAutomaticoMensual({
@@ -604,6 +647,132 @@ test('cobroAutomaticoMensual: si el subdocumento privado no existe o no tiene wo
 
   assert.equal(llamadas, 0);
   assert.deepEqual(resultado, { procesados: 1, exitosos: 0, fallidos: 0, suspendidos: 0 });
+});
+
+// ---------------------------------------------------------------------------
+// SDD pricing-cupo-real (Bloque 3b, facturacion-metered): el monto ya NO se infiere de
+// tenant.limite*/plan (calcularMontoMensualPesos, eliminada) -- se MIDE con
+// calcularFacturacionMensual (functions/facturacion.js, Bloque 2, pura, no reabierta aca),
+// alimentada por el conteo facturable inyectado (contarEstudiantesFacturables) + los extras
+// ya persistidos en el propio doc del tenant (sedesExtraContratadas/
+// equipoTecnicoExtraContratado, D7/D8 -- Bloque 3a).
+// ---------------------------------------------------------------------------
+
+test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable inyectado + extras del tenant (ya no infiere addons por diferencia de limites)', async () => {
+  const tenants = [
+    {
+      id: 'tnt-1',
+      wompiPaymentSourceId: 1,
+      emailClub: 'a@a.com',
+      sedesExtraContratadas: 1,
+      equipoTecnicoExtraContratado: 0,
+    },
+  ];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+  let amountRecibido = null;
+  let tenantIdContado = null;
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async () => 1,
+    contarEstudiantesFacturables: async (tenantId) => {
+      tenantIdContado = tenantId;
+      return 60; // cruza el primer tramo: 50@3800 + 10@3400
+    },
+    crearTransaccionWompi: async ({ amountInCents }) => {
+      amountRecibido = amountInCents;
+      return { estado: 'APPROVED', transactionId: 'txn-1' };
+    },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  await servicio(new Date());
+
+  // 60 facturables: (50*3800) + (10*3400) = 190000 + 34000 = 224000; + 1 sede extra
+  // ($89.900) = 313900 pesos = 31390000 centavos (calcularFacturacionMensual, facturacion.js).
+  assert.equal(tenantIdContado, 'tnt-1');
+  assert.equal(amountRecibido, 31390000);
+});
+
+test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra solo el tramo de estudiantes', async () => {
+  const tenants = [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com' }];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+  let amountRecibido = null;
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async () => 1,
+    contarEstudiantesFacturables: async () => 30,
+    crearTransaccionWompi: async ({ amountInCents }) => {
+      amountRecibido = amountInCents;
+      return { estado: 'APPROVED', transactionId: 'txn-1' };
+    },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  await servicio(new Date());
+
+  // 30 facturables, todos en el primer tramo: 30*3800 = 114000 pesos = 11400000 centavos.
+  assert.equal(amountRecibido, 11400000);
+});
+
+test('cobroAutomaticoMensual: 0 estudiantes facturables cobra $0 (Scenario facturacion-metered: fin de la prueba sin estudiantes matriculados)', async () => {
+  const tenants = [{ id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com' }];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+  let amountRecibido = null;
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async () => 1,
+    contarEstudiantesFacturables: async () => 0,
+    crearTransaccionWompi: async ({ amountInCents }) => {
+      amountRecibido = amountInCents;
+      return { estado: 'APPROVED', transactionId: 'txn-1' };
+    },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  await servicio(new Date());
+
+  assert.equal(amountRecibido, 0);
+});
+
+test('cobroAutomaticoMensual: si contarEstudiantesFacturables lanza (ej. .count() no disponible), el tenant se omite sin cobrar un monto adivinado y el resto del batch se sigue procesando', async () => {
+  const tenants = [
+    { id: 'tnt-1', wompiPaymentSourceId: 1, emailClub: 'a@a.com' },
+    { id: 'tnt-2', wompiPaymentSourceId: 2, emailClub: 'b@b.com' },
+  ];
+  const docs = tenants.map((tenant) => ({ id: tenant.id, data: () => tenant }));
+  let llamadasCobro = 0;
+
+  const servicio = crearServicioCobroAutomaticoMensual({
+    listarTenantsPendientesDeCobro: async () => docs,
+    obtenerWompiPaymentSourceId: async (tenantId) =>
+      tenants.find((t) => t.id === tenantId)?.wompiPaymentSourceId ?? null,
+    contarEstudiantesFacturables: async (tenantId) => {
+      if (tenantId === 'tnt-1') throw new Error('Firestore no disponible');
+      return 10;
+    },
+    crearTransaccionWompi: async () => { llamadasCobro += 1; return { estado: 'APPROVED', transactionId: 'txn-1' }; },
+    actualizarTenant: async () => {},
+    incrementarUno: () => '__INCREMENT__',
+    enviarCorreoFalloPago: async () => {},
+  });
+
+  const resultado = await servicio(new Date());
+
+  // tnt-1 nunca llega a cobrar -- ningun monto se adivina cuando no se puede saber cuantos
+  // estudiantes hay. El error cae en el mismo catch por-tenant que ya usa este archivo para
+  // "actualizarTenant rechaza inesperadamente" (ver test arriba): se loguea, se reintenta
+  // mañana, y tnt-2 se procesa con total normalidad en la MISMA corrida.
+  assert.equal(llamadasCobro, 1);
+  assert.equal(resultado.procesados, 2);
 });
 
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ const {
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
   crearLectorWompiPaymentSourceIdFirestore,
+  crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
 } = require("./wompiCobroAutomatico");
 const {
@@ -1101,6 +1102,11 @@ const listarTenantsPendientesDeCobroFirestore = crearListadoTenantsPendientesDeC
 const obtenerWompiPaymentSourceIdFirestore = crearLectorWompiPaymentSourceIdFirestore(
   admin.firestore()
 );
+// SDD pricing-cupo-real (Bloque 3b, facturacion-metered): agregación .count() (no un .get()
+// completo -- ver functions/wompiCobroAutomatico.js) sobre estudiantes activos del tenant.
+const contarEstudiantesFacturablesFirestore = crearContadorEstudiantesFacturablesFirestore(
+  admin.firestore()
+);
 const servicioCobroAutomaticoMensual = crearServicioCobroAutomaticoMensual({
   // listarTenantsPendientesDeCobroFirestore ya filtra en memoria por fechaVencimiento
   // (normalizarFecha soporta tanto Timestamp -- como la escribe webhookWompi -- como
@@ -1110,6 +1116,7 @@ const servicioCobroAutomaticoMensual = crearServicioCobroAutomaticoMensual({
   // wompiPaymentSourceId ya no vive en tenants/{tenantId} raíz (fix seguridad 2026-07-18) --
   // se lee del subdocumento privado tenants/{tenantId}/privado/facturacion.
   obtenerWompiPaymentSourceId: (tenantId) => obtenerWompiPaymentSourceIdFirestore(tenantId),
+  contarEstudiantesFacturables: (tenantId) => contarEstudiantesFacturablesFirestore(tenantId),
   crearTransaccionWompi: (args) =>
     crearTransaccionRecurrenteWompi({ ...args, wompiPrivateKey: process.env.WOMPI_PRIVATE_KEY }),
   actualizarTenant: (tenantId, datos) =>
