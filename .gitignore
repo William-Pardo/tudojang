@@ -39,6 +39,13 @@ coverage/
 # se caian con MODULE_NOT_FOUND en cold start. El frontend lo importa hacia adentro
 # (`./functions/planes-config.json`), que si funciona porque Vite construye desde la raiz.
 !functions/planes-config.json
+# Contrato de calculo de facturacion medida (SDD pricing-cupo-real, Bloque 2 -- D1,
+# design.md). Reemplaza planes-config.json (se borra en el Bloque 4, tasks.md 4.13); NO son
+# reportes generados, son la fuente unica de precios/tramos y los vectores dorados que
+# iteran functions/facturacion.test.js Y utils/facturacion.test.ts. Mismo motivo que la
+# excepcion de arriba: sin esto la regla `*.json` los deja fuera de git en silencio.
+!functions/facturacion-config.json
+!functions/facturacion-vectores.json
 # Linea base congelada de deuda del catalogo de soporte (openspec/changes/
 # catalogo-soporte-marcadores-vivos, Fase 6, D4). Fuente hand-curated que consume
 # scripts/verificar-rutas-soporte.mjs -- NO es un reporte generado, la regla `*.json` de
