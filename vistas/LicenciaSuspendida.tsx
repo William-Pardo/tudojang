@@ -1,31 +1,59 @@
 // vistas/LicenciaSuspendida.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useEstadoLicencia } from '../hooks/useEstadoLicencia';
 import { IconoLogoOficial, IconoGuardar, IconoInformacion, IconoWhatsApp } from '../components/Iconos';
 import { formatearPrecio } from '../utils/formatters';
-import { PLANES_SAAS } from '../constantes';
 import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
+import { obtenerEstudiantes } from '../servicios/estudiantesApi';
+import { calcularFacturacionMensual, esFacturable, type ResultadoFacturacion } from '../utils/facturacion';
 
-// Meses que se cobran en un pago anual (12 meses de plan, 10 cobrados -- 2 de bonificación).
-// Mismo criterio que vistas/PasarelaPagos.tsx.
-const MESES_A_COBRAR_ANUAL = 10;
-
+// SDD pricing-cupo-real (Bloque 4b, tarea 4.11 -- "remove plan selection"): mismo criterio
+// que vistas/PasarelaPagos.tsx -- sin planes fijos, el monto a pagar para reactivar es
+// EXACTAMENTE el que calcularía el cobro automático mensual para este tenant en este
+// momento, calculado EN VIVO con calcularFacturacionMensual (Bloque 2) alimentada por el
+// conteo real de estudiantes facturables (obtenerEstudiantes + esFacturable, D3). Cero
+// fórmula de precios nueva -- ver PasarelaPagos.tsx para el razonamiento completo.
 const LicenciaSuspendida: React.FC = () => {
-    const { diasRestantes, fechaVencimiento, plan, diasGracia, configClub } = useEstadoLicencia();
-    const [periodoAnual, setPeriodoAnual] = useState(false);
+    const { diasRestantes, fechaVencimiento, diasGracia, configClub } = useEstadoLicencia();
+    const [resultado, setResultado] = useState<ResultadoFacturacion | null>(null);
+    const [cargandoMonto, setCargandoMonto] = useState(true);
 
-    const planActual = (PLANES_SAAS as any)[plan || 'starter'] || PLANES_SAAS.starter;
-    const montoAPagar = planActual.precio * (periodoAnual ? MESES_A_COBRAR_ANUAL : 1);
+    useEffect(() => {
+        let cancelado = false;
+        const calcularMontoActual = async () => {
+            if (!configClub?.tenantId) {
+                setCargandoMonto(false);
+                return;
+            }
+            try {
+                const estudiantes = await obtenerEstudiantes(configClub.tenantId);
+                const estudiantesFacturables = estudiantes.filter(esFacturable).length;
+                const calculado = calcularFacturacionMensual({
+                    estudiantesFacturables,
+                    sedesExtraContratadas: configClub.sedesExtraContratadas || 0,
+                    equipoTecnicoExtraContratado: configClub.equipoTecnicoExtraContratado || 0,
+                });
+                if (!cancelado) setResultado(calculado);
+            } catch (error) {
+                console.error("Error al calcular el monto de renovación:", error);
+            } finally {
+                if (!cancelado) setCargandoMonto(false);
+            }
+        };
+        calcularMontoActual();
+        return () => { cancelado = true; };
+    }, [configClub?.tenantId, configClub?.sedesExtraContratadas, configClub?.equipoTecnicoExtraContratado]);
 
     const handlePagarConWompi = async () => {
+        if (!resultado) return;
         try {
             const urlRetorno = `${window.location.origin}/#/`;
             const urlWompi = await construirUrlCheckoutWompi({
                 tenantId: configClub?.tenantId || 'TEST',
-                itemType: 'plan',
-                itemId: planActual.id,
-                periodo: periodoAnual ? 'anual' : 'mensual',
-                montoEnPesos: montoAPagar,
+                itemType: 'alta',
+                itemId: 'renovacion',
+                periodo: 'mensual',
+                montoEnPesos: resultado.totalPesos,
                 redirectUrl: urlRetorno,
             });
 
@@ -77,44 +105,18 @@ const LicenciaSuspendida: React.FC = () => {
                         <p className="text-gray-400 font-bold uppercase text-[11px] tracking-widest">Activa instantáneamente el acceso a tu academia</p>
                     </div>
 
-                    {/* SELECTOR DE PERIODO (mismo patron que vistas/PasarelaPagos.tsx) */}
-                    <div className="flex items-center gap-3">
-                        <div className="bg-gray-100 dark:bg-white/10 p-1.5 rounded-2xl flex items-center shadow-inner">
-                            <button
-                                type="button"
-                                onClick={() => setPeriodoAnual(false)}
-                                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
-                            >
-                                Mensual
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setPeriodoAnual(true)}
-                                className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
-                            >
-                                Anual (Ahorra 2 Meses)
-                            </button>
-                        </div>
-                    </div>
-
                     <div className="tkd-card dark:bg-white/5 border-2 border-tkd-blue/20 p-8 space-y-6 relative overflow-hidden group">
                         <div className="flex justify-between items-start relative z-10">
                             <div>
-                                <p className="text-[10px] font-black text-tkd-blue uppercase tracking-widest mb-1">Plan de Continuidad</p>
-                                <h3 className="text-3xl font-black uppercase tracking-tighter">{planActual.nombre}</h3>
+                                <p className="text-[10px] font-black text-tkd-blue uppercase tracking-widest mb-1">Monto a Pagar</p>
+                                <h3 className="text-3xl font-black uppercase tracking-tighter">{configClub?.nombreClub || 'Tu Academia'}</h3>
                             </div>
                             <div className="text-right">
-                                <p className="text-3xl font-black text-tkd-blue">{formatearPrecio(montoAPagar)}</p>
-                                <p className="text-[9px] font-black text-gray-400 uppercase">
-                                    {periodoAnual ? 'Pago único anual' : 'Mensualidad recurrente'}
+                                <p data-testid="monto-renovacion" className="text-3xl font-black text-tkd-blue">
+                                    {cargandoMonto ? '...' : formatearPrecio(resultado?.totalPesos || 0)}
                                 </p>
+                                <p className="text-[9px] font-black text-gray-400 uppercase">Mensualidad recurrente</p>
                             </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3 relative z-10">
-                            <span className="bg-gray-100 dark:bg-white/10 px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-gray-500">{planActual.limiteEstudiantes} Alumnos</span>
-                            <span className="bg-gray-100 dark:bg-white/10 px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-gray-500">Sedes Ilimitadas</span>
-                            <span className="bg-gray-100 dark:bg-white/10 px-4 py-1.5 rounded-full text-[9px] font-black uppercase text-gray-500">Soporte Sabonim AI</span>
                         </div>
 
                         <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:scale-110 transition-transform">
@@ -125,7 +127,8 @@ const LicenciaSuspendida: React.FC = () => {
                     <div className="space-y-4">
                         <button
                             onClick={handlePagarConWompi}
-                            className="w-full bg-tkd-blue text-white py-6 rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all"
+                            disabled={cargandoMonto}
+                            className="w-full bg-tkd-blue text-white py-6 rounded-3xl font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <IconoGuardar className="w-6 h-6" /> Pagar & Activar Ahora
                         </button>
