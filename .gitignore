@@ -46,6 +46,13 @@ coverage/
 # excepcion de arriba: sin esto la regla `*.json` los deja fuera de git en silencio.
 !functions/facturacion-config.json
 !functions/facturacion-vectores.json
+# Umbrales del guardrail de crecimiento/caida anomala de matricula (SDD pricing-cupo-real,
+# Bloque 3b -- D5, design.md). Deliberadamente un archivo separado de facturacion-config.json
+# (Bloque 2, no reabierto): D1 acota ese archivo a precios/tramos de facturacion, no a
+# parametros de deteccion de anomalias. Consumido por functions/vigilanciaFacturacion.js --
+# mismo motivo que las excepciones de arriba: sin esto, la regla `*.json` lo deja fuera de git
+# en silencio y el cron revienta con MODULE_NOT_FOUND en cold start.
+!functions/vigilancia-config.json
 # Linea base congelada de deuda del catalogo de soporte (openspec/changes/
 # catalogo-soporte-marcadores-vivos, Fase 6, D4). Fuente hand-curated que consume
 # scripts/verificar-rutas-soporte.mjs -- NO es un reporte generado, la regla `*.json` de

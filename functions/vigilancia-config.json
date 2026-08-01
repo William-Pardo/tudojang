@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "umbralCrecimiento": {
+    "pisoAbsoluto": 30,
+    "factorDuplicacion": 2,
+    "incrementoDiarioMaximo": 100
+  },
+  "umbralCaida": {
+    "factorCaida": 0.5,
+    "diasHastaCorte": 3
+  },
+  "dedupeHoras": 24,
+  "historialMaximo": 30
+}

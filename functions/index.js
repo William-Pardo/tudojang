@@ -16,6 +16,17 @@ const {
   crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
 } = require("./wompiCobroAutomatico");
+// SDD pricing-cupo-real (Bloque 3b, D5 "Growth guardrail placement"): guardrail de
+// crecimiento/caida anomala de matricula, notify-only. `crearContadorEstudiantesFacturablesFirestore`
+// se renombra al importar -- este modulo define su PROPIA copia independiente de esa misma
+// query (ver comentario en vigilanciaFacturacion.js), y ambos exports comparten nombre.
+const {
+  crearServicioVigilarCrecimientoFacturable,
+  crearListadoTenantsFirestore,
+  crearContadorEstudiantesFacturablesFirestore: crearContadorFacturablesVigilanciaFirestore,
+  crearLectorHistorialVigilanciaFirestore,
+  crearGuardadorHistorialVigilanciaFirestore,
+} = require("./vigilanciaFacturacion");
 const {
   validarTenantParaProvision,
   validarEvidenciaPagoParaActivacion,
@@ -1091,6 +1102,38 @@ const construirHtmlFalloCobroAutomatico = (nombreClub) => `
   </div>
 `;
 
+// HTML del email de alerta del guardrail de crecimiento/caida anomala de matricula (D5,
+// design.md) -- SOLO para el rol SuperAdmin (MASTER_EMAIL), nunca para el tenant. Reusa
+// ESTILOS_EMAIL/HEADER_HTML/FOOTER_HTML igual que construirHtmlFalloCobroAutomatico arriba.
+const NOMBRES_SENALES = {
+  s1: 'Crecimiento acelerado (duplicación sobre una base no trivial)',
+  s2: 'Salto de un solo día (+100 o más)',
+  s3: 'Caída sospechosa cerca del corte de facturación',
+};
+
+const construirHtmlAlertaVigilanciaFacturacion = ({ tenantId, tenant, nHoy, nAyer, nHace7d, diasHastaCorte, senales }) => {
+  const senalesDisparadas = Object.entries(senales)
+    .filter(([clave, valor]) => valor === true && NOMBRES_SENALES[clave])
+    .map(([clave]) => NOMBRES_SENALES[clave]);
+
+  return `
+    <div style="${ESTILOS_EMAIL}">
+      ${HEADER_HTML('Vigilancia de Facturación')}
+      <div style="padding: 30px;">
+        <h2 style="color: #CD2E3A; margin-top: 0;">Crecimiento/caída anómala detectada</h2>
+        <p><b>Tenant:</b> ${tenant?.nombreClub || tenantId} (${tenantId})</p>
+        <ul>
+          ${senalesDisparadas.map((s) => `<li>${s}</li>`).join('')}
+        </ul>
+        <p><b>Estudiantes facturables hoy:</b> ${nHoy}</p>
+        <p><b>Ayer:</b> ${nAyer ?? 'sin dato'} · <b>Hace 7 días:</b> ${nHace7d ?? 'sin dato'}</p>
+        <p><b>Días hasta el corte de facturación:</b> ${diasHastaCorte ?? 'sin fecha de vencimiento'}</p>
+        <p style="margin-top: 20px; font-size: 13px; color: #64748b;">Esto es solo informativo -- el club NO fue notificado ni bloqueado. Revisión manual recomendada.</p>
+      </div>
+    </div>
+  `;
+};
+
 // Cron de cobro automático mensual (mecanismo de suscripción recurrente sobre Wompi
 // Colombia, que no tiene suscripciones nativas -- ver functions/wompiCobroAutomatico.js).
 // Corre una vez al día: entre corridas, cualquier tenant con fechaVencimiento vencida
@@ -1137,6 +1180,45 @@ exports.cobroAutomaticoMensual = paymentFunctions.pubsub
   .schedule("every 24 hours")
   .timeZone("America/Bogota")
   .onRun(async () => servicioCobroAutomaticoMensual(new Date()));
+
+// SDD pricing-cupo-real (Bloque 3b, D5 "Growth guardrail placement"): guardrail diario de
+// crecimiento/caída anómala de matrícula facturable -- SOLO notifica al rol SuperAdmin
+// (MASTER_EMAIL, mismo destinatario ya usado para "Notificar a Master sobre nuevo Tenant" y
+// "MISIÓN KICHO LEGALIZADA" más arriba en este archivo -- el Open Question de design.md sobre
+// `SOPORTE_PLATAFORMA_EMAIL` queda resuelto reusando esta constante ya cableada, en vez de
+// introducir `info@tudojang.com` -- que en este archivo siempre se usa como remitente hacia
+// TENANTS, nunca como destinatario de alertas de plataforma). NUNCA bloquea ni revierte
+// ninguna matrícula (capacidad-tenant, Scenario "Crecimiento anómalo dispara alerta, no
+// bloqueo").
+const listarTenantsVigilanciaFirestore = crearListadoTenantsFirestore(admin.firestore());
+const contarFacturablesVigilanciaFirestore = crearContadorFacturablesVigilanciaFirestore(
+  admin.firestore()
+);
+const leerHistorialVigilanciaFirestore = crearLectorHistorialVigilanciaFirestore(
+  admin.firestore()
+);
+const guardarHistorialVigilanciaFirestore = crearGuardadorHistorialVigilanciaFirestore(
+  admin.firestore()
+);
+const servicioVigilarCrecimientoFacturable = crearServicioVigilarCrecimientoFacturable({
+  listarTenants: () => listarTenantsVigilanciaFirestore(),
+  contarEstudiantesFacturables: (tenantId) => contarFacturablesVigilanciaFirestore(tenantId),
+  leerHistorialVigilancia: (tenantId) => leerHistorialVigilanciaFirestore(tenantId),
+  guardarHistorialVigilancia: (tenantId, datos) => guardarHistorialVigilanciaFirestore(tenantId, datos),
+  notificarAlerta: async (payload) => {
+    await enviarCorreo(getResend(), {
+      from: "Tudojang Vigilancia <info@tudojang.com>",
+      to: [MASTER_EMAIL],
+      subject: `⚠️ Crecimiento/caída anómala de matrícula: ${payload.tenant?.nombreClub || payload.tenantId}`,
+      html: construirHtmlAlertaVigilanciaFacturacion(payload),
+    });
+  },
+});
+
+exports.vigilarCrecimientoFacturable = emailFunctions.pubsub
+  .schedule("every day 07:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioVigilarCrecimientoFacturable(new Date()));
 
 /**
  * TRIGGER: Analizar comprobante de pago con IA (Gemini 1.5 Flash)
