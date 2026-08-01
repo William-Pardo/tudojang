@@ -4,7 +4,7 @@ import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc } fro
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { ConfiguracionNotificaciones, ConfiguracionClub } from '../tipos';
-import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
+import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
 const KEY_CONF_NOTIF = 'tkd_mock_conf_notif';
 
@@ -48,10 +48,6 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
             colorPrimario: slug === 'dragones' ? '#4c1d95' : '#1f3e90',
             estadoSuscripcion: 'activo',
             fechaVencimiento: '2030-12-31',
-            plan: 'starter',
-            limiteEstudiantes: PLANES_SAAS.starter.limiteEstudiantes,
-            limiteUsuarios: PLANES_SAAS.starter.limiteUsuarios,
-            limiteSedes: PLANES_SAAS.starter.limiteSedes
         } as ConfiguracionClub;
     }
 
@@ -65,21 +61,22 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
 };
 
 /**
- * Crea un nuevo tenant en el sistema (Onboarding)
+ * Crea un nuevo tenant en el sistema (Onboarding).
+ *
+ * SDD pricing-cupo-real (Bloque 4): ya no hay planes que seleccionar al registrar una
+ * escuela nueva -- el trial de 7 días (`estadoSuscripcion:'demo'`) se activa igual para
+ * cualquier tenant nuevo, sin depender de un plan/límite inicial (capacidad-tenant: la
+ * capacidad incluida es fija -- `calcularCapacidad`, no un valor por plan).
  */
 export const registrarNuevaEscuela = async (datos: Partial<ConfiguracionClub>): Promise<string> => {
     if (!isFirebaseConfigured) return '';
 
     const nuevoTenantId = datos.tenantId || `tnt-${Date.now()}`;
-    const planSeleccionado = (datos.plan && (PLANES_SAAS as any)[datos.plan]) || PLANES_SAAS.starter;
 
     const configNueva: ConfiguracionClub = {
         ...CONFIGURACION_CLUB_POR_DEFECTO,
         estadoSuscripcion: 'demo', // Valor por defecto
         fechaVencimiento: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 días de gracia
-        limiteEstudiantes: planSeleccionado.limiteEstudiantes,
-        limiteUsuarios: planSeleccionado.limiteUsuarios,
-        limiteSedes: planSeleccionado.limiteSedes,
         ...datos,
         tenantId: nuevoTenantId,
         slug: datos.slug?.toLowerCase().trim() || '',
@@ -136,28 +133,6 @@ export const actualizarCapacidadClub = async (
     await callable({ tenantId, campo, cantidad });
 };
 
-// SDD pricing-cupo-real (D7/D8, design.md): ya no hay planes que actualizar -- `plan`/
-// `limite*` quedan reemplazados por `calcularCapacidad`/`calcularFacturacionMensual`
-// (utils/facturacion.ts). Esta funcion NO se borra todavia: `vistas/Configuracion.tsx`
-// (Bloque 4 de este cambio, fuera de alcance de este batch) sigue importandola -- borrarla
-// aca rompería `npm run typecheck` en un archivo que este batch tiene instrucción explícita
-// de NO tocar. Queda sin uso real (el import en Configuracion.tsx no la invoca) hasta que
-// Bloque 4 reemplace las tarjetas de plan/addon por el panel de uso + extras y retire este
-// import junto con el resto del corte final (tasks.md 4.13).
-export const actualizarPlanClub = async (
-    tenantId: string,
-    nuevoPlan: any
-): Promise<void> => {
-    if (!isFirebaseConfigured) return;
-    const docRef = doc(db, 'tenants', tenantId);
-    await updateDoc(docRef, {
-        plan: nuevoPlan.id,
-        limiteEstudiantes: nuevoPlan.limiteEstudiantes,
-        limiteUsuarios: nuevoPlan.limiteUsuarios,
-        limiteSedes: nuevoPlan.limiteSedes
-    });
-};
-
 /**
  * SUPER ADMIN: Obtiene todas las academias registradas en el ecosistema.
  */
@@ -165,8 +140,8 @@ export const obtenerTodosLosTenants = async (): Promise<ConfiguracionClub[]> => 
     if (!isFirebaseConfigured) {
         return [
             CONFIGURACION_CLUB_POR_DEFECTO,
-            { ...CONFIGURACION_CLUB_POR_DEFECTO, tenantId: 't2', nombreClub: 'Dragones TKD', slug: 'dragones', estadoSuscripcion: 'demo', plan: 'starter' },
-            { ...CONFIGURACION_CLUB_POR_DEFECTO, tenantId: 't3', nombreClub: 'TKD Master Center', slug: 'master', estadoSuscripcion: 'suspendido', plan: 'pro' }
+            { ...CONFIGURACION_CLUB_POR_DEFECTO, tenantId: 't2', nombreClub: 'Dragones TKD', slug: 'dragones', estadoSuscripcion: 'demo' },
+            { ...CONFIGURACION_CLUB_POR_DEFECTO, tenantId: 't3', nombreClub: 'TKD Master Center', slug: 'master', estadoSuscripcion: 'suspendido' }
         ];
     }
     const snapshot = await getDocs(collection(db, 'tenants'));
