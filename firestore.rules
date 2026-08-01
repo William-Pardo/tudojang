@@ -132,6 +132,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // SDD pricing-cupo-real (D6, design.md "Guardrail history storage"): historial diario de
+    // estudiantes facturables por tenant, usado por functions/vigilanciaFacturacion.js para
+    // detectar crecimiento anomalo (o una caida sospechosa cerca del corte, señal S3) --
+    // server-only sin excepcion, ni siquiera SuperAdmin lee esto desde el cliente. Guardar el
+    // historial en tenants/{tenantId}/privado/facturacion (Admin read/write desde el cliente,
+    // D7) dejaria que el propio tenant manipule la serie que se usa para detectar SU PROPIA
+    // anomalia -- ver D6 en design.md. Mismo patron server-only que asistente_cuotas/
+    // asistente_telemetria arriba (no el patron mas permisivo de tickets_soporte, que sí deja
+    // leer a SuperAdmin/owner).
+    match /facturacion_vigilancia/{tenantId} {
+      allow read, write: if false;
+    }
+
     // Perfil de usuario autenticado usado durante login.
     match /usuarios/{uid} {
       // NOTA (ERR-0011): `get` queda sin condicion de tenant a proposito -- requiere

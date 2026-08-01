@@ -1,9 +1,17 @@
+// SDD pricing-cupo-real (Bloque 4b, tarea 4.14): el registro ya no selecciona un plan ni
+// pasa por un checkout de Wompi -- registrarNuevaEscuela crea el tenant en
+// estadoSuscripcion:'demo' de forma incondicional (7 días de gracia) y la pantalla de éxito
+// se muestra DIRECTO tras aprovisionar el usuario (ver vistas/RegistroEscuela.tsx). Este
+// spec reemplaza el flujo viejo (registro -> checkout Wompi -> retorno simulado -> éxito)
+// por (registro -> éxito directo). Cypress sigue flagueado como no confiable en este entorno
+// (design.md) -- best effort, no bloqueante.
 describe('Flujo de Registro y Onboarding', () => {
     const testEmail = `test-${Date.now()}@tudojang.com`;
     const testClub = 'Club Onboarding Test';
 
-    it('Debe completar el registro, simular pago y validar acceso', () => {
-        // 1. Ir a la Landing y seleccionar plan
+    it('Debe completar el registro sin seleccionar plan y activar el trial de 7 días de inmediato', () => {
+        // 1. Ir a la Landing -- ya no hay plan que seleccionar (la calculadora reemplazó el
+        // grid de planes fijos, precio-publico-calculadora), el CTA lleva directo al registro.
         cy.visit('/');
         cy.contains('Iniciar prueba sin costo').click();
 
@@ -40,49 +48,18 @@ describe('Flujo de Registro y Onboarding', () => {
             }
         });
 
-        // Validar que intentó ir a Wompi mediante la variable global
-        cy.log('Validando redirección a Wompi...');
-        cy.get('#debug-log-onboarding').then($el => {
-            cy.log('ESTADO FINAL LOG: ' + $el.text());
-        });
-        cy.window({ timeout: 15000 }).should('have.property', 'lastRedirectWompi');
-        cy.window().then((win: any) => {
-            expect(win.lastRedirectWompi).to.include('checkout.wompi.co');
-        });
-
-        // Verificamos si se guardó el registro pendiente en LocalStorage
-        cy.window().its('localStorage').should((ls) => {
-            const pendingReg = ls.getItem('registro_pendiente');
-            expect(pendingReg).to.not.be.null;
-        });
-
-        // 4. SIMULAR RETORNO DE WOMPI (Activación)
-        // Navegamos directamente a la URL de retorno con un ID de transacción ficticio
-        // Lo ponemos en ambos sitios para asegurar detección (search y hash)
-        cy.log('Navegando a la URL de retorno...');
-        cy.visit('/?id=8888-9999-TEST#/registro-escuela?id=8888-9999-TEST');
-
-        // 5. Validar pantalla de éxito y activación
-        cy.log('Esperando activación...');
-        // Verificar log de depuración tras recarga
-        cy.get('#debug-log-onboarding', { timeout: 15000 }).should('contain', 'RE_DETECT');
-
+        // 4. Validar pantalla de éxito DIRECTA -- sin checkout de Wompi, sin retorno
+        // simulado, sin localStorage de registro pendiente. El trial de 7 días activa solo.
+        cy.log('Esperando pantalla de éxito...');
+        cy.get('#debug-log-onboarding', { timeout: 15000 }).should('contain', '¡Éxito!');
         cy.contains('¡Dojang Activado!', { timeout: 15000 }).should('be.visible');
 
         // El botón de login debería estar habilitado después de copiar
         cy.contains('Copiar Contraseña').click();
         cy.contains('Iniciar Sesión Ahora', { timeout: 10000 }).should('not.be.disabled');
 
-        // 6. VALIDACIÓN FINAL: Login con las nuevas credenciales
-        cy.window().then((win) => {
-            const pendingReg = win.localStorage.getItem('registro_pendiente');
-            // En el código real se borra después de mostrar éxito, pero aquí lo leemos justo antes
-        });
-
+        // 5. VALIDACIÓN FINAL: navegar a Login con las nuevas credenciales
         cy.contains('Iniciar Sesión Ahora').click();
-
-        // 7. Intentar Login
         cy.url().should('include', '/login');
-        // Aquí el test termina la validación del flujo
     });
 });

@@ -17,6 +17,7 @@ import { useNotificacion } from '../context/NotificacionContext';
 import { useAnalytics } from '../context/AnalyticsContext';
 import Loader from '../components/Loader';
 import ToggleSwitch from '../components/ToggleSwitch';
+import { calcularCapacidad } from '../utils/facturacion';
 
 const VistaMasterDashboard: React.FC = () => {
     const [tenants, setTenants] = useState<ConfiguracionClub[]>([]);
@@ -255,20 +256,25 @@ const VistaMasterDashboard: React.FC = () => {
                             <thead className="bg-gray-100 dark:bg-black/40 text-[9px] font-black uppercase text-gray-500 tracking-widest">
                                 <tr>
                                     <th className="px-8 py-5">Dojang / Identidad</th>
-                                    <th className="px-6 py-5">Plan de Licencia</th>
+                                    <th className="px-6 py-5">Capacidad</th>
                                     <th className="px-6 py-5">Vencimiento</th>
                                     <th className="px-8 py-5 text-right">Status / Control</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                {tenants.map(t => (
+                                {tenants.map(t => {
+                                    // SDD pricing-cupo-real (Bloque 4): ya no hay `plan` -- se muestra la
+                                    // capacidad real (incluida + bono + extras), fuente única
+                                    // (calcularCapacidad, utils/facturacion.ts, Bloque 2).
+                                    const capacidad = calcularCapacidad(t);
+                                    return (
                                     <tr key={t.tenantId} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
                                         <td className="px-8 py-6">
                                             <p className="font-black text-sm uppercase group-hover:text-tkd-blue transition-colors">{t.nombreClub}</p>
                                             <p className="text-[9px] font-black text-gray-500 uppercase mt-1">{t.slug}.tudojang.com</p>
                                         </td>
                                         <td className="px-6 py-6">
-                                            <span className="px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[9px] font-black uppercase border border-gray-200 dark:border-white/5">{t.plan}</span>
+                                            <span className="px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[9px] font-black uppercase border border-gray-200 dark:border-white/5">{capacidad.sedes} sedes · {capacidad.equipoTecnico} equipo</span>
                                         </td>
                                         <td className="px-6 py-6">
                                             <p className="text-xs font-bold text-gray-400">{t.fechaVencimiento}</p>
@@ -285,7 +291,8 @@ const VistaMasterDashboard: React.FC = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

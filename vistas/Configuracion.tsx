@@ -15,9 +15,9 @@ import { useGestionConfiguracion } from '../hooks/useGestionConfiguracion';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { actualizarUsuario } from '../servicios/api';
-import { actualizarCapacidadClub, actualizarPlanClub } from '../servicios/configuracionApi';
-import { COSTOS_ADICIONALES, PLANES_SAAS, CONFIGURACION_WOMPI } from '../constantes';
-import { construirUrlCheckoutWompi, crearFuentePagoWompi } from '../servicios/wompiApi';
+import { actualizarCapacidadClub } from '../servicios/configuracionApi';
+import { CONFIGURACION_WOMPI, COSTOS_ADICIONALES } from '../constantes';
+import { crearFuentePagoWompi } from '../servicios/wompiApi';
 import TablaUsuarios from '../components/TablaUsuarios';
 import FormularioUsuario from '../components/FormularioUsuario';
 import FormularioSede from '../components/FormularioSede';
@@ -26,7 +26,7 @@ import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import InvitacionesView from './admin/InvitacionesView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
-import { obtenerLimiteEquipoTecnico, obtenerLimiteOperativo } from '../utils/limitesSaas';
+import { calcularCapacidad } from '../utils/facturacion';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -91,98 +91,13 @@ const ModalFormPrograma: React.FC<{
     );
 };
 
-const ModalPagoCheckout: React.FC<{
-    item: any,
-    tipo: 'addon' | 'plan',
-    tenantId: string,
-    onCerrar: () => void,
-    onExito: (datos: any) => void
-}> = ({ item, tipo, tenantId, onCerrar, onExito }) => {
-    const { mostrarNotificacion } = useNotificacion();
-    // Selector Mensual/Anual (mismo patron que vistas/PasarelaPagos.tsx y
-    // vistas/LicenciaSuspendida.tsx). Solo aplica a cambio/renovacion de plan -- los
-    // addons (+alumnos, +usuario, +sede) son siempre un cargo mensual recurrente.
-    const [periodoAnual, setPeriodoAnual] = useState(false);
-    const esPlan = tipo === 'plan';
-    const MESES_A_COBRAR_ANUAL = 10; // 12 meses de plan, 10 cobrados (2 de bonificación).
-    const montoFinal = esPlan && periodoAnual ? item.precio * MESES_A_COBRAR_ANUAL : item.precio;
-
-    const handleProcederAlPago = async () => {
-        try {
-            const urlRetorno = `${window.location.origin}/#/`;
-            const urlWompi = await construirUrlCheckoutWompi({
-                tenantId,
-                itemType: tipo === 'addon' ? 'addon' : 'plan',
-                itemId: tipo === 'addon' ? item.key : item.id,
-                periodo: esPlan && periodoAnual ? 'anual' : 'mensual',
-                montoEnPesos: montoFinal,
-                redirectUrl: urlRetorno,
-            });
-
-            window.open(urlWompi, '_blank');
-            if (tipo === 'addon') onExito({ tipo: 'addon', item: item.key });
-            else onExito({ tipo: 'plan', plan: item.id });
-            onCerrar();
-        } catch (error) {
-            console.error("Error al redireccionar a pasarela:", error);
-            mostrarNotificacion("Error al conectar con la pasarela de pagos.", "error");
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-tkd-dark/90 p-4 animate-fade-in backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-md p-10 overflow-hidden relative">
-                <div className="space-y-8 animate-slide-in-right">
-                    <div className="text-center">
-                        <h3 className="text-2xl font-black uppercase tracking-tight dark:text-white">Confirmar {tipo === 'plan' ? 'Cambio de Plan' : 'Compra'}</h3>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Serás redirigido a la pasarela segura de Wompi</p>
-                    </div>
-
-                    {esPlan && (
-                        <div className="flex justify-center">
-                            <div className="bg-gray-100 dark:bg-white/10 p-1.5 rounded-2xl flex items-center shadow-inner">
-                                <button
-                                    type="button"
-                                    onClick={() => setPeriodoAnual(false)}
-                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
-                                >
-                                    Mensual
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPeriodoAnual(true)}
-                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${periodoAnual ? 'bg-white dark:bg-gray-900 text-tkd-blue shadow-md scale-105' : 'text-gray-400'}`}
-                                >
-                                    Anual (Ahorra 2 Meses)
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
-                        <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black uppercase text-gray-400">Concepto</span>
-                            <span className="text-xs font-black dark:text-white uppercase">{item.label || item.nombre}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 border-t dark:border-gray-700">
-                            <span className="text-[10px] font-black uppercase text-gray-400">
-                                {esPlan && periodoAnual ? 'Inversión (pago único anual)' : 'Inversión'}
-                            </span>
-                            <span className="text-2xl font-black text-tkd-blue">{formatearPrecio(montoFinal)}</span>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <button onClick={handleProcederAlPago} className="w-full bg-tkd-red text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 hover:bg-red-700 transition-all active:scale-95">
-                            <IconoAprobar className="w-6 h-6" /> Ir a pago seguro
-                        </button>
-                        <button onClick={onCerrar} className="w-full text-gray-400 font-black uppercase text-[10px] tracking-widest py-2">Cancelar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+// SDD pricing-cupo-real (Bloque 4b): ModalPagoCheckout (checkout de Wompi para "comprar" un
+// plan o un addon) se elimina -- ya no hay planes fijos que cambiar, y sedes/equipo técnico
+// extra ya no se "compran" vía un checkout de Wompi puntual: se contratan de inmediato con
+// la Cloud Function actualizarExtrasContratados (D7, servicios/configuracionApi.ts::
+// actualizarCapacidadClub), que alimenta directamente calcularCapacidad -- el próximo corte
+// de cobroAutomaticoMensual ya factura la capacidad ampliada (misma calcularFacturacionMensual,
+// Bloque 2). Ver el panel "Ampliar Capacidad" más abajo en el tab "licencia".
 
 // Decisión (2026-07-15, confirmada contra https://docs.wompi.co/en/docs/colombia/fuentes-de-pago/
 // y https://docs.wompi.co/en/docs/colombia/widget-checkout-web/): NO se usa `new WidgetCheckout(...).open(callback)`
@@ -398,10 +313,12 @@ const VistaConfiguracion: React.FC = () => {
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
     const [modalSedeAbierto, setModalSedeAbierto] = useState(false);
-    const [planSeleccionado, setPlanSeleccionado] = useState<string>(localConfigClub?.plan || 'starter');
     const [modalReiniciarAbierto, setModalReiniciarAbierto] = useState(false);
     const [cargandoReinicio, setCargandoReinicio] = useState(false);
-    const [itemAPagar, setItemAPagar] = useState<{ item: any, tipo: 'addon' | 'plan' } | null>(null);
+    // SDD pricing-cupo-real (Bloque 4b, D7): sedes/equipo técnico extra ya no se "compran"
+    // vía un checkout de Wompi puntual (ModalPagoCheckout, eliminado) -- se contratan de
+    // inmediato con la Cloud Function actualizarExtrasContratados.
+    const [comprandoExtra, setComprandoExtra] = useState<'sedesExtraContratadas' | 'equipoTecnicoExtraContratado' | null>(null);
     const [modalCuentasAbierto, setModalCuentasAbierto] = useState(false);
 
     const cerrarModalSede = () => {
@@ -446,9 +363,23 @@ const VistaConfiguracion: React.FC = () => {
         }
     };
 
-    const handleExitoPago = (datos: any) => {
-        setItemAPagar(null);
-        mostrarNotificacion("Solicitud de pago iniciada. Verifica tu correo tras completar la transacción.", "warning");
+    // SDD pricing-cupo-real (Bloque 4b, D7): único writer de sedesExtraContratadas/
+    // equipoTecnicoExtraContratado desde este panel -- misma Cloud Function
+    // actualizarExtrasContratados ya usada por SeccionCobroAutomatico's onActivado (patrón
+    // de actualización optimista local + notificación).
+    const handleComprarExtra = async (campo: 'sedesExtraContratadas' | 'equipoTecnicoExtraContratado') => {
+        if (!localConfigClub) return;
+        setComprandoExtra(campo);
+        try {
+            await actualizarCapacidadClub(localConfigClub.tenantId, campo, 1);
+            setLocalConfigClub(prev => prev ? { ...prev, [campo]: (Number(prev[campo]) || 0) + 1 } : prev);
+            mostrarNotificacion("Capacidad ampliada correctamente.", "success");
+        } catch (e) {
+            const mensaje = e instanceof Error && e.message ? e.message : "No se pudo ampliar la capacidad.";
+            mostrarNotificacion(mensaje, "error");
+        } finally {
+            setComprandoExtra(null);
+        }
     };
 
     // --- LÓGICA DE ONBOARDING ---
@@ -545,7 +476,13 @@ const VistaConfiguracion: React.FC = () => {
     const usuariosStaff = usuarios.filter(
         (u) => u.rol !== RolUsuario.Tutor && u.rol !== RolUsuario.Estudiante
     );
-    const limiteEquipoTecnico = obtenerLimiteEquipoTecnico(localConfigClub);
+    // SDD pricing-cupo-real (Bloque 4b): fuente única de capacidad (capacidad-tenant) --
+    // calcularCapacidad (utils/facturacion.ts, Bloque 2) reemplaza a
+    // obtenerLimiteEquipoTecnico/obtenerLimiteOperativo (utils/limitesSaas.ts, borrado en
+    // este bloque). El owner ya cuenta DENTRO de los 3 cupos incluidos (D8) -- sin el `+1`
+    // viejo. `estudiantes` no tiene límite (capacidad.estudiantes siempre es null).
+    const capacidad = calcularCapacidad(localConfigClub);
+    const limiteEquipoTecnico = capacidad.equipoTecnico;
     const equipoTecnicoCompleto = limiteEquipoTecnico > 0 && usuariosStaff.length >= limiteEquipoTecnico;
 
     // Gestionar Vínculo Legal (Equipo Técnico): comparte el link de firma del Contrato
@@ -885,11 +822,10 @@ const VistaConfiguracion: React.FC = () => {
                             </div>
                             <button onClick={() => {
                                 const sedesAdicionalesActuales = totalSedesActivas - 1;
-                                const effectiveLimit = obtenerLimiteOperativo(localConfigClub, 'limiteSedes');
-                                const limiteSedesAdicionales = effectiveLimit - 1;
+                                const limiteSedesAdicionales = capacidad.sedes - 1;
 
                                 if (sedesAdicionalesActuales >= limiteSedesAdicionales) {
-                                    mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu plan para agregar más sucursales.`, "warning");
+                                    mostrarNotificacion(`Límite de Sedes Adicionales alcanzado (${limiteSedesAdicionales}). Amplía tu capacidad contratada para agregar más sucursales.`, "warning");
                                     return;
                                 }
                                 setSedeEdit(null);
@@ -1097,19 +1033,20 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
+                {/* SDD pricing-cupo-real (Bloque 4b): reemplaza el grid de planes fijos
+                    (starter/growth/pro) + las tarjetas de addon por un panel de uso real +
+                    compra de extras. Estudiantes ya no se "compran": se facturan por conteo
+                    real (calcularFacturacionMensual, Bloque 2) -- sin límite que mostrar acá
+                    (capacidad-tenant: "Sin tope duro de matrícula"). Sedes y equipo técnico
+                    sí tienen una capacidad contratada real (calcularCapacidad) que se puede
+                    ampliar de inmediato con la Cloud Function actualizarExtrasContratados. */}
                 {!isWizardMode && activeTab === 'licencia' && (
                     <div className="space-y-10 animate-fade-in">
                         <div className="bg-tkd-dark text-white p-10 rounded-[3rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-8 border border-white/5 relative overflow-hidden">
                             <div className="relative z-10">
                                 <p className="text-[10px] font-black text-tkd-red uppercase tracking-[0.4em] mb-2">Estado de Suscripción</p>
-                                <h3 className="text-4xl font-black uppercase tracking-tighter">Plan <span className="text-tkd-blue">{localConfigClub.plan}</span></h3>
+                                <h3 className="text-4xl font-black uppercase tracking-tighter capitalize">{localConfigClub.estadoSuscripcion}</h3>
                                 <p className="text-gray-400 text-xs mt-4 font-bold uppercase tracking-widest">Vence el: {localConfigClub.fechaVencimiento}</p>
-                            </div>
-                            <div className="flex gap-4 relative z-10">
-                                <button onClick={() => {
-                                    const el = document.getElementById('grid-planes-saas');
-                                    el?.scrollIntoView({ behavior: 'smooth' });
-                                }} className="bg-white text-tkd-dark px-10 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-gray-100 transition-all active:scale-95">Renovar o Mejorar Licencia</button>
                             </div>
                             <div className="absolute -right-20 -bottom-20 opacity-5 rotate-12"><IconoLogoOficial className="w-80 h-80" /></div>
                         </div>
@@ -1130,140 +1067,97 @@ const VistaConfiguracion: React.FC = () => {
                                 {
                                     label: 'Estudiantes',
                                     used: estudiantes.length,
-                                    limit: obtenerLimiteOperativo(localConfigClub, 'limiteEstudiantes'),
+                                    limit: null as number | null, // capacidad-tenant: sin tope, se factura por conteo real
                                     icon: IconoEstudiantes,
                                     color: 'text-tkd-blue'
                                 },
                                 {
                                     label: 'Docentes / Staff',
                                     used: usuariosStaff.length,
-                                    limit: obtenerLimiteEquipoTecnico(localConfigClub),
+                                    limit: capacidad.equipoTecnico,
                                     icon: IconoUsuario,
                                     color: 'text-green-500'
                                 },
                                 {
                                     label: 'Sedes (Principal + Adicionales)',
                                     used: totalSedesActivas,
-                                    limit: obtenerLimiteOperativo(localConfigClub, 'limiteSedes'),
+                                    limit: capacidad.sedes,
                                     icon: IconoCasa,
                                     color: 'text-tkd-red'
                                 }
                             ].map((metric) => {
-                                const percent = Math.min((metric.used / metric.limit) * 100, 100);
+                                const percent = metric.limit ? Math.min((metric.used / metric.limit) * 100, 100) : 0;
                                 return (
                                     <div key={metric.label} className="bg-white dark:bg-white/5 p-6 rounded-[2.5rem] border border-gray-100 dark:border-white/10 space-y-4">
                                         <div className="flex justify-between items-start">
                                             <div className={`p-3 rounded-2xl bg-gray-50 dark:bg-white/5 ${metric.color}`}><metric.icon className="w-5 h-5" /></div>
                                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{metric.label}</span>
                                         </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between items-end">
-                                                <span className="text-2xl font-black dark:text-white leading-none">{metric.used} <span className="text-xs text-gray-400 font-bold lowercase">de</span> {metric.limit}</span>
-                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{Math.round(percent)}%</span>
+                                        {metric.limit === null ? (
+                                            <div className="space-y-2">
+                                                <span className="text-2xl font-black dark:text-white leading-none">{metric.used}</span>
+                                                <span className="block text-[9px] font-black text-green-600 uppercase tracking-widest">Sin tope — se factura por conteo real</span>
                                             </div>
-                                            <div className="w-full h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                                <div className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-tkd-red' : percent > 70 ? 'bg-orange-500' : 'bg-tkd-blue'}`} style={{ width: `${percent}%` }} />
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-end">
+                                                    <span className="text-2xl font-black dark:text-white leading-none">{metric.used} <span className="text-xs text-gray-400 font-bold lowercase">de</span> {metric.limit}</span>
+                                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">{Math.round(percent)}%</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
+                                                    <div className={`h-full transition-all duration-1000 ${percent > 90 ? 'bg-tkd-red' : percent > 70 ? 'bg-orange-500' : 'bg-tkd-blue'}`} style={{ width: `${percent}%` }} />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
 
-                        <div id="grid-planes-saas" className="space-y-10">
+                        <div id="panel-extras" className="space-y-6">
                             <div className="text-center space-y-3">
-                                <h4 className="text-3xl font-black uppercase tracking-tight dark:text-white">Membresías del Ecosistema</h4>
+                                <h4 className="text-3xl font-black uppercase tracking-tight dark:text-white">Ampliar Capacidad</h4>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/5 px-4 py-1 rounded-full inline-block">
-                                    Cobro recurrente mensual automático vía Wompi
+                                    Efecto inmediato — se refleja en el próximo corte de facturación
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                {Object.values(PLANES_SAAS).map(plan => {
-                                    const esPlanActual = localConfigClub.plan === plan.id;
-                                    const esSeleccionado = planSeleccionado === plan.id;
-                                    const orden = { starter: 1, growth: 2, pro: 3 };
-                                    const actualOrden = (orden as any)[localConfigClub.plan || 'starter'] || 1;
-                                    const planOrden = (orden as any)[plan.id] || 1;
-                                    const esUpgrade = planOrden > actualOrden;
-
-                                    return (
-                                        <div
-                                            key={plan.id}
-                                            onClick={() => setPlanSeleccionado(plan.id)}
-                                            className={`group cursor-pointer p-8 rounded-[3.5rem] border-4 transition-all duration-500 relative flex flex-col justify-between
-                                                ${esSeleccionado
-                                                    ? 'border-tkd-blue bg-white dark:bg-gray-800 shadow-[0_30px_60px_-15px_rgba(31,62,144,0.3)] scale-105 z-10'
-                                                    : esUpgrade
-                                                        ? 'border-tkd-red/20 opacity-90 hover:border-tkd-red/40 hover:opacity-100 bg-gray-50/50 dark:bg-white/5'
-                                                        : 'border-transparent bg-gray-50/30 dark:bg-white/5 opacity-50 hover:opacity-100'
-                                                }`}
-                                        >
-                                            {esUpgrade && (
-                                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-tkd-red text-white px-5 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg z-20 animate-bounce">
-                                                    Upgrade Recomendado
-                                                </div>
-                                            )}
-
-                                            {esPlanActual && !esUpgrade && (
-                                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-tkd-blue text-white px-5 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg z-20">
-                                                    Plan Actual
-                                                </div>
-                                            )}
-
-                                            <div className="space-y-6">
-                                                <div className="flex justify-between items-start">
-                                                    <h5 className={`text-xl font-black uppercase tracking-tighter ${esSeleccionado ? 'text-tkd-blue' : 'text-gray-400'}`}>
-                                                        {plan.nombre}
-                                                    </h5>
-                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${esSeleccionado ? 'border-tkd-blue bg-tkd-blue' : 'border-gray-200'}`}>
-                                                        {esSeleccionado && <div className="w-2 h-2 bg-white rounded-full" />}
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    <p className="text-3xl font-black dark:text-white flex items-start gap-1">
-                                                        <span className="text-sm mt-1">$</span>
-                                                        {formatearPrecio(plan.precio).replace('$', '')}
-                                                        <span className="text-[10px] text-gray-400 uppercase self-end mb-1">/ mes</span>
-                                                    </p>
-                                                    <ul className="space-y-3">
-                                                        {plan.caracteristicas.map(c => (
-                                                            <li key={c} className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-2">
-                                                                <div className={`w-1.5 h-1.5 rounded-full ${esSeleccionado ? 'bg-tkd-blue' : 'bg-gray-300'}`} />
-                                                                {c}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex justify-center pt-8">
-                                <button
-                                    onClick={() => {
-                                        const p = (PLANES_SAAS as any)[planSeleccionado];
-                                        if (p) setItemAPagar({ item: p, tipo: 'plan' });
-                                    }}
-                                    className="group bg-tkd-red text-white px-12 py-6 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-[0_20px_50px_-10px_rgba(205,46,58,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
-                                >
-                                    <IconoAprobar className="w-6 h-6" />
-                                    {planSeleccionado === localConfigClub.plan ? 'Renovar Membresía Actual' : 'Cambiar a este Plan Premium'}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {Object.values(COSTOS_ADICIONALES).map(addon => (
-                                <div key={addon.key} className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
-                                    <h4 className="text-xl font-black uppercase tracking-tight dark:text-white">{addon.label}</h4>
-                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">{formatearPrecio(addon.precio)} <span className="text-[9px] opacity-40">Pago mensual</span></p>
-                                    <button onClick={() => setItemAPagar({ item: addon, tipo: 'addon' })} className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm">Adquirir Capacidad</button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-tkd-red/10 rounded-2xl"><IconoCasa className="w-5 h-5 text-tkd-red" /></div>
+                                        <h5 className="text-xl font-black uppercase tracking-tight dark:text-white">Sede Extra</h5>
+                                    </div>
+                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">
+                                        {capacidad.sedes} sede(s) contratadas actualmente
+                                    </p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.sede.precio)} / mes por sede extra</p>
+                                    <button
+                                        onClick={() => handleComprarExtra('sedesExtraContratadas')}
+                                        disabled={comprandoExtra === 'sedesExtraContratadas'}
+                                        className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {comprandoExtra === 'sedesExtraContratadas' ? 'Ampliando...' : '+1 Sede Adicional'}
+                                    </button>
                                 </div>
-                            ))}
+                                <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-green-500/10 rounded-2xl"><IconoUsuario className="w-5 h-5 text-green-500" /></div>
+                                        <h5 className="text-xl font-black uppercase tracking-tight dark:text-white">Cupo de Equipo Técnico</h5>
+                                    </div>
+                                    <p className="text-sm font-black text-gray-900 dark:text-gray-400 mt-4">
+                                        {capacidad.equipoTecnico} cupo(s) contratados actualmente
+                                    </p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.equipoTecnico.precio)} / mes por cupo extra</p>
+                                    <button
+                                        onClick={() => handleComprarExtra('equipoTecnicoExtraContratado')}
+                                        disabled={comprandoExtra === 'equipoTecnicoExtraContratado'}
+                                        className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {comprandoExtra === 'equipoTecnicoExtraContratado' ? 'Ampliando...' : '+1 Cupo de Equipo Técnico'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1300,7 +1194,6 @@ const VistaConfiguracion: React.FC = () => {
             )}
             {modalProgramaAbierto && <ModalFormPrograma programa={programaEdit} onCerrar={() => setModalProgramaAbierto(false)} onGuardar={handleGuardarPrograma} />}
             {modalSedeAbierto && <FormularioSede abierto={modalSedeAbierto} onCerrar={cerrarModalSede} onGuardar={handleGuardarSede} sedeActual={sedeEdit} cargando={cargandoAccion} />}
-            {itemAPagar && <ModalPagoCheckout item={itemAPagar.item} tipo={itemAPagar.tipo} tenantId={localConfigClub.tenantId} onCerrar={() => setItemAPagar(null)} onExito={handleExitoPago} />}
             {modalCuentasAbierto && (
                 <div className="fixed inset-0 z-[120] flex items-center justify-center bg-tkd-dark/95 p-4 animate-fade-in backdrop-blur-sm">
                     <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-2xl p-10 space-y-8 overflow-y-auto max-h-[90vh] relative border border-gray-100 dark:border-white/5">

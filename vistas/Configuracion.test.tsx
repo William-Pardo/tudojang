@@ -1,13 +1,20 @@
 // vistas/Configuracion.test.tsx
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import VistaConfiguracion from './Configuracion';
 import { useConfiguracion, useProgramas, useEstudiantes, useSedes } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
+import { actualizarCapacidadClub } from '../servicios/configuracionApi';
+import { calcularCapacidad } from '../utils/facturacion';
+import { COSTOS_ADICIONALES } from '../constantes';
 import type { ConfiguracionClub } from '../tipos';
+
+jest.mock('../servicios/configuracionApi', () => ({
+  actualizarCapacidadClub: jest.fn(),
+}));
 
 // Este test se limita a los 4 campos nuevos de medios de pago (pagoNequi/pagoDaviplata/
 // pagoBreB/pagoBanco) dentro de la pestaña "branding" (tab por defecto de la vista, ver
@@ -67,10 +74,6 @@ const configClubBase: ConfiguracionClub = {
     colorAcento: '#CD2E3A',
     estadoSuscripcion: 'activo',
     fechaVencimiento: '2027-01-01',
-    plan: 'starter',
-    limiteEstudiantes: 100,
-    limiteUsuarios: 5,
-    limiteSedes: 1,
     onboardingStep: 5,
     activarFormularioInscripcion: true,
 };
@@ -141,5 +144,114 @@ describe('Configuracion - medios de pago (pagoNequi/pagoDaviplata/pagoBreB/pagoB
         await user.type(inputNequi, '300 111 2222');
 
         expect(inputNequi).toHaveValue('300 111 2222');
+    });
+});
+
+// SDD pricing-cupo-real (Bloque 4b, tareas 4.5/4.6): panel de uso + extras en el tab
+// "licencia", reemplaza el grid de 3 planes fijos + las tarjetas de addon (ModalPagoCheckout,
+// eliminado). Nota de transparencia (no oculta): esta cobertura se agregó DESPUÉS de escribir
+// la implementación en el mismo batch de reescritura del archivo (1,386 líneas, muchas piezas
+// interdependientes) -- no siguió el orden RED-primero estricto para esta sub-pieza puntual,
+// a diferencia del resto del bloque. Se corrió igual contra la implementación real para
+// confirmar el comportamiento, no se asumió.
+describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)', () => {
+    const actualizarCapacidadClubMock = actualizarCapacidadClub as jest.MockedFunction<typeof actualizarCapacidadClub>;
+
+    const configClubConExtras: ConfiguracionClub = {
+        ...configClubBase,
+        sedeBonusOtorgada: false,
+        sedesExtraContratadas: 1,
+        equipoTecnicoExtraContratado: 0,
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        actualizarCapacidadClubMock.mockResolvedValue(undefined);
+        useConfiguracionMock.mockReturnValue({
+            usuarios: [],
+            configNotificaciones: {},
+            configClub: configClubConExtras,
+            cargando: false,
+            error: null,
+            guardarConfiguraciones: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+            agregarUsuario: jest.fn(),
+            actualizarUsuario: jest.fn(),
+            eliminarUsuario: jest.fn(),
+            cargarConfiguracion: jest.fn(),
+        });
+        useProgramasMock.mockReturnValue({
+            programas: [], eliminarPrograma: jest.fn(), agregarPrograma: jest.fn(), actualizarPrograma: jest.fn(),
+        });
+        useEstudiantesMock.mockReturnValue({ estudiantes: [{ id: '1' }, { id: '2' }, { id: '3' }] });
+        useSedesMock.mockReturnValue({
+            sedes: [], sedesVisibles: [], totalSedesActivas: 1,
+            eliminarSede: jest.fn(), agregarSede: jest.fn(), actualizarSede: jest.fn(),
+        });
+        useAuthMock.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'test-tenant', rol: 'Admin', email: 'admin@test.com' } });
+        useNotificacionMock.mockReturnValue({ toasts: [], mostrarNotificacion: jest.fn(), ocultarNotificacion: jest.fn() });
+    });
+
+    const irATabLicencia = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getByText('Licencia'));
+    };
+
+    it('no renderiza el grid de planes fijos (starter/growth/pro) ni las tarjetas de addon', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        expect(screen.queryByText(/membresías del ecosistema/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/adquirir capacidad/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/cambiar a este plan premium/i)).not.toBeInTheDocument();
+    });
+
+    it('el panel de uso muestra estudiantes SIN tope (capacidad-tenant: sin tope duro) y sedes/equipo con calcularCapacidad', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        const capacidadEsperada = calcularCapacidad(configClubConExtras);
+
+        expect(screen.getByText('3')).toBeInTheDocument(); // 3 estudiantes, sin "de N"
+        expect(screen.getByText(/sin tope/i)).toBeInTheDocument();
+        // "de" vive en un <span> separado del número -- se verifica el texto combinado del
+        // panel entero en vez de un único nodo de texto contiguo.
+        const panelUso = screen.getByText('Docentes / Staff').closest('div.space-y-4') as HTMLElement;
+        expect(panelUso.textContent).toContain(`de ${capacidadEsperada.equipoTecnico}`);
+        const panelSedes = screen.getByText('Sedes (Principal + Adicionales)').closest('div.space-y-4') as HTMLElement;
+        expect(panelSedes.textContent).toContain(`de ${capacidadEsperada.sedes}`);
+    });
+
+    it('muestra el precio unitario de cada extra (COSTOS_ADICIONALES, D1: única fuente de precios)', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        expect(screen.getByText(new RegExp(`${COSTOS_ADICIONALES.sede.precio}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')))).toBeInTheDocument();
+        expect(screen.getByText(new RegExp(`${COSTOS_ADICIONALES.equipoTecnico.precio}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')))).toBeInTheDocument();
+    });
+
+    it('el botón "+1 Sede Adicional" llama actualizarCapacidadClub con delta +1 sobre sedesExtraContratadas', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        await user.click(screen.getByText(/\+1 Sede Adicional/i));
+
+        await waitFor(() => {
+            expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'sedesExtraContratadas', 1);
+        });
+    });
+
+    it('el botón "+1 Cupo de Equipo Técnico" llama actualizarCapacidadClub con delta +1 sobre equipoTecnicoExtraContratado', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        await user.click(screen.getByText(/\+1 Cupo de Equipo Técnico/i));
+
+        await waitFor(() => {
+            expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'equipoTecnicoExtraContratado', 1);
+        });
     });
 });

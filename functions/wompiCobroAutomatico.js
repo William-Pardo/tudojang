@@ -14,12 +14,13 @@ const WOMPI_API_BASE = 'https://production.wompi.co/v1';
 // functions/ es JS puro y no puede importar ese archivo TS del frontend.
 const WOMPI_PUBLIC_KEY = 'pub_prod_2XIISLESsoU3kWMce51HMChsMdr1tzVB';
 
-// Fuente única de verdad para los valores numéricos de planes/addons: planes-config.json
-// (raíz del repo), también consumido por constantes.ts (frontend) y por
-// academico/sedes.js / academico/estudiantes.js. `precio` está en pesos COP (no
-// centavos); la conversión a amount_in_cents (*100) espeja construirUrlCheckoutWompi en
-// servicios/wompiApi.ts.
-const { planes: PLANES_SAAS, addons: COSTOS_ADICIONALES } = require('./planes-config.json');
+// SDD pricing-cupo-real (Bloque 3b, facturacion-metered): el monto ya NO se infiere del plan
+// del tenant (planes-config.json) -- se MIDE con la misma funcion pura que usa la calculadora
+// publica (D1, design.md). `calcularFacturacionMensual` nunca toca Firestore; el conteo de
+// estudiantes facturables y los extras contratados se resuelven aca (I/O) y se le pasan como
+// entrada. `precio`/`totalPesos` estan en pesos COP (no centavos); la conversión a
+// amount_in_cents (*100) espeja construirUrlCheckoutWompi en servicios/wompiApi.ts.
+const { calcularFacturacionMensual } = require('./facturacion');
 
 const MAX_INTENTOS_FALLIDOS = 3;
 
@@ -71,39 +72,12 @@ function extraerMensajeErrorWompi(error) {
   return 'Error desconocido al comunicarse con Wompi';
 }
 
-/**
- * Calcula el monto mensual a cobrar (en pesos COP) para un tenant, a partir de su plan
- * base más los addons inferidos por diferencia entre sus límites actuales y los del plan
- * (no hay una lista explícita de addons comprados, ver actualizarCapacidadClub en
- * servicios/configuracionApi.ts).
- */
-function calcularMontoMensualPesos(tenant) {
-  const planBase = PLANES_SAAS[tenant?.plan] || PLANES_SAAS.starter;
-
-  const addonsEstudiantes = Math.round(
-    ((Number(tenant?.limiteEstudiantes) || 0) - planBase.limiteEstudiantes) /
-      COSTOS_ADICIONALES.estudiantes.cantidad
-  );
-  const addonsUsuarios = Math.round(
-    ((Number(tenant?.limiteUsuarios) || 0) - planBase.limiteUsuarios) /
-      COSTOS_ADICIONALES.instructor.cantidad
-  );
-  const addonsSedes = Math.round(
-    ((Number(tenant?.limiteSedes) || 0) - planBase.limiteSedes) / COSTOS_ADICIONALES.sede.cantidad
-  );
-
-  return (
-    planBase.precio +
-    Math.max(0, addonsEstudiantes) * COSTOS_ADICIONALES.estudiantes.precio +
-    Math.max(0, addonsUsuarios) * COSTOS_ADICIONALES.instructor.precio +
-    Math.max(0, addonsSedes) * COSTOS_ADICIONALES.sede.precio
-  );
-}
-
 // Misma conversión que construirUrlCheckoutWompi en servicios/wompiApi.ts:
-// amountInCents = Math.round(montoEnPesos * 100).
-function calcularMontoMensualCentavos(tenant) {
-  return Math.round(calcularMontoMensualPesos(tenant) * 100);
+// amountInCents = Math.round(montoEnPesos * 100). `resultadoFacturacion` es el
+// ResultadoFacturacion que devuelve calcularFacturacionMensual (facturacion.js, Bloque 2) --
+// esta función es el único paso de esa función pura hacia Wompi (que exige centavos enteros).
+function calcularMontoFacturableCentavos(resultadoFacturacion) {
+  return Math.round(resultadoFacturacion.totalPesos * 100);
 }
 
 // Formato pedido: SUSC_<tenantId>_auto_mensual_recurrente_<timestamp>. El tenantId real
@@ -259,10 +233,23 @@ async function crearTransaccionRecurrenteWompi({
  * deja que webhookWompi (transaction.updated) reconcilie fechaVencimiento/estadoSuscripcion,
  * igual que el checkout manual. Un DECLINED/ERROR incrementa el contador de intentos
  * fallidos y, al tercer fallo consecutivo, suspende la suscripción y notifica por email.
+ *
+ * SDD pricing-cupo-real (Bloque 3b, facturacion-metered): el monto ya NO se infiere del plan
+ * (`calcularMontoMensualPesos`, eliminada) -- se MIDE por tenant en cada corrida: se cuenta
+ * cuántos estudiantes están facturables HOY (snapshot sin prorrateo, spec "Corte de conteo en
+ * la fecha de facturación") vía `contarEstudiantesFacturables` (inyectada; producción =
+ * agregación `.count()`, ver `crearContadorEstudiantesFacturablesFirestore` más abajo) y se
+ * alimenta junto a `sedesExtraContratadas`/`equipoTecnicoExtraContratado` del propio doc del
+ * tenant a `calcularFacturacionMensual` (facturacion.js, Bloque 2, pura -- misma función que
+ * consume la calculadora pública, D1). Si `contarEstudiantesFacturables` lanza (ej. Firestore
+ * no disponible), la excepción sube al `catch` exterior de ESE tenant: no se cobra un monto
+ * adivinado -- se loguea y se reintenta mañana, igual que cualquier otro fallo inesperado de
+ * este bloque (mismo criterio que un `actualizarTenant` que rechaza).
  */
 function crearServicioCobroAutomaticoMensual({
   listarTenantsPendientesDeCobro,
   obtenerWompiPaymentSourceId,
+  contarEstudiantesFacturables,
   crearTransaccionWompi,
   actualizarTenant,
   incrementarUno,
@@ -293,7 +280,19 @@ function crearServicioCobroAutomaticoMensual({
           continue;
         }
 
-        const amountInCents = calcularMontoMensualCentavos(tenant);
+        // Snapshot del conteo facturable EN ESTE MOMENTO -- sin prorrateo (spec
+        // facturacion-metered): un alta a mitad de ciclo cuenta completo, un retiro anterior
+        // al corte ya no cuenta (estadoMatricula=='activo' es el filtro de la query, ver
+        // crearContadorEstudiantesFacturablesFirestore). sedesExtraContratadas/
+        // equipoTecnicoExtraContratado son opcionales/aditivos en tenants/{tenantId} (D7) --
+        // calcularFacturacionMensual ya los normaliza a 0 si vienen undefined.
+        const estudiantesFacturables = await contarEstudiantesFacturables(tenantId);
+        const resultadoFacturacion = calcularFacturacionMensual({
+          estudiantesFacturables,
+          sedesExtraContratadas: tenant.sedesExtraContratadas,
+          equipoTecnicoExtraContratado: tenant.equipoTecnicoExtraContratado,
+        });
+        const amountInCents = calcularMontoFacturableCentavos(resultadoFacturacion);
         const reference = construirReferenciaCobroAutomatico(tenantId, Date.now());
 
         let resultado;
@@ -402,19 +401,51 @@ function crearLectorWompiPaymentSourceIdFirestore(firestore) {
   };
 }
 
+// Cuenta estudiantes FACTURABLES (estadoMatricula=='activo') de un tenant vía una agregación
+// `.count()` de Firestore -- NO un `.get()` completo (design.md, pricing-cupo-real: este cron
+// corre a diario por cada tenant vencido; un `.get()` completo sería N lecturas de documento
+// innecesarias solo para saber CUÁNTOS hay, ver EntradaFacturacion.estudiantesFacturables en
+// design.md, "un count, NOT a doc list"). El predicado `estadoMatricula=='activo'` es también
+// el mecanismo por el que un estudiante retirado antes del corte deja de contar (spec
+// facturacion-metered, Scenario "Estudiante retirado antes del corte no se factura") --
+// Firestore filtra server-side, no hay lógica JS de exclusión que agregar acá.
+//
+// Nota operativa (documentada, no adivinada -- ver apply-progress/reporte final): esta query
+// asume que `scripts/backfillEstadoMatricula.js` (Bloque 1) ya corrió en producción antes de
+// que este lector exista ahí. `normalizarEstadoMatricula` (facturacion.js) trata la AUSENCIA
+// del campo como 'activo' para lecturas en memoria de un doc completo, pero Firestore no puede
+// expresar "campo ausente OR == 'activo'" en un único `where` de agregación -- el rollout de
+// design.md (Migration/Rollout, paso 1) ordena el backfill explícitamente ANTES de que este
+// lector se despliegue, precisamente para que este `==` sea exacto.
+//
+// Mismo patrón (independiente, sin módulo compartido -- ver academico/estudiantes.js y
+// vigilanciaFacturacion.js, que definen su propia copia de esta misma query por la misma
+// razón que el resto de este archivo no comparte `assertEsAdmin`/`assertTenantAutorizado` con
+// esos módulos: cada Cloud Function es un archivo autocontenido en este repo).
+function crearContadorEstudiantesFacturablesFirestore(firestore) {
+  return async function contarEstudiantesFacturables(tenantId) {
+    const snapshot = await firestore
+      .collection('estudiantes')
+      .where('tenantId', '==', tenantId)
+      .where('estadoMatricula', '==', 'activo')
+      .count()
+      .get();
+
+    return snapshot.data().count;
+  };
+}
+
 module.exports = {
   crearServicioCrearFuentePagoWompi,
   crearServicioCobroAutomaticoMensual,
   crearListadoTenantsPendientesDeCobroFirestore,
   crearLectorWompiPaymentSourceIdFirestore,
+  crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
-  calcularMontoMensualPesos,
-  calcularMontoMensualCentavos,
+  calcularMontoFacturableCentavos,
   construirReferenciaCobroAutomatico,
   extraerMensajeErrorWompi,
   normalizarFecha,
-  PLANES_SAAS,
-  COSTOS_ADICIONALES,
   WOMPI_PUBLIC_KEY,
   WOMPI_API_BASE,
   MAX_INTENTOS_FALLIDOS,

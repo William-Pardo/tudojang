@@ -6,7 +6,7 @@ import { RolUsuario } from '../tipos';
 import { useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
-import { obtenerLimiteEquipoTecnico } from '../utils/limitesSaas';
+import { calcularCapacidad } from '../utils/facturacion';
 import { DOMINIOS_PASARELAS_PAGO_PERMITIDOS } from '../constantes';
 
 export const useGestionConfiguracion = () => {
@@ -93,8 +93,13 @@ export const useGestionConfiguracion = () => {
         );
     }, [usuarios, filtroUsuario]);
 
+    // SDD pricing-cupo-real (Bloque 4, D8 design.md): calcularCapacidad ya cuenta al
+    // owner/Admin DENTRO de los 3 cupos incluidos (facturacion-config.json ->
+    // incluido.equipoTecnico) -- reemplaza a obtenerLimiteEquipoTecnico (utils/limitesSaas.ts,
+    // borrado en este bloque), que sumaba `limitePlan + 1 + cuposAdicionales` con el owner
+    // como un cupo extra oculto por fuera del plan.
     const limiteUsuariosPermitido = useMemo(() => {
-        return obtenerLimiteEquipoTecnico(configClub);
+        return calcularCapacidad(configClub ?? {}).equipoTecnico;
     }, [configClub]);
 
     // Fix tutor-role-end-to-end (2026-07-14): el cupo del plan es de STAFF (equipo técnico).
@@ -232,6 +237,7 @@ export const useGestionConfiguracion = () => {
         cargarConfiguracion,
         usuarios,
         usuariosFiltrados,
+        limiteUsuariosPermitido,
         localConfigClub,
         localConfigNotificaciones,
         cargandoAccion,

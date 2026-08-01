@@ -1,5 +1,5 @@
 // vistas/RegistroEscuela.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -7,8 +7,7 @@ import { registrarNuevaEscuela, buscarTenantPorSlug } from '../servicios/configu
 import { IconoLogoOficial, IconoCasa, IconoEnviar, IconoExitoAnimado } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import FormInputError from '../components/FormInputError';
-import { enviarEmailBienvenida, provisionarUsuarioOnboarding, activarSuscripcionManual } from '../servicios/emailService';
-import { construirUrlCheckoutWompi } from '../servicios/wompiApi';
+import { enviarEmailBienvenida, provisionarUsuarioOnboarding } from '../servicios/emailService';
 
 const schema = yup.object({
     nombreClub: yup.string().required('El nombre de la academia es obligatorio.'),
@@ -24,12 +23,18 @@ const generarSlug = (nombre: string) => {
         .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y final
 };
 
+// SDD pricing-cupo-real (Bloque 4, tarea 4.11 -- "remove plan selection; 7-day demo trial
+// untouched"): el alta ya NO pasa por un checkout de Wompi. registrarNuevaEscuela crea el
+// tenant en estadoSuscripcion:'demo' de forma incondicional (7 días de gracia) -- exigir un
+// pago antes de poder usar la cuenta era redundante con ese trial y quedaba inconsistente
+// una vez que la landing dejó de ofrecer planes fijos que "elegir y pagar". El flujo pasa de
+// (registro -> checkout Wompi -> retorno -> éxito) a (registro -> éxito directo).
 const RegistroEscuela: React.FC = () => {
-    const [paso, setPaso] = useState<'formulario' | 'procesando' | 'exito'>('formulario');
+    const [paso, setPaso] = useState<'formulario' | 'exito'>('formulario');
     const [cargando, setCargando] = useState(false);
     const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
     const [aceptaTerminos, setAceptaTerminos] = useState(false);
-    const [datosTemporales, setDatosTemporales] = useState<any>(null); // Datos tras volver de Wompi
+    const [datosTemporales, setDatosTemporales] = useState<any>(null);
     const [passwordCopiada, setPasswordCopiada] = useState(false); // Control para habilitar login
     const [debugLog, setDebugLog] = useState<string>('');
     const { mostrarNotificacion } = useNotificacion();
@@ -40,68 +45,6 @@ const RegistroEscuela: React.FC = () => {
     const nombreClub = watch('nombreClub');
     const slugCalculado = nombreClub ? generarSlug(nombreClub) : '';
     const aceptoCondicionesLegales = aceptaPrivacidad && aceptaTerminos;
-
-    // Helper robusto para obtener parámetros sin importar HashRouter
-    const getParam = (name: string) => {
-        const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.has(name)) return searchParams.get(name);
-
-        const hashParts = window.location.hash.split('?');
-        if (hashParts.length > 1) {
-            const hashParams = new URLSearchParams(hashParts[1]);
-            return hashParams.get(name);
-        }
-        return null;
-    };
-
-    // Detectar retorno de Wompi
-    useEffect(() => {
-        const wompiId = getParam('id');
-        const pendingReg = localStorage.getItem('registro_pendiente');
-
-        if ((window as any).setAppDebugLog) {
-            (window as any).setAppDebugLog(`RE_DETECT: ID=${wompiId} | Pending=${!!pendingReg}`);
-        }
-
-        if (wompiId) {
-            if (!pendingReg) {
-                setDebugLog("Error: id detectado pero no hay registro_pendiente");
-            } else {
-                setDebugLog("Retorno detectado: " + wompiId);
-                setPaso('procesando');
-                const FinalizarActivacion = async () => {
-                    setDebugLog("Finalizando activación...");
-                    const datos = JSON.parse(pendingReg);
-                    setDatosTemporales(datos);
-
-                    try {
-                        // DOBLE SEGURIDAD: Activamos manualmente al volver
-                        await activarSuscripcionManual({
-                            tenantId: datos.tenantId,
-                            email: datos.email,
-                            transactionId: wompiId
-                        });
-
-                        // Enviamos email de bienvenida
-                        await enviarEmailBienvenida({
-                            email: datos.email,
-                            nombreClub: datos.nombreClub,
-                            passwordTemporal: datos.password,
-                            slug: datos.slug
-                        });
-                    } catch (e) {
-                        console.warn("Aviso: Activación manual ya procesada o lenta:", e);
-                    }
-
-                    setDebugLog("¡Éxito!");
-                    setPaso('exito');
-                    localStorage.removeItem('registro_pendiente');
-                };
-
-                setTimeout(FinalizarActivacion, 2000);
-            }
-        }
-    }, [window.location.search, window.location.hash]);
 
     const onSubmit = async (data: any) => {
         if (!aceptoCondicionesLegales) {
@@ -135,19 +78,18 @@ const RegistroEscuela: React.FC = () => {
             }
             const passwordTemporal = Math.random().toString(36).slice(-8).toUpperCase();
             const nuevoTenantId = `tnt-${Date.now()}`;
-
-            log("Guardando LocalStorage...");
-            localStorage.setItem('registro_pendiente', JSON.stringify({
+            const datosNuevaEscuela = {
                 tenantId: nuevoTenantId,
                 slug,
                 email: data.email,
                 password: passwordTemporal,
                 nombreClub: data.nombreClub
-            }));
+            };
 
-            // 1. Registrar el Tenant en Firestore
+            // Registrar el Tenant en Firestore -- sin plan que seleccionar, entra directo en
+            // el trial de 7 días (estadoSuscripcion:'demo', ya incondicional en
+            // registrarNuevaEscuela).
             log("Registrando club...");
-            const planId = getParam('plan');
 
             if (!(window as any).Cypress) {
                 await registrarNuevaEscuela({
@@ -155,12 +97,11 @@ const RegistroEscuela: React.FC = () => {
                     nombreClub: data.nombreClub,
                     slug,
                     emailClub: data.email,
-                    plan: planId || 'starter',
                     passwordTemporal: passwordTemporal,
                     estadoSuscripcion: 'demo' as any
                 });
 
-                // 2. Pre-provisionar el usuario (Cloud Function)
+                // Pre-provisionar el usuario (Cloud Function)
                 log("Provisionando cuenta...");
                 await provisionarUsuarioOnboarding({
                     tenantId: nuevoTenantId,
@@ -168,35 +109,27 @@ const RegistroEscuela: React.FC = () => {
                     nombre: data.nombreClub,
                     password: passwordTemporal
                 });
+
+                // Email de bienvenida con las credenciales -- ya no depende de un retorno de
+                // Wompi para dispararse. Un fallo acá no debe bloquear la pantalla de éxito
+                // (mismo criterio defensivo que ya tenía el flujo viejo tras el pago).
+                try {
+                    await enviarEmailBienvenida({
+                        email: data.email,
+                        nombreClub: data.nombreClub,
+                        passwordTemporal: passwordTemporal,
+                        slug
+                    });
+                } catch (e) {
+                    console.warn("Aviso: no se pudo enviar el email de bienvenida:", e);
+                }
             } else {
                 log("[TEST MODE] Saltando llamadas a Firebase");
             }
 
-            console.log("Calculando firmas...");
-            const precioParam = getParam('precio') || '50000';
-
-            log("Generando firma...");
-            const urlRetorno = `${window.location.origin}/#/registro-escuela`;
-            const urlWompi = await construirUrlCheckoutWompi({
-                tenantId: nuevoTenantId,
-                itemType: 'alta',
-                itemId: planId || 'starter',
-                periodo: 'mensual',
-                montoEnPesos: parseInt(precioParam, 10),
-                redirectUrl: urlRetorno,
-            });
-            log("Firma generada. Preparando URL...");
-
-            console.log("Redirigiendo a Wompi:", urlWompi);
-            log("URL Lista. Redirigiendo...");
-
-            // Soporte para tests de Cypress (evitar salir de la app)
-            if ((window as any).Cypress) {
-                (window as any).lastRedirectWompi = urlWompi;
-                (window as any).setAppDebugLog("REDIRECT_SET: " + urlWompi);
-            } else {
-                window.location.assign(urlWompi);
-            }
+            log("¡Éxito!");
+            setDatosTemporales(datosNuevaEscuela);
+            setPaso('exito');
 
         } catch (error: any) {
             if ((window as any).setAppDebugLog) {
@@ -221,18 +154,6 @@ const RegistroEscuela: React.FC = () => {
             </a>
         </nav>
     );
-
-    if (paso === 'procesando') {
-        return (
-            <div className="min-h-screen bg-white flex items-center justify-center font-sans">
-                <div className="text-center space-y-4">
-                    <div className="w-16 h-16 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin mx-auto"></div>
-                    <h2 className="text-2xl font-black uppercase text-tkd-dark">Verificando Pago...</h2>
-                    <p className="text-gray-500 text-sm">Estamos confirmando tu transacción con el banco.</p>
-                </div>
-            </div>
-        );
-    }
 
     if (paso === 'exito' && datosTemporales) {
         const copiarPassword = () => {
@@ -395,7 +316,7 @@ const RegistroEscuela: React.FC = () => {
                                 className="w-full bg-tkd-dark text-white py-6 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:bg-tkd-blue transition-all flex items-center justify-center gap-4 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 mt-4"
                             >
                                 {cargando ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-5 h-5" />}
-                                Ir al Pago Seguro
+                                Crear mi Academia
                             </button>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

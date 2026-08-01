@@ -15,9 +15,11 @@ function crearContextoAdmin(overrides = {}) {
   };
 }
 
-// Fake minimo de Firestore: sedes en memoria + doc de tenant (plan/cupos), suficiente
-// para las dos colecciones que estas funciones tocan (`sedes`, `tenants`).
-function crearFirestoreFake({ sedesExistentes = [], tenantData = { plan: 'starter' } } = {}) {
+// Fake minimo de Firestore: sedes en memoria + doc de tenant (capacidad), suficiente
+// para las dos colecciones que estas funciones tocan (`sedes`, `tenants`). SDD
+// pricing-cupo-real (Bloque 3b): `tenantData` por defecto es `{}` -- calcularCapacidad({}).sedes
+// = 1 (solo la sede incluida, sin bono ni extras), ya no `LIMITE_SEDES_POR_PLAN[plan]`.
+function crearFirestoreFake({ sedesExistentes = [], tenantData = {} } = {}) {
   const sedes = new Map(sedesExistentes.map((s) => [s.id, { ...s }]));
   let contadorIds = 0;
 
@@ -107,13 +109,15 @@ test('createSede: rechaza nombre vacio', async () => {
   );
 });
 
-test('createSede: rechaza si ya se alcanzo el limite del plan (bug real: antes solo se chequeaba en el boton de la UI)', async () => {
+test('createSede: rechaza si ya se alcanzo la capacidad incluida (bug real: antes solo se chequeaba en el boton de la UI)', async () => {
   const firestore = crearFirestoreFake({
     sedesExistentes: [
       { id: 'principal', tenantId: 'tenant-1', nombre: 'Sede Principal' },
       { id: 'sede-2', tenantId: 'tenant-1', nombre: 'Sede 2' },
     ],
-    tenantData: { plan: 'starter' }, // limiteSedes: 2
+    // calcularCapacidad({}).sedes = 1 (solo la incluida, sin bono ni extras) -- 2 existentes
+    // ya la superan.
+    tenantData: {},
   });
   const servicio = crearServicioCreateSede({ firestore });
 
@@ -123,13 +127,13 @@ test('createSede: rechaza si ya se alcanzo el limite del plan (bug real: antes s
   );
 });
 
-test('createSede: permite crear si hay cupos adicionales comprados que amplian el limite del plan', async () => {
+test('createSede: permite crear si hay sedesExtraContratadas que amplian la capacidad incluida (SDD pricing-cupo-real: ya no PLANES_SAAS/cuposSedesAdicionales)', async () => {
   const firestore = crearFirestoreFake({
     sedesExistentes: [
       { id: 'principal', tenantId: 'tenant-1', nombre: 'Sede Principal' },
       { id: 'sede-2', tenantId: 'tenant-1', nombre: 'Sede 2' },
     ],
-    tenantData: { plan: 'starter', cuposSedesAdicionales: 1 }, // 2 + 1 = 3
+    tenantData: { sedesExtraContratadas: 2 }, // calcularCapacidad: 1 incluida + 2 extra = 3
   });
   const servicio = crearServicioCreateSede({ firestore });
 
@@ -138,13 +142,50 @@ test('createSede: permite crear si hay cupos adicionales comprados que amplian e
   assert.equal(creada.nombre, 'Sede 3');
 });
 
-test('createSede: no cuenta sedes con deletedAt contra el limite del plan', async () => {
+test('createSede: el bono de sede (sedeBonusOtorgada) tambien amplia la capacidad -- obtenerLimiteSedes delega en calcularCapacidad, no en un campo propio', async () => {
+  const firestore = crearFirestoreFake({
+    sedesExistentes: [
+      { id: 's1', tenantId: 'tenant-1', nombre: 'Sede 1' },
+      { id: 's2', tenantId: 'tenant-1', nombre: 'Sede 2' },
+      { id: 's3', tenantId: 'tenant-1', nombre: 'Sede 3' },
+    ],
+    // calcularCapacidad: 1 incluida + 1 bono (70 estudiantes, D4) + 2 extra = 4
+    tenantData: { sedeBonusOtorgada: true, sedesExtraContratadas: 2 },
+  });
+  const servicio = crearServicioCreateSede({ firestore });
+
+  const creada = await servicio({ tenantId: 'tenant-1', nombre: 'Sede 4' }, crearContextoAdmin());
+
+  assert.equal(creada.nombre, 'Sede 4');
+});
+
+test('createSede: rechaza al superar la capacidad (incluida + bono + extras), no un limite de plan', async () => {
+  const firestore = crearFirestoreFake({
+    sedesExistentes: [
+      { id: 's1', tenantId: 'tenant-1', nombre: 'Sede 1' },
+      { id: 's2', tenantId: 'tenant-1', nombre: 'Sede 2' },
+      { id: 's3', tenantId: 'tenant-1', nombre: 'Sede 3' },
+      { id: 's4', tenantId: 'tenant-1', nombre: 'Sede 4' },
+    ],
+    tenantData: { sedeBonusOtorgada: true, sedesExtraContratadas: 2 }, // capacidad = 4
+  });
+  const servicio = crearServicioCreateSede({ firestore });
+
+  await assert.rejects(
+    () => servicio({ tenantId: 'tenant-1', nombre: 'Sede 5' }, crearContextoAdmin()),
+    /l[íi]mite de sedes alcanzado/i,
+  );
+});
+
+test('createSede: no cuenta sedes con deletedAt contra la capacidad', async () => {
   const firestore = crearFirestoreFake({
     sedesExistentes: [
       { id: 'principal', tenantId: 'tenant-1', nombre: 'Sede Principal' },
       { id: 'sede-vieja', tenantId: 'tenant-1', nombre: 'Sede Vieja', deletedAt: '2026-01-01T00:00:00.000Z' },
     ],
-    tenantData: { plan: 'starter' }, // limiteSedes: 2
+    // 1 incluida + 1 extra = 2 -- solo 1 sede ACTIVA existente ("Sede Principal"), asi que
+    // esto aisla el comportamiento de deletedAt (no la aritmetica de capacidad en si).
+    tenantData: { sedesExtraContratadas: 1 },
   });
   const servicio = crearServicioCreateSede({ firestore });
 
@@ -158,7 +199,7 @@ test('createSede: rechaza nombre duplicado (insensible a mayusculas/espacios) --
     sedesExistentes: [
       { id: 'sede-b', tenantId: 'tenant-1', nombre: 'Sede B' },
     ],
-    tenantData: { plan: 'growth' }, // limiteSedes: 3, no es el limite lo que bloquea aca
+    tenantData: { sedesExtraContratadas: 2 }, // capacidad de sobra (1+2=3): no es el limite lo que bloquea aca
   });
   const servicio = crearServicioCreateSede({ firestore });
 
@@ -168,10 +209,10 @@ test('createSede: rechaza nombre duplicado (insensible a mayusculas/espacios) --
   );
 });
 
-test('createSede: crea correctamente dentro del limite con nombre unico', async () => {
+test('createSede: crea correctamente dentro de la capacidad con nombre unico', async () => {
   const firestore = crearFirestoreFake({
     sedesExistentes: [{ id: 'principal', tenantId: 'tenant-1', nombre: 'Sede Principal' }],
-    tenantData: { plan: 'growth' }, // limiteSedes: 3
+    tenantData: { sedesExtraContratadas: 2 }, // 1 incluida + 2 extra = 3
   });
   const servicio = crearServicioCreateSede({ firestore });
 
@@ -186,10 +227,7 @@ test('createSede: crea correctamente dentro del limite con nombre unico', async 
 });
 
 test('createSede: ignora cualquier deletedAt/id/tenantId que venga en el payload del cliente', async () => {
-  const firestore = crearFirestoreFake({
-    sedesExistentes: [],
-    tenantData: { plan: 'starter' },
-  });
+  const firestore = crearFirestoreFake({ sedesExistentes: [] });
   const servicio = crearServicioCreateSede({ firestore });
 
   const creada = await servicio(
@@ -317,13 +355,13 @@ test('deleteSede: marca deletedAt (soft delete) sin borrar el documento', async 
   assert.equal(sedeGuardada.nombre, 'Sede Norte');
 });
 
-test('deleteSede: una sede eliminada deja de contar contra el limite del plan para un create posterior', async () => {
+test('deleteSede: una sede eliminada deja de contar contra la capacidad para un create posterior', async () => {
   const firestore = crearFirestoreFake({
     sedesExistentes: [
       { id: 'principal', tenantId: 'tenant-1', nombre: 'Sede Principal' },
       { id: 'sede-2', tenantId: 'tenant-1', nombre: 'Sede 2' },
     ],
-    tenantData: { plan: 'starter' }, // limiteSedes: 2
+    tenantData: { sedesExtraContratadas: 1 }, // 1 incluida + 1 extra = 2
   });
   const eliminar = crearServicioDeleteSede({ firestore });
   const crear = crearServicioCreateSede({ firestore });
@@ -337,7 +375,7 @@ test('deleteSede: una sede eliminada deja de contar contra el limite del plan pa
 // ─── SuperAdmin cross-tenant ────────────────────────────────────────────────
 
 test('createSede: SuperAdmin puede crear sedes en cualquier tenant', async () => {
-  const firestore = crearFirestoreFake({ tenantData: { plan: 'pro' } });
+  const firestore = crearFirestoreFake();
   const servicio = crearServicioCreateSede({ firestore });
 
   const creada = await servicio(

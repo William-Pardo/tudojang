@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
-import { PLANES_SAAS } from '../constantes';
 
 // Componentes
 import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificados, IconoInformacion, IconoCampana, IconoCarnets, IconoControlAsistencia } from '../components/Iconos';
@@ -61,6 +60,8 @@ export const VistaEstudiantes: React.FC = () => {
         abrirConfirmacionEliminar,
         cerrarConfirmacion,
         confirmarEliminacion,
+        retirarEstudiante,
+        reactivarEstudiante,
         modalFirmaAbierto,
         firmaParaVer,
         abrirModalFirma,
@@ -73,7 +74,6 @@ export const VistaEstudiantes: React.FC = () => {
         goToNextPage,
         goToPreviousPage,
         exportarCSV,
-        configClub,
         limpiarFiltros,
         filtrosActivos,
     } = useGestionEstudiantes();
@@ -82,10 +82,6 @@ export const VistaEstudiantes: React.FC = () => {
     const [misionActiva, setMisionActiva] = useState<MisionKicho | null>(null);
     const [countdown, setCountdown] = useState('');
     const [generandoData, setGenerandoData] = useState(false);
-    const limiteEstudiantes = PLANES_SAAS[configClub.plan as keyof typeof PLANES_SAAS]?.limiteEstudiantes
-        || configClub.limiteEstudiantes
-        || 50;
-    const porcentajeCapacidad = estudiantes.length / limiteEstudiantes;
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
     const [activeTab, setActiveTab] = useState<TabId>(esTutor ? 'asistencia' : 'directorio');
@@ -152,7 +148,7 @@ export const VistaEstudiantes: React.FC = () => {
                                     <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
                                 </div>
                             </div>
-                            <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} />
+                            <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} onRetirar={retirarEstudiante} onReactivar={reactivarEstudiante} />
                             {renderPaginacion()}
                         </>
                     )}
@@ -225,22 +221,15 @@ export const VistaEstudiantes: React.FC = () => {
                     <div className="flex items-center gap-4 mt-2">
                         <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.2em]">Gestión centralizada de la base técnica</p>
                         <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-tkd-blue/60 uppercase tracking-widest mb-1">Capacidad del Plan</span>
-                                <div className="w-32 h-2 bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden border border-black/5 dark:border-white/5">
-                                    <div
-                                        className={`h-full transition-all duration-1000 ${porcentajeCapacidad > 0.9 ? 'bg-tkd-red' : 'bg-tkd-blue'}`}
-                                        style={{ width: `${Math.min(porcentajeCapacidad * 100, 100)}%` }}
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs font-black text-tkd-dark dark:text-white leading-none">
-                                    {estudiantes.length} / {limiteEstudiantes}
-                                </span>
-                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Estudiantes Activos</span>
-                            </div>
+                        {/* SDD pricing-cupo-real (Bloque 4, capacidad-tenant: "Sin tope duro de
+                            matrícula"): ya no hay un límite de plan contra el cual mostrar una
+                            barra de capacidad -- solo el conteo real, que es exactamente lo que
+                            factura calcularFacturacionMensual. */}
+                        <div className="flex flex-col">
+                            <span className="text-xs font-black text-tkd-dark dark:text-white leading-none">
+                                {estudiantes.length}
+                            </span>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Estudiantes Activos</span>
                         </div>
                     </div>
                 </div>
@@ -253,7 +242,7 @@ export const VistaEstudiantes: React.FC = () => {
                             <button
                                 disabled={generandoData}
                                 onClick={async () => {
-                                    if (window.confirm("¿Generar 10 estudiantes de prueba? (Se validará el límite de tu plan)")) {
+                                    if (window.confirm("¿Generar 10 estudiantes de prueba?")) {
                                         setGenerandoData(true);
                                         try {
                                             const { generarEstudiantesFicticios } = await import('../utils/userSeeder');

@@ -28,24 +28,20 @@ coverage/
 !package.json
 !package-lock.json
 !**/package.json
-# Fuente unica de verdad de precios y limites de plan. NO es un reporte generado: lo
-# consumen constantes.ts (frontend) y functions/{wompiCobroAutomatico,academico/sedes,
-# academico/estudiantes}.js (Cloud Functions). Sin esta excepcion la regla `*.json` de
-# arriba lo dejaba fuera de git y en un clone limpio / CI el build reventaba.
-#
-# VIVE DENTRO DE functions/ A PROPOSITO: firebase.json declara `"source": "functions"`, asi
-# que el deploy empaqueta y sube UNICAMENTE esa carpeta. Con el archivo en la raiz del repo,
-# los `require('../../planes-config.json')` resolvian fuera del paquete y las tres Functions
-# se caian con MODULE_NOT_FOUND en cold start. El frontend lo importa hacia adentro
-# (`./functions/planes-config.json`), que si funciona porque Vite construye desde la raiz.
-!functions/planes-config.json
 # Contrato de calculo de facturacion medida (SDD pricing-cupo-real, Bloque 2 -- D1,
-# design.md). Reemplaza planes-config.json (se borra en el Bloque 4, tasks.md 4.13); NO son
-# reportes generados, son la fuente unica de precios/tramos y los vectores dorados que
-# iteran functions/facturacion.test.js Y utils/facturacion.test.ts. Mismo motivo que la
-# excepcion de arriba: sin esto la regla `*.json` los deja fuera de git en silencio.
+# design.md; reemplaza al viejo planes-config.json, borrado en el Bloque 4, tasks.md 4.13).
+# NO son reportes generados, son la fuente unica de precios/tramos y los vectores dorados que
+# iteran functions/facturacion.test.js Y utils/facturacion.test.ts. Mismo motivo que la regla
+# `*.json` de arriba: sin esta excepcion quedan fuera de git en silencio.
 !functions/facturacion-config.json
 !functions/facturacion-vectores.json
+# Umbrales del guardrail de crecimiento/caida anomala de matricula (SDD pricing-cupo-real,
+# Bloque 3b -- D5, design.md). Deliberadamente un archivo separado de facturacion-config.json
+# (Bloque 2, no reabierto): D1 acota ese archivo a precios/tramos de facturacion, no a
+# parametros de deteccion de anomalias. Consumido por functions/vigilanciaFacturacion.js --
+# mismo motivo que las excepciones de arriba: sin esto, la regla `*.json` lo deja fuera de git
+# en silencio y el cron revienta con MODULE_NOT_FOUND en cold start.
+!functions/vigilancia-config.json
 # Linea base congelada de deuda del catalogo de soporte (openspec/changes/
 # catalogo-soporte-marcadores-vivos, Fase 6, D4). Fuente hand-curated que consume
 # scripts/verificar-rutas-soporte.mjs -- NO es un reporte generado, la regla `*.json` de

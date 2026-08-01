@@ -80,6 +80,8 @@ const renderFila = (overrides: Partial<React.ComponentProps<typeof FilaEstudiant
     onEliminar: jest.fn(),
     onVerFirma: jest.fn(),
     onCompartirLink: jest.fn(),
+    onRetirar: jest.fn(),
+    onReactivar: jest.fn(),
     isCard: true,
     ...overrides,
   };
@@ -192,7 +194,32 @@ describe('FilaEstudiante', () => {
     renderFila();
 
     expect(screen.queryByTitle('Eliminar')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Retirar (conserva historial)')).not.toBeInTheDocument();
     expect(screen.getByTitle('Editar')).toBeInTheDocument();
+  });
+
+  // SDD pricing-cupo-real (Bloque 4, matricula-estado-estudiante): conecta la UI a
+  // retirarEstudiante/reactivarEstudiante (Bloque 1, ya implementadas y probadas en
+  // servicios/estudiantesApi.ts -- no se reabre esa lógica acá).
+  it('Scenario "Retirar un estudiante": un estudiante activo muestra el botón Retirar y lo invoca con el estudiante', async () => {
+    const user = userEvent.setup();
+    const { props } = renderFila({ estudiante: crearEstudiante({ estadoMatricula: 'activo' }) });
+
+    expect(screen.queryByText('Retirado')).not.toBeInTheDocument();
+    await user.click(screen.getByTitle('Retirar (conserva historial)'));
+    expect(props.onRetirar).toHaveBeenCalledWith(props.estudiante);
+    expect(screen.queryByTitle('Reactivar matrícula')).not.toBeInTheDocument();
+  });
+
+  it('Scenario "Reactivar un estudiante retirado": muestra el badge Retirado y el botón Reactivar, sin ocultar la fila', async () => {
+    const user = userEvent.setup();
+    const { props } = renderFila({ estudiante: crearEstudiante({ estadoMatricula: 'retirado' }) });
+
+    expect(screen.getByText('Retirado')).toBeInTheDocument();
+    expect(screen.getByText('Ana García')).toBeInTheDocument(); // la fila NO se borra
+    await user.click(screen.getByTitle('Reactivar matrícula'));
+    expect(props.onReactivar).toHaveBeenCalledWith(props.estudiante);
+    expect(screen.queryByTitle('Retirar (conserva historial)')).not.toBeInTheDocument();
   });
 
   // Nota 2026-07-22: aca vivian 4 casos mas, sobre la anulacion del ultimo pago. El commit

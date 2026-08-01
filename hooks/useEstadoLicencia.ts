@@ -12,7 +12,6 @@ export const useEstadoLicencia = () => {
             diasRestantes: 0,
             fechaVencimiento: '',
             diasGracia: 5,
-            plan: 'starter',
             esDemo: false
         };
     }
@@ -30,7 +29,6 @@ export const useEstadoLicencia = () => {
             diasRestantes: 30,
             fechaVencimiento: '',
             diasGracia,
-            plan: configClub.plan,
             esDemo: configClub.estadoSuscripcion === 'demo',
             cargando: false
         };
@@ -55,7 +53,6 @@ export const useEstadoLicencia = () => {
         diasRestantes,
         fechaVencimiento: configClub.fechaVencimiento,
         diasGracia,
-        plan: configClub.plan,
         esDemo: configClub.estadoSuscripcion === 'demo',
         configClub,
         cargando: false

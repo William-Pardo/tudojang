@@ -596,28 +596,32 @@ describe('ModalImportacionMasiva', () => {
       );
     });
 
-    it('cuando el rechazo es por límite del plan, muestra ese motivo accionable', async () => {
+    // SDD pricing-cupo-real (Bloque 4, capacidad-tenant: "Alta nunca se bloquea por
+    // capacidad"): ya no existe un tope duro de plan -- el backend
+    // (functions/academico/estudiantes.js) dejó de lanzar 'resource-exhausted' desde el
+    // Bloque 3 (tasks.md 3.9/3.10). Este caso reemplaza al viejo "muestra ese motivo
+    // accionable": un error con ese código (legado, ya no lo emite el backend, pero no debe
+    // recibir trato especial si llegara a aparecer) cae al mensaje genérico de conteo, igual
+    // que cualquier otro fallo de fila.
+    it('un error con código legado resource-exhausted ya NO recibe trato especial -- cae al mensaje genérico de conteo', async () => {
       const user = userEvent.setup();
       const { container } = renderModal();
-      const limite: any = new Error(
-        'Límite del plan superado (50 alumnos). Por favor, suba de plan o agregue un addon para agregar más estudiantes.'
-      );
-      limite.code = 'functions/resource-exhausted';
+      const errorLegado: any = new Error('Cualquier mensaje del backend');
+      errorLegado.code = 'functions/resource-exhausted';
       mockAgregarEstudiante
         .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(limite);
+        .mockRejectedValueOnce(errorLegado);
 
       await importarDosFilas(user, container);
 
       await waitFor(() => {
         expect(mockMostrarNotificacion).toHaveBeenCalledWith(
-          expect.stringContaining('Límite del plan superado (50 alumnos)'),
+          'Se registraron 1 de 2 alumnos. 1 fila no se pudo importar.',
           'error'
         );
       });
-      // El conteo real tambien viaja, para que el operador sepa que SI entro.
-      expect(mockMostrarNotificacion).toHaveBeenCalledWith(
-        expect.stringContaining('Se registraron 1 de 2 alumnos'),
+      expect(mockMostrarNotificacion).not.toHaveBeenCalledWith(
+        expect.stringContaining('Límite del plan'),
         'error'
       );
     });

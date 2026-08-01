@@ -68,6 +68,21 @@ test("clients cannot write billing-affecting tenant fields directly -- camposFac
   );
 });
 
+// SDD pricing-cupo-real (D6, design.md "Guardrail history storage"): historial diario de
+// estudiantes facturables por tenant (functions/vigilanciaFacturacion.js), server-only sin
+// excepcion -- ni siquiera SuperAdmin lee este historial desde el cliente. A diferencia de
+// tenants/{tenantId}/privado/facturacion (Admin read/write desde el cliente, D7), guardar la
+// serie usada para detectar la propia anomalia de un tenant en un lugar que ese mismo tenant
+// puede escribir le permitiria manipularla -- ver D6 en design.md. Mismo patron que
+// asistente_cuotas/asistente_telemetria arriba (`allow read, write: if false`), no el patron
+// mas permisivo de tickets_soporte (que si permite `read` a SuperAdmin/owner).
+test("clients cannot read or write the billing growth watchdog history", () => {
+  assert.match(
+    rules,
+    /match \/facturacion_vigilancia\/\{tenantId\}[\s\S]*allow read, write: if false;/
+  );
+});
+
 // ERR-0011: aislamiento por tenant en las 7 colecciones raiz que se leian/escribian sin
 // filtro de tenant (ver bitacora.json). Cada assert.match confirma que la condicion de
 // tenant esta presente en el bloque de la coleccion correspondiente -- estos son

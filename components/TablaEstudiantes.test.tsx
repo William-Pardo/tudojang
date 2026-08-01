@@ -17,6 +17,8 @@ jest.mock('./FilaEstudiante', () => ({
       <button onClick={() => props.onEliminar(props.estudiante)}>Eliminar {props.estudiante.id}</button>
       <button onClick={() => props.onVerFirma(`firma-${props.estudiante.id}`, props.estudiante.tutor)}>Ver Firma {props.estudiante.id}</button>
       <button onClick={() => props.onCompartirLink('firma', props.estudiante.id)}>Compartir {props.estudiante.id}</button>
+      <button onClick={() => props.onRetirar(props.estudiante)}>Retirar {props.estudiante.id}</button>
+      <button onClick={() => props.onReactivar(props.estudiante)}>Reactivar {props.estudiante.id}</button>
       </>
     );
     return props.isCard
@@ -58,6 +60,8 @@ describe('TablaEstudiantes', () => {
     onEliminar: jest.fn(),
     onVerFirma: jest.fn(),
     onCompartirLink: jest.fn(),
+    onRetirar: jest.fn(),
+    onReactivar: jest.fn(),
   };
 
   beforeEach(() => jest.clearAllMocks());
@@ -98,5 +102,18 @@ describe('TablaEstudiantes', () => {
     expect(callbacks.onEliminar).toHaveBeenCalledWith(estudiante);
     expect(callbacks.onVerFirma).toHaveBeenCalledWith('firma-1', estudiante.tutor);
     expect(callbacks.onCompartirLink).toHaveBeenCalledWith('firma', '1');
+  });
+
+  it('propaga Retirar y Reactivar desde una fila (matricula-estado-estudiante)', async () => {
+    const user = userEvent.setup();
+    const estudiante = crearEstudiante('1', 'Ana');
+    render(<TablaEstudiantes estudiantes={[estudiante]} {...callbacks} />);
+
+    const fila = screen.getByTestId('fila-table-1');
+    await user.click(within(fila).getByText('Retirar 1'));
+    await user.click(within(fila).getByText('Reactivar 1'));
+
+    expect(callbacks.onRetirar).toHaveBeenCalledWith(estudiante);
+    expect(callbacks.onReactivar).toHaveBeenCalledWith(estudiante);
   });
 });

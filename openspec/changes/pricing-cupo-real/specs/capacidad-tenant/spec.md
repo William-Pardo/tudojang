@@ -28,9 +28,15 @@ El sistema MUST exponer un único cálculo de capacidad de sede y de equipo téc
 - WHEN `sedes.js`, `estudiantes.js`, el frontend y cualquier otro lector calculan su límite
 - THEN todos MUST obtener el mismo número, por venir de la misma fuente
 
-### Requirement: Sin tope duro de matrícula, con guardrail de crecimiento anómalo
+### Requirement: Sin tope duro de matrícula, con guardrail de crecimiento/caída anómala
 
-El sistema MUST NOT bloquear la creación de estudiantes por límite de plan o capacidad (reemplaza el bloqueo server-side existente en `crearEstudiante`, `functions/academico/estudiantes.js`). En su lugar, MUST generar una alerta visible para el rol SuperAdmin (superficie: `vistas/MasterDashboard.tsx`) cuando un tenant cruza un umbral de crecimiento anómalo configurable, con default: más de 100 matrículas nuevas activas en una ventana móvil de 7 días.
+El sistema MUST NOT bloquear la creación de estudiantes por límite de plan o capacidad (reemplaza el bloqueo server-side existente en `crearEstudiante`, `functions/academico/estudiantes.js`). En su lugar, MUST generar una alerta visible para el rol SuperAdmin (superficie: `vistas/MasterDashboard.tsx`, correo a `MASTER_EMAIL`) cuando un tenant dispara alguna de tres señales configurables, evaluadas diariamente contra el propio historial reciente del tenant (no contra un umbral absoluto único):
+
+- **S1 (crecimiento relativo)**: el conteo de hoy es mayor o igual al mayor entre un piso absoluto configurable (default 30) y el doble del conteo de hace 7 días.
+- **S2 (salto de un día)**: el conteo de hoy supera al de ayer en más de un incremento diario máximo configurable (default 100).
+- **S3 (caída sospechosa antes del corte)**: el conteo de hoy cae a la mitad o menos del de hace 7 días, y faltan 3 días o menos para la fecha de corte de facturación del tenant.
+
+Estas señales están calibradas para detectar cargas masivas repentinas (S1/S2) y el patrón de "retirar antes del corte, reactivar después" (S3), priorizando evitar falsas alertas sobre clubes grandes que crecen de forma orgánica y gradual. Por diseño, un tenant que ya tiene una base grande y crece de forma sostenida y pareja (por encima del umbral en términos absolutos, pero por debajo en términos relativos a su propia base) MUST NOT disparar ninguna de las tres señales — es una omisión deliberada, no un defecto pendiente.
 
 #### Scenario: Alta de estudiante nunca se bloquea por capacidad
 
@@ -38,18 +44,30 @@ El sistema MUST NOT bloquear la creación de estudiantes por límite de plan o c
 - WHEN se da de alta un estudiante nuevo
 - THEN la creación MUST NOT rechazarse por límite de capacidad o plan
 
-#### Scenario: Crecimiento anómalo dispara alerta, no bloqueo
+#### Scenario: Crecimiento relativo dispara alerta, no bloqueo (S1)
 
-- GIVEN un tenant que registra 101 matrículas nuevas activas en los últimos 7 días
+- GIVEN un tenant cuyo conteo de hoy es mayor o igual al doble del de hace 7 días, y por encima del piso absoluto configurado
 - WHEN se evalúa el guardrail
 - THEN el sistema MUST generar una alerta visible para SuperAdmin para revisión manual, y MUST NOT bloquear ni revertir ninguna matrícula
 - AND el club MUST seguir operando sin restricción
 
-#### Scenario: Umbral configurable
+#### Scenario: Salto de un día dispara alerta, no bloqueo (S2)
 
-- GIVEN el umbral configurado en un valor distinto al default (ej. 50 estudiantes / 3 días)
-- WHEN un tenant lo cruza
-- THEN el guardrail MUST evaluarse contra el valor configurado, no un valor fijo en código
+- GIVEN un tenant cuyo conteo de hoy supera al de ayer en más del incremento diario máximo configurado
+- WHEN se evalúa el guardrail
+- THEN el sistema MUST generar una alerta visible para SuperAdmin para revisión manual, y MUST NOT bloquear ni revertir ninguna matrícula
+
+#### Scenario: Caída sospechosa antes del corte dispara alerta (S3)
+
+- GIVEN un tenant cuyo conteo de hoy cae a la mitad o menos del de hace 7 días, a 3 días o menos de su fecha de corte de facturación
+- WHEN se evalúa el guardrail
+- THEN el sistema MUST generar una alerta visible para SuperAdmin para revisión manual
+
+#### Scenario: Umbrales configurables
+
+- GIVEN los umbrales de S1/S2/S3 configurados en valores distintos al default
+- WHEN un tenant los cruza
+- THEN el guardrail MUST evaluarse contra los valores configurados, no valores fijos en código
 
 ### Requirement: Bono de sede por crecimiento, permanente
 

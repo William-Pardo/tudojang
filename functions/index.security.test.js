@@ -82,6 +82,13 @@ test("email-capable Functions bind RESEND_API_KEY from Secret Manager", () => {
     source,
     /exports\.cobroAutomaticoMensual = paymentFunctions\.pubsub/
   );
+  // SDD pricing-cupo-real (Bloque 3b, D5): vigilarCrecimientoFacturable llama a
+  // enviarCorreo(getResend(), ...) dentro de notificarAlerta -- debe estar atado a
+  // emailFunctions (RESEND_API_KEY), igual que notificarMasterMisionKicho arriba.
+  assert.match(
+    source,
+    /exports\.vigilarCrecimientoFacturable = emailFunctions\.pubsub/
+  );
 });
 
 test("Resend is initialized lazily from the bound environment secret", () => {

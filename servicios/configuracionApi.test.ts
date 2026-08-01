@@ -9,11 +9,10 @@ import {
   obtenerConfiguracionClub,
   guardarConfiguracionClub,
   actualizarCapacidadClub,
-  actualizarPlanClub,
   obtenerTodosLosTenants,
   cambiarEstadoSuscripcionTenant,
 } from './configuracionApi';
-import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO, PLANES_SAAS } from '../constantes';
+import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((db, name) => ({ args: [db, name] })), addDoc: jest.fn(),
@@ -177,11 +176,19 @@ describe('configuracionApi', () => {
   });
 
   describe('registrarNuevaEscuela', () => {
-    it('debería registrar una nueva escuela con los datos proporcionados', async () => {
+    // SDD pricing-cupo-real (Bloque 4): ya no hay planes que seleccionar al registrar una
+    // escuela nueva -- el trial de 7 días (`estadoSuscripcion:'demo'`) se activa igual, sin
+    // derivar límites de `datos.plan`/PLANES_SAAS (que ya no se importa en este archivo).
+    // Nota de secuenciación: `plan`/`limite*` como CAMPOS todavía viajan en el payload en
+    // esta etapa -- vienen del spread de CONFIGURACION_CLUB_POR_DEFECTO, que sigue siendo
+    // obligatorio satisfacer el tipo `ConfiguracionClub` completo hasta el corte final
+    // (tasks.md 4.13, que borra esos campos de tipos.ts). Migration/Rollout de design.md:
+    // "Legacy tenant fields... left in the documents, unread by new code" -- esa es
+    // exactamente esta ventana.
+    it('debería registrar una nueva escuela sin derivar límites de un plan', async () => {
       const datos = {
         nombreClub: 'Nueva Academia',
         slug: 'nueva-academia',
-        plan: 'pro',
       };
       (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
 
@@ -192,12 +199,26 @@ describe('configuracionApi', () => {
         expect.objectContaining({
           nombreClub: 'Nueva Academia',
           slug: 'nueva-academia',
-          plan: 'pro',
           estadoSuscripcion: 'demo',
-          limiteEstudiantes: PLANES_SAAS.pro.limiteEstudiantes,
         })
       );
       expect(tenantId).toEqual(expect.any(String));
+    });
+
+    // SDD pricing-cupo-real (Bloque 4b, corte final tasks.md 4.13): plan/limiteEstudiantes/
+    // limiteUsuarios/limiteSedes ya NO existen en ConfiguracionClub -- este caso reemplaza
+    // al anterior (que solo probaba que no se derivaban de datos.plan mientras el campo
+    // seguía vivo como legado); ahora prueba que ni siquiera viajan en el payload.
+    it('el payload nunca incluye plan/limiteEstudiantes/limiteUsuarios/limiteSedes -- retirados de ConfiguracionClub', async () => {
+      (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
+
+      await registrarNuevaEscuela({ nombreClub: 'A', slug: 'a' });
+      const [, payload] = (setDoc as jest.Mock).mock.calls[0];
+
+      expect(payload).not.toHaveProperty('plan');
+      expect(payload).not.toHaveProperty('limiteEstudiantes');
+      expect(payload).not.toHaveProperty('limiteUsuarios');
+      expect(payload).not.toHaveProperty('limiteSedes');
     });
 
     it('debería generar un tenantId si no se proporciona uno', async () => {
@@ -306,29 +327,6 @@ describe('obtenerConfiguracionClub', () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await actualizarCapacidadClub('tenant123', 'sedesExtraContratadas', 5);
       expect(mockCallable).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('actualizarPlanClub', () => {
-    it('debería actualizar el plan del club en Firestore', async () => {
-      const nuevoPlan = { id: 'premium', limiteEstudiantes: 100, limiteUsuarios: 10, limiteSedes: 2 };
-      await actualizarPlanClub('tenant123', nuevoPlan);
-      expect(updateDoc).toHaveBeenCalledWith(
-        doc(db, 'tenants', 'tenant123'),
-        {
-          plan: 'premium',
-          limiteEstudiantes: 100,
-          limiteUsuarios: 10,
-          limiteSedes: 2,
-        }
-      );
-    });
-
-    it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
-      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
-      const nuevoPlan = { id: 'premium', limiteEstudiantes: 100, limiteUsuarios: 10, limiteSedes: 2 };
-      await actualizarPlanClub('tenant123', nuevoPlan);
-      expect(updateDoc).not.toHaveBeenCalled();
     });
   });
 
