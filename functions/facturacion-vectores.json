@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "_proposito": "Vectores dorados (SDD pricing-cupo-real, Bloque 2, D1 design.md): fuente unica de verdad de entrada/salida esperada para calcularFacturacionMensual/calcularCapacidad/esFacturable/normalizarEstadoMatricula. Escrito ANTES que functions/facturacion.js y utils/facturacion.ts -- ambas suites (functions/facturacion.test.js con node:test, utils/facturacion.test.ts con Jest) iteran este MISMO archivo. Si una implementacion se desvia de la otra para el mismo vector, su propia suite se pone roja -- la paridad es un contrato de datos, no una promesa de revision.",
+
+  "calcularFacturacionMensual": [
+    {
+      "nombre": "0 estudiantes facturables, sin extras -> total $0",
+      "entrada": { "estudiantesFacturables": 0, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": { "cantidad": 0, "subtotal": 0, "tramos": [] },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 0
+      }
+    },
+    {
+      "nombre": "1 estudiante facturable -> tarifa del tramo 1-50",
+      "entrada": { "estudiantesFacturables": 1, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": { "cantidad": 1, "subtotal": 3800, "tramos": [ { "desde": 1, "hasta": 50, "cantidad": 1, "tarifa": 3800, "subtotal": 3800 } ] },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 3800
+      }
+    },
+    {
+      "nombre": "30 estudiantes -- spec Scenario 'Tenant dentro del primer tramo': 30 x $3.800, sin tramos adicionales",
+      "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": { "cantidad": 30, "subtotal": 114000, "tramos": [ { "desde": 1, "hasta": 50, "cantidad": 30, "tarifa": 3800, "subtotal": 114000 } ] },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 114000
+      }
+    },
+    {
+      "nombre": "50 estudiantes -- limite superior exacto del tramo 1-50",
+      "entrada": { "estudiantesFacturables": 50, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": { "cantidad": 50, "subtotal": 190000, "tramos": [ { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 } ] },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 190000
+      }
+    },
+    {
+      "nombre": "51 estudiantes -- cruza a tramo 51-150; delta vs 50 MUST ser exactamente $3.400 (continuidad)",
+      "entrada": { "estudiantesFacturables": 51, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 51,
+          "subtotal": 193400,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 1, "tarifa": 3400, "subtotal": 3400 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 193400
+      }
+    },
+    {
+      "nombre": "60 estudiantes -- spec Scenario 'Tenant que cruza un tramo': (50x$3.800)+(10x$3.400), NO 60x$3.400",
+      "entrada": { "estudiantesFacturables": 60, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 60,
+          "subtotal": 224000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 10, "tarifa": 3400, "subtotal": 34000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 224000
+      }
+    },
+    {
+      "nombre": "150 estudiantes -- limite superior exacto del tramo 51-150",
+      "entrada": { "estudiantesFacturables": 150, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 150,
+          "subtotal": 530000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 100, "tarifa": 3400, "subtotal": 340000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 530000
+      }
+    },
+    {
+      "nombre": "151 estudiantes -- cruza a tramo 151-350; delta vs 150 MUST ser exactamente $3.000 (continuidad)",
+      "entrada": { "estudiantesFacturables": 151, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 151,
+          "subtotal": 533000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 100, "tarifa": 3400, "subtotal": 340000 },
+            { "desde": 151, "hasta": 350, "cantidad": 1, "tarifa": 3000, "subtotal": 3000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 533000
+      }
+    },
+    {
+      "nombre": "350 estudiantes -- limite superior exacto del tramo 151-350",
+      "entrada": { "estudiantesFacturables": 350, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 350,
+          "subtotal": 1130000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 100, "tarifa": 3400, "subtotal": 340000 },
+            { "desde": 151, "hasta": 350, "cantidad": 200, "tarifa": 3000, "subtotal": 600000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 1130000
+      }
+    },
+    {
+      "nombre": "351 estudiantes -- cruza a tramo 351+; delta vs 350 MUST ser exactamente $2.600 (continuidad)",
+      "entrada": { "estudiantesFacturables": 351, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 351,
+          "subtotal": 1132600,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 100, "tarifa": 3400, "subtotal": 340000 },
+            { "desde": 151, "hasta": 350, "cantidad": 200, "tarifa": 3000, "subtotal": 600000 },
+            { "desde": 351, "hasta": null, "cantidad": 1, "tarifa": 2600, "subtotal": 2600 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 1132600
+      }
+    },
+    {
+      "nombre": "500 estudiantes -- spec Scenario 'Sin tope superior': el tramo 351+ sigue aplicando sin limite maximo",
+      "entrada": { "estudiantesFacturables": 500, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 500,
+          "subtotal": 1520000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 100, "tarifa": 3400, "subtotal": 340000 },
+            { "desde": 151, "hasta": 350, "cantidad": 200, "tarifa": 3000, "subtotal": 600000 },
+            { "desde": 351, "hasta": null, "cantidad": 150, "tarifa": 2600, "subtotal": 390000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 1520000
+      }
+    },
+    {
+      "nombre": "30 estudiantes + 1 sede extra -- spec Scenario 'Tenant con una sede extra': +$89.900 sobre el calculo de estudiantes",
+      "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 1, "equipoTecnicoExtraContratado": 0 },
+      "esperado": {
+        "estudiantes": { "cantidad": 30, "subtotal": 114000, "tramos": [ { "desde": 1, "hasta": 50, "cantidad": 30, "tarifa": 3800, "subtotal": 114000 } ] },
+        "sedesExtra": { "cantidad": 1, "subtotal": 89900 },
+        "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 },
+        "totalPesos": 203900
+      }
+    },
+    {
+      "nombre": "30 estudiantes + 2 cupos de equipo tecnico extra -- +$72.000 (2 x $36.000) sobre el calculo de estudiantes",
+      "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 2 },
+      "esperado": {
+        "estudiantes": { "cantidad": 30, "subtotal": 114000, "tramos": [ { "desde": 1, "hasta": 50, "cantidad": 30, "tarifa": 3800, "subtotal": 114000 } ] },
+        "sedesExtra": { "cantidad": 0, "subtotal": 0 },
+        "equipoTecnicoExtra": { "cantidad": 2, "subtotal": 72000 },
+        "totalPesos": 186000
+      }
+    },
+    {
+      "nombre": "60 estudiantes + 1 sede extra + 1 equipo tecnico extra -- combo de extras sobre un cruce de tramo",
+      "entrada": { "estudiantesFacturables": 60, "sedesExtraContratadas": 1, "equipoTecnicoExtraContratado": 1 },
+      "esperado": {
+        "estudiantes": {
+          "cantidad": 60,
+          "subtotal": 224000,
+          "tramos": [
+            { "desde": 1, "hasta": 50, "cantidad": 50, "tarifa": 3800, "subtotal": 190000 },
+            { "desde": 51, "hasta": 150, "cantidad": 10, "tarifa": 3400, "subtotal": 34000 }
+          ]
+        },
+        "sedesExtra": { "cantidad": 1, "subtotal": 89900 },
+        "equipoTecnicoExtra": { "cantidad": 1, "subtotal": 36000 },
+        "totalPesos": 349900
+      }
+    },
+    {
+      "nombre": "0 estudiantes + 5 sedes extra + 10 equipos tecnicos extra -- extras aislados de la matricula, sin interaccion con tramos",
+      "entrada": { "estudiantesFacturables": 0, "sedesExtraContratadas": 5, "equipoTecnicoExtraContratado": 10 },
+      "esperado": {
+        "estudiantes": { "cantidad": 0, "subtotal": 0, "tramos": [] },
+        "sedesExtra": { "cantidad": 5, "subtotal": 449500 },
+        "equipoTecnicoExtra": { "cantidad": 10, "subtotal": 360000 },
+        "totalPesos": 809500
+      }
+    }
+  ],
+
+  "calcularCapacidad": [
+    {
+      "nombre": "tenant nuevo -- spec Scenario 'Tenant nuevo sin extras': 1 sede + 3 cupos de equipo tecnico, sin bono ni extras",
+      "entrada": { "sedeBonusOtorgada": false, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": { "sedes": 1, "equipoTecnico": 3, "estudiantes": null }
+    },
+    {
+      "nombre": "bono de sede otorgado, sin extras -- +1 sede incluida de forma permanente",
+      "entrada": { "sedeBonusOtorgada": true, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
+      "esperado": { "sedes": 2, "equipoTecnico": 3, "estudiantes": null }
+    },
+    {
+      "nombre": "sin bono, con 2 sedes extra contratadas",
+      "entrada": { "sedeBonusOtorgada": false, "sedesExtraContratadas": 2, "equipoTecnicoExtraContratado": 0 },
+      "esperado": { "sedes": 3, "equipoTecnico": 3, "estudiantes": null }
+    },
+    {
+      "nombre": "sin bono, con 3 cupos de equipo tecnico extra contratados",
+      "entrada": { "sedeBonusOtorgada": false, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 3 },
+      "esperado": { "sedes": 1, "equipoTecnico": 6, "estudiantes": null }
+    },
+    {
+      "nombre": "bono otorgado + sedes extra + equipo tecnico extra combinados",
+      "entrada": { "sedeBonusOtorgada": true, "sedesExtraContratadas": 2, "equipoTecnicoExtraContratado": 5 },
+      "esperado": { "sedes": 4, "equipoTecnico": 8, "estudiantes": null }
+    },
+    {
+      "nombre": "campos ausentes (tenant legacy sin los campos nuevos, aditivos) -- default false/0 por Migracion/Rollout",
+      "entrada": {},
+      "esperado": { "sedes": 1, "equipoTecnico": 3, "estudiantes": null }
+    }
+  ],
+
+  "esFacturable": [
+    {
+      "nombre": "estadoMatricula 'activo' -> facturable",
+      "entrada": { "estadoMatricula": "activo" },
+      "esperado": true
+    },
+    {
+      "nombre": "estadoMatricula 'retirado' -> NO facturable",
+      "entrada": { "estadoMatricula": "retirado" },
+      "esperado": false
+    },
+    {
+      "nombre": "estadoMatricula ausente en el documento -> facturable por default (D3)",
+      "entrada": {},
+      "esperado": true
+    },
+    {
+      "nombre": "documento nulo (llamada sin argumento) -> facturable por default (D3)",
+      "entrada": null,
+      "esperado": true
+    }
+  ],
+
+  "normalizarEstadoMatricula": [
+    {
+      "nombre": "estadoMatricula 'activo' explicito -> 'activo'",
+      "entrada": { "estadoMatricula": "activo" },
+      "esperado": "activo"
+    },
+    {
+      "nombre": "estadoMatricula 'retirado' explicito -> 'retirado'",
+      "entrada": { "estadoMatricula": "retirado" },
+      "esperado": "retirado"
+    },
+    {
+      "nombre": "estadoMatricula ausente en el documento -> 'activo' (D3: unico lugar donde vive esta regla)",
+      "entrada": {},
+      "esperado": "activo"
+    },
+    {
+      "nombre": "documento nulo -> 'activo'",
+      "entrada": null,
+      "esperado": "activo"
+    }
+  ]
+}
