@@ -1,16 +1,29 @@
 
 // vistas/PublicLanding.tsx
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 // Added comment above fix: Included IconoDashboard in the imports from Iconos.tsx
-import { IconoLogoOficial, IconoAprobar, IconoWhatsApp, IconoFirma, IconoCampana, IconoCasa, IconoUsuario, IconoEstudiantes, IconoDashboard } from '../components/Iconos';
-import { PLANES_SAAS } from '../constantes';
-import { formatearPrecio } from '../utils/formatters';
+import { IconoLogoOficial, IconoWhatsApp, IconoFirma, IconoCampana, IconoDashboard } from '../components/Iconos';
+import PrecioCalculadora from '../components/PrecioCalculadora';
+import { calcularFacturacionMensual } from '../utils/facturacion';
 
+// SDD pricing-cupo-real (Bloque 4, precio-publico-calculadora): reemplaza el grid de
+// planes fijos (starter/growth/pro, PLANES_SAAS) por la calculadora pública. `PrecioCalculadora`
+// es puramente presentacional (components/PrecioCalculadora.tsx) -- el único punto del
+// landing que calcula un monto es esta llamada a calcularFacturacionMensual
+// (utils/facturacion.ts, Bloque 2, misma función que usa el cobro real). No existe una
+// segunda fórmula de precios en este archivo (spec: "MUST NOT existir una segunda fórmula").
 const PublicLanding: React.FC = () => {
-    const [cicloFacturacion, setCicloFacturacion] = React.useState<'mensual' | 'anual'>('anual');
-    const [planSeleccionado, setPlanSeleccionado] = React.useState<string | null>(null);
+    const [estudiantes, setEstudiantes] = React.useState(50);
+    const [sedesExtra, setSedesExtra] = React.useState(0);
+    const [equipoTecnicoExtra, setEquipoTecnicoExtra] = React.useState(0);
+
+    const resultado = React.useMemo(() => calcularFacturacionMensual({
+        estudiantesFacturables: estudiantes,
+        sedesExtraContratadas: sedesExtra,
+        equipoTecnicoExtraContratado: equipoTecnicoExtra,
+    }), [estudiantes, sedesExtra, equipoTecnicoExtra]);
 
     return (
         <div className="min-h-screen bg-white text-tkd-dark font-sans selection:bg-tkd-blue selection:text-white overflow-x-hidden">
@@ -127,132 +140,35 @@ const PublicLanding: React.FC = () => {
                 </div>
             </section>
 
-            {/* TARIFAS: PUNTO DE CIERRE 2 */}
+            {/* TARIFAS: PUNTO DE CIERRE 2 -- calculadora de cupo real (precio-publico-calculadora),
+                reemplaza el grid de planes fijos starter/growth/pro */}
             <section id="tarifas" className="py-24 px-6 sm:px-12">
-                <div className="max-w-6xl mx-auto space-y-16">
-                    <div className="text-center space-y-6">
-                        <div>
-                            <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
-                            <p className="text-gray-400 font-bold uppercase text-xs tracking-widest mt-2">Planes diseñados para el crecimiento de su escuela</p>
-                        </div>
-
-                        {/* Toggle Mensual / Anual */}
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="bg-gray-100 p-1.5 rounded-2xl inline-flex relative">
-                                <button
-                                    onClick={() => setCicloFacturacion('mensual')}
-                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'mensual' ? 'bg-white text-tkd-dark shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                                >
-                                    Mensual
-                                </button>
-                                <button
-                                    onClick={() => setCicloFacturacion('anual')}
-                                    className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${cicloFacturacion === 'anual' ? 'bg-white text-tkd-blue shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
-                                >
-                                    Anual (Ahorra 2 Meses)
-                                </button>
-                            </div>
-                            {cicloFacturacion === 'anual' && (
-                                <span className="bg-green-100 text-green-600 px-4 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">
-                                    ¡Bonificación por pago anual activada!
-                                </span>
-                            )}
-                        </div>
+                <div className="max-w-4xl mx-auto space-y-16">
+                    <div className="text-center space-y-4">
+                        <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
+                        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">Pague por lo que realmente usa: sin planes fijos, sin sorpresas</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        {Object.values(PLANES_SAAS).map((plan: any) => {
-                            const precioFinal = cicloFacturacion === 'anual' ? plan.precio * 10 : plan.precio; // 12 meses pagando solo 10
-                            const esActivo = planSeleccionado === plan.id;
+                    <PrecioCalculadora
+                        estudiantes={estudiantes}
+                        sedesExtra={sedesExtra}
+                        equipoTecnicoExtra={equipoTecnicoExtra}
+                        resultado={resultado}
+                        onEstudiantesChange={setEstudiantes}
+                        onSedesExtraChange={setSedesExtra}
+                        onEquipoTecnicoExtraChange={setEquipoTecnicoExtra}
+                    />
 
-                            return (
-                                <motion.div
-                                    key={plan.id}
-                                    layout // Mantiene la fluidez del layout al cambiar estados
-                                    onClick={() => setPlanSeleccionado(plan.id)}
-                                    initial={false}
-                                    animate={{
-                                        // Efecto de elevación y escala física
-                                        scale: esActivo ? 1.05 : 0.98,
-                                        y: esActivo ? -10 : 0
-                                    }}
-                                    transition={{
-                                        type: 'spring',
-                                        stiffness: 300,
-                                        damping: 20
-                                    }}
-                                    className={`cursor-pointer rounded-[3rem] p-10 border-4 transition-all relative flex flex-col ${esActivo
-                                        // CLASES DE RESALTO CRÍTICO: Borde azul, fondo blanco, sombra extrema y z-index superior
-                                        ? 'border-tkd-blue bg-white shadow-[0_40px_80px_-15px_rgba(31,62,144,0.25)] z-10'
-                                        // ESTADO INACTIVO: Borde gris sutil y opacidad reducida
-                                        : 'border-gray-50 bg-gray-50 opacity-60 hover:opacity-100'
-                                        }`}
-                                >
-                                    {/* Etiqueta de Recomendado */}
-                                    {plan.popular && (
-                                        <div className="absolute -top-5 left-0 right-0 flex justify-center z-20">
-                                            <span className="bg-tkd-red text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                                                Recomendado
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-6">
-                                        <h4 className="text-2xl font-black uppercase tracking-tight text-tkd-blue/60">{plan.nombre}</h4>
-
-                                        {/* Animación de cambio de precios (Anual/Mensual) */}
-                                        <div className="flex items-baseline gap-1">
-                                            <AnimatePresence mode="wait">
-                                                <motion.span
-                                                    key={cicloFacturacion}
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -10 }}
-                                                    className="text-4xl font-black text-tkd-blue flex items-start"
-                                                >
-                                                    <span className="text-xl mr-1">$</span>
-                                                    {formatearPrecio(precioFinal).replace('$', '')}
-                                                </motion.span>
-                                            </AnimatePresence>
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase">
-                                                /{cicloFacturacion === 'anual' ? 'año' : 'mes'}
-                                            </span>
-                                        </div>
-
-                                        <ul className="space-y-4 pt-4 text-[10px] font-black uppercase text-gray-500">
-                                            <li className="flex items-center gap-3"><IconoEstudiantes className="w-4 h-4 text-tkd-blue/40" /> Hasta {plan.limiteEstudiantes} alumnos</li>
-                                            <li className="flex items-center gap-3"><IconoUsuario className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteUsuarios} Instructores</li>
-                                            <li className="flex items-center gap-3"><IconoCasa className="w-4 h-4 text-tkd-blue/40" /> {plan.limiteSedes} Sedes</li>
-                                            {plan.caracteristicas.slice(3).map((c: string, idx: number) => (
-                                                <li key={idx} className="flex items-center gap-3 opacity-60"><IconoAprobar className="w-3.5 h-3.5 text-green-500" /> {c}</li>
-                                            ))}
-                                        </ul>
-                                    </div>
-
-                                    <div className="mt-8 space-y-4 flex flex-col items-center">
-                                        {/* Check de validación visual inferior (Solo visible en activo) */}
-                                        <Link
-                                            to={`/registro-escuela?plan=${plan.id}&precio=${precioFinal}`}
-                                            className="flex flex-col items-center gap-4"
-                                        >
-                                            <div
-                                                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${esActivo ? 'border-tkd-blue bg-tkd-blue shadow-lg scale-110' : 'border-gray-300 hover:border-tkd-blue'
-                                                    }`}
-                                            >
-                                                <IconoAprobar className={`w-6 h-6 transition-colors ${esActivo ? 'text-white' : 'text-gray-300'}`} />
-                                            </div>
-
-                                            <span className={`text-[10px] uppercase tracking-widest transition-all duration-300 ${esActivo ? 'text-red-600 font-bold scale-105' : 'text-gray-400 font-medium'
-                                                }`}>
-                                                Elegir este plan
-                                            </span>
-                                        </Link>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
+                    <div className="flex flex-col items-center gap-4">
+                        <Link
+                            to="/registro-escuela"
+                            className="bg-tkd-red text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-[0_20px_50px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
+                        >
+                            Iniciar prueba sin costo (7 días)
+                        </Link>
                     </div>
-                    <div className="text-center mt-12 bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
+
+                    <div className="text-center bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
                         <p className="text-sm font-black uppercase text-tkd-blue tracking-tight">
                             "Con solo 1 o 2 mensualidades recuperadas que antes se perdían en mora, Tudojang se paga solo."
                         </p>
