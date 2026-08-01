@@ -250,19 +250,13 @@ const ModalImportacionMasiva: React.FC<Props> = ({ abierto, onCerrar, onExito })
         if (fallos.length === 0) {
             mostrarNotificacion(`Importación Exitosa: ${exitos} alumnos registrados.`, "success");
         } else {
-            // El limite del plan es el unico motivo ACCIONABLE para el operador (subir de
-            // plan o comprar un addon), asi que si aparece se muestra su mensaje textual en
-            // vez del conteo generico. Lo lanza el callable `crearEstudiante` con code
-            // 'resource-exhausted' (functions/academico/estudiantes.js), que httpsCallable
-            // entrega prefijado como 'functions/resource-exhausted'.
-            const porLimiteDePlan = fallos.find((f) =>
-                String(f.error?.code ?? '').includes('resource-exhausted')
-            );
-            const detalle = porLimiteDePlan
-                ? porLimiteDePlan.error.message
-                : fallos.length === 1
-                    ? '1 fila no se pudo importar.'
-                    : `${fallos.length} filas no se pudieron importar.`;
+            // SDD pricing-cupo-real (Bloque 4, capacidad-tenant: "Alta nunca se bloquea por
+            // capacidad"): ya no existe un límite de plan que rechace la creación
+            // (functions/academico/estudiantes.js dejó de lanzar 'resource-exhausted' desde
+            // el Bloque 3) -- todo fallo de fila usa el mismo mensaje de conteo genérico.
+            const detalle = fallos.length === 1
+                ? '1 fila no se pudo importar.'
+                : `${fallos.length} filas no se pudieron importar.`;
 
             mostrarNotificacion(
                 `Se registraron ${exitos} de ${datosRaw.length} alumnos. ${detalle}`,
