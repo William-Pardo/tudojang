@@ -64,7 +64,7 @@ const PublicLanding: React.FC = () => {
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
                             <a
-                                href="https://wa.me/573007654321?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang.%20Agendemos%20una%20consultoría"
+                                href="https://wa.me/573195653135?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang.%20Agendemos%20una%20consultoría"
                                 target="_blank"
                                 className="bg-tkd-red text-white px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.1em] shadow-[0_20px_40px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
                             >
@@ -140,39 +140,55 @@ const PublicLanding: React.FC = () => {
                 </div>
             </section>
 
-            {/* TARIFAS: PUNTO DE CIERRE 2 -- calculadora de cupo real (precio-publico-calculadora),
-                reemplaza el grid de planes fijos starter/growth/pro */}
-            <section id="tarifas" className="py-24 px-6 sm:px-12">
+            {/* DEMO Y VALOR: REEMPLAZO DE SECCIÓN DE CALCULADORA DE PRECIOS */}
+            <section id="tarifas" className="py-24 px-6 sm:px-12 bg-gray-50/50">
                 <div className="max-w-4xl mx-auto space-y-16">
                     <div className="text-center space-y-4">
-                        <h2 className="text-4xl font-black uppercase tracking-tighter">Inversión para su Academia</h2>
-                        <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">Pague por lo que realmente usa: sin planes fijos, sin sorpresas</p>
+                        <div className="inline-block bg-tkd-red/10 text-tkd-red px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                            Demostración Guiada sin Compromiso
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Conozca Tudojang en Acción</h2>
+                        <p className="text-gray-500 font-bold uppercase text-xs tracking-widest">Descubra en 10 minutos cómo organizar alumnos, asistencias y cobros en su academia</p>
                     </div>
 
-                    <PrecioCalculadora
-                        estudiantes={estudiantes}
-                        sedesExtra={sedesExtra}
-                        equipoTecnicoExtra={equipoTecnicoExtra}
-                        resultado={resultado}
-                        onEstudiantesChange={setEstudiantes}
-                        onSedesExtraChange={setSedesExtra}
-                        onEquipoTecnicoExtraChange={setEquipoTecnicoExtra}
-                    />
+                    {/* Calculadora oculta cosméticamente pero montada en el DOM */}
+                    <div className="hidden" aria-hidden="true">
+                        <PrecioCalculadora
+                            estudiantes={estudiantes}
+                            sedesExtra={sedesExtra}
+                            equipoTecnicoExtra={equipoTecnicoExtra}
+                            resultado={resultado}
+                            onEstudiantesChange={setEstudiantes}
+                            onSedesExtraChange={setSedesExtra}
+                            onEquipoTecnicoExtraChange={setEquipoTecnicoExtra}
+                        />
+                    </div>
 
-                    <div className="flex flex-col items-center gap-4">
-                        <Link
-                            to="/registro-escuela"
-                            className="bg-tkd-red text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-[0_20px_50px_-10px_rgba(205,46,58,0.4)] hover:scale-105 active:scale-95 transition-all text-center"
+                    {/* BOTÓN ALTA VISIBILIDAD DE AGENDAR DEMO */}
+                    <div className="flex flex-col items-center gap-6 text-center">
+                        <a
+                            href="https://wa.me/573195653135?text=Hola!%20Deseo%20conocer%20más%20sobre%20Tudojang.%20Quiero%20agendar%20una%20demostración%20de%2010%20minutos"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="bg-tkd-red text-white text-sm sm:text-base px-10 py-6 rounded-2xl font-black uppercase tracking-[0.15em] shadow-[0_20px_50px_-10px_rgba(205,46,58,0.5)] hover:scale-105 active:scale-95 transition-all text-center animate-pulse flex items-center justify-center gap-3"
                         >
-                            Iniciar prueba sin costo (7 días)
-                        </Link>
+                            <IconoWhatsApp className="w-7 h-7 text-white" />
+                            📅 Agendar Demo Gratuita (10 Minutos)
+                        </a>
+                        <div className="flex flex-wrap justify-center items-center gap-6 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                            <span>✓ Sin costo</span>
+                            <span>•</span>
+                            <span>✓ Sin permanencia</span>
+                            <span>•</span>
+                            <span>✓ Asesoría personalizada</span>
+                        </div>
                     </div>
 
-                    <div className="text-center bg-tkd-blue/5 p-6 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto">
-                        <p className="text-sm font-black uppercase text-tkd-blue tracking-tight">
+                    <div className="text-center bg-tkd-blue/5 p-8 rounded-3xl border border-tkd-blue/20 max-w-2xl mx-auto shadow-sm">
+                        <p className="text-base font-black uppercase text-tkd-blue tracking-tight leading-snug">
                             "Con solo 1 o 2 mensualidades recuperadas que antes se perdían en mora, Tudojang se paga solo."
                         </p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Inversión operativa con protección de datos y pagos seguros</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-3">Inversión operativa ajustada a la cantidad de alumnos activos</p>
                     </div>
                 </div>
             </section>
@@ -194,7 +210,7 @@ const PublicLanding: React.FC = () => {
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60">Activación Completa</p>
                         <div className="h-px bg-white/10 my-8"></div>
                         <a
-                            href="https://wa.me/573007654321?text=Deseo%20activar%20la%20Misión%20Kicho%20en%20mi%20academia"
+                            href="https://wa.me/573195653135?text=Deseo%20activar%20la%20Misión%20Kicho%20en%20mi%20academia"
                             target="_blank"
                             className="bg-white text-tkd-blue px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-gray-100 transition-all inline-block"
                         >
