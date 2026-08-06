@@ -29,8 +29,8 @@ export const optimizarImagenBase64 = (base64Str: string, maxWidth: number = 800,
             }
 
             ctx.drawImage(img, 0, 0, width, height);
-            // Exportar como webp si el navegador lo soporta, sino jpeg
-            const compressed = canvas.toDataURL('image/jpeg', quality);
+            // webp preserva transparencia; si el navegador no lo soporta, toDataURL cae a png (también con alfa)
+            const compressed = canvas.toDataURL('image/webp', quality);
             resolve(compressed);
         };
         img.onerror = (err) => reject(err);
