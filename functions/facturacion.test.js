@@ -61,20 +61,20 @@ test('calcularCapacidad nunca lee un conteo de estudiantes del input (pureza, D4
 // hacen explicito como delta, no solo implicito por comparacion manual de dos vectores.
 const sinExtras = (estudiantesFacturables) => ({ estudiantesFacturables, sedesExtraContratadas: 0, equipoTecnicoExtraContratado: 0 });
 
-test('continuidad exacta: 50 -> 51 suma exactamente la tarifa del tramo 51-150 ($3.400)', () => {
-  const en50 = calcularFacturacionMensual(sinExtras(50));
-  const en51 = calcularFacturacionMensual(sinExtras(51));
-  assert.equal(en51.totalPesos - en50.totalPesos, 3400);
+test('continuidad exacta: 70 -> 71 suma exactamente la tarifa del tramo 71-150 ($3.600)', () => {
+  const en70 = calcularFacturacionMensual(sinExtras(70));
+  const en71 = calcularFacturacionMensual(sinExtras(71));
+  assert.equal(en71.totalPesos - en70.totalPesos, 3600);
 });
 
-test('continuidad exacta: 150 -> 151 suma exactamente la tarifa del tramo 151-350 ($3.000)', () => {
+test('continuidad exacta: 150 -> 151 suma exactamente la tarifa del tramo 151-350 ($3.400)', () => {
   const en150 = calcularFacturacionMensual(sinExtras(150));
   const en151 = calcularFacturacionMensual(sinExtras(151));
-  assert.equal(en151.totalPesos - en150.totalPesos, 3000);
+  assert.equal(en151.totalPesos - en150.totalPesos, 3400);
 });
 
-test('continuidad exacta: 350 -> 351 suma exactamente la tarifa del tramo 351+ ($2.600)', () => {
+test('continuidad exacta: 350 -> 351 suma exactamente la tarifa del tramo 351+ ($3.000)', () => {
   const en350 = calcularFacturacionMensual(sinExtras(350));
   const en351 = calcularFacturacionMensual(sinExtras(351));
-  assert.equal(en351.totalPesos - en350.totalPesos, 2600);
+  assert.equal(en351.totalPesos - en350.totalPesos, 3000);
 });

@@ -77,22 +77,22 @@ describe('calcularFacturacionMensual', () => {
         equipoTecnicoExtraContratado: 0,
     });
 
-    it('continuidad exacta: 50 -> 51 suma exactamente la tarifa del tramo 51-150 ($3.400)', () => {
-        const en50 = calcularFacturacionMensual(sinExtras(50));
-        const en51 = calcularFacturacionMensual(sinExtras(51));
-        expect(en51.totalPesos - en50.totalPesos).toBe(3400);
+    it('continuidad exacta: 70 -> 71 suma exactamente la tarifa del tramo 71-150 ($3.600)', () => {
+        const en70 = calcularFacturacionMensual(sinExtras(70));
+        const en71 = calcularFacturacionMensual(sinExtras(71));
+        expect(en71.totalPesos - en70.totalPesos).toBe(3600);
     });
 
-    it('continuidad exacta: 150 -> 151 suma exactamente la tarifa del tramo 151-350 ($3.000)', () => {
+    it('continuidad exacta: 150 -> 151 suma exactamente la tarifa del tramo 151-350 ($3.400)', () => {
         const en150 = calcularFacturacionMensual(sinExtras(150));
         const en151 = calcularFacturacionMensual(sinExtras(151));
-        expect(en151.totalPesos - en150.totalPesos).toBe(3000);
+        expect(en151.totalPesos - en150.totalPesos).toBe(3400);
     });
 
-    it('continuidad exacta: 350 -> 351 suma exactamente la tarifa del tramo 351+ ($2.600)', () => {
+    it('continuidad exacta: 350 -> 351 suma exactamente la tarifa del tramo 351+ ($3.000)', () => {
         const en350 = calcularFacturacionMensual(sinExtras(350));
         const en351 = calcularFacturacionMensual(sinExtras(351));
-        expect(en351.totalPesos - en350.totalPesos).toBe(2600);
+        expect(en351.totalPesos - en350.totalPesos).toBe(3000);
     });
 });
 

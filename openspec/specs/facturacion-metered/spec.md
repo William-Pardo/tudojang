@@ -12,10 +12,10 @@ El monto por estudiantes MUST calcularse de forma marginal/progresiva: cada estu
 
 | Tramo | Tarifa/estudiante/mes |
 |---|---|
-| 1–50 | $3.800 |
-| 51–150 | $3.400 |
-| 151–350 | $3.000 |
-| 351+ | $2.600 |
+| 1–70 | $3.800 |
+| 71–150 | $3.600 |
+| 151–350 | $3.400 |
+| 351+ | $3.000 |
 
 #### Scenario: Tenant dentro del primer tramo
 
@@ -25,15 +25,15 @@ El monto por estudiantes MUST calcularse de forma marginal/progresiva: cada estu
 
 #### Scenario: Tenant que cruza un tramo
 
-- GIVEN un tenant con 60 estudiantes facturables
+- GIVEN un tenant con 80 estudiantes facturables
 - WHEN se calcula el monto
-- THEN MUST cobrarse (50 × $3.800) + (10 × $3.400), no 60 × $3.400
+- THEN MUST cobrarse (70 × $3.800) + (10 × $3.600), no 80 × $3.600
 
 #### Scenario: Continuidad exacta en cada límite de tramo
 
-- GIVEN tres pares de tenants con (50,51), (150,151) y (350,351) estudiantes facturables respectivamente
+- GIVEN tres pares de tenants con (70,71), (150,151) y (350,351) estudiantes facturables respectivamente
 - WHEN se calcula el monto de cada par
-- THEN la diferencia dentro de cada par MUST ser exactamente la tarifa marginal del tramo siguiente ($3.400, $3.000 y $2.600 respectivamente), sin salto adicional
+- THEN la diferencia dentro de cada par MUST ser exactamente la tarifa marginal del tramo siguiente ($3.600, $3.400 y $3.000 respectivamente), sin salto adicional
 
 #### Scenario: Sin tope superior
 
