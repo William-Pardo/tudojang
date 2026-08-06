@@ -64,6 +64,25 @@ function normalizarFecha(valor) {
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
+// Fix facturacion-periodo-vs-snapshot: aproxima el inicio del período de facturación
+// actual como `fechaVencimiento` MENOS 1 mes calendario -- mismo patrón de aritmética de
+// fechas que ya usa functions/index.js:1034-1036 para AVANZAR fechaVencimiento al
+// reconciliar un pago (webhookWompi), acá el mismo cálculo pero hacia atrás. No existe un
+// campo persistido de "inicio del período anterior"; esta resta es una aproximación
+// deliberada -- simple y conservadora -- que alcanza para cerrar el abuso de
+// alta/retiro/reingreso repetido (nunca coincidir "activo" justo el día del corte) sin
+// rediseñar el modelo de suscripción. Reusa normalizarFecha para aceptar tanto Timestamp
+// como string 'YYYY-MM-DD'.
+function calcularInicioPeriodoFacturable(fechaVencimientoValor) {
+  const fechaVencimiento = normalizarFecha(fechaVencimientoValor);
+  if (!fechaVencimiento) return null;
+  return new Date(
+    fechaVencimiento.getFullYear(),
+    fechaVencimiento.getMonth() - 1,
+    fechaVencimiento.getDate()
+  );
+}
+
 function extraerMensajeErrorWompi(error) {
   const errorWompi = error?.response?.data?.error;
   const mensajeWompi = errorWompi?.reason || errorWompi?.type || errorWompi?.message;
@@ -236,15 +255,23 @@ async function crearTransaccionRecurrenteWompi({
  *
  * SDD pricing-cupo-real (Bloque 3b, facturacion-metered): el monto ya NO se infiere del plan
  * (`calcularMontoMensualPesos`, eliminada) -- se MIDE por tenant en cada corrida: se cuenta
- * cuántos estudiantes están facturables HOY (snapshot sin prorrateo, spec "Corte de conteo en
- * la fecha de facturación") vía `contarEstudiantesFacturables` (inyectada; producción =
- * agregación `.count()`, ver `crearContadorEstudiantesFacturablesFirestore` más abajo) y se
- * alimenta junto a `sedesExtraContratadas`/`equipoTecnicoExtraContratado` del propio doc del
- * tenant a `calcularFacturacionMensual` (facturacion.js, Bloque 2, pura -- misma función que
- * consume la calculadora pública, D1). Si `contarEstudiantesFacturables` lanza (ej. Firestore
- * no disponible), la excepción sube al `catch` exterior de ESE tenant: no se cobra un monto
+ * cuántos estudiantes son facturables en el período actual vía `contarEstudiantesFacturables`
+ * (inyectada; producción = dos agregaciones `.count()`, ver
+ * `crearContadorEstudiantesFacturablesFirestore` más abajo) y se alimenta junto a
+ * `sedesExtraContratadas`/`equipoTecnicoExtraContratado` del propio doc del tenant a
+ * `calcularFacturacionMensual` (facturacion.js, Bloque 2, pura -- misma función que consume la
+ * calculadora pública, D1). Si `contarEstudiantesFacturables` lanza (ej. Firestore no
+ * disponible), la excepción sube al `catch` exterior de ESE tenant: no se cobra un monto
  * adivinado -- se loguea y se reintenta mañana, igual que cualquier otro fallo inesperado de
  * este bloque (mismo criterio que un `actualizarTenant` que rechaza).
+ *
+ * Fix facturacion-periodo-vs-snapshot: `contarEstudiantesFacturables` recibe también la
+ * `fechaVencimiento` vigente del tenant (necesaria para calcular el inicio del período
+ * actual, ver `calcularInicioPeriodoFacturable`) -- antes el conteo era solo una foto del
+ * momento exacto del corte (`estadoMatricula=='activo'` hoy), lo que permitía que un
+ * estudiante dado de alta y retirado repetidamente entre cortes nunca coincidiera "activo"
+ * justo el día del corte y nunca se facturara pese a haber usado la plataforma la mayor
+ * parte del período.
  */
 function crearServicioCobroAutomaticoMensual({
   listarTenantsPendientesDeCobro,
@@ -280,13 +307,18 @@ function crearServicioCobroAutomaticoMensual({
           continue;
         }
 
-        // Snapshot del conteo facturable EN ESTE MOMENTO -- sin prorrateo (spec
-        // facturacion-metered): un alta a mitad de ciclo cuenta completo, un retiro anterior
-        // al corte ya no cuenta (estadoMatricula=='activo' es el filtro de la query, ver
-        // crearContadorEstudiantesFacturablesFirestore). sedesExtraContratadas/
+        // Conteo facturable del PERÍODO actual -- sin prorrateo (spec facturacion-metered):
+        // un alta a mitad de ciclo cuenta completo. Un retiro cuenta si cae DENTRO del
+        // período actual (fix facturacion-periodo-vs-snapshot: ya no es una foto puntual del
+        // momento del corte, ver crearContadorEstudiantesFacturablesFirestore). Se le pasa la
+        // propia fechaVencimiento del tenant porque es el input para calcular el inicio del
+        // período (calcularInicioPeriodoFacturable). sedesExtraContratadas/
         // equipoTecnicoExtraContratado son opcionales/aditivos en tenants/{tenantId} (D7) --
         // calcularFacturacionMensual ya los normaliza a 0 si vienen undefined.
-        const estudiantesFacturables = await contarEstudiantesFacturables(tenantId);
+        const estudiantesFacturables = await contarEstudiantesFacturables(
+          tenantId,
+          tenant.fechaVencimiento
+        );
         const resultadoFacturacion = calcularFacturacionMensual({
           estudiantesFacturables,
           sedesExtraContratadas: tenant.sedesExtraContratadas,
@@ -401,14 +433,27 @@ function crearLectorWompiPaymentSourceIdFirestore(firestore) {
   };
 }
 
-// Cuenta estudiantes FACTURABLES (estadoMatricula=='activo') de un tenant vía una agregación
-// `.count()` de Firestore -- NO un `.get()` completo (design.md, pricing-cupo-real: este cron
-// corre a diario por cada tenant vencido; un `.get()` completo sería N lecturas de documento
-// innecesarias solo para saber CUÁNTOS hay, ver EntradaFacturacion.estudiantesFacturables en
-// design.md, "un count, NOT a doc list"). El predicado `estadoMatricula=='activo'` es también
-// el mecanismo por el que un estudiante retirado antes del corte deja de contar (spec
-// facturacion-metered, Scenario "Estudiante retirado antes del corte no se factura") --
-// Firestore filtra server-side, no hay lógica JS de exclusión que agregar acá.
+// Cuenta estudiantes FACTURABLES de un tenant en el período actual sumando DOS agregaciones
+// `.count()` de Firestore -- NUNCA un `.get()` completo (design.md, pricing-cupo-real: este
+// cron corre a diario por cada tenant vencido; un `.get()` completo sería N lecturas de
+// documento innecesarias solo para saber CUÁNTOS hay). Se suman dos conteos en vez de armar
+// una única query OR (evita depender de soporte de queries OR compuestas en el SDK):
+//   1) estadoMatricula=='activo' HOY.
+//   2) estadoMatricula=='retirado' Y fechaRetiro >= inicio del período actual.
+//
+// Fix facturacion-periodo-vs-snapshot: ANTES esto era solo (1), una foto puntual del momento
+// exacto del corte -- permitía que un tenant diera de alta un estudiante, lo retirara a los
+// pocos días y lo reingresara el mes siguiente repitiendo el ciclo, de forma que ese
+// estudiante nunca coincidiera "activo" justo el día del corte y nunca se facturara pese a
+// haber usado la plataforma la mayor parte del tiempo. (2) cierra ese abuso: un retiro DENTRO
+// del período actual sigue contando para ESE período, sin necesidad de un campo persistido de
+// "inicio del período anterior" -- se aproxima con `calcularInicioPeriodoFacturable`
+// (fechaVencimiento del propio tenant menos 1 mes calendario), aproximación deliberadamente
+// simple y conservadora (mismo criterio que el resto de este módulo: no adivinar, aproximar
+// de forma documentada). `fechaRetiro` se guarda como string ISO 8601
+// (servicios/estudiantesApi.ts, retirarEstudiante) -- comparar con `>=` funciona porque ISO
+// 8601 ordena lexicográficamente igual que cronológicamente, siempre que el límite del
+// período también se construya como ISO string (toISOString()), lo que hace acá.
 //
 // Nota operativa (documentada, no adivinada -- ver apply-progress/reporte final): esta query
 // asume que `scripts/backfillEstadoMatricula.js` (Bloque 1) ya corrió en producción antes de
@@ -422,16 +467,30 @@ function crearLectorWompiPaymentSourceIdFirestore(firestore) {
 // vigilanciaFacturacion.js, que definen su propia copia de esta misma query por la misma
 // razón que el resto de este archivo no comparte `assertEsAdmin`/`assertTenantAutorizado` con
 // esos módulos: cada Cloud Function es un archivo autocontenido en este repo).
+// vigilanciaFacturacion.js (guardrail de crecimiento, notify-only) aplica el mismo fix por
+// separado en su propia copia de esta consulta.
 function crearContadorEstudiantesFacturablesFirestore(firestore) {
-  return async function contarEstudiantesFacturables(tenantId) {
-    const snapshot = await firestore
+  return async function contarEstudiantesFacturables(tenantId, fechaVencimiento) {
+    const snapshotActivos = await firestore
       .collection('estudiantes')
       .where('tenantId', '==', tenantId)
       .where('estadoMatricula', '==', 'activo')
       .count()
       .get();
+    const activos = snapshotActivos.data().count;
 
-    return snapshot.data().count;
+    const inicioPeriodo = calcularInicioPeriodoFacturable(fechaVencimiento);
+    if (!inicioPeriodo) return activos;
+
+    const snapshotRetiradosEnPeriodo = await firestore
+      .collection('estudiantes')
+      .where('tenantId', '==', tenantId)
+      .where('estadoMatricula', '==', 'retirado')
+      .where('fechaRetiro', '>=', inicioPeriodo.toISOString())
+      .count()
+      .get();
+
+    return activos + snapshotRetiradosEnPeriodo.data().count;
   };
 }
 
@@ -443,6 +502,7 @@ module.exports = {
   crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
   calcularMontoFacturableCentavos,
+  calcularInicioPeriodoFacturable,
   construirReferenciaCobroAutomatico,
   extraerMensajeErrorWompi,
   normalizarFecha,

@@ -51,9 +51,9 @@ El monto total MUST incluir el precio de cada sede y cada cupo de equipo técnic
 - WHEN se calcula el monto mensual
 - THEN el monto MUST incluir $89.900 adicionales sobre el cálculo de estudiantes
 
-### Requirement: Corte de conteo en la fecha de facturación, sin prorrateo
+### Requirement: Corte de conteo por período completo, sin prorrateo
 
-El conteo de estudiantes facturables MUST tomarse como una foto (snapshot) en el momento en que corre el cobro automático mensual del tenant (mismo corte que usa hoy `cobroAutomaticoMensual` contra `fechaVencimiento`). El sistema MUST NOT prorratear estudiantes matriculados o retirados a mitad de ciclo.
+El conteo de estudiantes facturables MUST incluir a todo estudiante que estuvo activo en algún momento durante el período de facturación del tenant, no solo en el instante exacto del corte (mismo corte que usa hoy `cobroAutomaticoMensual` contra `fechaVencimiento`). Un estudiante cuenta si está `estadoMatricula:'activo'` en el momento del corte, O si su `fechaRetiro` cae dentro del período actual (posterior al inicio de ese período, aproximado como `fechaVencimiento` menos 1 mes calendario). El sistema MUST NOT prorratear el monto de un estudiante por los días exactos que estuvo activo dentro del ciclo.
 
 #### Scenario: Estudiante matriculado a mitad de ciclo
 
@@ -61,11 +61,18 @@ El conteo de estudiantes facturables MUST tomarse como una foto (snapshot) en el
 - WHEN corre el corte de facturación
 - THEN ese estudiante MUST contarse completo en el monto del mes, sin prorratear por los días restantes
 
-#### Scenario: Estudiante retirado antes del corte no se factura
+#### Scenario: Estudiante retirado antes de que empezara el período actual no se factura
 
-- GIVEN un estudiante con `estadoMatricula: 'retirado'` antes de la fecha de corte del tenant
+- GIVEN un estudiante con `estadoMatricula: 'retirado'` cuyo `fechaRetiro` es anterior al inicio del período de facturación actual del tenant
 - WHEN corre el corte de facturación
 - THEN ese estudiante MUST NOT incluirse en el conteo facturable de ese ciclo
+
+#### Scenario: Estudiante retirado dentro del período actual sí se factura
+
+- GIVEN un estudiante que se matriculó y se retiró en algún momento dentro del período de facturación actual del tenant (ej. retirado a los 10 días de un ciclo de 30)
+- WHEN corre el corte de facturación
+- THEN ese estudiante MUST incluirse en el conteo facturable de ese ciclo, aunque no esté activo el día exacto del corte
+- AND esto MUST prevenir el patrón de matricular y retirar repetidamente para evitar el cobro
 
 ### Requirement: Único punto de cálculo, compartido
 

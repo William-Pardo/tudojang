@@ -11,6 +11,7 @@ const {
   crearContadorEstudiantesFacturablesFirestore,
   crearTransaccionRecurrenteWompi,
   calcularMontoFacturableCentavos,
+  calcularInicioPeriodoFacturable,
   construirReferenciaCobroAutomatico,
   normalizarFecha,
 } = require('./wompiCobroAutomatico');
@@ -36,55 +37,265 @@ test('calcularMontoFacturableCentavos: redondea igual que construirUrlCheckoutWo
 });
 
 // ---------------------------------------------------------------------------
-// crearContadorEstudiantesFacturablesFirestore
+// calcularInicioPeriodoFacturable
 //
-// Cuenta estudiantes facturables (estadoMatricula=='activo') de un tenant via una agregacion
-// .count() de Firestore -- NO un .get() completo (design.md: este cron corre a diario por
-// cada tenant vencido, un .get() completo seria N lecturas de documento innecesarias solo
-// para saber CUANTOS hay). El predicado estadoMatricula=='activo' es tambien el mecanismo por
-// el que un estudiante retirado deja de contar (Scenario "Estudiante retirado antes del corte
-// no se factura", spec facturacion-metered) -- Firestore filtra server-side, no hay logica JS
-// de exclusion que probar aca aparte de la forma exacta de la query.
+// Fix facturacion-periodo-vs-snapshot: aproxima el inicio del periodo de facturacion
+// actual como fechaVencimiento MENOS 1 mes calendario -- mismo patron de aritmetica de
+// fechas que ya usa functions/index.js:1034-1036 para AVANZAR fechaVencimiento (hacia
+// atras). No hay un campo persistido de "inicio del periodo anterior"; es una
+// aproximacion deliberada, simple y conservadora.
 // ---------------------------------------------------------------------------
 
-test('crearContadorEstudiantesFacturablesFirestore: usa una agregacion .count() filtrando tenantId + estadoMatricula=="activo" (Scenario: Estudiante retirado antes del corte no se factura)', async () => {
-  const wheresLlamados = [];
-  let countLlamado = false;
+test('calcularInicioPeriodoFacturable: resta 1 mes calendario a una fechaVencimiento como Firestore Timestamp', () => {
+  const timestampFake = { toDate: () => new Date(2026, 6, 15) }; // 15 jul 2026 (local)
+  const inicioPeriodo = calcularInicioPeriodoFacturable(timestampFake);
+
+  assert.equal(inicioPeriodo.getFullYear(), 2026);
+  assert.equal(inicioPeriodo.getMonth(), 5); // jun (0-indexed)
+  assert.equal(inicioPeriodo.getDate(), 15);
+});
+
+test('calcularInicioPeriodoFacturable: funciona igual con fechaVencimiento como string YYYY-MM-DD (caso 5)', () => {
+  // No se asume un huso horario fijo: se compara contra el mismo pipeline de parseo
+  // (normalizarFecha) que usa la propia funcion, para que el test sea deterministico sin
+  // importar el TZ del entorno donde corre.
+  const base = normalizarFecha('2026-07-15');
+  const inicioPeriodo = calcularInicioPeriodoFacturable('2026-07-15');
+
+  assert.equal(inicioPeriodo.getFullYear(), base.getFullYear());
+  assert.equal(inicioPeriodo.getDate(), base.getDate());
+  assert.equal(inicioPeriodo.getMonth(), (base.getMonth() + 11) % 12);
+});
+
+test('calcularInicioPeriodoFacturable: cruza el limite de año (enero -> diciembre del año anterior)', () => {
+  const timestampFake = { toDate: () => new Date(2026, 0, 15) }; // 15 ene 2026 (local)
+  const inicioPeriodo = calcularInicioPeriodoFacturable(timestampFake);
+
+  assert.equal(inicioPeriodo.getFullYear(), 2025);
+  assert.equal(inicioPeriodo.getMonth(), 11); // dic
+  assert.equal(inicioPeriodo.getDate(), 15);
+});
+
+test('calcularInicioPeriodoFacturable: devuelve null si fechaVencimiento es invalida o esta ausente', () => {
+  assert.equal(calcularInicioPeriodoFacturable(null), null);
+  assert.equal(calcularInicioPeriodoFacturable(undefined), null);
+  assert.equal(calcularInicioPeriodoFacturable('no-es-una-fecha'), null);
+});
+
+// ---------------------------------------------------------------------------
+// crearContadorEstudiantesFacturablesFirestore
+//
+// Fix facturacion-periodo-vs-snapshot: cuenta estudiantes facturables de un tenant sumando
+// DOS agregaciones .count() independientes (nunca un .get() completo, design.md) --
+// 1) estadoMatricula=='activo' HOY, y 2) estadoMatricula=='retirado' con fechaRetiro dentro
+// del periodo de facturacion actual (>= inicioPeriodo). Antes solo (1) existia, lo que
+// permitia que un estudiante retirado justo antes del corte y reingresado despues nunca se
+// facturara aunque hubiera usado la plataforma la mayor parte del periodo.
+// ---------------------------------------------------------------------------
+
+// Fake de Firestore que evalua los .where() contra una lista en memoria (en vez de solo
+// registrar la forma de la query) -- permite probar el RESULTADO de negocio (cuenta o no
+// cuenta), no solo que se llamo a .count().
+function crearFirestoreFakeConEstudiantes(documentos) {
+  return {
+    collection: (nombre) => {
+      assert.equal(nombre, 'estudiantes');
+      let filtrados = documentos;
+      const query = {
+        where: (campo, op, valor) => {
+          filtrados = filtrados.filter((doc) => {
+            if (op === '==') return doc[campo] === valor;
+            if (op === '>=') return doc[campo] >= valor;
+            throw new Error(`Operador no soportado en el fake: ${op}`);
+          });
+          return query;
+        },
+        count: () => ({ get: async () => ({ data: () => ({ count: filtrados.length }) }) }),
+        // Si el codigo real llamara .get() en vez de .count().get(), este fake debe
+        // delatarlo -- es exactamente lo que design.md pide evitar.
+        get: async () => { throw new Error('No debe usarse un .get() completo -- usar .count()'); },
+      };
+      return query;
+    },
+  };
+}
+
+test('contarEstudiantesFacturables (caso 1): estudiante activo hoy cuenta', async () => {
+  const firestoreFake = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'activo' },
+  ]);
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  const resultado = await contar('tnt-1', '2026-07-15');
+
+  assert.equal(resultado, 1);
+});
+
+test('contarEstudiantesFacturables (caso 2): estudiante retirado ANTES de que empezara el periodo actual NO cuenta', async () => {
+  // fechaVencimiento 2026-07-15 -> inicioPeriodo ~2026-06-15. Retiro el 2026-05-01 queda
+  // afuera del periodo actual.
+  const firestoreFake = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro: '2026-05-01T00:00:00.000Z' },
+  ]);
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  const resultado = await contar('tnt-1', '2026-07-15');
+
+  assert.equal(resultado, 0);
+});
+
+test('contarEstudiantesFacturables (caso 3): estudiante retirado DENTRO del periodo actual SI cuenta (cierra el abuso)', async () => {
+  // fechaVencimiento a 20 dias, retiro hace 10 dias -> dentro del periodo (~1 mes) actual.
+  const ahora = new Date('2026-07-15T00:00:00.000Z');
+  const fechaVencimiento = new Date(ahora.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString();
+  const fechaRetiro = new Date(ahora.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
+
+  const firestoreFake = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro },
+  ]);
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  const resultado = await contar('tnt-1', fechaVencimiento);
+
+  assert.equal(resultado, 1);
+});
+
+test('contarEstudiantesFacturables: suma activos + retirados-en-periodo (no descarta unos por otros)', async () => {
+  const firestoreFake = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'activo' },
+    { tenantId: 'tnt-1', estadoMatricula: 'activo' },
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro: '2026-07-01T00:00:00.000Z' },
+    // Otro tenant nunca debe filtrarse hacia adentro.
+    { tenantId: 'tnt-otro', estadoMatricula: 'activo' },
+  ]);
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  const resultado = await contar('tnt-1', '2026-07-15');
+
+  assert.equal(resultado, 3);
+});
+
+test('contarEstudiantesFacturables (caso 5): calcula el periodo igual con fechaVencimiento como Timestamp o como string', async () => {
+  const timestampFake = { toDate: () => new Date('2026-07-15T00:00:00.000Z') };
+  const documentos = [
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro: '2026-07-01T00:00:00.000Z' },
+  ];
+
+  const contarConTimestamp = crearContadorEstudiantesFacturablesFirestore(
+    crearFirestoreFakeConEstudiantes(documentos)
+  );
+  const contarConString = crearContadorEstudiantesFacturablesFirestore(
+    crearFirestoreFakeConEstudiantes(documentos)
+  );
+
+  assert.equal(await contarConTimestamp('tnt-1', timestampFake), 1);
+  assert.equal(await contarConString('tnt-1', '2026-07-15'), 1);
+});
+
+test('contarEstudiantesFacturables: usa .count() (nunca .get() completo) para ambas agregaciones', async () => {
+  const wheresPorQuery = [];
+  let countLlamadas = 0;
 
   const firestoreFake = {
     collection: (nombre) => {
       assert.equal(nombre, 'estudiantes');
-      return {
-        where: (campo1, op1, valor1) => {
-          wheresLlamados.push([campo1, op1, valor1]);
-          return {
-            where: (campo2, op2, valor2) => {
-              wheresLlamados.push([campo2, op2, valor2]);
-              return {
-                count: () => {
-                  countLlamado = true;
-                  return { get: async () => ({ data: () => ({ count: 3 }) }) };
-                },
-                // Si el codigo real llamara .get() en vez de .count().get(), este fake debe
-                // delatarlo -- es exactamente lo que design.md pide evitar.
-                get: async () => { throw new Error('No debe usarse un .get() completo -- usar .count()'); },
-              };
-            },
-          };
+      const wheres = [];
+      const query = {
+        where: (campo, op, valor) => {
+          wheres.push([campo, op, valor]);
+          return query;
         },
+        count: () => {
+          countLlamadas += 1;
+          wheresPorQuery.push([...wheres]);
+          return { get: async () => ({ data: () => ({ count: 0 }) }) };
+        },
+        get: async () => { throw new Error('No debe usarse un .get() completo -- usar .count()'); },
       };
+      return query;
     },
   };
 
   const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
-  const resultado = await contar('tnt-1');
+  await contar('tnt-1', '2026-07-15');
 
-  assert.equal(resultado, 3);
-  assert.ok(countLlamado);
-  assert.deepEqual(wheresLlamados, [
+  assert.equal(countLlamadas, 2);
+  assert.deepEqual(wheresPorQuery[0], [
     ['tenantId', '==', 'tnt-1'],
     ['estadoMatricula', '==', 'activo'],
   ]);
+  assert.equal(wheresPorQuery[1][0][0], 'tenantId');
+});
+
+test('contarEstudiantesFacturables: la segunda agregacion filtra estadoMatricula=="retirado" y fechaRetiro >= inicioPeriodo calculado', async () => {
+  const wheresPorQuery = [];
+
+  const firestoreFake = {
+    collection: () => {
+      const wheres = [];
+      const query = {
+        where: (campo, op, valor) => {
+          wheres.push([campo, op, valor]);
+          return query;
+        },
+        count: () => {
+          wheresPorQuery.push([...wheres]);
+          return { get: async () => ({ data: () => ({ count: 0 }) }) };
+        },
+        get: async () => { throw new Error('No debe usarse un .get() completo -- usar .count()'); },
+      };
+      return query;
+    },
+  };
+
+  const contar = crearContadorEstudiantesFacturablesFirestore(firestoreFake);
+  await contar('tnt-1', '2026-07-15');
+
+  const inicioPeriodoEsperado = calcularInicioPeriodoFacturable('2026-07-15').toISOString();
+  assert.deepEqual(wheresPorQuery[1], [
+    ['tenantId', '==', 'tnt-1'],
+    ['estadoMatricula', '==', 'retirado'],
+    ['fechaRetiro', '>=', inicioPeriodoEsperado],
+  ]);
+});
+
+test('contarEstudiantesFacturables (caso 4, escenario completo de abuso): alta -> retiro a los 10 dias -> reingreso -> retiro de nuevo -- ningun corte mensual deja de contar al estudiante', async () => {
+  // Cutoff 1: 2026-01-15. El estudiante se retiro el 2026-01-11 (10 dias despues del alta
+  // del 2026-01-01). estadoMatricula ya es 'retirado' al momento del corte.
+  const inicioPeriodoCutoff1 = calcularInicioPeriodoFacturable('2026-01-15').toISOString();
+  assert.ok(
+    '2026-01-11T00:00:00.000Z' >= inicioPeriodoCutoff1,
+    'precondicion del escenario: el retiro debe caer dentro del periodo del corte 1'
+  );
+  const firestoreCutoff1 = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro: '2026-01-11T00:00:00.000Z' },
+  ]);
+  const contarCutoff1 = crearContadorEstudiantesFacturablesFirestore(firestoreCutoff1);
+  assert.equal(
+    await contarCutoff1('tnt-1', '2026-01-15'),
+    1,
+    'corte 1: el retiro del 11 de enero debe contar (esta dentro del periodo)'
+  );
+
+  // Entre cortes: 2026-01-20 reingresa, 2026-02-10 se retira de nuevo. fechaRetiro se
+  // sobreescribe con el ultimo retiro (mismo campo, un solo valor -- ver
+  // servicios/estudiantesApi.ts retirarEstudiante).
+  // Cutoff 2: 2026-02-15. El documento vigente en ese momento ya refleja el retiro del 10
+  // de febrero.
+  const inicioPeriodoCutoff2 = calcularInicioPeriodoFacturable('2026-02-15').toISOString();
+  assert.ok(
+    '2026-02-10T00:00:00.000Z' >= inicioPeriodoCutoff2,
+    'precondicion del escenario: el segundo retiro debe caer dentro del periodo del corte 2'
+  );
+  const firestoreCutoff2 = crearFirestoreFakeConEstudiantes([
+    { tenantId: 'tnt-1', estadoMatricula: 'retirado', fechaRetiro: '2026-02-10T00:00:00.000Z' },
+  ]);
+  const contarCutoff2 = crearContadorEstudiantesFacturablesFirestore(firestoreCutoff2);
+  assert.equal(
+    await contarCutoff2('tnt-1', '2026-02-15'),
+    1,
+    'corte 2: el retiro del 10 de febrero tampoco debe escaparse del conteo'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -428,8 +639,8 @@ function crearDepsScheduler({ tenants, resultadoCobro, wompiPaymentSourceIds }) 
       llamadasObtenerPaymentSourceId.push(tenantId);
       return mapaPaymentSourceIds[tenantId] ?? null;
     },
-    contarEstudiantesFacturables: async (tenantId) => {
-      llamadasContarEstudiantesFacturables.push(tenantId);
+    contarEstudiantesFacturables: async (tenantId, fechaVencimiento) => {
+      llamadasContarEstudiantesFacturables.push({ tenantId, fechaVencimiento });
       return tenants.find((t) => t.id === tenantId)?.estudiantesFacturables ?? 0;
     },
     crearTransaccionWompi:
@@ -657,6 +868,28 @@ test('cobroAutomaticoMensual: si el subdocumento privado no existe o no tiene wo
 // ya persistidos en el propio doc del tenant (sedesExtraContratadas/
 // equipoTecnicoExtraContratado, D7/D8 -- Bloque 3a).
 // ---------------------------------------------------------------------------
+
+test('cobroAutomaticoMensual (fix facturacion-periodo-vs-snapshot): pasa la fechaVencimiento del propio tenant a contarEstudiantesFacturables para que pueda calcular el inicio del periodo', async () => {
+  const { deps, llamadasContarEstudiantesFacturables } = crearDepsScheduler({
+    tenants: [
+      {
+        id: 'tnt-1',
+        wompiPaymentSourceId: 1,
+        emailClub: 'a@a.com',
+        fechaVencimiento: '2026-07-15',
+        estudiantesFacturables: 5,
+      },
+    ],
+    resultadoCobro: { estado: 'APPROVED', transactionId: 'txn-1' },
+  });
+
+  const servicio = crearServicioCobroAutomaticoMensual(deps);
+  await servicio(new Date());
+
+  assert.deepEqual(llamadasContarEstudiantesFacturables, [
+    { tenantId: 'tnt-1', fechaVencimiento: '2026-07-15' },
+  ]);
+});
 
 test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable inyectado + extras del tenant (ya no infiere addons por diferencia de limites)', async () => {
   const tenants = [
