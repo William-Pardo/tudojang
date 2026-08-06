@@ -46,6 +46,24 @@ function haceNDias(fecha, n) {
   return new Date(fecha.getTime() - n * MS_POR_DIA);
 }
 
+// Fix facturacion-periodo-vs-snapshot: mismo calculo que
+// wompiCobroAutomatico.js::calcularInicioPeriodoFacturable -- aproxima el inicio del periodo
+// de facturacion actual como `fechaVencimiento` MENOS 1 mes calendario (no hay un campo
+// persistido de "inicio del periodo anterior"; aproximacion deliberada, simple y
+// conservadora, misma que ya usa el cobro real). DUPLICADA aca a proposito -- ver la nota
+// "cada Cloud Function es un archivo autocontenido" mas abajo -- en vez de importada desde
+// wompiCobroAutomatico.js. Reusa normalizarFecha (ya importado arriba) para aceptar tanto
+// Timestamp de Firestore como string 'YYYY-MM-DD'.
+function calcularInicioPeriodoFacturable(fechaVencimientoValor) {
+  const fechaVencimiento = normalizarFecha(fechaVencimientoValor);
+  if (!fechaVencimiento) return null;
+  return new Date(
+    fechaVencimiento.getFullYear(),
+    fechaVencimiento.getMonth() - 1,
+    fechaVencimiento.getDate()
+  );
+}
+
 // null si el tenant no tiene fechaVencimiento (o no es parseable) -- S3 exige un valor no-null
 // (historial corto/dato faltante es inerte), asi que un tenant sin fecha de corte simplemente
 // nunca dispara esa señal, sin lanzar.
@@ -119,7 +137,11 @@ function crearServicioVigilarCrecimientoFacturable({
       const tenant = doc.data() || {};
 
       try {
-        const nHoy = await contarEstudiantesFacturables(tenantId);
+        // Fix facturacion-periodo-vs-snapshot: se le pasa la propia fechaVencimiento del
+        // tenant -- es el input que contarEstudiantesFacturables necesita para calcular el
+        // inicio del periodo actual (ver calcularInicioPeriodoFacturable), mismo criterio
+        // que cobroAutomaticoMensual (wompiCobroAutomatico.js) ya aplica para el cobro real.
+        const nHoy = await contarEstudiantesFacturables(tenantId, tenant.fechaVencimiento);
         const { historial, ultimaAlertaEnviada } = await leerHistorialVigilancia(tenantId);
 
         // Lookup por FECHA, no por indice fijo del array -- si el cron se salto un dia (falla
@@ -174,21 +196,54 @@ function crearServicioVigilarCrecimientoFacturable({
   };
 }
 
-// Cuenta estudiantes FACTURABLES (estadoMatricula=='activo') de un tenant vía una agregación
-// `.count()` de Firestore -- mismo patrón/query (independiente, sin módulo compartido -- ver
-// la nota en wompiCobroAutomatico.js y academico/estudiantes.js) que las otras dos copias de
-// esta misma consulta en este cambio; este cron corre una vez al dia por CADA tenant, no solo
-// los que tienen `cobroAutomaticoActivo`, así que la eficiencia de `.count()` importa igual.
+// Cuenta estudiantes FACTURABLES de un tenant en el período actual sumando DOS agregaciones
+// `.count()` de Firestore -- NUNCA un `.get()` completo; este cron corre una vez al dia por
+// CADA tenant, no solo los que tienen `cobroAutomaticoActivo`, así que la eficiencia de
+// `.count()` importa igual:
+//   1) estadoMatricula=='activo' HOY.
+//   2) estadoMatricula=='retirado' Y fechaRetiro >= inicio del período actual.
+//
+// Fix facturacion-periodo-vs-snapshot: ANTES esto era solo (1), una foto puntual del momento
+// exacto de la corrida diaria -- permitía que un tenant diera de alta un estudiante, lo
+// retirara antes de esa corrida y lo reingresara después, de forma que ese estudiante nunca
+// coincidiera "activo" el día exacto de la corrida y nunca disparara este guardrail pese a
+// haber usado la plataforma la mayor parte del período (mismo patrón de abuso que cerró el
+// fix homónimo en wompiCobroAutomatico.js para el cobro real). (2) cierra ese hueco: un
+// retiro DENTRO del período actual sigue contando para ESE período, aproximado con
+// `calcularInicioPeriodoFacturable` (fechaVencimiento del propio tenant menos 1 mes
+// calendario). `fechaRetiro` se guarda como string ISO 8601 (servicios/estudiantesApi.ts,
+// retirarEstudiante) -- comparar con `>=` funciona porque ISO 8601 ordena lexicográficamente
+// igual que cronológicamente, siempre que el límite del período también se construya como
+// ISO string (toISOString()), lo que hace acá.
+//
+// Mismo patrón (independiente, sin módulo compartido -- ver la nota en wompiCobroAutomatico.js
+// y academico/estudiantes.js, que definen su propia copia de esta misma query por la misma
+// razón que este archivo no comparte `evaluarSenalesCrecimiento`/`fechaBogota` con esos
+// módulos: cada Cloud Function es un archivo autocontenido en este repo). Este fix vive
+// también acá (antes vivía SOLO en wompiCobroAutomatico.js -- este guardrail, notify-only,
+// había quedado desincronizado con el conteo real de facturación).
 function crearContadorEstudiantesFacturablesFirestore(firestore) {
-  return async function contarEstudiantesFacturables(tenantId) {
-    const snapshot = await firestore
+  return async function contarEstudiantesFacturables(tenantId, fechaVencimiento) {
+    const snapshotActivos = await firestore
       .collection('estudiantes')
       .where('tenantId', '==', tenantId)
       .where('estadoMatricula', '==', 'activo')
       .count()
       .get();
+    const activos = snapshotActivos.data().count;
 
-    return snapshot.data().count;
+    const inicioPeriodo = calcularInicioPeriodoFacturable(fechaVencimiento);
+    if (!inicioPeriodo) return activos;
+
+    const snapshotRetiradosEnPeriodo = await firestore
+      .collection('estudiantes')
+      .where('tenantId', '==', tenantId)
+      .where('estadoMatricula', '==', 'retirado')
+      .where('fechaRetiro', '>=', inicioPeriodo.toISOString())
+      .count()
+      .get();
+
+    return activos + snapshotRetiradosEnPeriodo.data().count;
   };
 }
 
@@ -234,5 +289,6 @@ module.exports = {
   crearLectorHistorialVigilanciaFirestore,
   crearGuardadorHistorialVigilanciaFirestore,
   evaluarSenalesCrecimiento,
+  calcularInicioPeriodoFacturable,
   fechaBogota,
 };

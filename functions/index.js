@@ -1206,7 +1206,11 @@ const guardarHistorialVigilanciaFirestore = crearGuardadorHistorialVigilanciaFir
 );
 const servicioVigilarCrecimientoFacturable = crearServicioVigilarCrecimientoFacturable({
   listarTenants: () => listarTenantsVigilanciaFirestore(),
-  contarEstudiantesFacturables: (tenantId) => contarFacturablesVigilanciaFirestore(tenantId),
+  // Fix facturacion-periodo-vs-snapshot: se le pasa la propia fechaVencimiento del tenant --
+  // es el input que contarFacturablesVigilanciaFirestore necesita para calcular el inicio
+  // del período actual (ya no es solo una foto puntual del momento de la corrida diaria).
+  contarEstudiantesFacturables: (tenantId, fechaVencimiento) =>
+    contarFacturablesVigilanciaFirestore(tenantId, fechaVencimiento),
   leerHistorialVigilancia: (tenantId) => leerHistorialVigilanciaFirestore(tenantId),
   guardarHistorialVigilancia: (tenantId, datos) => guardarHistorialVigilanciaFirestore(tenantId, datos),
   notificarAlerta: async (payload) => {

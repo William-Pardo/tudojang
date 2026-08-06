@@ -466,9 +466,9 @@ function crearLectorWompiPaymentSourceIdFirestore(firestore) {
 // Mismo patrón (independiente, sin módulo compartido -- ver academico/estudiantes.js y
 // vigilanciaFacturacion.js, que definen su propia copia de esta misma query por la misma
 // razón que el resto de este archivo no comparte `assertEsAdmin`/`assertTenantAutorizado` con
-// esos módulos: cada Cloud Function es un archivo autocontenido en este repo). Este fix vive
-// SOLO acá (y en su caller) -- vigilanciaFacturacion.js (guardrail de crecimiento, notify-only)
-// mantiene su propia copia de la query antigua (solo activos), fuera de alcance de este fix.
+// esos módulos: cada Cloud Function es un archivo autocontenido en este repo).
+// vigilanciaFacturacion.js (guardrail de crecimiento, notify-only) aplica el mismo fix por
+// separado en su propia copia de esta consulta.
 function crearContadorEstudiantesFacturablesFirestore(firestore) {
   return async function contarEstudiantesFacturables(tenantId, fechaVencimiento) {
     const snapshotActivos = await firestore
