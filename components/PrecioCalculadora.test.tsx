@@ -40,18 +40,18 @@ describe('PrecioCalculadora', () => {
       />
     );
 
-    // 80 estudiantes cruza 2 tramos (1-50 y 51-150) -- el desglose muestra AMBOS, no un
+    // 80 estudiantes cruza 2 tramos (1-70 y 71-150) -- el desglose muestra AMBOS, no un
     // monto único, y el total resultante sí es la suma (estudiantes + sede extra).
     const filas = screen.getAllByTestId('tramo-fila');
     expect(filas).toHaveLength(2);
-    expect(filas[0]).toHaveTextContent('50 alumnos');
-    expect(filas[1]).toHaveTextContent('30 alumnos');
+    expect(filas[0]).toHaveTextContent('70 alumnos');
+    expect(filas[1]).toHaveTextContent('10 alumnos');
     const totalEsperado = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(resultado.totalPesos);
     expect(screen.getByTestId('precio-total').textContent?.replace(/\s/g, '')).toBe(totalEsperado.replace(/\s/g, ''));
   });
 
   it('no asume una longitud fija de tramos -- renderiza solo los tramos con cantidad>0 (array disperso)', () => {
-    // 30 estudiantes cae ENTERO dentro del primer tramo (1-50): el array `tramos` que
+    // 30 estudiantes cae ENTERO dentro del primer tramo (1-70): el array `tramos` que
     // calcularFacturacionMensual devuelve tiene largo 1, no 4 -- el componente no debe
     // asumir índices fijos.
     const resultado = calcularFacturacionMensual({
