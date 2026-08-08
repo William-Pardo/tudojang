@@ -923,10 +923,13 @@ test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable i
 
   await servicio(new Date());
 
-  // 60 facturables: (50*3800) + (10*3400) = 190000 + 34000 = 224000; + 1 sede extra
-  // ($89.900) = 313900 pesos = 31390000 centavos (calcularFacturacionMensual, facturacion.js).
+  // 60 facturables: tramo corregido (facturacion-config.json) es 1-70 @ 3800, asi que los
+  // 60 caen enteros en el primer tramo: 60*3800 = 228000; + 1 sede extra ($89.900) = 317900
+  // pesos = 31790000 centavos (calcularFacturacionMensual, facturacion.js). Este assert
+  // quedo desactualizado cuando se corrigieron los tramos a 70/150/350 (antes el corte
+  // del primer tramo estaba en 50).
   assert.equal(tenantIdContado, 'tnt-1');
-  assert.equal(amountRecibido, 31390000);
+  assert.equal(amountRecibido, 31790000);
 });
 
 test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra solo el tramo de estudiantes', async () => {
