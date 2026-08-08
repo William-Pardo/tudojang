@@ -115,6 +115,21 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposProtegidos);
     }
 
+    // Misión KICHO: 'directo' es el sentinel del link fijo "Compartir Formulario" (sin
+    // campaña, sin expiración por diseño -- ver MISION_ID_DIRECTO en constantes.ts). Para una
+    // misión real, exige que siga activa Y no haya pasado su fechaExpiracion -- cierra el hueco
+    // donde CensoPublico.tsx seguía aceptando registros después de que el contador del Admin
+    // marcara "EXPIRADO" (esa cuenta regresiva era solo visual, nunca se validaba acá) y
+    // habilita que el SuperAdmin corte la vigencia a mano (desactivarMisionKicho -> activa:false)
+    // sin esperar a que pasen las 72h.
+    function misionVigente(misionId) {
+      let ref = /databases/$(database)/documents/misiones_kicho/$(misionId);
+      return misionId == 'directo'
+        || (exists(ref)
+            && get(ref).data.activa == true
+            && request.time < timestamp.value(get(ref).data.fechaExpiracion));
+    }
+
     // =========================================================================
     // Colecciones existentes
     // =========================================================================
@@ -251,6 +266,56 @@ service cloud.firestore {
       // ERR-0011: update/delete tampoco validaban tenant -- un Instructor de OTRO tenant
       // podia editar/borrar estudiantes ajenos conociendo (o adivinando) el docId.
       allow update, delete: if isInstructor() && resource.data.tenantId == currentTenantId();
+    }
+
+    // Misión KICHO: censo masivo de aspirantes (link/QR público -> revisión del tenant ->
+    // legalización -> inyección a `estudiantes`). Nunca tuvieron match propio: caían en el
+    // catch-all final (`allow read, write: if false`), bloqueando TODO acceso -- lectura del
+    // propio Admin del tenant incluida -- para TODOS los clubes, siempre (mismo patrón de bug
+    // que ERR-0010 en `asistencia`; reportado 2026-08-04 con perfil Cocodrilos pero no es
+    // específico de ese tenant).
+    match /misiones_kicho/{misionId} {
+      // obtenerMisionPorId (CensoPublico.tsx, SIN login) necesita leer una misión puntual por
+      // su id (opaco, no enumerable -- no hay `list` acá) para decidir si el formulario público
+      // sigue vigente antes de mostrarlo. No expone nada explotable: el documento no tiene PII
+      // de aspirantes, solo metadata de la campaña (y la firma de legalización, que ya viaja
+      // detrás de un id no adivinable, mismo modelo de "link como capability" que el resto de
+      // Misión KICHO).
+      allow get: if true;
+      // obtenerMisiones (MasterDashboard, SuperAdmin) lista TODAS las misiones sin filtro de
+      // tenant; obtenerMisionActivaTenant/obtenerRegistrosMision (tenant, censoApi.ts) filtran
+      // por su propio tenantId via where(). `list` sigue exigiendo rol -- a diferencia de `get`,
+      // sin un id puntual esto sería enumerar la colección entera.
+      allow list: if isSuperAdmin()
+        || (isInstructor() && resource.data.tenantId == currentTenantId());
+      // handleActivarKichoAuto (self-service, Admin/Editor, vistas/MisionKicho.tsx) crea para
+      // su propio tenant; MasterDashboard (SuperAdmin) crea en nombre de CUALQUIER tenant al
+      // aprobar una solicitud de Soporte.
+      allow create: if isSuperAdmin()
+        || (isInstructor() && request.resource.data.tenantId == currentTenantId());
+      // legalizarLoteKicho (Admin del tenant) e inyectarEstudiantesKicho (SuperAdmin) escriben
+      // autenticados. registrarAspirantePublico (censo público, SIN login) solo incrementa
+      // `registrosRecibidos` sobre una misión activa -- se acota a esa única clave con
+      // diff().affectedKeys() para no abrir el resto del documento a escritura anónima.
+      allow update: if isSuperAdmin()
+        || (isAdmin() && resource.data.tenantId == currentTenantId())
+        || (resource.data.activa == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrosRecibidos']));
+      allow delete: if isSuperAdmin();
+    }
+
+    // Registros temporales de aspirantes capturados por el censo público (con o sin campaña
+    // Kicho activa detrás, ver MISION_ID_DIRECTO en vistas/MisionKicho.tsx). CensoPublico.tsx
+    // escribe SIN login -- se valida que el tenantId exista y se fuerza estado:'pendiente' para
+    // que el registro nazca en la bandeja de revisión, nunca ya aprobado/procesado.
+    match /registros_temporales/{regId} {
+      // obtenerRegistrosMision (SuperAdmin, vía MasterDashboard, para inyectarEstudiantesKicho)
+      // lee registros de cualquier tenant por misionId; el tenant solo lee los propios.
+      allow read: if isSuperAdmin() || (isInstructor() && resource.data.tenantId == currentTenantId());
+      allow create: if request.resource.data.estado == 'pendiente'
+        && exists(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId))
+        && misionVigente(request.resource.data.misionId);
+      allow update, delete: if isSuperAdmin() || (isInstructor() && resource.data.tenantId == currentTenantId());
     }
 
     // Asistencia de guarderia/entrega a tutores (Sistema C, colección raíz `asistencia`,

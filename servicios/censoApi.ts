@@ -85,6 +85,31 @@ export const validarRegistroTemporal = async (id: string, estado: 'verificado' |
 };
 
 /**
+ * Lectura pública de una misión por id (censo público, sin login) para validar que el
+ * link siga vigente antes de mostrar el formulario -- ver misionVigente() en firestore.rules,
+ * misma condición (activa + no vencida) aplicada del lado del cliente.
+ */
+export const obtenerMisionPorId = async (misionId: string): Promise<MisionKicho | null> => {
+    if (!isFirebaseConfigured) return null;
+    const snap = await getDoc(doc(db, 'misiones_kicho', misionId));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as MisionKicho;
+};
+
+/**
+ * SUPERADMIN: Corta manualmente la vigencia de una misión activa (soporte/seguridad),
+ * sin esperar a que el tenant la legalice ni a que venza el contador de 72h.
+ */
+export const desactivarMisionKicho = async (misionId: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    await updateDoc(doc(db, 'misiones_kicho', misionId), {
+        activa: false,
+        estadoLote: 'cancelado',
+        fechaCancelacion: new Date().toISOString()
+    });
+};
+
+/**
  * TENANT: El Admin firma y envía el lote al SuperAdmin
  */
 export const legalizarLoteKicho = async (misionId: string, firmaBase64: string): Promise<void> => {
@@ -164,4 +189,29 @@ export const obtenerRegistrosMision = async (misionId: string): Promise<Registro
     const q = query(collection(db, 'registros_temporales'), where("misionId", "==", misionId));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroTemporal));
+};
+
+/**
+ * TENANT: Aspirantes pendientes de todo el tenant, sin importar la misión de origen.
+ * Filtra por tenantId (no por misionId) para que el link fijo "Compartir Formulario"
+ * (?club=slug, sin campaña Kicho activa) también quede visible en la bandeja de revisión.
+ */
+export const obtenerRegistrosPendientesTenant = async (tenantId: string): Promise<RegistroTemporal[]> => {
+    if (!isFirebaseConfigured) return [];
+    const q = query(
+        collection(db, 'registros_temporales'),
+        where("tenantId", "==", tenantId),
+        where("estado", "==", "pendiente")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroTemporal));
+};
+
+/**
+ * TENANT: Descarta el registro temporal una vez que sus datos ya quedaron
+ * incorporados a un Estudiante real (aprobación individual) o tras rechazarlo.
+ */
+export const eliminarRegistroTemporal = async (id: string): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    await deleteDoc(doc(db, 'registros_temporales', id));
 };

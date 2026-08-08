@@ -89,7 +89,9 @@ export const VistaEstudiantes: React.FC = () => {
     // Cargar misión activa para el banner global
     useEffect(() => {
         if (usuario) {
-            obtenerMisionActivaTenant(usuario.tenantId).then(setMisionActiva);
+            obtenerMisionActivaTenant(usuario.tenantId)
+                .then(setMisionActiva)
+                .catch(() => setMisionActiva(null));
         }
     }, [usuario, activeTab]);
 
@@ -286,7 +288,7 @@ export const VistaEstudiantes: React.FC = () => {
             </div >
 
             <div className="min-h-[400px]">
-                {activeTab === 'kicho' && <div className="animate-fade-in"><VistaMisionKicho /></div>}
+                {activeTab === 'kicho' && <div className="animate-fade-in"><VistaMisionKicho guardarEstudiante={guardarEstudiante} cargandoAccion={cargandoAccion} /></div>}
                 {activeTab === 'directorio' && renderDirectorio()}
                 {activeTab === 'asistencia' && <div className="animate-fade-in"><VistaGestionClase /></div>}
                 {activeTab === 'carnets' && <div className="animate-fade-in"><VistaCarnetizacion /></div>}

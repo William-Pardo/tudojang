@@ -139,26 +139,26 @@ describe('configuracionApi', () => {
   });
 
   describe('buscarTenantPorSlug', () => {
+    // Bug real (sesion 2026-08-06): esto consultaba `tenants` DIRECTO desde el cliente, pero
+    // firestore.rules exige authenticated() -- un visitante SIN LOGIN (el caso real de esta
+    // funcion: censo/evento publico) nunca podia resolver el tenant. Ahora es un wrapper
+    // delgado sobre httpsCallable('resolverTenantPublico'), mismo patron que
+    // actualizarCapacidadClub arriba.
     it('debería retornar null si no se encuentra el slug', async () => {
-      (getDocs as jest.Mock).mockResolvedValueOnce({
-        empty: true,
-      });
+      mockCallable.mockResolvedValueOnce({ data: null });
 
       const tenant = await buscarTenantPorSlug('nonexistent');
-      expect(query).toHaveBeenCalled();
-      expect(where).toHaveBeenCalledWith('slug', '==', 'nonexistent');
+      expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'resolverTenantPublico');
+      expect(mockCallable).toHaveBeenCalledWith({ slug: 'nonexistent' });
       expect(tenant).toBeNull();
     });
 
     it('debería retornar el tenant si se encuentra el slug', async () => {
-      const mockTenant = { slug: 'tudojang', nombreClub: 'Tudojang SaaS' };
-      (getDocs as jest.Mock).mockResolvedValueOnce({
-        empty: false,
-        docs: [{ id: 'tenant123', data: () => mockTenant }],
-      });
+      const mockTenant = { tenantId: 'tenant123', slug: 'tudojang', nombreClub: 'Tudojang SaaS' };
+      mockCallable.mockResolvedValueOnce({ data: mockTenant });
 
       const tenant = await buscarTenantPorSlug('tudojang');
-      expect(tenant).toEqual({ id: 'tenant123', ...mockTenant });
+      expect(tenant).toEqual(mockTenant);
     });
 
     it('debería usar el modo mock si isFirebaseConfigured es falso', async () => {
@@ -245,7 +245,7 @@ describe('obtenerConfiguracionClub', () => {
         writable: true,
         configurable: true,
       });
-      (getDocs as jest.Mock).mockResolvedValueOnce({ empty: true }); // buscarTenantPorSlug
+      mockCallable.mockResolvedValueOnce({ data: null }); // buscarTenantPorSlug
 
       const config = await obtenerConfiguracionClub('nonexistent');
       expect(config).toEqual(CONFIGURACION_CLUB_POR_DEFECTO);
@@ -268,13 +268,10 @@ describe('obtenerConfiguracionClub', () => {
         writable: true,
         configurable: true,
       });
-      (getDocs as jest.Mock).mockResolvedValueOnce({
-        empty: false,
-        docs: [{ id: 'slugTenantId', data: () => mockClubConfig }],
-      }); // buscarTenantPorSlug
+      mockCallable.mockResolvedValueOnce({ data: mockClubConfig }); // buscarTenantPorSlug
 
       const config = await obtenerConfiguracionClub();
-      expect(config).toEqual({ id: 'slugTenantId', ...mockClubConfig });
+      expect(config).toEqual(mockClubConfig);
     });
 
     it('debería usar el modo mock si isFirebaseConfigured es falso', async () => {

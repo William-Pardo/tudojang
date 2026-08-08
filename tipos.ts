@@ -379,9 +379,10 @@ export interface MisionKicho {
     fechaExpiracion: string;
     activa: boolean;
     registrosRecibidos: number;
-    estadoLote: 'captura' | 'legalizado' | 'procesado';
+    estadoLote: 'captura' | 'legalizado' | 'procesado' | 'cancelado';
     firmaLegalizacion?: string;
     fechaLegalizacion?: string;
+    fechaCancelacion?: string; // Presente cuando un SuperAdmin corta la vigencia manualmente
     sedeId?: string; // Nuevo: Sede asignada a esta generación de Misión Kicho
 }
 

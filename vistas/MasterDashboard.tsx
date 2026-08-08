@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { obtenerTodosLosTenants, cambiarEstadoSuscripcionTenant } from '../servicios/configuracionApi';
-import { obtenerMisiones, crearMisionKicho, inyectarEstudiantesKicho, obtenerRegistrosMision } from '../servicios/censoApi';
+import { obtenerMisiones, crearMisionKicho, inyectarEstudiantesKicho, obtenerRegistrosMision, desactivarMisionKicho } from '../servicios/censoApi';
 import { escucharTicketsActivos, actualizarTicket } from '../servicios/soporteApi';
 import { enviarNotificacion } from '../servicios/api';
 import { ConfiguracionClub, MisionKicho, RegistroTemporal, TicketSoporte, EtapaSoporte } from '../tipos';
@@ -97,6 +97,18 @@ const VistaMasterDashboard: React.FC = () => {
             setTenants(prev => prev.map(t => t.tenantId === id ? { ...t, estadoSuscripcion: nuevo } : t));
             mostrarNotificacion(`Estado de academia actualizado a ${nuevo}`, "success");
         } catch (e) { mostrarNotificacion("Error al cambiar estado", "error"); }
+    };
+
+    const handleDesactivarMision = async (mision: MisionKicho) => {
+        const club = tenants.find(t => t.tenantId === mision.tenantId)?.nombreClub || 'el dojang';
+        if (!window.confirm(`¿Romper el link de "${mision.nombreMision}" (${club}) ahora mismo? Los aspirantes que aún no enviaron sus datos ya no podrán hacerlo.`)) return;
+        try {
+            await desactivarMisionKicho(mision.id);
+            setMisiones(prev => prev.map(m => m.id === mision.id ? { ...m, activa: false, estadoLote: 'cancelado' } : m));
+            mostrarNotificacion("Link de la misión desactivado", "success");
+        } catch (e) {
+            mostrarNotificacion("No se pudo desactivar la misión", "error");
+        }
     };
 
     const abrirHomologador = async (mision: MisionKicho) => {
@@ -331,9 +343,18 @@ const VistaMasterDashboard: React.FC = () => {
                                             <h4 className="font-black uppercase text-sm">{m.nombreMision}</h4>
                                             <p className="text-[8px] text-gray-500 uppercase mt-2">Cierra: {new Date(m.fechaExpiracion).toLocaleString()}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-xl font-black text-tkd-blue dark:text-white">{m.registrosRecibidos}</div>
-                                            <p className="text-[8px] font-bold text-gray-400 uppercase">Recibidos</p>
+                                        <div className="flex items-center gap-6">
+                                            <div className="text-right">
+                                                <div className="text-xl font-black text-tkd-blue dark:text-white">{m.registrosRecibidos}</div>
+                                                <p className="text-[8px] font-bold text-gray-400 uppercase">Recibidos</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDesactivarMision(m)}
+                                                title="Romper el link manualmente"
+                                                className="p-3 bg-red-50 dark:bg-tkd-red/10 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm"
+                                            >
+                                                <IconoRechazar className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 ))}

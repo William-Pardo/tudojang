@@ -1,20 +1,59 @@
 
 // vistas/CensoPublico.tsx
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useTenant } from '../components/BrandingProvider';
-import { registrarAspirantePublico } from '../servicios/censoApi';
-import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar } from '../components/Iconos';
+import { buscarTenantPorSlug } from '../servicios/configuracionApi';
+import type { ConfiguracionClub } from '../tipos';
+import { registrarAspirantePublico, obtenerMisionPorId } from '../servicios/censoApi';
+import { MISION_ID_DIRECTO } from '../constantes';
+import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar, IconoAlertaTriangulo } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
 
 const CensoPublico: React.FC = () => {
     const { misionId } = useParams();
-    const { tenant, estaCargado } = useTenant();
+    const [searchParams] = useSearchParams();
+    const clubSlug = searchParams.get('club');
+
+    // Si viene ?club=slug, cargamos el tenant por slug (URL directa sin misión activa).
+    // Si no, usamos el BrandingProvider normal (flujo de MisionKicho con subdominio).
+    const { tenant: tenantCtx, estaCargado: ctxCargado } = useTenant();
+    const [tenantSlug, setTenantSlug] = useState<ConfiguracionClub | null>(null);
+    const [slugCargado, setSlugCargado] = useState(!clubSlug);
+
+    useEffect(() => {
+        if (!clubSlug) return;
+        buscarTenantPorSlug(clubSlug)
+            .then(c => setTenantSlug(c))
+            .finally(() => setSlugCargado(true));
+    }, [clubSlug]);
+
+    const tenant = clubSlug ? tenantSlug : tenantCtx;
+    const estaCargado = clubSlug ? slugCargado : ctxCargado;
+
     const [edad, setEdad] = useState<number | null>(null);
     const [enviado, setEnviado] = useState(false);
     const [cargando, setCargando] = useState(false);
+
+    // El link fijo (MISION_ID_DIRECTO) nunca vence; una misión real sí -- se valida contra
+    // Firestore (activa + fechaExpiracion) antes de mostrar el formulario, mismo criterio que
+    // misionVigente() en firestore.rules del lado del servidor.
+    const esMisionReal = !!misionId && misionId !== MISION_ID_DIRECTO;
+    const [verificandoMision, setVerificandoMision] = useState(esMisionReal);
+    const [misionInvalida, setMisionInvalida] = useState(false);
+
+    useEffect(() => {
+        if (!esMisionReal) return;
+        obtenerMisionPorId(misionId!)
+            .then(m => {
+                const vigente = !!m && m.activa && new Date(m.fechaExpiracion) > new Date();
+                setMisionInvalida(!vigente);
+            })
+            .catch(() => setMisionInvalida(true))
+            .finally(() => setVerificandoMision(false));
+    }, [misionId]);
 
     const [formData, setFormData] = useState({
         nombres: '', apellidos: '', email: '', telefono: '',
@@ -52,7 +91,17 @@ const CensoPublico: React.FC = () => {
         }
     };
 
-    if (!estaCargado) return <div className="h-screen bg-tkd-dark flex items-center justify-center"><Loader texto="Autenticando Dojang..." /></div>;
+    if (!estaCargado || verificandoMision) return <div className="h-screen bg-tkd-dark flex items-center justify-center"><Loader texto="Autenticando Dojang..." /></div>;
+
+    if (misionInvalida) {
+        return (
+            <div className="h-screen flex flex-col items-center justify-center bg-tkd-dark p-6 text-center">
+                <IconoAlertaTriangulo className="w-16 h-16 text-red-500 mb-4" />
+                <h1 className="text-white font-black uppercase">Link No Disponible</h1>
+                <p className="text-gray-400 mt-2 max-w-sm">Este formulario de registro ya no está activo. Contacta directamente a tu academia para conseguir un link vigente.</p>
+            </div>
+        );
+    }
 
     if (enviado) {
         return (

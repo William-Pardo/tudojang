@@ -102,6 +102,9 @@ const {
   crearServicioCrearEstudiante,
 } = require("./academico/estudiantes");
 const {
+  crearServicioResolverTenantPublico,
+} = require("./academico/tenantPublico");
+const {
   crearServicioActualizarExtrasContratados,
 } = require("./academico/capacidad");
 const {
@@ -421,6 +424,10 @@ const servicioCrearEstudiante = crearServicioCrearEstudiante({
   firestore: admin.firestore()
 });
 
+const servicioResolverTenantPublico = crearServicioResolverTenantPublico({
+  firestore: admin.firestore()
+});
+
 const servicioActualizarExtrasContratados = crearServicioActualizarExtrasContratados({
   firestore: admin.firestore()
 });
@@ -710,6 +717,15 @@ exports.repararSedesEjecucionPrograma = functionsV1.https.onCall(
 // Function (uso mucho mas frecuente que sedes, fuera de alcance de este fix puntual).
 exports.crearEstudiante = functionsV1.https.onCall(
   crearHandlerCallable(servicioCrearEstudiante)
+);
+
+// Resolucion PUBLICA de tenant por slug (SIN auth) -- ver academico/tenantPublico.js para el
+// detalle completo del bug real que esto cierra (visitante anonimo veia "Escuela No
+// Encontrada" en vez del formulario/evento publico). A diferencia de crearEstudiante/sedes,
+// esta funcion es intencionalmente accesible sin login: es justamente lo que un prospecto sin
+// cuenta necesita para llegar al formulario.
+exports.resolverTenantPublico = functionsV1.https.onCall(
+  crearHandlerCallable(servicioResolverTenantPublico)
 );
 
 // SDD pricing-cupo-real (D7, design.md): unico writer de sedesExtraContratadas/
