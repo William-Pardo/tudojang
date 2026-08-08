@@ -243,15 +243,19 @@ describe('censoApi', () => {
         docs: mockRegistros.map(r => ({ id: r.id, data: () => r })),
       });
 
-      const registros = await obtenerRegistrosMision('m1');
+      const registros = await obtenerRegistrosMision('m1', 't1');
       expect(query).toHaveBeenCalled();
       expect(where).toHaveBeenCalledWith('misionId', '==', 'm1');
+      // Bug real (sesion 2026-08-08): sin este segundo filtro, Firestore rechaza el `list`
+      // con permission-denied -- la regla exige tenantId y no puede verificarla solo con
+      // misionId en la query (ver comentario en censoApi.ts).
+      expect(where).toHaveBeenCalledWith('tenantId', '==', 't1');
       expect(registros).toEqual(mockRegistros);
     });
 
     it('debería retornar un array vacío si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
-      const registros = await obtenerRegistrosMision('m1');
+      const registros = await obtenerRegistrosMision('m1', 't1');
       expect(registros).toEqual([]);
     });
   });

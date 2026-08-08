@@ -112,7 +112,7 @@ const VistaMasterDashboard: React.FC = () => {
     };
 
     const abrirHomologador = async (mision: MisionKicho) => {
-        const regs = await obtenerRegistrosMision(mision.id);
+        const regs = await obtenerRegistrosMision(mision.id, mision.tenantId);
         const verificados = regs.filter(r => r.estado === 'verificado');
         setRegistrosAProcesar(verificados);
         setMisionAProcesar(mision);

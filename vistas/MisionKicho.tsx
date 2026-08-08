@@ -137,7 +137,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
             const m = await obtenerMisionActivaTenant(usuario.tenantId);
             if (m) {
                 setMision(m);
-                const r = await obtenerRegistrosMision(m.id);
+                const r = await obtenerRegistrosMision(m.id, usuario.tenantId);
                 setRegistros(r);
             }
         } catch (e) {

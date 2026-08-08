@@ -184,9 +184,22 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
     await batch.commit();
 };
 
-export const obtenerRegistrosMision = async (misionId: string): Promise<RegistroTemporal[]> => {
+/**
+ * Bug real (sesion 2026-08-08): esta query filtraba SOLO por misionId, sin tenantId. La regla
+ * `registros_temporales` exige `resource.data.tenantId == currentTenantId()` -- para un `list`,
+ * Firestore evalua la condicion contra los filtros DECLARADOS en la query, no contra los datos
+ * reales; si tenantId no esta entre esos filtros, no puede verificar la regla y rechaza TODO el
+ * list con permission-denied, sin importar cuantos documentos matcheen misionId de verdad.
+ * Se agrega tenantId como segundo filtro de igualdad (no requiere indice compuesto, verificado
+ * contra Firestore real) para que la query sea estaticamente verificable.
+ */
+export const obtenerRegistrosMision = async (misionId: string, tenantId: string): Promise<RegistroTemporal[]> => {
     if (!isFirebaseConfigured) return [];
-    const q = query(collection(db, 'registros_temporales'), where("misionId", "==", misionId));
+    const q = query(
+        collection(db, 'registros_temporales'),
+        where("misionId", "==", misionId),
+        where("tenantId", "==", tenantId)
+    );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroTemporal));
 };
