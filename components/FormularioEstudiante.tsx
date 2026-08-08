@@ -19,6 +19,13 @@ interface Props {
     onGuardar: (estudiante: Estudiante) => Promise<void>;
     estudianteActual: Estudiante | null;
     cargando: boolean;
+    /**
+     * Datos pre-cargados de una solicitud pública pendiente (RegistroTemporal) que el
+     * tenant está aprobando. A diferencia de estudianteActual, NO activa el modo edición:
+     * sigue siendo un alta nueva (sede/método de pago/matrícula quedan visibles y editables)
+     * pero con los campos ya rellenos para que el tenant solo revise y complete lo que falta.
+     */
+    borrador?: Partial<Estudiante> | null;
 }
 
 export const calcularEdadYGrupo = (fechaNacimiento: string): { edad: number, grupo: GrupoEdad } => {
@@ -82,7 +89,7 @@ export const schemaEstudiante = yup.object({
     enviarInvitacionLoginTutor: yup.boolean().default(false)
 }).required();
 
-const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando }) => {
+const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, estudianteActual, cargando, borrador }) => {
     const { sedesVisibles } = useSedes();
     const { programas } = useProgramas();
     const { configClub } = useConfiguracion();
@@ -105,7 +112,10 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         // Fix tutor-role-end-to-end (2026-07-14): la invitación al TUTOR viene tildada por
         // defecto en registros nuevos (el padre = usuario real del sistema en un dojo de
         // menores). El club puede desactivarla poniendo invitarTutorAlCrear: false.
-        enviarInvitacionLoginTutor: configClub.configuracionCuentasExternas?.invitarTutorAlCrear !== false
+        enviarInvitacionLoginTutor: configClub.configuracionCuentasExternas?.invitarTutorAlCrear !== false,
+        // Solicitud pública pendiente de aprobación: precarga lo que el aspirante ya envió,
+        // el tenant revisa/completa (sede, identificación, método de pago) antes de guardar.
+        ...(borrador || {})
     });
 
     const { register, handleSubmit, formState: { errors, isValid }, watch, setValue, reset } = useForm<any>({
@@ -165,7 +175,7 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
             enviarInvitacionLoginEstudiante: false,
             enviarInvitacionLoginTutor: false
         } : crearDefaultsEstudiante());
-    }, [abierto, estudianteActual, reset, configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear, configClub.configuracionCuentasExternas?.invitarTutorAlCrear]);
+    }, [abierto, estudianteActual, borrador, reset, configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear, configClub.configuracionCuentasExternas?.invitarTutorAlCrear]);
 
     const onSubmit = async (data: any) => { await onGuardar(data); onCerrar(); };
 
@@ -175,7 +185,7 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-tkd-dark/80 p-4 animate-fade-in backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/10">
                 <header className="p-8 border-b dark:border-gray-800 flex justify-between items-center">
-                    <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white tracking-tighter">{estudianteActual ? 'Editar Ficha' : 'Nuevo Registro Técnico'}</h2>
+                    <h2 className="text-2xl font-black uppercase text-tkd-dark dark:text-white tracking-tighter">{estudianteActual ? 'Editar Ficha' : borrador ? 'Aprobar Solicitud de Registro' : 'Nuevo Registro Técnico'}</h2>
                     <button onClick={onCerrar} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all"><IconoCerrar className="w-6 h-6 text-gray-400" /></button>
                 </header>
 

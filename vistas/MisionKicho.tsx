@@ -5,19 +5,56 @@ import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
-import { obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho } from '../servicios/censoApi';
+import {
+    obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho,
+    obtenerRegistrosPendientesTenant, eliminarRegistroTemporal
+} from '../servicios/censoApi';
 import { crearTicketSoporte } from '../servicios/soporteApi';
-import { useEstudiantes, useSedes } from '../context/DataContext';
-import { MisionKicho, RegistroTemporal, RolUsuario } from '../tipos';
+import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataContext';
+import { MisionKicho, RegistroTemporal, RolUsuario, Estudiante } from '../tipos';
 import {
     IconoWhatsApp, IconoCopiar, IconoAprobar,
     IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
-    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoAprobar as IconoLab
+    IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoAprobar as IconoLab,
+    IconoCompartir
 } from '../components/Iconos';
 import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
+import FormularioEstudiante from '../components/FormularioEstudiante';
+import { MISION_ID_DIRECTO } from '../constantes';
+
+const mapearRegistroABorrador = (reg: RegistroTemporal): Partial<Estudiante> => {
+    const d = reg.datos;
+    return {
+        nombres: d.nombres,
+        apellidos: d.apellidos,
+        // El censo público no pide cédula propia del aspirante; se precarga con el teléfono
+        // (mismo criterio que la inyección masiva de Kicho) y el tenant la corrige al revisar.
+        numeroIdentificacion: d.telefono,
+        fechaNacimiento: d.fechaNacimiento,
+        telefono: d.telefono,
+        correo: d.email,
+        eps: d.eps || '',
+        rh: d.rh || '',
+        direccion: d.direccion || '',
+        barrio: d.barrio || '',
+        ...(d.sedeSugeridaId ? { sedeId: d.sedeSugeridaId } : {}),
+        tutor: d.tutorNombre ? {
+            nombres: d.tutorNombre,
+            apellidos: d.tutorApellidos || '',
+            numeroIdentificacion: d.tutorCedula || '',
+            telefono: d.tutorTelefono || '',
+            correo: d.tutorEmail || ''
+        } : undefined
+    };
+};
+
+interface Props {
+    guardarEstudiante: (estudiante: any) => Promise<void>;
+    cargandoAccion: boolean;
+}
 
 // Componente Interno: Reloj de Conteo Regresivo
 const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion }) => {
@@ -62,10 +99,11 @@ const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion
     );
 };
 
-const VistaMisionKicho: React.FC = () => {
+const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }) => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
     const { sedesVisibles } = useSedes();
+    const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
 
     const [mision, setMision] = useState<MisionKicho | null>(null);
@@ -81,13 +119,25 @@ const VistaMisionKicho: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [dibujando, setDibujando] = useState(false);
 
+    // Cola de envío masivo por WhatsApp: el admin pega teléfonos de padres nuevos y la
+    // UI arma un link wa.me pre-cargado por número (mismo criterio de "57" + dígitos que
+    // ya usa vistas/GestionClase.tsx). No hay envío server-side real -- cada fila sigue
+    // abriendo el WhatsApp del propio admin, pero elimina copiar/pegar el link a mano.
+    const [numerosTexto, setNumerosTexto] = useState('');
+    const [colaEnvio, setColaEnvio] = useState<{ telefono: string; enviado: boolean }[]>([]);
+
+    // Solicitudes captadas por el link fijo "Compartir Formulario" (?club=slug), sin
+    // campaña Kicho detrás -- se cargan por tenantId, no por misionId (ver censoApi.ts).
+    const [registrosDirectos, setRegistrosDirectos] = useState<RegistroTemporal[]>([]);
+    const [solicitudEnRevision, setSolicitudEnRevision] = useState<RegistroTemporal | null>(null);
+
     const cargarDatos = async () => {
         if (!usuario) return;
         try {
             const m = await obtenerMisionActivaTenant(usuario.tenantId);
             if (m) {
                 setMision(m);
-                const r = await obtenerRegistrosMision(m.id);
+                const r = await obtenerRegistrosMision(m.id, usuario.tenantId);
                 setRegistros(r);
             }
         } catch (e) {
@@ -97,9 +147,47 @@ const VistaMisionKicho: React.FC = () => {
         }
     };
 
-    useEffect(() => { cargarDatos(); }, []);
+    const cargarSolicitudesDirectas = async () => {
+        if (!usuario) return;
+        try {
+            const pendientes = await obtenerRegistrosPendientesTenant(usuario.tenantId);
+            setRegistrosDirectos(pendientes.filter(r => r.misionId === MISION_ID_DIRECTO));
+        } catch (e) {
+            mostrarNotificacion("Error al cargar solicitudes de registro", "error");
+        }
+    };
+
+    useEffect(() => { cargarDatos(); cargarSolicitudesDirectas(); }, []);
 
     const linkPublico = mision ? generarUrlAbsoluta(`/censo/${mision.id}`) : '';
+    const linkDirecto = configClub?.slug ? generarUrlAbsoluta(`/censo/${MISION_ID_DIRECTO}?club=${configClub.slug}`) : '';
+
+    const handleCopiarLinkDirecto = () => {
+        navigator.clipboard.writeText(linkDirecto);
+        mostrarNotificacion("Link copiado. ¡Pégalo en WhatsApp!", "success");
+    };
+
+    const handleRechazarDirecto = async (reg: RegistroTemporal) => {
+        try {
+            await validarRegistroTemporal(reg.id, 'rechazado');
+            setRegistrosDirectos(prev => prev.filter(r => r.id !== reg.id));
+            mostrarNotificacion("Solicitud rechazada", "success");
+        } catch (e) {
+            mostrarNotificacion("Error al rechazar la solicitud", "error");
+        }
+    };
+
+    const handleGuardarAprobacion = async (datosEstudiante: any) => {
+        if (!solicitudEnRevision) return;
+        await guardarEstudiante(datosEstudiante);
+        try {
+            await eliminarRegistroTemporal(solicitudEnRevision.id);
+        } catch (e) {
+            mostrarNotificacion("Estudiante creado, pero no se pudo limpiar la solicitud pendiente.", "warning");
+        }
+        setRegistrosDirectos(prev => prev.filter(r => r.id !== solicitudEnRevision.id));
+        setSolicitudEnRevision(null);
+    };
 
     const handleActivarKichoAuto = async () => {
         if (!usuario) return;
@@ -156,6 +244,25 @@ const VistaMisionKicho: React.FC = () => {
         mostrarNotificacion("Link copiado. ¡Pégalo en WhatsApp!", "success");
     };
 
+    const generarCola = () => {
+        const numeros = numerosTexto
+            .split(/[\n,]+/)
+            .map(n => n.replace(/\D/g, ''))
+            .filter(n => n.length === 10);
+        const unicos = Array.from(new Set(numeros));
+        if (unicos.length === 0) {
+            mostrarNotificacion("Ningún número válido (10 dígitos, sin indicativo).", "warning");
+            return;
+        }
+        setColaEnvio(unicos.map(telefono => ({ telefono, enviado: false })));
+    };
+
+    const marcarEnviado = (telefono: string) => {
+        setColaEnvio(prev => prev.map(item => item.telefono === telefono ? { ...item, enviado: true } : item));
+    };
+
+    const enviadosCount = colaEnvio.filter(c => c.enviado).length;
+
     const handleStressTest = async () => {
         if (!mision || !usuario) return;
         setActivando(true);
@@ -198,6 +305,87 @@ const VistaMisionKicho: React.FC = () => {
         } catch (e) { mostrarNotificacion("Error en firma", "error"); }
     };
 
+    const seccionCompartirDirecta = (
+        <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-700 p-8 sm:p-10 mb-8">
+            <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start">
+                {/* QR PERMANENTE DE CAPTACIÓN -- a diferencia del QR de la campaña (panel "KICHO
+                    ACTIVE" más abajo, atado a una misión con vencimiento y que el SuperAdmin
+                    puede romper a mano), este apunta a linkDirecto (?club=slug, sin misionId):
+                    nunca vence, no se puede desactivar, pensado para imprimir una sola vez y
+                    dejarlo pegado en la entrada del dojang de forma indefinida. */}
+                {linkDirecto && (
+                    <div className="bg-white p-5 rounded-[2rem] shadow-lg border-4 border-tkd-blue/10 flex-shrink-0">
+                        <QRCodeSVG value={linkDirecto} size={140} />
+                    </div>
+                )}
+                <div className="flex-1 w-full">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-tkd-blue/10 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                <IconoCompartir className="w-6 h-6 text-tkd-blue" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black uppercase tracking-tight dark:text-white">QR y Link Permanente de Captación</h3>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                                    Nunca vence ni se puede desactivar -- imprímelo y pégalo en tu dojang. Cada registro queda pendiente de tu aprobación, nunca entra directo al directorio.
+                                </p>
+                            </div>
+                        </div>
+                        {linkDirecto ? (
+                            <div className="flex gap-3 w-full sm:w-auto">
+                                <button onClick={handleCopiarLinkDirecto} className="flex-1 sm:flex-none px-6 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+                                    <IconoCopiar className="w-4 h-4" /> Copiar Link
+                                </button>
+                                <a href={`https://wa.me/?text=🥋%20*REGISTRO%20TUDOJANG*%0A%0AHola!%20Por%20favor%20ingresa%20tus%20datos%20aquí%20para%20iniciar%20tu%20ingreso%20a%20la%20academia:%20${encodeURIComponent(linkDirecto)}`} target="_blank" rel="noreferrer" className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-green-700 transition-all">
+                                    <IconoWhatsApp className="w-4 h-4" /> WhatsApp
+                                </a>
+                            </div>
+                        ) : (
+                            <p className="text-[10px] font-bold text-tkd-red uppercase tracking-widest">Configura el slug del club en Configuración para activar este link.</p>
+                        )}
+                    </div>
+
+                    {registrosDirectos.length > 0 && (
+                <div className="mt-8 pt-8 border-t dark:border-gray-800 overflow-x-auto">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4">Solicitudes Pendientes ({registrosDirectos.length})</p>
+                    <table className="w-full text-left">
+                        <tbody className="divide-y dark:divide-gray-700">
+                            {registrosDirectos.map(reg => (
+                                <tr key={reg.id}>
+                                    <td className="py-4 pr-4">
+                                        <div className="font-black text-sm uppercase text-gray-900 dark:text-white">{reg.datos.nombres} {reg.datos.apellidos}</div>
+                                        <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">
+                                            {reg.datos.tutorNombre ? `Tutor: ${reg.datos.tutorNombre}` : 'Mayor de edad'} · {reg.datos.telefono}
+                                        </div>
+                                    </td>
+                                    <td className="py-4 text-right">
+                                        <div className="flex justify-end gap-3">
+                                            <button onClick={() => setSolicitudEnRevision(reg)} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Revisar y Aprobar"><IconoAprobar className="w-5 h-5" /></button>
+                                            <button onClick={() => handleRechazarDirecto(reg)} className="p-3 bg-red-50 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm" title="Rechazar"><IconoRechazar className="w-5 h-5" /></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const modalAprobarDirecta = solicitudEnRevision && (
+        <FormularioEstudiante
+            abierto={true}
+            onCerrar={() => setSolicitudEnRevision(null)}
+            onGuardar={handleGuardarAprobacion}
+            estudianteActual={null}
+            cargando={cargandoAccion}
+            borrador={mapearRegistroABorrador(solicitudEnRevision)}
+        />
+    );
+
     if (cargando) return <Loader texto="Escaneando Protocolos..." />;
 
     // LÓGICA DE ONBOARDING: Si no hay misión y el club es nuevo (< 10 alumnos)
@@ -205,6 +393,7 @@ const VistaMisionKicho: React.FC = () => {
         const esNuevo = estudiantes.length < 10;
         return (
             <div className="max-w-4xl mx-auto py-12 px-4 animate-fade-in">
+                {seccionCompartirDirecta}
                 {esNuevo ? (
                     <div className="bg-gradient-to-br from-tkd-blue to-blue-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden border border-white/10">
                         <div className="relative z-10 space-y-8 max-w-2xl">
@@ -310,12 +499,14 @@ const VistaMisionKicho: React.FC = () => {
                         </div>
                     )}
                 </AnimatePresence>
+                {modalAprobarDirecta}
             </div>
         );
     }
 
     return (
         <div className="space-y-8 animate-fade-in pb-20">
+            {seccionCompartirDirecta}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* PANEL IZQUIERDO: COMPARTICIÓN Y TIEMPO */}
                 <div className="lg:col-span-1 space-y-6">
@@ -361,7 +552,7 @@ const VistaMisionKicho: React.FC = () => {
                     <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-[2rem] border border-blue-100 dark:border-blue-800 flex gap-4">
                         <IconoInformacion className="w-6 h-6 text-tkd-blue flex-shrink-0" />
                         <p className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase leading-relaxed">
-                            Muestra este QR en la entrada de tu dojang o envíalo por el grupo de padres. Los datos aparecerán a la derecha en tiempo real.
+                            Este QR es de esta campaña puntual: vence con el contador y puedes romperlo desde Soporte antes de tiempo. Compártelo por WhatsApp/grupo de padres -- para un QR fijo pensado para imprimir, usa el de "Captación" más arriba. Los datos aparecerán a la derecha en tiempo real.
                         </p>
                     </div>
                 </div>
@@ -430,6 +621,65 @@ const VistaMisionKicho: React.FC = () => {
                 </div>
             </div>
 
+            {/* ENVÍO MASIVO A LISTA DE PADRES */}
+            <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-700 p-8 sm:p-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
+                    <div>
+                        <h3 className="text-lg font-black uppercase tracking-tight dark:text-white">Enviar a Lista de Padres</h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                            Pega los números de WhatsApp (uno por línea o separados por coma, 10 dígitos, sin indicativo) y envía el link de la misión a cada uno.
+                        </p>
+                    </div>
+                    {colaEnvio.length > 0 && (
+                        <span className="text-[10px] font-black uppercase text-tkd-blue tracking-widest bg-tkd-blue/10 px-4 py-2 rounded-xl whitespace-nowrap">
+                            {enviadosCount} / {colaEnvio.length} enviados
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    <textarea
+                        value={numerosTexto}
+                        onChange={(e) => setNumerosTexto(e.target.value)}
+                        placeholder={"3001234567\n3007654321"}
+                        rows={3}
+                        className="flex-1 w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-xs font-bold outline-none focus:ring-2 focus:ring-tkd-blue/30 dark:text-white"
+                    />
+                    <button
+                        onClick={generarCola}
+                        disabled={!numerosTexto.trim()}
+                        className="px-6 py-4 bg-tkd-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-blue-800 transition-all disabled:opacity-40 whitespace-nowrap"
+                    >
+                        Generar Lista
+                    </button>
+                </div>
+
+                {colaEnvio.length > 0 && (
+                    <div className="mt-8 pt-8 border-t dark:border-gray-800 overflow-x-auto">
+                        <table className="w-full text-left">
+                            <tbody className="divide-y dark:divide-gray-700">
+                                {colaEnvio.map(item => (
+                                    <tr key={item.telefono}>
+                                        <td className={`py-3 pr-4 font-black text-sm uppercase ${item.enviado ? 'text-gray-300 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>{item.telefono}</td>
+                                        <td className="py-3 text-right">
+                                            <a
+                                                href={`https://wa.me/57${item.telefono}?text=${encodeURIComponent(`🥋 *PROTOCOLO DE REGISTRO TUDOJANG*\n\nHola! Por favor ingresa tus datos aquí para formalizar tu ingreso a la academia: ${linkPublico}`)}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                onClick={() => marcarEnviado(item.telefono)}
+                                                className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all ${item.enviado ? 'bg-gray-100 text-gray-400 dark:bg-gray-900' : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'}`}
+                                            >
+                                                <IconoWhatsApp className="w-4 h-4" /> {item.enviado ? 'Enviado' : 'Enviar'}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
             {/* MODAL DE FIRMA LEGALIZACIÓN (ESTILO NUEVO ESTUDIANTE) */}
             <AnimatePresence>
                 {mostrarFirma && (
@@ -491,6 +741,7 @@ const VistaMisionKicho: React.FC = () => {
                     </div>
                 )}
             </AnimatePresence>
+            {modalAprobarDirecta}
         </div>
     );
 };

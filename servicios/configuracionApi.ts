@@ -51,13 +51,20 @@ export const buscarTenantPorSlug = async (slug: string): Promise<ConfiguracionCl
         } as ConfiguracionClub;
     }
 
-    const tenantsRef = collection(db, 'tenants');
-    const q = query(tenantsRef, where("slug", "==", slug.toLowerCase().trim()));
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) return null;
-
-    return { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as any;
+    // Bug real (sesion 2026-08-06): esto consultaba `tenants` DIRECTO desde el cliente, pero
+    // firestore.rules exige authenticated() para leer esa coleccion -- un visitante SIN LOGIN
+    // (el caso real de esta funcion: CensoPublico.tsx, EventoPublico.tsx via
+    // BrandingProvider.tsx, y el check de slug en RegistroEscuela.tsx) nunca podia resolver el
+    // tenant y veia "Escuela No Encontrada" en vez del formulario/evento. Nunca se detecto
+    // porque las pruebas siempre se hacian con sesion de Admin abierta en el mismo navegador.
+    // Ahora pasa por la Cloud Function `resolverTenantPublico` (Admin SDK, bypasea las reglas),
+    // que devuelve solo el subconjunto de campos publicos -- ver functions/academico/tenantPublico.js.
+    const callable = httpsCallable<{ slug: string }, ConfiguracionClub | null>(
+        getFunctions(),
+        'resolverTenantPublico'
+    );
+    const { data } = await callable({ slug });
+    return data;
 };
 
 /**

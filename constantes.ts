@@ -77,6 +77,11 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
 
 export const ADMIN_WHATSAPP = "3001234567";
 
+// Sentinel de misionId (vistas/MisionKicho.tsx, vistas/CensoPublico.tsx, censoApi.ts) para
+// solicitudes capturadas por el link fijo "Compartir Formulario" (?club=slug), que no
+// pertenecen a ninguna campaña Misión KICHO con expiración -- ese link nunca vence.
+export const MISION_ID_DIRECTO = 'directo';
+
 export const FRASES_SALIDA = [
     "¡Hola! [ESTUDIANTE] ha terminado su práctica con éxito en {{CLUB}}. Ya puedes pasar a recogerlo(a).",
     "¡Qué gran clase hoy! [ESTUDIANTE] ya terminó su sesión en {{CLUB}}. Te esperamos en la salida.",
