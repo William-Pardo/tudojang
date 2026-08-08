@@ -610,7 +610,7 @@ const AppRoutes: React.FC = () => {
                 />
                 <ReactRouterDOM.Route path="/registro-escuela" element={<RegistroEscuela />} />
                 <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} /> {/* NUEVA RUTA */}
-                <ReactRouterDOM.Route path="/censo/:mionId" element={<CensoPublico />} />
+                <ReactRouterDOM.Route path="/censo/:misionId" element={<CensoPublico />} />
                 <ReactRouterDOM.Route path="/evento/:id" element={<EventoPublico />} />
                 <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
                 <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
