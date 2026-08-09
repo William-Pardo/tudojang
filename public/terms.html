@@ -368,7 +368,7 @@
           <h2>6. Integración con Google Drive</h2>
         </div>
         <p>
-          Cuando un administrador conecta su cuenta de Google Drive, Tudojang solicita exclusivamente permisos limitados bajo el alcance <code>https://www.googleapis.com/auth/drive.file</code>. Esto faculta a la aplicación a gestionar únicamente aquellos archivos o carpetas autorizados de forma explícita por el usuario administrador para su vinculación al Centro de Estudios. El acceso puede ser revocado en cualquier momento desde los paneles de seguridad de Google. De realizarse la revocación, las funciones de visualización de contenidos vinculados a Google Drive quedarán inactivas.
+          Cuando un administrador conecta su cuenta de Google Drive, Tudojang solicita exclusivamente el alcance de solo lectura <code>https://www.googleapis.com/auth/drive.readonly</code>. Esto habilita a la aplicación a leer y listar el contenido de la carpeta institucional que el administrador selecciona, con el único fin de disponibilizar el material académico dentro del Centro de Estudios. Tudojang no crea, modifica ni elimina archivos en el Drive conectado. El acceso puede ser revocado en cualquier momento desde los paneles de seguridad de Google o desde el panel de configuración de Tudojang. De realizarse la revocación, las funciones de visualización de contenidos vinculados a Google Drive quedarán inactivas.
         </p>
       </div>
 

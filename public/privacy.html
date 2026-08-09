@@ -311,17 +311,17 @@
           <div class="legal-icon">
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
           </div>
-          <h2>3. Uso de Google Drive y Ámbito "drive.file"</h2>
+          <h2>3. Uso de Google Drive</h2>
         </div>
         <p>
-          Tudojang proporciona una integración opcional con Google Drive para que los administradores y profesores puedan asociar y disponibilizar materiales académicos (como manuales de formas, vídeos o reglamentos) dentro del Centro de Estudios de los alumnos.
+          Tudojang ofrece una integración opcional con Google Drive para que el administrador de cada escuela pueda vincular una carpeta institucional con materiales académicos (manuales, videos, evaluaciones) y ponerlos a disposición de los estudiantes en el Centro de Estudios.
         </p>
         <p>
-          Nuestra aplicación solicita de forma explícita el alcance restringido y limitado:
-          <code>https://www.googleapis.com/auth/drive.file</code>
+          La aplicación solicita el alcance restringido de solo lectura:
+          <code>https://www.googleapis.com/auth/drive.readonly</code>
         </p>
         <p>
-          Esto significa que Tudojang <strong>únicamente puede leer, escribir y gestionar los archivos específicos que vos selecciones y autorices explícitamente</strong> dentro de la plataforma. De ninguna manera solicitamos ni poseemos acceso general a la totalidad de los archivos de tu Google Drive. Los datos obtenidos a través de la API de Google se utilizan pura y exclusivamente para listar los recursos del dojang y no se comparten con terceros, no se venden, ni se utilizan para alimentar modelos de publicidad o marketing.
+          Este permiso habilita a Tudojang para <strong>leer el contenido de la carpeta institucional que el administrador conecta voluntariamente</strong>, con el único fin de listar y servir el material académico allí almacenado. Tudojang no crea, modifica ni elimina archivos en el Google Drive del administrador, ni accede a carpetas distintas a la carpeta institucional seleccionada, ni al Drive personal de estudiantes o tutores. Los datos obtenidos a través de la API de Google se utilizan exclusivamente para listar los recursos del dojang y no se comparten con terceros, no se venden, ni se utilizan para alimentar modelos de publicidad o marketing.
         </p>
       </div>
 
@@ -391,7 +391,7 @@
         <ul class="legal-list">
           <li><strong>Aislamiento Estricto:</strong> Cada dojang posee un espacio de almacenamiento segregado lógicamente para evitar filtraciones de datos entre diferentes escuelas.</li>
           <li><strong>Encriptación y Resguardos:</strong> La información crítica de contraseñas se almacena encriptada y bajo protocolos seguros.</li>
-          <li><strong>Google Drive:</strong> Se facilita la revocación automática de accesos directamente desde el Panel de Seguridad de Google por parte del usuario, lo que desvincula instantáneamente el scope <code>drive.file</code> de la base de datos de Tudojang.</li>
+          <li><strong>Google Drive:</strong> Se facilita la revocación automática de accesos directamente desde el Panel de Seguridad de Google por parte del usuario, lo que desvincula instantáneamente el scope <code>drive.readonly</code> de la base de datos de Tudojang.</li>
         </ul>
       </div>
 
