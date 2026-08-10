@@ -1,10 +1,8 @@
 
 // vistas/CensoPublico.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useTenant } from '../components/BrandingProvider';
-import { buscarTenantPorSlug } from '../servicios/configuracionApi';
-import type { ConfiguracionClub } from '../tipos';
 import { registrarAspirantePublico, obtenerMisionPorId } from '../servicios/censoApi';
 import { MISION_ID_DIRECTO } from '../constantes';
 import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar, IconoAlertaTriangulo } from '../components/Iconos';
@@ -14,24 +12,11 @@ import { formatearPrecio } from '../utils/formatters';
 
 const CensoPublico: React.FC = () => {
     const { misionId } = useParams();
-    const [searchParams] = useSearchParams();
-    const clubSlug = searchParams.get('club');
 
-    // Si viene ?club=slug, cargamos el tenant por slug (URL directa sin misión activa).
-    // Si no, usamos el BrandingProvider normal (flujo de MisionKicho con subdominio).
-    const { tenant: tenantCtx, estaCargado: ctxCargado } = useTenant();
-    const [tenantSlug, setTenantSlug] = useState<ConfiguracionClub | null>(null);
-    const [slugCargado, setSlugCargado] = useState(!clubSlug);
-
-    useEffect(() => {
-        if (!clubSlug) return;
-        buscarTenantPorSlug(clubSlug)
-            .then(c => setTenantSlug(c))
-            .finally(() => setSlugCargado(true));
-    }, [clubSlug]);
-
-    const tenant = clubSlug ? tenantSlug : tenantCtx;
-    const estaCargado = clubSlug ? slugCargado : ctxCargado;
+    // Resolución del tenant (incluye ?club=slug cuando está presente en la URL) ya vive
+    // centralizada en BrandingProvider -- antes esta vista tenía su propio bypass duplicado,
+    // arreglando el síntoma acá en vez de la causa real (ver BrandingProvider.tsx).
+    const { tenant, estaCargado } = useTenant();
 
     const [edad, setEdad] = useState<number | null>(null);
     const [enviado, setEnviado] = useState(false);

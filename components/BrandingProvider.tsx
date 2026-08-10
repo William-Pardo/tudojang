@@ -1,6 +1,7 @@
 
 // components/BrandingProvider.tsx
 import React, { useEffect, useState, createContext, useContext } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { buscarTenantPorSlug, obtenerConfiguracionClub } from '../servicios/configuracionApi';
 import type { ConfiguracionClub } from '../tipos';
 import { CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
@@ -23,6 +24,8 @@ const TenantContext = createContext<TenantContextType>({
 
 const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { usuario } = useAuth();
+    const [searchParams] = useSearchParams();
+    const clubParam = searchParams.get('club');
     const [tenant, setTenant] = useState<ConfiguracionClub | null>(null);
     const [estado, setEstado] = useState<'cargando' | 'error' | 'vencido' | 'ok'>('cargando');
     const [bypassDev, setBypassDev] = useState(false);
@@ -56,6 +59,35 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
                 console.error("[BrandingProvider] Error cargando config por usuario:", err);
                 // Si falla, seguimos con la lógica de slug como fallback
             }
+        }
+
+        // Fix de raiz (2026-08-10): un link publico (censo, evento, firma, inscripcion,
+        // reportar-pago...) puede traer ?club=slug para identificar el tenant explicitamente,
+        // sin depender de subdominio -- imprescindible porque un visitante anonimo que abre el
+        // link desde el dominio raiz (tudojang.com, sin subdominio propio del club) no tiene
+        // forma de que el host resuelva el tenant. Se evalua ANTES del atajo de "dominio raiz ->
+        // tenant generico" de abajo, para que CUALQUIER ruta publica que agregue este parametro
+        // quede resuelta correctamente sin necesitar su propia logica de bypass duplicada (antes
+        // vivia solo en CensoPublico.tsx, arreglando un unico sintoma en vez de la causa).
+        // No se llama a validarSuscripcion(): un aspirante anonimo llenando un formulario
+        // publico no debe toparse con la pantalla de "Suscripción Vencida" del tenant -- ese
+        // aviso es para el Admin logueado, no para quien apenas se esta registrando.
+        if (clubParam) {
+            try {
+                const config = await buscarTenantPorSlug(clubParam);
+                if (config) {
+                    aplicarEstilos(config);
+                    setTenant(config);
+                    setEstado('ok');
+                } else {
+                    setEstado('error');
+                    setMensajeError(`Academia "${clubParam}" no registrada.`);
+                }
+            } catch (e) {
+                setEstado('error');
+                setMensajeError("Error de conexión.");
+            }
+            return;
         }
 
         const host = window.location.hostname;
@@ -110,7 +142,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
     useEffect(() => {
         cargarTenant();
-    }, [usuario?.tenantId]);
+    }, [usuario?.tenantId, clubParam]);
 
     if (estado === 'cargando') return <div className="h-screen flex items-center justify-center bg-tkd-dark"><Loader texto="Sincronizando..." /></div>;
 
