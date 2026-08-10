@@ -159,7 +159,14 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
 
     useEffect(() => { cargarDatos(); cargarSolicitudesDirectas(); }, []);
 
-    const linkPublico = mision ? generarUrlAbsoluta(`/censo/${mision.id}`) : '';
+    // Fix (mismo bug de fondo que linkDirecto, 2026-08-10): sin ?club=slug, un visitante
+    // anonimo que abre este link desde el dominio raiz (tudojang.com, sin subdominio propio
+    // del club) cae en el atajo de BrandingProvider que asigna el tenant GENERICO por defecto
+    // (ver components/BrandingProvider.tsx, `isRoot && slug === 'tudojang'`) en vez de resolver
+    // el tenant real -- el aspirante veia la marca equivocada y el registro no quedaba
+    // asociado al tenant correcto. Se fuerza la misma resolucion por slug que ya prueba
+    // funcionar en linkDirecto.
+    const linkPublico = mision && configClub?.slug ? generarUrlAbsoluta(`/censo/${mision.id}?club=${configClub.slug}`) : '';
     const linkDirecto = configClub?.slug ? generarUrlAbsoluta(`/censo/${MISION_ID_DIRECTO}?club=${configClub.slug}`) : '';
 
     const handleCopiarLinkDirecto = () => {
