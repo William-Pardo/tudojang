@@ -582,6 +582,25 @@ const AppRoutes: React.FC = () => {
                         oobCode contra Firebase Auth directo), así que son seguras acá. */}
                     <ReactRouterDOM.Route path="/activar-cuenta" element={<VistaActivarCuenta />} />
                     <ReactRouterDOM.Route path="/restablecer-clave" element={<VistaRestablecerClave />} />
+                    {/* Fix (mismo patrón que activar-cuenta/restablecer-clave, 2026-08-10): un
+                        aspirante/tutor que abre un link público de censo, evento, firma o pago
+                        SIEMPRE llega sin sesión y sin tenant resuelto por subdominio cuando el
+                        link circula sobre el dominio raíz (tudojang.com) en vez de un subdominio
+                        de club -- caía en el catch-all de abajo y lo mandaba a "/" antes de que
+                        React Router llegara siquiera a evaluar la ruta real más abajo. Cada una
+                        de estas vistas ya resuelve su propio tenant/registro por :id o por
+                        ?club=slug, no depende de este `tenant` de nivel raíz. */}
+                    <ReactRouterDOM.Route path="/inscripcion" element={<PasarelaInscripcion />} />
+                    <ReactRouterDOM.Route path="/censo/:misionId" element={<CensoPublico />} />
+                    <ReactRouterDOM.Route path="/evento/:id" element={<EventoPublico />} />
+                    <ReactRouterDOM.Route path="/salida" element={<VistaSalidaPublica />} />
+                    <ReactRouterDOM.Route path="/ayuda" element={<VistaAyudaPqrs />} />
+                    <ReactRouterDOM.Route path="/contrato/:idEstudiante" element={<VistaFirmaContrato />} />
+                    <ReactRouterDOM.Route path="/contrato-colaborador/:idUsuario" element={<VistaFirmaContratoColaborador />} />
+                    <ReactRouterDOM.Route path="/firma/:idEstudiante" element={<VistaFirmaConsentimiento />} />
+                    <ReactRouterDOM.Route path="/firma-imagen/:idEstudiante" element={<VistaFirmaImagen />} />
+                    <ReactRouterDOM.Route path="/imagen/:idEstudiante" element={<VistaFirmaImagen />} />
+                    <ReactRouterDOM.Route path="/reportar-pago" element={<ReportarPagoPublico />} />
                     <ReactRouterDOM.Route path="*" element={<ReactRouterDOM.Navigate to="/" />} />
                 </ReactRouterDOM.Routes>
                 {debugDiv}
