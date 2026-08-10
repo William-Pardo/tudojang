@@ -21,6 +21,7 @@ const CensoPublico: React.FC = () => {
     const [edad, setEdad] = useState<number | null>(null);
     const [enviado, setEnviado] = useState(false);
     const [cargando, setCargando] = useState(false);
+    const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
 
     // El link fijo (MISION_ID_DIRECTO) nunca vence; una misión real sí -- se valida contra
     // Firestore (activa + fechaExpiracion) antes de mostrar el formulario, mismo criterio que
@@ -66,11 +67,18 @@ const CensoPublico: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setCargando(true);
+        setErrorEnvio(null);
         try {
             await registrarAspirantePublico(misionId || 'general', tenant?.tenantId || 'anon', formData);
             setEnviado(true);
         } catch (err) {
+            // Fix (2026-08-10): antes este catch solo hacia console.error -- el aspirante
+            // (sin acceso a la consola del navegador) no se enteraba de nada si el envio
+            // fallaba (ej. permission-denied porque el tenant/mision aun no cargo, o la
+            // mision vencio). El boton volvia a su estado normal en silencio, sin exito NI
+            // error, indistinguible de que "no paso nada".
             console.error(err);
+            setErrorEnvio('No pudimos enviar tu registro. Verifica tu conexión e intenta de nuevo; si el problema sigue, contacta directamente a tu academia.');
         } finally {
             setCargando(false);
         }
@@ -234,6 +242,12 @@ const CensoPublico: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-10 border-t dark:border-gray-800">
+                    {errorEnvio && (
+                        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl flex items-start gap-3">
+                            <IconoAlertaTriangulo className="w-5 h-5 text-tkd-red flex-shrink-0 mt-0.5" />
+                            <p className="text-xs font-bold text-tkd-red">{errorEnvio}</p>
+                        </div>
+                    )}
                     <button type="submit" disabled={cargando} className="w-full py-5 text-white rounded-[2rem] font-black uppercase text-sm tracking-[0.3em] shadow-2xl transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4" style={{ backgroundColor: tenant?.colorSecundario }}>
                         {cargando ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoEnviar className="w-6 h-6" />}
                         Finalizar Registro
