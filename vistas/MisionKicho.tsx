@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import {
     obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho,
-    obtenerRegistrosPendientesTenant, eliminarRegistroTemporal
+    obtenerRegistrosPendientesTenant, eliminarRegistroTemporal, obtenerTodosRegistrosTenant
 } from '../servicios/censoApi';
 import { crearTicketSoporte } from '../servicios/soporteApi';
 import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataContext';
@@ -16,7 +16,7 @@ import {
     IconoWhatsApp, IconoCopiar, IconoAprobar,
     IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
     IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoAprobar as IconoLab,
-    IconoCompartir
+    IconoCompartir, IconoExportar
 } from '../components/Iconos';
 import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
@@ -130,6 +130,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     // campaña Kicho detrás -- se cargan por tenantId, no por misionId (ver censoApi.ts).
     const [registrosDirectos, setRegistrosDirectos] = useState<RegistroTemporal[]>([]);
     const [solicitudEnRevision, setSolicitudEnRevision] = useState<RegistroTemporal | null>(null);
+    const [exportando, setExportando] = useState(false);
 
     const cargarDatos = async () => {
         if (!usuario) return;
@@ -172,6 +173,79 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     const handleCopiarLinkDirecto = () => {
         navigator.clipboard.writeText(linkDirecto);
         mostrarNotificacion("Link copiado. ¡Pégalo en WhatsApp!", "success");
+    };
+
+    const escapeCSV = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    };
+
+    const handleExportarCSV = async () => {
+        if (!usuario) return;
+        setExportando(true);
+        try {
+            const todos = await obtenerTodosRegistrosTenant(usuario.tenantId);
+            if (todos.length === 0) {
+                mostrarNotificacion("No hay registros de censo para exportar.", "info");
+                return;
+            }
+
+            const headers = [
+                'Origen', 'Estado', 'FechaRegistro', 'Nombres', 'Apellidos', 'Email', 'Telefono',
+                'FechaNacimiento', 'EPS', 'RH', 'Direccion', 'Barrio',
+                'TutorNombre', 'TutorApellidos', 'TutorCedula', 'TutorTelefono', 'TutorEmail', 'Parentesco'
+            ];
+
+            const csvRows = [
+                headers.join(','),
+                ...todos.map(r => ([
+                    escapeCSV(r.misionId === MISION_ID_DIRECTO ? 'Captación' : 'Misión Kicho'),
+                    escapeCSV(r.estado),
+                    escapeCSV(r.fechaRegistro),
+                    escapeCSV(r.datos.nombres),
+                    escapeCSV(r.datos.apellidos),
+                    escapeCSV(r.datos.email),
+                    escapeCSV(r.datos.telefono),
+                    escapeCSV(r.datos.fechaNacimiento),
+                    escapeCSV(r.datos.eps),
+                    escapeCSV(r.datos.rh),
+                    escapeCSV(r.datos.direccion),
+                    escapeCSV(r.datos.barrio),
+                    escapeCSV(r.datos.tutorNombre),
+                    escapeCSV(r.datos.tutorApellidos),
+                    escapeCSV(r.datos.tutorCedula),
+                    escapeCSV(r.datos.tutorTelefono),
+                    escapeCSV(r.datos.tutorEmail),
+                    escapeCSV(r.datos.parentesco),
+                ].join(',')))
+            ];
+
+            // BOM (﻿) al inicio: sin esto Excel en Windows interpreta el UTF-8 como
+            // Latin-1 y rompe las tildes/ñ -- mismo criterio que exportarCSV en
+            // useGestionEstudiantes.ts (export de Directorio).
+            const csvContent = csvRows.join('\n');
+            const bom = String.fromCharCode(0xFEFF);
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            const timestamp = new Date().toISOString().slice(0, 10);
+            link.setAttribute('download', `registros_censo_${timestamp}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            mostrarNotificacion("Exportación a CSV completada.", "success");
+        } catch (e) {
+            mostrarNotificacion("Error al exportar los registros.", "error");
+        } finally {
+            setExportando(false);
+        }
     };
 
     const handleRechazarDirecto = async (reg: RegistroTemporal) => {
@@ -338,18 +412,26 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                 </p>
                             </div>
                         </div>
-                        {linkDirecto ? (
-                            <div className="flex gap-3 w-full sm:w-auto">
-                                <button onClick={handleCopiarLinkDirecto} className="flex-1 sm:flex-none px-6 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
-                                    <IconoCopiar className="w-4 h-4" /> Copiar Link
-                                </button>
-                                <a href={`https://wa.me/?text=🥋%20*REGISTRO%20TUDOJANG*%0A%0AHola!%20Por%20favor%20ingresa%20tus%20datos%20aquí%20para%20iniciar%20tu%20ingreso%20a%20la%20academia:%20${encodeURIComponent(linkDirecto)}`} target="_blank" rel="noreferrer" className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-green-700 transition-all">
-                                    <IconoWhatsApp className="w-4 h-4" /> WhatsApp
-                                </a>
-                            </div>
-                        ) : (
-                            <p className="text-[10px] font-bold text-tkd-red uppercase tracking-widest">Configura el slug del club en Configuración para activar este link.</p>
-                        )}
+                        <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                            {linkDirecto ? (
+                                <>
+                                    <button onClick={handleCopiarLinkDirecto} className="flex-1 sm:flex-none px-6 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+                                        <IconoCopiar className="w-4 h-4" /> Copiar Link
+                                    </button>
+                                    <a href={`https://wa.me/?text=🥋%20*REGISTRO%20TUDOJANG*%0A%0AHola!%20Por%20favor%20ingresa%20tus%20datos%20aquí%20para%20iniciar%20tu%20ingreso%20a%20la%20academia:%20${encodeURIComponent(linkDirecto)}`} target="_blank" rel="noreferrer" className="flex-1 sm:flex-none px-6 py-3 bg-green-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg hover:bg-green-700 transition-all">
+                                        <IconoWhatsApp className="w-4 h-4" /> WhatsApp
+                                    </a>
+                                </>
+                            ) : (
+                                <p className="text-[10px] font-bold text-tkd-red uppercase tracking-widest">Configura el slug del club en Configuración para activar este link.</p>
+                            )}
+                            {/* Exporta TODOS los registros del tenant (Misión Kicho + Captación,
+                                cualquier estado) -- no solo los pendientes visibles en pantalla. */}
+                            <button onClick={handleExportarCSV} disabled={exportando} className="flex-1 sm:flex-none px-6 py-3 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 text-green-700 dark:text-green-400 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-green-100 dark:hover:bg-green-900/20 transition-all disabled:opacity-50">
+                                {exportando ? <div className="w-4 h-4 border-2 border-green-700 border-t-transparent rounded-full animate-spin"></div> : <IconoExportar className="w-4 h-4" />}
+                                Exportar CSV
+                            </button>
+                        </div>
                     </div>
 
                     {registrosDirectos.length > 0 && (

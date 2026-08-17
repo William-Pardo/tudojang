@@ -221,6 +221,18 @@ export const obtenerRegistrosPendientesTenant = async (tenantId: string): Promis
 };
 
 /**
+ * TENANT: TODOS los registros temporales del tenant (cualquier estado, cualquier misionId --
+ * misión con campaña o link fijo de Captación). Para exportar/auditar, no para la bandeja de
+ * revisión (esa usa obtenerRegistrosPendientesTenant, solo 'pendiente').
+ */
+export const obtenerTodosRegistrosTenant = async (tenantId: string): Promise<RegistroTemporal[]> => {
+    if (!isFirebaseConfigured) return [];
+    const q = query(collection(db, 'registros_temporales'), where("tenantId", "==", tenantId));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RegistroTemporal));
+};
+
+/**
  * TENANT: Descarta el registro temporal una vez que sus datos ya quedaron
  * incorporados a un Estudiante real (aprobación individual) o tras rechazarlo.
  */
