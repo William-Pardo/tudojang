@@ -102,6 +102,10 @@ const {
   crearServicioCrearEstudiante,
 } = require("./academico/estudiantes");
 const {
+  crearServicioSolicitudCarnets,
+  crearServicioActualizarEstadoSolicitudCarnets,
+} = require("./academico/carnets");
+const {
   crearServicioResolverTenantPublico,
 } = require("./academico/tenantPublico");
 const {
@@ -424,6 +428,14 @@ const servicioCrearEstudiante = crearServicioCrearEstudiante({
   firestore: admin.firestore()
 });
 
+const servicioSolicitudCarnets = crearServicioSolicitudCarnets({
+  firestore: admin.firestore()
+});
+
+const servicioActualizarEstadoSolicitudCarnets = crearServicioActualizarEstadoSolicitudCarnets({
+  firestore: admin.firestore()
+});
+
 const servicioResolverTenantPublico = crearServicioResolverTenantPublico({
   firestore: admin.firestore()
 });
@@ -717,6 +729,23 @@ exports.repararSedesEjecucionPrograma = functionsV1.https.onCall(
 // Function (uso mucho mas frecuente que sedes, fuera de alcance de este fix puntual).
 exports.crearEstudiante = functionsV1.https.onCall(
   crearHandlerCallable(servicioCrearEstudiante)
+);
+
+// La cantidad y el lote de estudiantes se recalculan server-side (nunca se confía en lo que
+// mande el cliente) -- ver academico/carnets.js para el detalle completo. `create` en
+// `solicitudes_carnets` queda bloqueado en firestore.rules, mismo criterio ya usado para
+// `estudiantes`/`sedes`.
+exports.solicitarFabricacionCarnets = functionsV1.https.onCall(
+  crearHandlerCallable(servicioSolicitudCarnets)
+);
+
+// Avanza/rechaza una solicitud existente (solo Master). `solicitudes_carnets` nunca se borra
+// -- si se rechaza, revierte `carnetGenerado` en los estudiantes del lote en la MISMA
+// transacción para que puedan volver a solicitarse. `update` en `solicitudes_carnets` queda
+// bloqueado en firestore.rules: este callable es el único camino de escritura después de
+// creada la solicitud.
+exports.actualizarEstadoSolicitudCarnets = functionsV1.https.onCall(
+  crearHandlerCallable(servicioActualizarEstadoSolicitudCarnets)
 );
 
 // Resolucion PUBLICA de tenant por slug (SIN auth) -- ver academico/tenantPublico.js para el

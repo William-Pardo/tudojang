@@ -5,11 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { obtenerTodosLosTenants, cambiarEstadoSuscripcionTenant } from '../servicios/configuracionApi';
 import { obtenerMisiones, crearMisionKicho, inyectarEstudiantesKicho, obtenerRegistrosMision, desactivarMisionKicho } from '../servicios/censoApi';
 import { escucharTicketsActivos, actualizarTicket } from '../servicios/soporteApi';
+import { escucharSolicitudesCarnets, actualizarEstadoSolicitudCarnet } from '../servicios/carnetsApi';
 import { enviarNotificacion } from '../servicios/api';
-import { ConfiguracionClub, MisionKicho, RegistroTemporal, TicketSoporte, EtapaSoporte } from '../tipos';
-import { 
-    IconoLogoOficial, IconoAprobar, IconoRechazar, IconoDashboard, 
-    IconoInformacion, IconoCasa, IconoEstudiantes, IconoUsuario, 
+import { ConfiguracionClub, MisionKicho, RegistroTemporal, TicketSoporte, EtapaSoporte, SolicitudCarnet } from '../tipos';
+import {
+    IconoLogoOficial, IconoAprobar, IconoRechazar, IconoDashboard,
+    IconoInformacion, IconoCasa, IconoEstudiantes, IconoUsuario,
     IconoCampana, IconoEnviar, IconoFirma, IconoAgregar, IconoCerrar, IconoGuardar,
     IconoWhatsApp
 } from '../components/Iconos';
@@ -23,8 +24,9 @@ const VistaMasterDashboard: React.FC = () => {
     const [tenants, setTenants] = useState<ConfiguracionClub[]>([]);
     const [misiones, setMisiones] = useState<MisionKicho[]>([]);
     const [tickets, setTickets] = useState<TicketSoporte[]>([]);
+    const [solicitudesCarnets, setSolicitudesCarnets] = useState<SolicitudCarnet[]>([]);
     const [cargando, setCargando] = useState(true);
-    const [tabActiva, setTabActiva] = useState<'ecosistema' | 'kicho-central' | 'soporte-premium' | 'ux-analytics'>('soporte-premium');
+    const [tabActiva, setTabActiva] = useState<'ecosistema' | 'kicho-central' | 'soporte-premium' | 'ux-analytics' | 'bandeja-carnets'>('soporte-premium');
     
     // UI States
     const [modalNuevaMision, setModalNuevaMision] = useState(false);
@@ -56,10 +58,17 @@ const VistaMasterDashboard: React.FC = () => {
         }
     };
 
-    useEffect(() => { 
+    useEffect(() => {
         cargarDatos();
         const desSuscribirTickets = escucharTicketsActivos(setTickets);
-        return () => desSuscribirTickets();
+        const desSuscribirCarnets = escucharSolicitudesCarnets(
+            setSolicitudesCarnets,
+            () => mostrarNotificacion("No se pudo cargar la bandeja de carnets", "error")
+        );
+        return () => {
+            desSuscribirTickets();
+            desSuscribirCarnets();
+        };
     }, []);
 
     const handleCrearMision = async (e: React.FormEvent) => {
@@ -149,6 +158,60 @@ const VistaMasterDashboard: React.FC = () => {
         mostrarNotificacion("Ticket cerrado exitosamente", "success");
     };
 
+    // `enviado` y `rechazado` son terminales (sin siguiente paso). Rechazar NO es "el
+    // siguiente paso" de nada -- es una salida aparte, disponible desde pendiente o
+    // en_producción (ver PUEDE_RECHAZAR_ESTADO_CARNET), por eso vive en su propio handler.
+    const SIGUIENTE_ESTADO_CARNET: Record<SolicitudCarnet['estado'], SolicitudCarnet['estado'] | null> = {
+        pendiente: 'en_produccion',
+        en_produccion: 'enviado',
+        enviado: null,
+        rechazado: null,
+    };
+
+    const PUEDE_RECHAZAR_ESTADO_CARNET: Record<SolicitudCarnet['estado'], boolean> = {
+        pendiente: true,
+        en_produccion: true,
+        enviado: false,
+        rechazado: false,
+    };
+
+    const COLOR_ESTADO_CARNET: Record<SolicitudCarnet['estado'], string> = {
+        pendiente: 'text-tkd-red',
+        en_produccion: 'text-tkd-blue',
+        enviado: 'text-green-600 dark:text-green-400',
+        rechazado: 'text-gray-400 dark:text-gray-500',
+    };
+
+    const avanzarSolicitudCarnet = async (s: SolicitudCarnet) => {
+        const siguiente = SIGUIENTE_ESTADO_CARNET[s.estado];
+        if (!siguiente) return;
+        try {
+            await actualizarEstadoSolicitudCarnet(s.id, siguiente);
+            mostrarNotificacion(`Solicitud de ${s.nombreClub} pasó a "${siguiente.replace('_', ' ')}"`, "success");
+        } catch (e) {
+            mostrarNotificacion("No se pudo actualizar la solicitud", "error");
+        }
+    };
+
+    // Rechazar revierte carnetGenerado:false en los estudiantes del lote (server-side, misma
+    // transacción -- ver academico/carnets.js) para que vuelvan a la cola de pendientes: un
+    // estudiante rechazado nunca recibió su carnet físico. La solicitud NUNCA se borra, solo
+    // queda archivada en estado "rechazado" como evidencia de lo ocurrido.
+    const rechazarSolicitudCarnet = async (s: SolicitudCarnet) => {
+        if (!window.confirm(`¿Rechazar la solicitud de ${s.nombreClub} (${s.cantidad} carnets)? Esos estudiantes volverán a la cola de pendientes para poder re-solicitarse.`)) return;
+        try {
+            await actualizarEstadoSolicitudCarnet(s.id, 'rechazado');
+            mostrarNotificacion(`Solicitud de ${s.nombreClub} rechazada -- sus estudiantes vuelven a la cola de pendientes`, "info");
+        } catch (e) {
+            mostrarNotificacion("No se pudo rechazar la solicitud", "error");
+        }
+    };
+
+    const pendientesCarnetsCount = useMemo(
+        () => solicitudesCarnets.filter(s => s.estado === 'pendiente').length,
+        [solicitudesCarnets]
+    );
+
     if (cargando) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950"><Loader texto="Accediendo a la Consola Maestra..." /></div>;
 
     const selectClasses = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:ring-tkd-blue focus:border-tkd-blue transition-all outline-none text-sm font-bold uppercase";
@@ -168,6 +231,7 @@ const VistaMasterDashboard: React.FC = () => {
                     {[
                         { id: 'soporte-premium', label: 'Soporte Master' },
                         { id: 'kicho-central', label: 'Kicho Central' },
+                        { id: 'bandeja-carnets', label: `Carnets${pendientesCarnetsCount > 0 ? ` (${pendientesCarnetsCount})` : ''}` },
                         { id: 'ecosistema', label: 'Ecosistema' },
                         { id: 'ux-analytics', label: 'UX Analytics' }
                     ].map((t) => (
@@ -251,6 +315,82 @@ const VistaMasterDashboard: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* SECCIÓN: BANDEJA DE SOLICITUDES DE CARNETS */}
+            {tabActiva === 'bandeja-carnets' && (
+                <section className="bg-white dark:bg-white/5 rounded-[3rem] border border-gray-200 dark:border-white/10 overflow-hidden shadow-xl animate-fade-in">
+                    <div className="p-8 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-black/20">
+                        <div className="flex items-center gap-3">
+                            <IconoFirma className="w-5 h-5 text-gray-400" />
+                            <h2 className="text-sm font-black uppercase tracking-widest">Bandeja de Fabricación de Carnets</h2>
+                        </div>
+                        <p className="text-[10px] font-black text-gray-500 uppercase">{solicitudesCarnets.length} Solicitudes</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-100 dark:bg-black/40 text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                                <tr>
+                                    <th className="px-8 py-5">Dojang</th>
+                                    <th className="px-6 py-5">Sede</th>
+                                    <th className="px-6 py-5">Cantidad</th>
+                                    <th className="px-6 py-5">Fecha</th>
+                                    <th className="px-8 py-5 text-right">Estado / Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                                {solicitudesCarnets.map(s => {
+                                    const siguiente = SIGUIENTE_ESTADO_CARNET[s.estado];
+                                    return (
+                                    <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
+                                        <td className="px-8 py-6">
+                                            <p className="font-black text-sm uppercase group-hover:text-tkd-blue transition-colors">{s.nombreClub}</p>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <span className="px-3 py-1 bg-gray-100 dark:bg-white/5 rounded-full text-[9px] font-black uppercase border border-gray-200 dark:border-white/5">{s.sedeNombre}</span>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <p className="text-xl font-black text-tkd-blue dark:text-white">{s.cantidad}</p>
+                                        </td>
+                                        <td className="px-6 py-6">
+                                            <p className="text-xs font-bold text-gray-400">{s.fechaSolicitud ? new Date(s.fechaSolicitud).toLocaleDateString() : '---'}</p>
+                                        </td>
+                                        <td className="px-8 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-4">
+                                                <span className={`text-[10px] font-black uppercase ${COLOR_ESTADO_CARNET[s.estado]}`}>{s.estado.replace('_', ' ')}</span>
+                                                {siguiente && (
+                                                    <button
+                                                        onClick={() => avanzarSolicitudCarnet(s)}
+                                                        className="bg-tkd-dark text-white dark:bg-white/10 px-4 py-2 rounded-xl font-black uppercase text-[9px] tracking-widest shadow-lg hover:bg-tkd-blue transition-all"
+                                                    >
+                                                        Marcar {siguiente.replace('_', ' ')}
+                                                    </button>
+                                                )}
+                                                {PUEDE_RECHAZAR_ESTADO_CARNET[s.estado] && (
+                                                    <button
+                                                        onClick={() => rechazarSolicitudCarnet(s)}
+                                                        className="text-gray-400 hover:text-tkd-red font-black uppercase text-[9px] tracking-widest transition-colors"
+                                                    >
+                                                        Rechazar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    );
+                                })}
+                                {solicitudesCarnets.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="py-20 text-center opacity-30 grayscale">
+                                            <IconoFirma className="w-16 h-16 mx-auto mb-4" />
+                                            <p className="text-xs font-black uppercase tracking-widest">Sin solicitudes de carnets</p>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
             )}
 
             {/* SECCIÓN: ECOSISTEMA TUDOJANG */}

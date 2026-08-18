@@ -40,6 +40,16 @@ export interface TicketSoporte {
     mensajesInternos?: string[];
 }
 
+export interface SolicitudCarnet {
+    id: string;
+    tenantId: string;
+    nombreClub: string;
+    cantidad: number;
+    sedeNombre: string;
+    fechaSolicitud: string;
+    estado: 'pendiente' | 'en_produccion' | 'enviado' | 'rechazado';
+}
+
 export interface PuntoCalor {
     x: number;
     y: number;
