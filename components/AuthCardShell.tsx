@@ -23,7 +23,7 @@ const AuthCardShell: React.FC<AuthCardShellProps> = ({ children }) => {
           </div>
           <div className="mt-4 sm:mt-6 landscape:mt-0">
             <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
-              Tudojang <span className="text-tkd-blue">SaaS</span>
+              Tudojang
             </h2>
             <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-widest leading-none">Gestión Premium para Dojangs</p>
           </div>

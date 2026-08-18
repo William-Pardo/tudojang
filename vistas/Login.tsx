@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { useAuth } from '../context/AuthContext';
-import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoEmail, IconoLogin, IconoInformacion } from '../components/Iconos';
+import { IconoCandado, IconoOjoAbierto, IconoOjoCerrado, IconoEmail, IconoLogin } from '../components/Iconos';
 import FormInputError from '../components/FormInputError';
 import ModalRecuperarContrasena from '../components/ModalRecuperarContrasena';
 import AuthCardShell from '../components/AuthCardShell';
@@ -21,18 +21,13 @@ const Login: React.FC = () => {
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
   const [modalRecuperarAbierto, setModalRecuperarAbierto] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, setValue } = useForm<any>({
+  const { register, handleSubmit, formState: { errors } } = useForm<any>({
     resolver: yupResolver(schema),
     defaultValues: { email: '', contrasena: '' }
   });
 
   const manejarSubmit = async (data: any) => {
     try { await login(data.email, data.contrasena); } catch (e) { }
-  };
-
-  const autofillDev = () => {
-    setValue('email', 'admin@test.com');
-    setValue('contrasena', 'admin123');
   };
 
   return (
@@ -78,13 +73,6 @@ const Login: React.FC = () => {
               <span>{isSubmitting ? 'Verificando...' : 'Iniciar Sesión'}</span>
             </button>
           </form>
-
-          {/* ATAJO DESARROLLO */}
-          <div className="pt-4 mt-4 border-t dark:border-gray-800 text-center">
-            <button onClick={autofillDev} className="inline-flex items-center gap-2 text-[8px] sm:text-[9px] font-black uppercase text-gray-400 hover:text-tkd-blue transition-colors">
-              <IconoInformacion className="w-3 h-3" /> Usar credenciales de prueba
-            </button>
-          </div>
         </div>
       </AuthCardShell>
       <ModalRecuperarContrasena abierto={modalRecuperarAbierto} onCerrar={() => setModalRecuperarAbierto(false)} />
