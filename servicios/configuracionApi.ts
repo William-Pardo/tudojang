@@ -152,7 +152,16 @@ export const obtenerTodosLosTenants = async (): Promise<ConfiguracionClub[]> => 
         ];
     }
     const snapshot = await getDocs(collection(db, 'tenants'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        // fechaVencimiento puede llegar como Firestore Timestamp (escrita por
+        // functions/index.js con admin.firestore.Timestamp.fromDate) o como string.
+        // Se normaliza siempre a string ISO para que la UI la pueda renderizar directo.
+        const fechaVencimiento = data.fechaVencimiento?.toDate
+            ? data.fechaVencimiento.toDate().toISOString().split('T')[0]
+            : data.fechaVencimiento;
+        return { id: doc.id, ...data, fechaVencimiento } as any;
+    });
 };
 
 /**
