@@ -35,11 +35,20 @@ const EventoPublico: React.FC = () => {
         const cargarEvento = async () => {
             if (!id) { setError('No se proporcionó un ID de evento.'); setCargando(false); return; }
             if (!isFirebaseConfigured) {
+                // Fix (2026-08-17): las fechas de este mock (usado en dev sin Firebase y en
+                // EventoPublico.test.tsx) estaban fijas en el pasado -- una vez que la fecha
+                // real superaba fechaFinInscripcion, inscripcionAbierta daba false y rompia el
+                // test (mostraba "Inscripciones Cerradas" en vez del boton). Relativas a "ahora"
+                // para que el mock siga representando un evento con inscripcion abierta sin
+                // importar cuando se corra.
+                const hoy = Date.now();
+                const diaMs = 24 * 60 * 60 * 1000;
+                const aFecha = (offsetDias: number) => new Date(hoy + offsetDias * diaMs).toISOString().slice(0, 10);
                 setEvento({
                     id, tenantId: 'escuela-gajog-001', nombre: 'Torneo Interdepartamental de Taekwondo',
                     descripcion: 'Competencia abierta a todas las academias de la región. Categorías desde infantil hasta senior.',
-                    lugar: 'Coliseo Municipal, Cra 5 #10-20', fechaEvento: '2026-08-15',
-                    fechaInicioInscripcion: '2026-07-01', fechaFinInscripcion: '2026-08-10',
+                    lugar: 'Coliseo Municipal, Cra 5 #10-20', fechaEvento: aFecha(45),
+                    fechaInicioInscripcion: aFecha(-30), fechaFinInscripcion: aFecha(30),
                     valor: 80000, requisitos: 'Certificado médico vigente, seguro deportivo, dobok completo.',
                     imagenUrl: '', solicitudesPendientes: 0,
                 });
