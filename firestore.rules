@@ -361,6 +361,23 @@ service cloud.firestore {
       allow delete: if isAdmin() && resource.data.tenantId == currentTenantId();
     }
 
+    // Solicitudes de fabricación física de carnets (Carnetizacion.tsx -> Master/Aliant ->
+    // MasterDashboard.tsx). Un carnet físico es indispensable para el estudiante (asistencia
+    // a clase, eventos), así que la solicitud que lo pide NUNCA se pierde: `create` y
+    // `update` pasan exclusivamente por las Cloud Functions `solicitarFabricacionCarnets` /
+    // `actualizarEstadoSolicitudCarnets` (mismo criterio ya usado para `estudiantes`/`sedes`,
+    // ver academico/carnets.js) -- la cantidad, el lote de estudiantes, y la reversión de
+    // `carnetGenerado` al rechazar deben calcularse server-side contra datos reales de otra
+    // colección, algo que una regla de Firestore no puede validar. `delete` queda bloqueado
+    // sin excepción, ni siquiera para SuperAdmin: es el registro de trazabilidad/auditoría/
+    // recuperación de una fabricación física, debe sobrevivir sin importar en qué estado
+    // termine (pendiente, en_producción, rechazado o enviado). El club solo LEE las suyas.
+    match /solicitudes_carnets/{docId} {
+      allow read: if isSuperAdmin() || (isAdmin() && resource.data.tenantId == currentTenantId());
+      allow create, update: if false;
+      allow delete: if false;
+    }
+
     match /solicitudesInscripcion/{docId} {
       allow read: if isInstructor();
       allow create, update: if isInstructor();

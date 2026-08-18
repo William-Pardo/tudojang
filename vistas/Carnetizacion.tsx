@@ -5,6 +5,7 @@ import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataConte
 import { useNotificacion } from '../context/NotificacionContext';
 import { generarLoteCarnetsPdf, FormatoPapel } from '../utils/pdfBatchGenerator';
 import { marcarCarnetsComoGenerados } from '../servicios/api';
+import { solicitarFabricacionCarnets } from '../servicios/carnetsApi';
 import { IconoExportar, IconoHistorial, IconoEstudiantes, IconoCasa, IconoAprobar } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import { formatearFecha } from '../utils/formatters';
@@ -113,18 +114,20 @@ const VistaCarnetizacion: React.FC = () => {
                                         if (window.confirm(`¿Solicitar a Aliant la fabricación física de ${pendientes.length} carnets?`)) {
                                             setProcesando(true);
                                             try {
-                                                const { addDoc, collection } = await import('firebase/firestore');
-                                                const { db } = await import('../firebase/config');
-                                                await addDoc(collection(db, 'solicitudes_carnets'), {
-                                                    tenantId: configClub.tenantId,
-                                                    nombreClub: configClub.nombreClub,
-                                                    cantidad: pendientes.length,
-                                                    sedeNombre: sedesVisibles[0]?.nombre || 'Principal',
-                                                    fechaSolicitud: new Date().toISOString()
-                                                });
-                                                mostrarNotificacion("Solicitud enviada a producción. Aliant recibirá la notificación.", "success");
-                                            } catch (e) {
-                                                mostrarNotificacion("Error al enviar solicitud", "error");
+                                                // La cantidad real la calcula el servidor contra los estudiantes
+                                                // pendientes del tenant (functions/academico/carnets.js) -- no se
+                                                // confía en pendientes.length, que puede estar desactualizado.
+                                                const { cantidad } = await solicitarFabricacionCarnets(
+                                                    configClub.tenantId,
+                                                    sedesVisibles[0]?.nombre || 'Principal'
+                                                );
+                                                mostrarNotificacion(`Solicitud enviada a producción (${cantidad} carnets). Aliant recibirá la notificación.`, "success");
+                                                // Refresco aparte: si esto falla, la solicitud YA se envió con éxito
+                                                // (toast de arriba), así que un error acá no debe pisar ese mensaje --
+                                                // solo deja la lista de pendientes desactualizada hasta el próximo refresh.
+                                                cargarEstudiantes().catch(() => {});
+                                            } catch (e: any) {
+                                                mostrarNotificacion(e?.message || "Error al enviar solicitud", "error");
                                             } finally {
                                                 setProcesando(false);
                                             }
