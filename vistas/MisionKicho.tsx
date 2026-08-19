@@ -23,7 +23,8 @@ import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
 import Loader from '../components/Loader';
 import FormularioEstudiante from '../components/FormularioEstudiante';
-import { MISION_ID_DIRECTO } from '../constantes';
+import CountdownTimer from '../components/CountdownTimer';
+import { MISION_ID_DIRECTO, MISION_KICHO_DURACION_DIAS } from '../constantes';
 
 const mapearRegistroABorrador = (reg: RegistroTemporal): Partial<Estudiante> => {
     const d = reg.datos;
@@ -55,49 +56,6 @@ interface Props {
     guardarEstudiante: (estudiante: any) => Promise<void>;
     cargandoAccion: boolean;
 }
-
-// Componente Interno: Reloj de Conteo Regresivo
-const CountdownTimer: React.FC<{ fechaExpiracion: string }> = ({ fechaExpiracion }) => {
-    const [tiempo, setTiempo] = useState('');
-    const [urgencia, setUrgencia] = useState<'normal' | 'media' | 'critica'>('normal');
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const now = new Date().getTime();
-            const target = new Date(fechaExpiracion).getTime();
-            const diff = target - now;
-
-            if (diff <= 0) {
-                setTiempo("EXPIRADO");
-                clearInterval(interval);
-                return;
-            }
-
-            const h = Math.floor(diff / (1000 * 60 * 60));
-            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const s = Math.floor((diff % (1000 * 60)) / 1000);
-
-            if (h < 6) setUrgencia('critica');
-            else if (h < 24) setUrgencia('media');
-            else setUrgencia('normal');
-
-            setTiempo(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [fechaExpiracion]);
-
-    const colors = {
-        normal: 'text-tkd-blue bg-tkd-blue/10 border-tkd-blue/20',
-        media: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
-        critica: 'text-tkd-red bg-tkd-red/10 border-tkd-red/20 animate-pulse'
-    };
-
-    return (
-        <div className={`px-4 py-2 rounded-xl border font-black text-sm tracking-widest flex items-center gap-2 ${colors[urgencia]}`}>
-            <span className="text-[10px] opacity-60">CIERRE EN:</span> {tiempo}
-        </div>
-    );
-};
 
 const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }) => {
     const { usuario } = useAuth();
@@ -279,13 +237,13 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
 
         setActivando(true);
         try {
-            // Generar fecha de expiración: Ahora + 72 horas
+            // Generar fecha de expiración: Ahora + MISION_KICHO_DURACION_DIAS
             const expDate = new Date();
-            expDate.setHours(expDate.getHours() + 72);
+            expDate.setDate(expDate.getDate() + MISION_KICHO_DURACION_DIAS);
 
             await crearMisionKicho({
                 tenantId: usuario.tenantId,
-                nombreMision: "PROTOCOLO DE CARGA INICIAL (72H)",
+                nombreMision: `PROTOCOLO DE CARGA INICIAL (${MISION_KICHO_DURACION_DIAS}D)`,
                 fechaExpiracion: expDate.toISOString(),
                 sedeId: sedeSeleccionada || (sedesVisibles[0]?.id || 'principal')
             });
@@ -516,7 +474,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                         className="bg-white text-tkd-blue px-10 py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                                     >
                                         {activando ? <div className="w-5 h-5 border-4 border-tkd-blue border-t-transparent rounded-full animate-spin"></div> : <IconoAgregar className="w-6 h-6" />}
-                                        Activar Misión (72h)
+                                        Activar Misión ({MISION_KICHO_DURACION_DIAS}D)
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-3 px-6 py-4 bg-black/20 rounded-2xl border border-white/10 h-fit">
@@ -576,7 +534,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                 <IconoExitoAnimado className="mx-auto text-tkd-blue w-32 h-32" />
                                 <h2 className="text-3xl font-black uppercase text-gray-900 dark:text-white mt-6 tracking-tighter">¡Protocolo Iniciado!</h2>
                                 <p className="text-gray-500 mt-4 font-bold uppercase text-xs tracking-widest leading-relaxed">
-                                    Tienes **72 horas** para completar la captura. <br /> El QR de registro ya está disponible.
+                                    Tienes **{MISION_KICHO_DURACION_DIAS} días** para completar la captura. <br /> El QR de registro ya está disponible.
                                 </p>
                                 <button
                                     onClick={() => setShowExitoModal(false)}

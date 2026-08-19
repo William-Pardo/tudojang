@@ -121,7 +121,7 @@ service cloud.firestore {
     // donde CensoPublico.tsx seguía aceptando registros después de que el contador del Admin
     // marcara "EXPIRADO" (esa cuenta regresiva era solo visual, nunca se validaba acá) y
     // habilita que el SuperAdmin corte la vigencia a mano (desactivarMisionKicho -> activa:false)
-    // sin esperar a que pasen las 72h.
+    // sin esperar a que se cumpla el plazo (MISION_KICHO_DURACION_DIAS, ver constantes.ts).
     function misionVigente(misionId) {
       let ref = /databases/$(database)/documents/misiones_kicho/$(misionId);
       return misionId == 'directo'
