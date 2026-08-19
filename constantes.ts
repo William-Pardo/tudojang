@@ -82,6 +82,11 @@ export const ADMIN_WHATSAPP = "3001234567";
 // pertenecen a ninguna campaña Misión KICHO con expiración -- ese link nunca vence.
 export const MISION_ID_DIRECTO = 'directo';
 
+// Ventana de vigencia por defecto al activar una Misión KICHO desde el tenant
+// (vistas/MisionKicho.tsx, handleActivarKichoAuto). El SuperAdmin puede seguir fijando
+// una fecha/hora manual distinta desde MasterDashboard.tsx.
+export const MISION_KICHO_DURACION_DIAS = 5;
+
 export const FRASES_SALIDA = [
     "¡Hola! [ESTUDIANTE] ha terminado su práctica con éxito en {{CLUB}}. Ya puedes pasar a recogerlo(a).",
     "¡Qué gran clase hoy! [ESTUDIANTE] ya terminó su sesión en {{CLUB}}. Te esperamos en la salida.",

@@ -8,6 +8,8 @@ import { MISION_ID_DIRECTO } from '../constantes';
 import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar, IconoAlertaTriangulo } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
+import CountdownTimer from '../components/CountdownTimer';
+import type { MisionKicho } from '../tipos';
 import { formatearPrecio } from '../utils/formatters';
 
 const CensoPublico: React.FC = () => {
@@ -29,6 +31,10 @@ const CensoPublico: React.FC = () => {
     const esMisionReal = !!misionId && misionId !== MISION_ID_DIRECTO;
     const [verificandoMision, setVerificandoMision] = useState(esMisionReal);
     const [misionInvalida, setMisionInvalida] = useState(false);
+    // Se guarda la misión completa (no solo si es vigente) para poder mostrarle al
+    // aspirante/tutor el mismo contador de cierre que ya ve el tenant en MisionKicho.tsx --
+    // antes el plazo era invisible del lado del formulario público.
+    const [mision, setMision] = useState<MisionKicho | null>(null);
 
     useEffect(() => {
         if (!esMisionReal) return;
@@ -36,6 +42,7 @@ const CensoPublico: React.FC = () => {
             .then(m => {
                 const vigente = !!m && m.activa && new Date(m.fechaExpiracion) > new Date();
                 setMisionInvalida(!vigente);
+                if (vigente) setMision(m);
             })
             .catch(() => setMisionInvalida(true))
             .finally(() => setVerificandoMision(false));
@@ -121,6 +128,11 @@ const CensoPublico: React.FC = () => {
                 </div>
                 <h1 className="text-white text-4xl font-black uppercase tracking-tighter drop-shadow-lg">{tenant?.nombreClub}</h1>
                 <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.4em] mt-2">Protocolo de Registro Oficial</p>
+                {mision && (
+                    <div className="flex justify-center mt-4">
+                        <CountdownTimer fechaExpiracion={mision.fechaExpiracion} />
+                    </div>
+                )}
             </div>
 
             <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">

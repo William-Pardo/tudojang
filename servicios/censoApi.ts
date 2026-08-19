@@ -4,6 +4,7 @@ import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, incr
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
+import { MISION_KICHO_DURACION_DIAS } from '../constantes';
 
 /**
  * SUPERADMIN: Crea una nueva misión técnica para una escuela
@@ -38,7 +39,7 @@ export const obtenerMisionActivaTenant = async (tenantId: string): Promise<Misio
             id: 'm-mock-1',
             tenantId,
             nombreMision: 'MISIÓN KICHO: APERTURA 2024',
-            fechaExpiracion: new Date(Date.now() + 86400000).toISOString(),
+            fechaExpiracion: new Date(Date.now() + MISION_KICHO_DURACION_DIAS * 86400000).toISOString(),
             activa: true,
             registrosRecibidos: 3,
             estadoLote: 'captura'
@@ -98,7 +99,7 @@ export const obtenerMisionPorId = async (misionId: string): Promise<MisionKicho 
 
 /**
  * SUPERADMIN: Corta manualmente la vigencia de una misión activa (soporte/seguridad),
- * sin esperar a que el tenant la legalice ni a que venza el contador de 72h.
+ * sin esperar a que el tenant la legalice ni a que venza el contador (MISION_KICHO_DURACION_DIAS, ver constantes.ts).
  */
 export const desactivarMisionKicho = async (misionId: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
