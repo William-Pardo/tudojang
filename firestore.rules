@@ -315,7 +315,14 @@ service cloud.firestore {
       allow create: if request.resource.data.estado == 'pendiente'
         && exists(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId))
         && misionVigente(request.resource.data.misionId);
-      allow update, delete: if isSuperAdmin() || (isInstructor() && resource.data.tenantId == currentTenantId());
+      // El Instructor del tenant puede aprobar/rechazar (validarRegistroTemporal, campo
+      // `estado`) o corregir un typo capturado por el aspirante (actualizarDatosRegistroTemporal,
+      // campo `datos`) -- nunca reasignar el registro a otro tenant/misión ni falsificar
+      // fechaRegistro vía un update. SuperAdmin (soporte) sigue sin esta restricción.
+      allow update: if isSuperAdmin()
+        || (isInstructor() && resource.data.tenantId == currentTenantId()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'datos']));
+      allow delete: if isSuperAdmin() || (isInstructor() && resource.data.tenantId == currentTenantId());
     }
 
     // Asistencia de guarderia/entrega a tutores (Sistema C, colección raíz `asistencia`,

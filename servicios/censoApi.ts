@@ -86,6 +86,17 @@ export const validarRegistroTemporal = async (id: string, estado: 'verificado' |
 };
 
 /**
+ * TENANT: Corrige los datos capturados por el aspirante/tutor en el formulario público
+ * (typos, teléfono mal digitado, etc.) sin tocar `estado` -- distinto de aprobar/rechazar.
+ * Reemplaza el objeto `datos` completo (mismo criterio que registrarAspirantePublico, que
+ * también lo escribe entero) en vez de mergear campo a campo.
+ */
+export const actualizarDatosRegistroTemporal = async (id: string, datos: RegistroTemporal['datos']): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    await updateDoc(doc(db, 'registros_temporales', id), { datos });
+};
+
+/**
  * Lectura pública de una misión por id (censo público, sin login) para validar que el
  * link siga vigente antes de mostrar el formulario -- ver misionVigente() en firestore.rules,
  * misma condición (activa + no vencida) aplicada del lado del cliente.

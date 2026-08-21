@@ -6,6 +6,7 @@ import {
   obtenerMisionActivaTenant,
   registrarAspirantePublico,
   validarRegistroTemporal,
+  actualizarDatosRegistroTemporal,
   legalizarLoteKicho,
   inyectarEstudiantesKicho,
   obtenerRegistrosMision,
@@ -163,6 +164,30 @@ describe('censoApi', () => {
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await validarRegistroTemporal('reg123', 'verificado');
+      expect(updateDoc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('actualizarDatosRegistroTemporal', () => {
+    it('debería reemplazar el objeto datos de un registro temporal sin tocar el estado', async () => {
+      const datosCorregidos: RegistroTemporal['datos'] = {
+        nombres: 'Juan', apellidos: 'Perez Corregido', email: 'juan@correo.com',
+        telefono: '3001234567', fechaNacimiento: '1990-05-15',
+      };
+
+      await actualizarDatosRegistroTemporal('reg123', datosCorregidos);
+
+      expect(updateDoc).toHaveBeenCalledWith(
+        doc(db, 'registros_temporales', 'reg123'),
+        { datos: datosCorregidos }
+      );
+    });
+
+    it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
+      await actualizarDatosRegistroTemporal('reg123', {
+        nombres: '', apellidos: '', email: '', telefono: '', fechaNacimiento: '',
+      });
       expect(updateDoc).not.toHaveBeenCalled();
     });
   });

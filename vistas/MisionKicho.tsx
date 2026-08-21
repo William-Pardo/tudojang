@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import {
     obtenerMisionActivaTenant, obtenerRegistrosMision, validarRegistroTemporal, legalizarLoteKicho, crearMisionKicho,
-    obtenerRegistrosPendientesTenant, eliminarRegistroTemporal, obtenerTodosRegistrosTenant
+    obtenerRegistrosPendientesTenant, eliminarRegistroTemporal, obtenerTodosRegistrosTenant, actualizarDatosRegistroTemporal
 } from '../servicios/censoApi';
 import { crearTicketSoporte } from '../servicios/soporteApi';
 import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataContext';
@@ -16,14 +16,16 @@ import {
     IconoWhatsApp, IconoCopiar, IconoAprobar,
     IconoRechazar, IconoUsuario, IconoFirma, IconoInformacion,
     IconoCampana, IconoCerrar, IconoExitoAnimado, IconoAgregar, IconoAprobar as IconoLab,
-    IconoCompartir, IconoExportar
+    IconoCompartir, IconoExportar, IconoEditar, IconoAlertaTriangulo
 } from '../components/Iconos';
 import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
+import { detectarInconsistencias } from '../utils/censoInconsistencias';
 import Loader from '../components/Loader';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import CountdownTimer from '../components/CountdownTimer';
+import ModalEditarRegistroCenso from '../components/ModalEditarRegistroCenso';
 import { MISION_ID_DIRECTO, MISION_KICHO_DURACION_DIAS } from '../constantes';
 
 const mapearRegistroABorrador = (reg: RegistroTemporal): Partial<Estudiante> => {
@@ -57,6 +59,21 @@ interface Props {
     cargandoAccion: boolean;
 }
 
+// "Miga de pan" visual: no bloquea nada, solo asoma que detectarInconsistencias encontró
+// algo raro en este registro (teléfono corto, menor sin tutor, posible duplicado, etc.) para
+// que el tenant decida si lo corrige (Corregir Datos) o lo deja tal cual.
+const BadgeAlerta: React.FC<{ alertas: string[] }> = ({ alertas }) => {
+    if (alertas.length === 0) return null;
+    return (
+        <span
+            title={alertas.join(' · ')}
+            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/30 flex-shrink-0"
+        >
+            <IconoAlertaTriangulo className="w-3 h-3" />
+        </span>
+    );
+};
+
 const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }) => {
     const { usuario } = useAuth();
     const { estudiantes } = useEstudiantes();
@@ -89,6 +106,12 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     const [registrosDirectos, setRegistrosDirectos] = useState<RegistroTemporal[]>([]);
     const [solicitudEnRevision, setSolicitudEnRevision] = useState<RegistroTemporal | null>(null);
     const [exportando, setExportando] = useState(false);
+
+    // Corrección de datos capturados con error (típicamente un typo en el celular o la fecha
+    // de nacimiento) -- distinto de aprobar/rechazar, aplica tanto a "Aspirantes Detectados"
+    // (registros, ligados a la campaña) como a "Solicitudes Pendientes" (registrosDirectos).
+    const [registroEnEdicion, setRegistroEnEdicion] = useState<RegistroTemporal | null>(null);
+    const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
     const cargarDatos = async () => {
         if (!usuario) return;
@@ -324,6 +347,21 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
         } catch (e) { mostrarNotificacion("Error al procesar", "error"); }
     };
 
+    const handleGuardarEdicionRegistro = async (id: string, datos: RegistroTemporal['datos']) => {
+        setGuardandoEdicion(true);
+        try {
+            await actualizarDatosRegistroTemporal(id, datos);
+            setRegistros(prev => prev.map(r => r.id === id ? { ...r, datos } : r));
+            setRegistrosDirectos(prev => prev.map(r => r.id === id ? { ...r, datos } : r));
+            mostrarNotificacion("Datos corregidos", "success");
+            setRegistroEnEdicion(null);
+        } catch (e) {
+            mostrarNotificacion("No se pudo guardar la corrección", "error");
+        } finally {
+            setGuardandoEdicion(false);
+        }
+    };
+
     const iniciarLegalizacion = () => {
         const todosProcesados = registros.every(r => r.estado !== 'pendiente');
         if (!todosProcesados) {
@@ -400,13 +438,17 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                             {registrosDirectos.map(reg => (
                                 <tr key={reg.id}>
                                     <td className="py-4 pr-4">
-                                        <div className="font-black text-sm uppercase text-gray-900 dark:text-white">{reg.datos.nombres} {reg.datos.apellidos}</div>
+                                        <div className="font-black text-sm uppercase text-gray-900 dark:text-white flex items-center gap-2">
+                                            {reg.datos.nombres} {reg.datos.apellidos}
+                                            <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} />
+                                        </div>
                                         <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">
                                             {reg.datos.tutorNombre ? `Tutor: ${reg.datos.tutorNombre}` : 'Mayor de edad'} · {reg.datos.telefono}
                                         </div>
                                     </td>
                                     <td className="py-4 text-right">
                                         <div className="flex justify-end gap-3">
+                                            <button onClick={() => setRegistroEnEdicion(reg)} className="p-3 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-300 rounded-xl hover:bg-tkd-blue hover:text-white transition-all shadow-sm" title="Corregir Datos"><IconoEditar className="w-5 h-5" /></button>
                                             <button onClick={() => setSolicitudEnRevision(reg)} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Revisar y Aprobar"><IconoAprobar className="w-5 h-5" /></button>
                                             <button onClick={() => handleRechazarDirecto(reg)} className="p-3 bg-red-50 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm" title="Rechazar"><IconoRechazar className="w-5 h-5" /></button>
                                         </div>
@@ -430,6 +472,15 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
             estudianteActual={null}
             cargando={cargandoAccion}
             borrador={mapearRegistroABorrador(solicitudEnRevision)}
+        />
+    );
+
+    const modalEditarRegistro = registroEnEdicion && (
+        <ModalEditarRegistroCenso
+            registro={registroEnEdicion}
+            onGuardar={handleGuardarEdicionRegistro}
+            onCerrar={() => setRegistroEnEdicion(null)}
+            guardando={guardandoEdicion}
         />
     );
 
@@ -547,6 +598,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                     )}
                 </AnimatePresence>
                 {modalAprobarDirecta}
+                {modalEditarRegistro}
             </div>
         );
     }
@@ -636,7 +688,10 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                     {registros.map(reg => (
                                         <tr key={reg.id} className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors ${reg.estado === 'rechazado' ? 'opacity-30 grayscale' : ''}`}>
                                             <td className="px-10 py-6">
-                                                <div className="font-black text-sm uppercase text-gray-900 dark:text-white">{reg.datos.nombres} {reg.datos.apellidos}</div>
+                                                <div className="font-black text-sm uppercase text-gray-900 dark:text-white flex items-center gap-2">
+                                                    {reg.datos.nombres} {reg.datos.apellidos}
+                                                    <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} />
+                                                </div>
                                                 <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">F. NAC: {reg.datos.fechaNacimiento}</div>
                                             </td>
                                             <td className="px-6 py-6">
@@ -652,6 +707,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                             </td>
                                             <td className="px-10 py-6 text-right">
                                                 <div className="flex justify-end gap-3">
+                                                    <button onClick={() => setRegistroEnEdicion(reg)} className="p-3 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-300 rounded-xl hover:bg-tkd-blue hover:text-white transition-all shadow-sm" title="Corregir Datos"><IconoEditar className="w-5 h-5" /></button>
                                                     <button onClick={() => handleValidar(reg.id, 'verificado')} className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm" title="Aprobar para Inyección"><IconoAprobar className="w-5 h-5" /></button>
                                                     <button onClick={() => handleValidar(reg.id, 'rechazado')} className="p-3 bg-red-50 text-tkd-red rounded-xl hover:bg-tkd-red hover:text-white transition-all shadow-sm" title="Rechazar Registro"><IconoRechazar className="w-5 h-5" /></button>
                                                 </div>
@@ -789,6 +845,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                 )}
             </AnimatePresence>
             {modalAprobarDirecta}
+            {modalEditarRegistro}
         </div>
     );
 };
