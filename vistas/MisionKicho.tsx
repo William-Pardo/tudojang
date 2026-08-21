@@ -21,7 +21,7 @@ import {
 import { simularRegistrosMasivos } from '../utils/kichoSimulator';
 import LogoDinamico from '../components/LogoDinamico';
 import { generarUrlAbsoluta } from '../utils/formatters';
-import { detectarInconsistencias } from '../utils/censoInconsistencias';
+import { detectarInconsistencias, type AlertaCenso } from '../utils/censoInconsistencias';
 import Loader from '../components/Loader';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import CountdownTimer from '../components/CountdownTimer';
@@ -59,18 +59,22 @@ interface Props {
     cargandoAccion: boolean;
 }
 
-// "Miga de pan" visual: no bloquea nada, solo asoma que detectarInconsistencias encontró
-// algo raro en este registro (teléfono corto, menor sin tutor, posible duplicado, etc.) para
-// que el tenant decida si lo corrige (Corregir Datos) o lo deja tal cual.
-const BadgeAlerta: React.FC<{ alertas: string[] }> = ({ alertas }) => {
+// "Miga de pan" táctil: no bloquea nada, solo asoma que detectarInconsistencias encontró
+// algo raro en este registro (teléfono corto, menor sin tutor, posible duplicado, etc.). El
+// `title` sigue ahí para quien pasa el mouse, pero el botón es tap-able a propósito -- en
+// mobile no hay hover, así que tocar el triángulo es la única forma de enterarse de CUÁL es
+// el problema; onClick abre "Corregir Datos" con el campo exacto ya resaltado.
+const BadgeAlerta: React.FC<{ alertas: AlertaCenso[]; onClick: () => void }> = ({ alertas, onClick }) => {
     if (alertas.length === 0) return null;
     return (
-        <span
-            title={alertas.join(' · ')}
-            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/30 flex-shrink-0"
+        <button
+            type="button"
+            onClick={onClick}
+            title={alertas.map(a => a.mensaje).join(' · ')}
+            className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/30 flex-shrink-0 hover:bg-orange-500/20 transition-all"
         >
             <IconoAlertaTriangulo className="w-3 h-3" />
-        </span>
+        </button>
     );
 };
 
@@ -440,7 +444,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                     <td className="py-4 pr-4">
                                         <div className="font-black text-sm uppercase text-gray-900 dark:text-white flex items-center gap-2">
                                             {reg.datos.nombres} {reg.datos.apellidos}
-                                            <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} />
+                                            <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} onClick={() => setRegistroEnEdicion(reg)} />
                                         </div>
                                         <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">
                                             {reg.datos.tutorNombre ? `Tutor: ${reg.datos.tutorNombre}` : 'Mayor de edad'} · {reg.datos.telefono}
@@ -478,6 +482,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     const modalEditarRegistro = registroEnEdicion && (
         <ModalEditarRegistroCenso
             registro={registroEnEdicion}
+            alertas={detectarInconsistencias(registroEnEdicion, [...registros, ...registrosDirectos], estudiantes)}
             onGuardar={handleGuardarEdicionRegistro}
             onCerrar={() => setRegistroEnEdicion(null)}
             guardando={guardandoEdicion}
@@ -690,7 +695,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                                             <td className="px-10 py-6">
                                                 <div className="font-black text-sm uppercase text-gray-900 dark:text-white flex items-center gap-2">
                                                     {reg.datos.nombres} {reg.datos.apellidos}
-                                                    <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} />
+                                                    <BadgeAlerta alertas={detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes)} onClick={() => setRegistroEnEdicion(reg)} />
                                                 </div>
                                                 <div className="text-[9px] text-gray-400 font-bold uppercase mt-1">F. NAC: {reg.datos.fechaNacimiento}</div>
                                             </td>
