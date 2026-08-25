@@ -1337,6 +1337,22 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
         advertencias.push(`Discrepancia de monto: Alumno dice ${data.montoInformado}, IA detectó ${extractedData.montoExtraido}`);
       }
 
+      // 5b. Detectar comprobante duplicado: misma referencia ya usada en un pago APROBADO.
+      // Solo compara contra Aprobado (no Pendiente/ValidadoIA) porque en ese punto es el
+      // único estado que confirma que el dinero ya fue acreditado a un estudiante.
+      if (extractedData.referencia) {
+        const dupSnap = await admin.firestore()
+          .collection('reportes_pagos_estudiantes')
+          .where('tenantId', '==', data.tenantId)
+          .where('datosIA.referencia', '==', extractedData.referencia)
+          .where('estado', '==', 'Aprobado')
+          .get();
+        const duplicado = dupSnap.docs.find((d) => d.id !== reporteId);
+        if (duplicado) {
+          advertencias.push(`Referencia duplicada: ya existe un pago APROBADO (reporte ${duplicado.id}) con esta misma referencia.`);
+        }
+      }
+
       // 6. Actualizar reporte con los datos de IA
       await snap.ref.update({
         estado: 'ValidadoIA',
