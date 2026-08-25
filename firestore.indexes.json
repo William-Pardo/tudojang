@@ -175,6 +175,15 @@
       ]
     },
     {
+      "collectionGroup": "reportes_pagos_estudiantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaValidacion", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "tickets_soporte",
       "queryScope": "COLLECTION",
       "fields": [
