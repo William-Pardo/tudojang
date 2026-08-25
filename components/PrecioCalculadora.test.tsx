@@ -21,7 +21,7 @@ describe('PrecioCalculadora', () => {
     jest.clearAllMocks();
   });
 
-  it('Scenario "Simulación con extras": muestra el desglose por tramos + extras sumados', () => {
+  it('Scenario "Simulación con extras": muestra el desglose (tarifa plana) + extras sumados', () => {
     const resultado = calcularFacturacionMensual({
       estudiantesFacturables: 80,
       sedesExtraContratadas: 1,
@@ -40,12 +40,13 @@ describe('PrecioCalculadora', () => {
       />
     );
 
-    // 80 estudiantes cruza 2 tramos (1-70 y 71-150) -- el desglose muestra AMBOS, no un
-    // monto único, y el total resultante sí es la suma (estudiantes + sede extra).
+    // Con descuentoVolumenActivo=false (ajuste de precios, 2026-08-25) los 80 estudiantes se
+    // cobran a tarifa plana en una única fila -- ya NO cruzan los ex-tramos 1-70/71-150
+    // (ese esquema queda desactivado, no eliminado, ver facturacion-config.json). El total
+    // resultante sigue siendo la suma (estudiantes + sede extra).
     const filas = screen.getAllByTestId('tramo-fila');
-    expect(filas).toHaveLength(2);
-    expect(filas[0]).toHaveTextContent('70 alumnos');
-    expect(filas[1]).toHaveTextContent('10 alumnos');
+    expect(filas).toHaveLength(1);
+    expect(filas[0]).toHaveTextContent('80 alumnos');
     const totalEsperado = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(resultado.totalPesos);
     expect(screen.getByTestId('precio-total').textContent?.replace(/\s/g, '')).toBe(totalEsperado.replace(/\s/g, ''));
   });

@@ -910,7 +910,7 @@ test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable i
     obtenerWompiPaymentSourceId: async () => 1,
     contarEstudiantesFacturables: async (tenantId) => {
       tenantIdContado = tenantId;
-      return 60; // cruza el primer tramo: 50@3800 + 10@3400
+      return 60;
     },
     crearTransaccionWompi: async ({ amountInCents }) => {
       amountRecibido = amountInCents;
@@ -923,13 +923,11 @@ test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable i
 
   await servicio(new Date());
 
-  // 60 facturables: tramo corregido (facturacion-config.json) es 1-70 @ 3800, asi que los
-  // 60 caen enteros en el primer tramo: 60*3800 = 228000; + 1 sede extra ($89.900) = 317900
-  // pesos = 31790000 centavos (calcularFacturacionMensual, facturacion.js). Este assert
-  // quedo desactualizado cuando se corrigieron los tramos a 70/150/350 (antes el corte
-  // del primer tramo estaba en 50).
+  // Con descuentoVolumenActivo=false (ajuste de precios, 2026-08-25) los 60 facturables se
+  // cobran a tarifa plana: 60*4.500 = 270.000; + 1 sede extra ($89.900) = 359.900 pesos =
+  // 35.990.000 centavos (calcularFacturacionMensual, facturacion.js).
   assert.equal(tenantIdContado, 'tnt-1');
-  assert.equal(amountRecibido, 31790000);
+  assert.equal(amountRecibido, 35990000);
 });
 
 test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra solo el tramo de estudiantes', async () => {
@@ -952,8 +950,8 @@ test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra sol
 
   await servicio(new Date());
 
-  // 30 facturables, todos en el primer tramo: 30*3800 = 114000 pesos = 11400000 centavos.
-  assert.equal(amountRecibido, 11400000);
+  // Tarifa plana (descuentoVolumenActivo=false): 30*4.500 = 135.000 pesos = 13.500.000 centavos.
+  assert.equal(amountRecibido, 13500000);
 });
 
 test('cobroAutomaticoMensual: 0 estudiantes facturables cobra $0 (Scenario facturacion-metered: fin de la prueba sin estudiantes matriculados)', async () => {
