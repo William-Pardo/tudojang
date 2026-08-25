@@ -568,7 +568,11 @@ const VistaConfiguracion: React.FC = () => {
                             { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra, iconScale: 'scale-[1.46]' },
                             { id: 'alertas', label: 'Alertas', icon: IconoConfiguracionAlertas, iconScale: 'scale-[1.72]' },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
-                        ].map(tab => (
+                        ]
+                            // Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial):
+                            // "Programas Extra" se reserva como valor agregado -- no se muestra en la demo.
+                            .filter(tab => tab.id !== 'programas' || !localConfigClub?.esDemoComercial)
+                            .map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
@@ -945,7 +949,7 @@ const VistaConfiguracion: React.FC = () => {
                     </div>
                 )}
 
-                {!isWizardMode && activeTab === 'programas' && (
+                {!isWizardMode && activeTab === 'programas' && !localConfigClub?.esDemoComercial && (
                     <div className="space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
                             <h3 className="text-xl font-black uppercase tracking-tight text-tkd-blue">Catálogo de Programas Extra</h3>

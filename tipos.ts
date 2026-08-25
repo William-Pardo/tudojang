@@ -147,6 +147,13 @@ export interface ConfiguracionClub {
     colorAcento: string;
     emailClub?: string;
     estadoSuscripcion: 'activo' | 'suspendido' | 'demo';
+    // Flag de marketing/ventas, independiente de estadoSuscripcion: oculta módulos que se
+    // reservan como valor agregado en una demo comercial (Carnetización, Programas Extra,
+    // configuración de Biblioteca/Drive). El trial real de 7 días de un cliente nuevo
+    // (estadoSuscripcion === 'demo') NO se ve afectado por esto -- solo lo activa SuperAdmin
+    // a mano para el/los tenant(s) que usa para mostrarle la app a un prospecto (ver
+    // vistas/MasterDashboard.tsx, alternarDemoComercialTenant en servicios/configuracionApi.ts).
+    esDemoComercial?: boolean;
     fechaVencimiento: string;
     logoUrl?: string;
     logoOriginalUrl?: string; // Para backups

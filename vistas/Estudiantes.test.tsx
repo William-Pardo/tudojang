@@ -6,6 +6,7 @@ import { EstadoPago, GradoTKD, GrupoEdad, RolUsuario, type Estudiante } from '..
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
 
 let mockUsuario: any = { id: 'admin-1', tenantId: 'tenant-1', sedeId: 'sede-1', rol: RolUsuario.Admin, email: 'admin@test.com' };
+let mockConfigClub: any = { esDemoComercial: false };
 let mockEscenario: any = {};
 const mockMostrarNotificacion = jest.fn();
 const mockCargarEstudiantes = jest.fn();
@@ -15,6 +16,7 @@ const mockRetirarEstudiante = jest.fn();
 const mockReactivarEstudiante = jest.fn();
 
 jest.mock('../context/AuthContext', () => ({ useAuth: () => ({ usuario: mockUsuario }) }));
+jest.mock('../context/DataContext', () => ({ useConfiguracion: () => ({ configClub: mockConfigClub }) }));
 jest.mock('../context/NotificacionContext', () => ({ useNotificacion: () => ({ mostrarNotificacion: mockMostrarNotificacion }) }));
 jest.mock('../servicios/censoApi', () => ({ obtenerMisionActivaTenant: jest.fn() }));
 jest.mock('../utils/userSeeder', () => ({ generarEstudiantesFicticios: (...args: any[]) => mockGenerar(...args) }));
@@ -153,6 +155,7 @@ describe('VistaEstudiantes', () => {
     jest.clearAllMocks();
     mockEscenario = {};
     mockUsuario = { id: 'admin-1', tenantId: 'tenant-1', sedeId: 'sede-1', rol: RolUsuario.Admin, email: 'admin@test.com' };
+    mockConfigClub = { esDemoComercial: false };
     misionMock.mockResolvedValue(null);
   });
 
@@ -243,6 +246,12 @@ describe('VistaEstudiantes', () => {
     expect(screen.getByTestId('firma')).toHaveTextContent('abc-Tutor');
     await user.click(screen.getByText('Guardar formulario'));
     await user.click(screen.getByText('Confirmar'));
+  });
+
+  it('oculta la pestaña Carnetización cuando el tenant está en modo demo comercial', async () => {
+    mockConfigClub = { esDemoComercial: true };
+    render(<VistaEstudiantes />);
+    expect(screen.queryByTitle('Carnetización')).not.toBeInTheDocument();
   });
 
   it('navega por las sub-vistas y usa paginación y exportación', async () => {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
 import { useAuth } from '../context/AuthContext';
+import { useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
@@ -30,6 +31,7 @@ type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho';
 
 export const VistaEstudiantes: React.FC = () => {
     const { usuario } = useAuth();
+    const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
     const {
         estudiantes,
@@ -187,7 +189,9 @@ export const VistaEstudiantes: React.FC = () => {
         { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor, iconScale: 'scale-[1.28]' },
         { id: 'asistencia', label: 'Control de Asistencia', icono: IconoControlAsistencia, visible: true, iconScale: 'scale-[1.48]' },
         { id: 'certificados', label: 'Certificaciones', icono: IconoCertificados, visible: !esTutor, iconScale: 'scale-[1.62]' },
-        { id: 'carnets', label: 'Carnetización', icono: IconoCarnets, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente, iconScale: 'scale-[1.60]' },
+        // Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial):
+        // Carnetización se reserva como valor agregado -- no se muestra en la demo.
+        { id: 'carnets', label: 'Carnetización', icono: IconoCarnets, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente && !configClub?.esDemoComercial, iconScale: 'scale-[1.60]' },
     ].filter(t => t.visible);
 
     return (
@@ -291,7 +295,7 @@ export const VistaEstudiantes: React.FC = () => {
                 {activeTab === 'kicho' && <div className="animate-fade-in"><VistaMisionKicho guardarEstudiante={guardarEstudiante} cargandoAccion={cargandoAccion} /></div>}
                 {activeTab === 'directorio' && renderDirectorio()}
                 {activeTab === 'asistencia' && <div className="animate-fade-in"><VistaGestionClase /></div>}
-                {activeTab === 'carnets' && <div className="animate-fade-in"><VistaCarnetizacion /></div>}
+                {activeTab === 'carnets' && !configClub?.esDemoComercial && <div className="animate-fade-in"><VistaCarnetizacion /></div>}
                 {activeTab === 'certificados' && <div className="animate-fade-in"><VistaCertificaciones /></div>}
             </div>
 

@@ -71,6 +71,7 @@ export const CONFIGURACION_CLUB_POR_DEFECTO: ConfiguracionClub = {
     colorAcento: '#CD2E3A',
     emailClub: 'soporte@tudojang.com',
     estadoSuscripcion: 'demo' as const,
+    esDemoComercial: false,
     fechaVencimiento: '2029-12-31',
     onboardingStep: 0
 };
