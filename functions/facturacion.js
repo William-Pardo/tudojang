@@ -63,10 +63,12 @@ function calcularCapacidad(tenant) {
 }
 
 /**
- * Monto mensual medido (facturacion-metered). Marginal/progresivo por tramo: cada
- * estudiante paga la tarifa de SU propio tramo y los tramos ya cruzados nunca se
- * recalculan a la tarifa nueva (spec Scenario "Tenant que cruza un tramo"). Extras de sede
- * y equipo tecnico se suman sin descuento por volumen, independientes de los tramos.
+ * Monto mensual medido (facturacion-metered). Cuando `descuentoVolumenActivo` es false
+ * (estado actual), se cobra una tarifa plana `tarifaEstandarPorEstudiante` a todos los
+ * estudiantes. Cuando es true, es marginal/progresivo por tramo: cada estudiante paga la
+ * tarifa de SU propio tramo y los tramos ya cruzados nunca se recalculan a la tarifa nueva
+ * (spec Scenario "Tenant que cruza un tramo"). Extras de sede y equipo tecnico se suman sin
+ * descuento por volumen, independientes de los tramos o de la tarifa plana.
  *
  * @param {{estudiantesFacturables: number, sedesExtraContratadas: number, equipoTecnicoExtraContratado: number}} entrada
  */
@@ -76,19 +78,30 @@ function calcularFacturacionMensual(entrada) {
   const equipoExtra = Number(entrada.equipoTecnicoExtraContratado) || 0;
 
   const tramos = [];
-  let restantes = totalEstudiantes;
   let subtotalEstudiantes = 0;
 
-  for (const tramo of config.tramosEstudiantes) {
-    if (restantes <= 0) break;
-    const tope = tramo.hasta === null ? Infinity : tramo.hasta;
-    const capacidadTramo = tope - tramo.desde + 1;
-    const cantidad = Math.min(restantes, capacidadTramo);
-    const subtotal = cantidad * tramo.tarifa;
+  if (config.descuentoVolumenActivo === false) {
+    // Descuento por volumen deshabilitado temporalmente (no eliminado): tarifa plana
+    // para todos los estudiantes. tramosEstudiantes queda intacto en el JSON para
+    // reactivar el esquema marginal con solo volver descuentoVolumenActivo a true.
+    const tarifa = config.tarifaEstandarPorEstudiante;
+    subtotalEstudiantes = totalEstudiantes * tarifa;
+    if (totalEstudiantes > 0) {
+      tramos.push({ desde: 1, hasta: totalEstudiantes, cantidad: totalEstudiantes, tarifa, subtotal: subtotalEstudiantes });
+    }
+  } else {
+    let restantes = totalEstudiantes;
+    for (const tramo of config.tramosEstudiantes) {
+      if (restantes <= 0) break;
+      const tope = tramo.hasta === null ? Infinity : tramo.hasta;
+      const capacidadTramo = tope - tramo.desde + 1;
+      const cantidad = Math.min(restantes, capacidadTramo);
+      const subtotal = cantidad * tramo.tarifa;
 
-    tramos.push({ desde: tramo.desde, hasta: tramo.hasta, cantidad, tarifa: tramo.tarifa, subtotal });
-    subtotalEstudiantes += subtotal;
-    restantes -= cantidad;
+      tramos.push({ desde: tramo.desde, hasta: tramo.hasta, cantidad, tarifa: tramo.tarifa, subtotal });
+      subtotalEstudiantes += subtotal;
+      restantes -= cantidad;
+    }
   }
 
   const sedesExtraSubtotal = sedesExtra * config.extras.sede;
