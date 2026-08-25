@@ -10,8 +10,7 @@ import { RolUsuario, MisionKicho } from '../tipos';
 import { obtenerMisionActivaTenant } from '../servicios/censoApi';
 
 // Componentes
-import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificados, IconoInformacion, IconoCampana, IconoCarnets, IconoControlAsistencia, IconoBillete } from '../components/Iconos';
-import ReportarPagoTutor from '../components/Pagos/ReportarPagoTutor';
+import { IconoAgregar, IconoEstudiantes, IconoExportar, IconoCertificados, IconoInformacion, IconoCampana, IconoCarnets, IconoControlAsistencia } from '../components/Iconos';
 import ModalConfirmacion from '../components/ModalConfirmacion';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import ModalVerFirma from '../components/ModalVerFirma';
@@ -28,7 +27,7 @@ import VistaCarnetizacion from './Carnetizacion';
 import VistaCertificaciones from './Certificaciones';
 import VistaMisionKicho from './MisionKicho';
 
-type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho' | 'pagos';
+type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho';
 
 export const VistaEstudiantes: React.FC = () => {
     const { usuario } = useAuth();
@@ -190,7 +189,6 @@ export const VistaEstudiantes: React.FC = () => {
         { id: 'directorio', label: 'Directorio', icono: IconoEstudiantes, visible: !esTutor, iconScale: 'scale-[1.28]' },
         { id: 'asistencia', label: 'Control de Asistencia', icono: IconoControlAsistencia, visible: true, iconScale: 'scale-[1.48]' },
         { id: 'certificados', label: 'Certificaciones', icono: IconoCertificados, visible: !esTutor, iconScale: 'scale-[1.62]' },
-        { id: 'pagos', label: 'Reportar Pago', icono: IconoBillete, visible: esTutor },
         // Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial):
         // Carnetización se reserva como valor agregado -- no se muestra en la demo.
         { id: 'carnets', label: 'Carnetización', icono: IconoCarnets, visible: !esTutor && usuario?.rol !== RolUsuario.Asistente && !configClub?.esDemoComercial, iconScale: 'scale-[1.60]' },
@@ -299,7 +297,6 @@ export const VistaEstudiantes: React.FC = () => {
                 {activeTab === 'asistencia' && <div className="animate-fade-in"><VistaGestionClase /></div>}
                 {activeTab === 'carnets' && !configClub?.esDemoComercial && <div className="animate-fade-in"><VistaCarnetizacion /></div>}
                 {activeTab === 'certificados' && <div className="animate-fade-in"><VistaCertificaciones /></div>}
-                {activeTab === 'pagos' && esTutor && <div className="animate-fade-in"><ReportarPagoTutor /></div>}
             </div>
 
             {modalFormularioAbierto && <FormularioEstudiante abierto={modalFormularioAbierto} onCerrar={cerrarFormulario} onGuardar={guardarEstudiante} estudianteActual={estudianteEnEdicion} cargando={cargandoAccion} />}
