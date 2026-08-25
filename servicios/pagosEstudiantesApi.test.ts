@@ -131,16 +131,16 @@ describe('pagosEstudiantesApi', () => {
 describe('obtenerEstudiantesDelTutor', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('normaliza el correo, consulta por tenant + tutor.correo y filtra por matrícula activa', async () => {
+  it('delega en resolveLinkedStudent (mismo resolver que usa el buzón de notificaciones) y filtra por matrícula activa', async () => {
     (getDocs as jest.Mock).mockResolvedValue({
       docs: [
-        { id: 'e1', data: () => ({ estadoMatricula: 'activo', nombres: 'Ana' }) },
-        { id: 'e2', data: () => ({ estadoMatricula: 'retirado', nombres: 'Luis' }) },
+        { id: 'e1', data: () => ({ tenantId: 'tenant-1', estadoMatricula: 'activo', nombres: 'Ana' }) },
+        { id: 'e2', data: () => ({ tenantId: 'tenant-1', estadoMatricula: 'retirado', nombres: 'Luis' }) },
       ],
     });
     const res = await obtenerEstudiantesDelTutor('tenant-1', '  Tutor@Correo.COM ');
     expect(where).toHaveBeenCalledWith('tutor.correo', '==', 'tutor@correo.com');
-    expect(res).toEqual([{ id: 'e1', estadoMatricula: 'activo', nombres: 'Ana' }]);
+    expect(res).toEqual([{ id: 'e1', tenantId: 'tenant-1', estadoMatricula: 'activo', nombres: 'Ana' }]);
   });
 });
 

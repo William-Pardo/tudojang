@@ -7,31 +7,21 @@ import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinan
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
 import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
+import { resolveLinkedStudent } from './academico/tutorStudentResolver';
 
 const storage = getStorage();
 const reportesCollection = collection(db, 'reportes_pagos_estudiantes');
-const estudiantesCollection = collection(db, 'estudiantes');
 
 /**
  * TUTOR: Estudiantes activos vinculados a la cuenta autenticada del tutor.
- * Misma normalización de correo que hooks/useGestionEstudiantes.ts (la regla de Firestore
- * compara estudiante.tutor.correo == request.auth.token.email, que llega en minúsculas).
- * El filtro de estadoMatricula se hace en cliente para no requerir un índice compuesto
- * adicional sobre tenantId + tutor.correo + estadoMatricula.
+ * Delega en resolveLinkedStudent (servicios/academico/tutorStudentResolver.ts), el resolver
+ * de identidad ya vigente para este mismo vínculo tutor->estudiante (usado por el buzón de
+ * notificaciones) -- evita una segunda query paralela para la misma regla de Firestore, y de
+ * paso hereda su soporte de modo demo/mock.
  */
 export const obtenerEstudiantesDelTutor = async (tenantId: string, correoTutor: string): Promise<Estudiante[]> => {
-    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
-    if (!isFirebaseConfigured) return [];
-    const correoNormalizado = correoTutor.toLowerCase().trim();
-    const q = query(
-        estudiantesCollection,
-        where("tenantId", "==", tenantId),
-        where("tutor.correo", "==", correoNormalizado)
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Estudiante))
-        .filter(e => e.estadoMatricula === 'activo');
+    const estudiantes = await resolveLinkedStudent(tenantId, correoTutor);
+    return estudiantes.filter(e => e.estadoMatricula === 'activo');
 };
 
 /**
