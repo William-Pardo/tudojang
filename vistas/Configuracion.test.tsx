@@ -291,3 +291,46 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
         });
     });
 });
+
+describe('Configuracion - modo demo comercial (esDemoComercial)', () => {
+    const setup = (esDemoComercial: boolean) => {
+        useConfiguracionMock.mockReturnValue({
+            usuarios: [],
+            configNotificaciones: {},
+            configClub: { ...configClubBase, esDemoComercial },
+            cargando: false,
+            error: null,
+            guardarConfiguraciones: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+            agregarUsuario: jest.fn(),
+            actualizarUsuario: jest.fn(),
+            eliminarUsuario: jest.fn(),
+            cargarConfiguracion: jest.fn(),
+        });
+        useProgramasMock.mockReturnValue({
+            programas: [], eliminarPrograma: jest.fn(), agregarPrograma: jest.fn(), actualizarPrograma: jest.fn(),
+        });
+        useEstudiantesMock.mockReturnValue({ estudiantes: [] });
+        useSedesMock.mockReturnValue({
+            sedes: [], sedesVisibles: [], totalSedesActivas: 1,
+            eliminarSede: jest.fn(), agregarSede: jest.fn(), actualizarSede: jest.fn(),
+        });
+        useAuthMock.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'test-tenant', rol: 'Admin', email: 'admin@test.com' } });
+        useNotificacionMock.mockReturnValue({ toasts: [], mostrarNotificacion: jest.fn(), ocultarNotificacion: jest.fn() });
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('oculta la pestaña "Programas Extra" cuando esDemoComercial es true', () => {
+        setup(true);
+        render(<VistaConfiguracion />);
+        expect(screen.queryByText('Programas Extra')).not.toBeInTheDocument();
+    });
+
+    it('muestra la pestaña "Programas Extra" cuando esDemoComercial es false (triangulación)', () => {
+        setup(false);
+        render(<VistaConfiguracion />);
+        expect(screen.getByText('Programas Extra')).toBeInTheDocument();
+    });
+});

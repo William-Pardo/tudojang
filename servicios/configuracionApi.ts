@@ -172,3 +172,16 @@ export const cambiarEstadoSuscripcionTenant = async (tenantId: string, nuevoEsta
     const docRef = doc(db, 'tenants', tenantId);
     await updateDoc(docRef, { estadoSuscripcion: nuevoEstado });
 };
+
+/**
+ * SUPER ADMIN: Activa/desactiva el modo demo comercial de un tenant -- oculta Carnetización,
+ * Programas Extra y la configuración de Biblioteca/Drive (ver ConfiguracionClub.esDemoComercial).
+ * Independiente de estadoSuscripcion: un tenant en 'demo' (trial real de 7 días) NO se ve
+ * afectado por esto, solo el/los tenant(s) que SuperAdmin marca a mano para mostrarle la app
+ * a un prospecto de ventas.
+ */
+export const alternarDemoComercialTenant = async (tenantId: string, esDemoComercial: boolean): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'tenants', tenantId);
+    await updateDoc(docRef, { esDemoComercial });
+};

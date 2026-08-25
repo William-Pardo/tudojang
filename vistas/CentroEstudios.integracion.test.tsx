@@ -51,6 +51,15 @@ jest.mock('../context/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// useConfiguracion (modo demo comercial, ConfiguracionClub.esDemoComercial) es una
+// preocupación transversal ajena a la cadena del consultor que documenta este archivo -- se
+// mockea puntualmente (no se levanta un DataProvider real con todos sus listeners de
+// usuarios/programas/eventos/etc., ajenos a este escenario) devolviendo el default (demo
+// comercial apagada) para no alterar el comportamiento que ya cubren estos tests.
+jest.mock('../context/DataContext', () => ({
+  useConfiguracion: () => ({ configClub: { esDemoComercial: false } }),
+}));
+
 import { sembrarDoc, limpiarFirestoreFake } from '../test-utils/fakeFirestore';
 import CentroEstudios from './CentroEstudios';
 

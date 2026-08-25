@@ -2,7 +2,7 @@
 // vistas/MasterDashboard.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { obtenerTodosLosTenants, cambiarEstadoSuscripcionTenant } from '../servicios/configuracionApi';
+import { obtenerTodosLosTenants, cambiarEstadoSuscripcionTenant, alternarDemoComercialTenant } from '../servicios/configuracionApi';
 import { obtenerMisiones, crearMisionKicho, inyectarEstudiantesKicho, obtenerRegistrosMision, desactivarMisionKicho } from '../servicios/censoApi';
 import { escucharTicketsActivos, actualizarTicket } from '../servicios/soporteApi';
 import { escucharSolicitudesCarnets, actualizarEstadoSolicitudCarnet } from '../servicios/carnetsApi';
@@ -106,6 +106,18 @@ const VistaMasterDashboard: React.FC = () => {
             setTenants(prev => prev.map(t => t.tenantId === id ? { ...t, estadoSuscripcion: nuevo } : t));
             mostrarNotificacion(`Estado de academia actualizado a ${nuevo}`, "success");
         } catch (e) { mostrarNotificacion("Error al cambiar estado", "error"); }
+    };
+
+    // Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial): oculta
+    // Carnetización, Programas Extra y la config de Biblioteca/Drive en el tenant marcado --
+    // independiente de estadoSuscripcion, que sigue siendo el trial real de un cliente nuevo.
+    const handleAlternarDemoComercial = async (id: string, actual?: boolean) => {
+        const nuevo = !actual;
+        try {
+            await alternarDemoComercialTenant(id, nuevo);
+            setTenants(prev => prev.map(t => t.tenantId === id ? { ...t, esDemoComercial: nuevo } : t));
+            mostrarNotificacion(`Demo comercial ${nuevo ? 'activada' : 'desactivada'}`, "success");
+        } catch (e) { mostrarNotificacion("Error al cambiar el modo demo comercial", "error"); }
     };
 
     const handleDesactivarMision = async (mision: MisionKicho) => {
@@ -410,6 +422,7 @@ const VistaMasterDashboard: React.FC = () => {
                                     <th className="px-8 py-5">Dojang / Identidad</th>
                                     <th className="px-6 py-5">Capacidad</th>
                                     <th className="px-6 py-5">Vencimiento</th>
+                                    <th className="px-6 py-5 text-right">Demo Comercial</th>
                                     <th className="px-8 py-5 text-right">Status / Control</th>
                                 </tr>
                             </thead>
@@ -430,6 +443,18 @@ const VistaMasterDashboard: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-6">
                                             <p className="text-xs font-bold text-gray-400">{t.fechaVencimiento}</p>
+                                        </td>
+                                        <td className="px-6 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-3">
+                                                <span className={`text-[9px] font-black uppercase ${t.esDemoComercial ? 'text-tkd-blue' : 'text-gray-400'}`}>{t.esDemoComercial ? 'Activa' : 'Off'}</span>
+                                                <button
+                                                    onClick={() => handleAlternarDemoComercial(t.tenantId, t.esDemoComercial)}
+                                                    title="Oculta Carnetización, Programas Extra y Biblioteca/Drive para mostrarle la app a un prospecto"
+                                                    className={`w-12 h-6 rounded-full relative transition-colors ${t.esDemoComercial ? 'bg-tkd-blue' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${t.esDemoComercial ? 'right-1' : 'left-1'}`} />
+                                                </button>
+                                            </div>
                                         </td>
                                         <td className="px-8 py-6 text-right">
                                             <div className="flex items-center justify-end gap-4">

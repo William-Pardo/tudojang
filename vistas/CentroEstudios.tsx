@@ -1,6 +1,7 @@
 import React from 'react';
 import { IconoProgresoEstudiante, IconoFlujoAcademico } from '../components/Iconos';
 import { useAuth } from '../context/AuthContext';
+import { useConfiguracion } from '../context/DataContext';
 import { RolUsuario } from '../tipos';
 import { centroEstudiosRepository, prepararAsignacionesCentroEstudios } from '../servicios/academico/centroEstudiosRepository';
 import { resolveStudentsForConsultor } from '../servicios/academico/tutorStudentResolver';
@@ -38,6 +39,7 @@ const pasosCentroEstudios = [
 
 const CentroEstudios: React.FC = () => {
   const { usuario } = useAuth();
+  const { configClub } = useConfiguracion();
   const [asignaciones, setAsignaciones] = React.useState<AsignacionCentroEstudios[]>([]);
   const [asignacionAbierta, setAsignacionAbierta] = React.useState<AsignacionCentroEstudios | null>(null);
   const [cargando, setCargando] = React.useState(true);
@@ -281,13 +283,19 @@ const CentroEstudios: React.FC = () => {
               aria-labelledby="tab-flujo"
               className="grid gap-5 xl:grid-cols-[18fr_34fr_48fr]"
             >
-              <BibliotecaView
-                embedded
-                tenantId={usuario?.tenantId ?? 'tenant-local'}
-                usuarioId={usuario?.id ?? 'usuario-local'}
-                onRecursoAprobado={() => setTriggerRecursos(prev => prev + 1)}
-                onFlujoEstadoChange={actualizarEstadoBiblioteca}
-              />
+              {/* Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial):
+                  la configuración de Biblioteca/Drive se reserva como valor agregado -- no se
+                  muestra en la demo. Asignaciones sigue visible (gestiona material ya publicado,
+                  no la conexión con Drive). */}
+              {!configClub?.esDemoComercial && (
+                <BibliotecaView
+                  embedded
+                  tenantId={usuario?.tenantId ?? 'tenant-local'}
+                  usuarioId={usuario?.id ?? 'usuario-local'}
+                  onRecursoAprobado={() => setTriggerRecursos(prev => prev + 1)}
+                  onFlujoEstadoChange={actualizarEstadoBiblioteca}
+                />
+              )}
 
               <AsignacionesView
                 embedded

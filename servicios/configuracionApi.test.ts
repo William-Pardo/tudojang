@@ -11,6 +11,7 @@ import {
   actualizarCapacidadClub,
   obtenerTodosLosTenants,
   cambiarEstadoSuscripcionTenant,
+  alternarDemoComercialTenant,
 } from './configuracionApi';
 import { CONFIGURACION_POR_DEFECTO, CONFIGURACION_CLUB_POR_DEFECTO } from '../constantes';
 
@@ -362,6 +363,30 @@ describe('obtenerConfiguracionClub', () => {
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       await cambiarEstadoSuscripcionTenant('tenant123', 'suspendido');
+      expect(updateDoc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('alternarDemoComercialTenant', () => {
+    it('debería activar el modo demo comercial del tenant en Firestore', async () => {
+      await alternarDemoComercialTenant('tenant123', true);
+      expect(updateDoc).toHaveBeenCalledWith(
+        doc(db, 'tenants', 'tenant123'),
+        { esDemoComercial: true }
+      );
+    });
+
+    it('debería desactivar el modo demo comercial del tenant en Firestore (triangulación)', async () => {
+      await alternarDemoComercialTenant('tenant456', false);
+      expect(updateDoc).toHaveBeenCalledWith(
+        doc(db, 'tenants', 'tenant456'),
+        { esDemoComercial: false }
+      );
+    });
+
+    it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
+      await alternarDemoComercialTenant('tenant123', true);
       expect(updateDoc).not.toHaveBeenCalled();
     });
   });
