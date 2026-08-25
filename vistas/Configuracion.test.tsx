@@ -254,4 +254,40 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
             expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'equipoTecnicoExtraContratado', 1);
         });
     });
+
+    it('el botón de quitar sede extra llama actualizarCapacidadClub con delta -1 sobre sedesExtraContratadas', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        await user.click(screen.getByLabelText(/Quitar una sede extra/i));
+
+        await waitFor(() => {
+            expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'sedesExtraContratadas', -1);
+        });
+    });
+
+    it('el botón de quitar cupo de equipo técnico llama actualizarCapacidadClub con delta -1 sobre equipoTecnicoExtraContratado', async () => {
+        useConfiguracionMock.mockReturnValue({
+            usuarios: [],
+            configNotificaciones: {},
+            configClub: { ...configClubConExtras, equipoTecnicoExtraContratado: 1 },
+            cargando: false,
+            error: null,
+            guardarConfiguraciones: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+            agregarUsuario: jest.fn(),
+            actualizarUsuario: jest.fn(),
+            eliminarUsuario: jest.fn(),
+            cargarConfiguracion: jest.fn(),
+        });
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        await user.click(screen.getByLabelText(/Quitar un cupo de equipo técnico/i));
+
+        await waitFor(() => {
+            expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'equipoTecnicoExtraContratado', -1);
+        });
+    });
 });

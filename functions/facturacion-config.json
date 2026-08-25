@@ -9,6 +9,6 @@
     { "desde": 151, "hasta": 350,  "tarifa": 3400 },
     { "desde": 351, "hasta": null, "tarifa": 3000 }
   ],
-  "extras": { "sede": 89900, "equipoTecnico": 36000 },
+  "extras": { "sede": 89900, "equipoTecnico": 45000 },
   "bonoSede": { "umbralEstudiantes": 70, "sedesOtorgadas": 1 }
 }

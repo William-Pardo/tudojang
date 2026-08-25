@@ -367,13 +367,13 @@ const VistaConfiguracion: React.FC = () => {
     // equipoTecnicoExtraContratado desde este panel -- misma Cloud Function
     // actualizarExtrasContratados ya usada por SeccionCobroAutomatico's onActivado (patrón
     // de actualización optimista local + notificación).
-    const handleComprarExtra = async (campo: 'sedesExtraContratadas' | 'equipoTecnicoExtraContratado') => {
+    const handleAjustarExtra = async (campo: 'sedesExtraContratadas' | 'equipoTecnicoExtraContratado', delta: 1 | -1) => {
         if (!localConfigClub) return;
         setComprandoExtra(campo);
         try {
-            await actualizarCapacidadClub(localConfigClub.tenantId, campo, 1);
-            setLocalConfigClub(prev => prev ? { ...prev, [campo]: (Number(prev[campo]) || 0) + 1 } : prev);
-            mostrarNotificacion("Capacidad ampliada correctamente.", "success");
+            await actualizarCapacidadClub(localConfigClub.tenantId, campo, delta);
+            setLocalConfigClub(prev => prev ? { ...prev, [campo]: Math.max(0, (Number(prev[campo]) || 0) + delta) } : prev);
+            mostrarNotificacion(delta < 0 ? "Capacidad reducida correctamente." : "Capacidad ampliada correctamente.", "success");
         } catch (e) {
             const mensaje = e instanceof Error && e.message ? e.message : "No se pudo ampliar la capacidad.";
             mostrarNotificacion(mensaje, "error");
@@ -1132,13 +1132,23 @@ const VistaConfiguracion: React.FC = () => {
                                         {capacidad.sedes} sede(s) contratadas actualmente
                                     </p>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.sede.precio)} / mes por sede extra</p>
-                                    <button
-                                        onClick={() => handleComprarExtra('sedesExtraContratadas')}
-                                        disabled={comprandoExtra === 'sedesExtraContratadas'}
-                                        className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {comprandoExtra === 'sedesExtraContratadas' ? 'Ampliando...' : '+1 Sede Adicional'}
-                                    </button>
+                                    <div className="mt-8 flex gap-3">
+                                        <button
+                                            onClick={() => handleAjustarExtra('sedesExtraContratadas', 1)}
+                                            disabled={comprandoExtra === 'sedesExtraContratadas'}
+                                            className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {comprandoExtra === 'sedesExtraContratadas' ? 'Ampliando...' : '+1 Sede Adicional'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleAjustarExtra('sedesExtraContratadas', -1)}
+                                            disabled={comprandoExtra === 'sedesExtraContratadas' || (localConfigClub?.sedesExtraContratadas ?? 0) <= 0}
+                                            aria-label="Quitar una sede extra"
+                                            className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-gray-400 hover:bg-tkd-red hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-50 dark:disabled:hover:bg-gray-800 dark:disabled:hover:text-gray-400"
+                                        >
+                                            <IconoEliminar className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="bg-white dark:bg-white/5 p-8 rounded-[2.5rem] border border-gray-100 dark:border-white/10 flex flex-col justify-between hover:shadow-premium transition-all">
                                     <div className="flex items-center gap-3">
@@ -1149,13 +1159,23 @@ const VistaConfiguracion: React.FC = () => {
                                         {capacidad.equipoTecnico} cupo(s) contratados actualmente
                                     </p>
                                     <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{formatearPrecio(COSTOS_ADICIONALES.equipoTecnico.precio)} / mes por cupo extra</p>
-                                    <button
-                                        onClick={() => handleComprarExtra('equipoTecnicoExtraContratado')}
-                                        disabled={comprandoExtra === 'equipoTecnicoExtraContratado'}
-                                        className="mt-8 w-full py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {comprandoExtra === 'equipoTecnicoExtraContratado' ? 'Ampliando...' : '+1 Cupo de Equipo Técnico'}
-                                    </button>
+                                    <div className="mt-8 flex gap-3">
+                                        <button
+                                            onClick={() => handleAjustarExtra('equipoTecnicoExtraContratado', 1)}
+                                            disabled={comprandoExtra === 'equipoTecnicoExtraContratado'}
+                                            className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {comprandoExtra === 'equipoTecnicoExtraContratado' ? 'Ampliando...' : '+1 Cupo de Equipo Técnico'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleAjustarExtra('equipoTecnicoExtraContratado', -1)}
+                                            disabled={comprandoExtra === 'equipoTecnicoExtraContratado' || (localConfigClub?.equipoTecnicoExtraContratado ?? 0) <= 0}
+                                            aria-label="Quitar un cupo de equipo técnico"
+                                            className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl text-gray-400 hover:bg-tkd-red hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-50 dark:disabled:hover:bg-gray-800 dark:disabled:hover:text-gray-400"
+                                        >
+                                            <IconoEliminar className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
