@@ -1,9 +1,17 @@
-import { addDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { addDoc, doc, getDocs, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import { EstadoPago, EstadoValidacion } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
-import { gestionarReportePago, obtenerReportesPendientes, reportarPagoEstudiante } from './pagosEstudiantesApi';
+import {
+  aprobarReportesEnLote,
+  buscarReferenciaDuplicada,
+  gestionarReportePago,
+  obtenerEstudiantesDelTutor,
+  obtenerHistorialReportes,
+  obtenerReportesPendientes,
+  reportarPagoEstudiante,
+} from './pagosEstudiantesApi';
 
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn(() => ({ path: 'reportes' })), addDoc: jest.fn(), query: jest.fn(() => 'query'),
@@ -42,9 +50,31 @@ describe('pagosEstudiantesApi', () => {
     await expect(reportarPagoEstudiante('t', 'e', 'Ana', 100, 'img')).rejects.toThrow('Storage caído');
   });
 
+  it('persiste tutorUsuarioId cuando el tutor está autenticado', async () => {
+    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-2' });
+    (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
+    (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
+    await reportarPagoEstudiante('tenant-1', 'est-1', 'Ana', 100, 'data:image/png;base64,x', 'tutor-uid-1');
+    expect(addDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tutorUsuarioId: 'tutor-uid-1' }));
+  });
+
+  it('omite tutorUsuarioId cuando no se informa (link público sin login)', async () => {
+    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-2' });
+    (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
+    (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
+    await reportarPagoEstudiante('tenant-1', 'est-1', 'Ana', 100, 'data:image/png;base64,x');
+    const payload = (addDoc as jest.Mock).mock.calls[0][1];
+    expect(payload).not.toHaveProperty('tutorUsuarioId');
+  });
+
   it('obtiene y normaliza reportes pendientes', async () => {
     (getDocs as jest.Mock).mockResolvedValue({ docs: [{ id: 'r1', data: () => ({ montoInformado: 100 }) }] });
     await expect(obtenerReportesPendientes('tenant-1')).resolves.toEqual([{ id: 'r1', montoInformado: 100 }]);
+  });
+
+  it('obtiene el historial de reportes ya resueltos', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [{ id: 'r1', data: () => ({ estado: 'Aprobado' }) }] });
+    await expect(obtenerHistorialReportes('tenant-1')).resolves.toEqual([{ id: 'r1', estado: 'Aprobado' }]);
   });
 
   it.each([[100, 100, 0], [100, 40, 60], [100, 120, -20]])(
@@ -95,5 +125,91 @@ describe('pagosEstudiantesApi', () => {
     (updateDoc as jest.Mock).mockResolvedValue(undefined);
     (agregarMovimiento as jest.Mock).mockRejectedValueOnce(new Error('Registro financiero falló'));
     await expect(gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin')).rejects.toThrow('Registro financiero falló');
+  });
+});
+
+describe('obtenerEstudiantesDelTutor', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('normaliza el correo, consulta por tenant + tutor.correo y filtra por matrícula activa', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({
+      docs: [
+        { id: 'e1', data: () => ({ estadoMatricula: 'activo', nombres: 'Ana' }) },
+        { id: 'e2', data: () => ({ estadoMatricula: 'retirado', nombres: 'Luis' }) },
+      ],
+    });
+    const res = await obtenerEstudiantesDelTutor('tenant-1', '  Tutor@Correo.COM ');
+    expect(where).toHaveBeenCalledWith('tutor.correo', '==', 'tutor@correo.com');
+    expect(res).toEqual([{ id: 'e1', estadoMatricula: 'activo', nombres: 'Ana' }]);
+  });
+});
+
+describe('buscarReferenciaDuplicada', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('encuentra otro reporte con la misma referencia, excluyendo el propio', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({
+      docs: [
+        { id: 'rep-1', data: () => ({ estado: 'Pendiente' }) },
+        { id: 'rep-2', data: () => ({ estado: 'Aprobado' }) },
+      ],
+    });
+    await expect(buscarReferenciaDuplicada('tenant-1', 'REF-1', 'rep-1')).resolves.toEqual({ id: 'rep-2', estado: 'Aprobado' });
+  });
+
+  it('devuelve null si no hay otro reporte con esa referencia', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [{ id: 'rep-1', data: () => ({}) }] });
+    await expect(buscarReferenciaDuplicada('tenant-1', 'REF-1', 'rep-1')).resolves.toBeNull();
+  });
+});
+
+describe('aprobarReportesEnLote', () => {
+  const reporteBase: any = {
+    id: 'r1', tenantId: 'tenant-1', estudianteId: 'est-1', estudianteNombre: 'Ana',
+    montoInformado: 40, fechaReporte: '2026-01-01', comprobanteUrl: '', estado: EstadoValidacion.ValidadoIA,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({ saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1' });
+    (updateDoc as jest.Mock).mockResolvedValue(undefined);
+    (agregarMovimiento as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it('aprueba todos los reportes cuando ninguno tiene referencia duplicada', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
+    const reportes = [
+      { ...reporteBase, id: 'r1' },
+      { ...reporteBase, id: 'r2', datosIA: { referencia: 'REF-2' } },
+    ];
+    const resultado = await aprobarReportesEnLote(reportes, 'admin-1');
+    expect(resultado).toEqual({ exitosos: ['r1', 'r2'], fallidos: [] });
+  });
+
+  it('marca como fallido el reporte con referencia duplicada, sin afectar al resto del lote', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [{ id: 'r-viejo', data: () => ({ estado: 'Aprobado' }) }] });
+    const reportes = [{ ...reporteBase, id: 'r1', datosIA: { referencia: 'REF-DUP' } }];
+    const resultado = await aprobarReportesEnLote(reportes, 'admin-1');
+    expect(resultado).toEqual({
+      exitosos: [],
+      fallidos: [{ id: 'r1', error: 'Referencia duplicada con el reporte r-viejo.' }],
+    });
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it('captura el fallo de un reporte individual sin abortar el resto del lote', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
+    (obtenerEstudiantePorId as jest.Mock)
+      .mockResolvedValueOnce({ saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1' })
+      .mockRejectedValueOnce(new Error('Estudiante no encontrado.'));
+    const reportes = [
+      { ...reporteBase, id: 'r1' },
+      { ...reporteBase, id: 'r2' },
+    ];
+    const resultado = await aprobarReportesEnLote(reportes, 'admin-1');
+    expect(resultado).toEqual({
+      exitosos: ['r1'],
+      fallidos: [{ id: 'r2', error: 'Estudiante no encontrado.' }],
+    });
   });
 });

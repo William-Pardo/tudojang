@@ -3,23 +3,49 @@
 import { collection, addDoc, query, where, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago } from '../tipos';
+import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago, Estudiante } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
 import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
 
 const storage = getStorage();
 const reportesCollection = collection(db, 'reportes_pagos_estudiantes');
+const estudiantesCollection = collection(db, 'estudiantes');
 
 /**
- * ESTUDIANTE: Reportar un nuevo pago subiendo el comprobante
+ * TUTOR: Estudiantes activos vinculados a la cuenta autenticada del tutor.
+ * Misma normalización de correo que hooks/useGestionEstudiantes.ts (la regla de Firestore
+ * compara estudiante.tutor.correo == request.auth.token.email, que llega en minúsculas).
+ * El filtro de estadoMatricula se hace en cliente para no requerir un índice compuesto
+ * adicional sobre tenantId + tutor.correo + estadoMatricula.
+ */
+export const obtenerEstudiantesDelTutor = async (tenantId: string, correoTutor: string): Promise<Estudiante[]> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
+    if (!isFirebaseConfigured) return [];
+    const correoNormalizado = correoTutor.toLowerCase().trim();
+    const q = query(
+        estudiantesCollection,
+        where("tenantId", "==", tenantId),
+        where("tutor.correo", "==", correoNormalizado)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Estudiante))
+        .filter(e => e.estadoMatricula === 'activo');
+};
+
+/**
+ * ESTUDIANTE/TUTOR: Reportar un nuevo pago subiendo el comprobante.
+ * tutorUsuarioId identifica al usuario autenticado que reportó (flujo con login);
+ * queda ausente en los reportes creados desde el link público /reportar-pago.
  */
 export const reportarPagoEstudiante = async (
     tenantId: string,
     estudianteId: string,
     estudianteNombre: string,
     monto: number,
-    imagenBase64: string
+    imagenBase64: string,
+    tutorUsuarioId?: string
 ): Promise<string> => {
     /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return "mock-id-reporte";
@@ -32,7 +58,9 @@ export const reportarPagoEstudiante = async (
         montoInformado: monto,
         fechaReporte: new Date().toISOString(),
         comprobanteUrl: '', // Se actualizará tras la subida
-        estado: EstadoValidacion.Pendiente
+        estado: EstadoValidacion.Pendiente,
+        // Firestore rechaza valores `undefined`: solo se incluye el campo si vino informado.
+        ...(tutorUsuarioId ? { tutorUsuarioId } : {})
     };
 
     const docRef = await addDoc(reportesCollection, nuevoReporte);
@@ -62,6 +90,84 @@ export const obtenerReportesPendientes = async (tenantId: string): Promise<Repor
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as ReportePagoEstudiante));
+};
+
+/**
+ * ADMIN: Historial de reportes ya resueltos (Aprobados/Rechazados) del Tenant, para la
+ * vista de conciliación "quién pagó, cuánto, cuándo".
+ */
+export const obtenerHistorialReportes = async (tenantId: string): Promise<ReportePagoEstudiante[]> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
+    if (!isFirebaseConfigured) return [];
+    const q = query(
+        reportesCollection,
+        where("tenantId", "==", tenantId),
+        where("estado", "in", [EstadoValidacion.Aprobado, EstadoValidacion.Rechazado]),
+        orderBy("fechaValidacion", "desc")
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ReportePagoEstudiante));
+};
+
+/**
+ * ADMIN: Busca otro reporte del mismo Tenant con la misma referencia de IA (excluyendo el
+ * propio). Chequeo cliente previo a aprobar en lote, para no acreditar dos veces el mismo
+ * comprobante -- complementa (no reemplaza) la advertencia que ya calcula la Cloud Function
+ * analizarComprobanteEstudiante contra pagos ya Aprobados.
+ */
+export const buscarReferenciaDuplicada = async (
+    tenantId: string,
+    referencia: string,
+    reporteIdExcluir: string
+): Promise<ReportePagoEstudiante | null> => {
+    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
+    if (!isFirebaseConfigured) return null;
+    const q = query(
+        reportesCollection,
+        where("tenantId", "==", tenantId),
+        where("datosIA.referencia", "==", referencia)
+    );
+    const snap = await getDocs(q);
+    const duplicado = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as ReportePagoEstudiante))
+        .find(r => r.id !== reporteIdExcluir);
+    return duplicado || null;
+};
+
+/**
+ * ADMIN: Aprobar varios reportes en lote. Antes de aprobar cada uno, revalida que su
+ * referencia (si la IA la extrajo) no esté duplicada -- un fallo individual (duplicado o
+ * cualquier error de gestionarReportePago) no aborta el resto del lote.
+ */
+export const aprobarReportesEnLote = async (
+    reportes: ReportePagoEstudiante[],
+    adminId: string
+): Promise<{ exitosos: string[]; fallidos: { id: string; error: string }[] }> => {
+    const resultados = await Promise.allSettled(reportes.map(async (reporte) => {
+        const referencia = reporte.datosIA?.referencia;
+        if (referencia) {
+            const duplicado = await buscarReferenciaDuplicada(reporte.tenantId, referencia, reporte.id);
+            if (duplicado) {
+                throw new Error(`Referencia duplicada con el reporte ${duplicado.id}.`);
+            }
+        }
+        await gestionarReportePago(reporte, EstadoValidacion.Aprobado, adminId);
+    }));
+
+    const exitosos: string[] = [];
+    const fallidos: { id: string; error: string }[] = [];
+
+    resultados.forEach((resultado, index) => {
+        const reporte = reportes[index];
+        if (resultado.status === 'fulfilled') {
+            exitosos.push(reporte.id);
+        } else {
+            const error = resultado.reason instanceof Error ? resultado.reason.message : 'Error desconocido';
+            fallidos.push({ id: reporte.id, error });
+        }
+    });
+
+    return { exitosos, fallidos };
 };
 
 /**
