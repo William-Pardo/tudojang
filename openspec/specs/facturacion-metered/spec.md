@@ -41,6 +41,16 @@ El monto por estudiantes MUST calcularse de forma marginal/progresiva: cada estu
 - WHEN se calcula el monto
 - THEN el cálculo MUST seguir aplicando la tarifa del tramo 351+ sin límite máximo de estudiantes
 
+### Requirement: Desactivación temporal del descuento por volumen
+
+El sistema MUST soportar desactivar el esquema marginal por tramos sin eliminar su definición, mediante el flag `descuentoVolumenActivo` en `facturacion-config.json`. Cuando `descuentoVolumenActivo` es `false`, el monto por estudiantes MUST calcularse a una tarifa plana única `tarifaEstandarPorEstudiante`, ignorando los tramos (que permanecen definidos en `tramosEstudiantes` para reactivarse solo con volver el flag a `true`).
+
+#### Scenario: Descuento por volumen desactivado (estado vigente desde 2026-08-25)
+
+- GIVEN `descuentoVolumenActivo: false` y `tarifaEstandarPorEstudiante: 4500`
+- WHEN se calcula el monto de un tenant con N estudiantes facturables
+- THEN el monto por estudiantes MUST ser N × $4.500, sin aplicar tramos ni descuento marginal
+
 ### Requirement: Extras de sede y equipo técnico se suman al monto
 
 El monto total MUST incluir el precio de cada sede y cada cupo de equipo técnico por encima de lo incluido (definido por `capacidad-tenant`), a $89.900/mes por sede extra y $36.000/mes por cupo extra, sin descuento por volumen.

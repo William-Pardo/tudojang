@@ -68,31 +68,36 @@ describe('calcularFacturacionMensual', () => {
         },
     );
 
-    // Continuidad exacta en cada limite de tramo (spec facturacion-metered) -- la pieza mas
+    // Continuidad exacta en cada ex-limite de tramo (spec facturacion-metered) -- la pieza mas
     // sensible a bugs sutiles de todo el cambio (design.md). Explicito como delta, no solo
-    // implicito por comparacion manual de dos vectores.
+    // implicito por comparacion manual de dos vectores. Con descuentoVolumenActivo=false
+    // (ajuste de precios, 2026-08-25) TODOS los estudiantes pagan tarifaEstandarPorEstudiante
+    // ($4.500) sin importar el tramo historico: el delta de agregar 1 estudiante en cualquier
+    // ex-limite de tramo debe ser exactamente esa tarifa plana, no la tarifa marginal vieja
+    // ($3.600/$3.400/$3.000). Cuando descuentoVolumenActivo vuelva a true, estos deltas
+    // vuelven a ser la tarifa marginal del tramo siguiente.
     const sinExtras = (estudiantesFacturables: number): EntradaFacturacion => ({
         estudiantesFacturables,
         sedesExtraContratadas: 0,
         equipoTecnicoExtraContratado: 0,
     });
 
-    it('continuidad exacta: 70 -> 71 suma exactamente la tarifa del tramo 71-150 ($3.600)', () => {
+    it('continuidad exacta: 70 -> 71 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
         const en70 = calcularFacturacionMensual(sinExtras(70));
         const en71 = calcularFacturacionMensual(sinExtras(71));
-        expect(en71.totalPesos - en70.totalPesos).toBe(3600);
+        expect(en71.totalPesos - en70.totalPesos).toBe(4500);
     });
 
-    it('continuidad exacta: 150 -> 151 suma exactamente la tarifa del tramo 151-350 ($3.400)', () => {
+    it('continuidad exacta: 150 -> 151 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
         const en150 = calcularFacturacionMensual(sinExtras(150));
         const en151 = calcularFacturacionMensual(sinExtras(151));
-        expect(en151.totalPesos - en150.totalPesos).toBe(3400);
+        expect(en151.totalPesos - en150.totalPesos).toBe(4500);
     });
 
-    it('continuidad exacta: 350 -> 351 suma exactamente la tarifa del tramo 351+ ($3.000)', () => {
+    it('continuidad exacta: 350 -> 351 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
         const en350 = calcularFacturacionMensual(sinExtras(350));
         const en351 = calcularFacturacionMensual(sinExtras(351));
-        expect(en351.totalPesos - en350.totalPesos).toBe(3000);
+        expect(en351.totalPesos - en350.totalPesos).toBe(4500);
     });
 });
 

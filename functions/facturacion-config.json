@@ -1,6 +1,8 @@
 {
   "version": 1,
   "incluido": { "sedes": 1, "equipoTecnico": 3 },
+  "descuentoVolumenActivo": false,
+  "tarifaEstandarPorEstudiante": 4500,
   "tramosEstudiantes": [
     { "desde": 1,   "hasta": 70,   "tarifa": 3800 },
     { "desde": 71,  "hasta": 150,  "tarifa": 3600 },
