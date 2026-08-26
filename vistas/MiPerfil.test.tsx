@@ -7,7 +7,9 @@ import VistaMiPerfil from './MiPerfil';
 import { useAuth } from '../context/AuthContext';
 import { useConfiguracion, useSedes } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
+import { useTenant } from '../components/BrandingProvider';
 import { resolveLinkedStudent } from '../servicios/academico/tutorStudentResolver';
+import { obtenerEstudiantesDelTutor } from '../servicios/pagosEstudiantesApi';
 import { EstadoPago, GradoTKD, GrupoEdad, RolUsuario, type Estudiante } from '../tipos';
 
 jest.mock('../context/AuthContext', () => ({
@@ -23,15 +25,29 @@ jest.mock('../context/NotificacionContext', () => ({
     useNotificacion: jest.fn(),
 }));
 
+jest.mock('../components/BrandingProvider', () => ({
+    useTenant: jest.fn(),
+}));
+
 jest.mock('../servicios/academico/tutorStudentResolver', () => ({
     resolveLinkedStudent: jest.fn(),
+}));
+
+// ReportarPagoTutor (renderizado dentro de MiPerfil para el rol Tutor) resuelve sus propios
+// estudiantes vía este servicio -- mismo resolveLinkedStudent por debajo, pero se mockea acá
+// directo para no acoplar este test a ese detalle de implementación.
+jest.mock('../servicios/pagosEstudiantesApi', () => ({
+    obtenerEstudiantesDelTutor: jest.fn(),
+    reportarPagoEstudiante: jest.fn(),
 }));
 
 const useAuthMock = useAuth as jest.Mock;
 const useConfiguracionMock = useConfiguracion as jest.Mock;
 const useSedesMock = useSedes as jest.Mock;
 const useNotificacionMock = useNotificacion as jest.Mock;
+const useTenantMock = useTenant as jest.Mock;
 const resolveLinkedStudentMock = resolveLinkedStudent as jest.Mock<() => Promise<Estudiante[]>>;
+const obtenerEstudiantesDelTutorMock = obtenerEstudiantesDelTutor as jest.Mock<() => Promise<Estudiante[]>>;
 
 const usuarioTutorMock = {
     id: 'tutor-1',
@@ -84,43 +100,45 @@ describe('VistaMiPerfil', () => {
             </ReactRouterDOM.MemoryRouter>
         );
 
-    it('muestra Medios de Pago Disponibles cuando hay saldo adeudado y hay un medio de pago configurado', async () => {
-        useConfiguracionMock.mockReturnValue({
-            configClub: { pagoNequi: '300 111 2222' },
-        });
-        resolveLinkedStudentMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 50000 })]);
+    // Estado de Pago y Reporte de Comprobante ahora lo resuelve ReportarPagoTutor (mismo
+    // componente que la pestaña autenticada del Tutor) en vez del bloque estático que tenía
+    // MiPerfil antes -- por eso estos tests mockean useTenant/obtenerEstudiantesDelTutor,
+    // que son las fuentes de datos reales de ese componente.
+    it('muestra Medios de Pago Directo cuando hay un medio de pago configurado', async () => {
+        useConfiguracionMock.mockReturnValue({ configClub: {} });
+        useTenantMock.mockReturnValue({ tenant: { pagoNequi: '300 111 2222' } });
+        resolveLinkedStudentMock.mockResolvedValue([]);
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 50000 })]);
 
         renderComponent();
 
-        expect(await screen.findByText('Medios de Pago Disponibles')).toBeInTheDocument();
+        expect(await screen.findByText('Medios de Pago Directo')).toBeInTheDocument();
         expect(screen.getByText('300 111 2222')).toBeInTheDocument();
     });
 
-    it('no muestra Medios de Pago Disponibles cuando el saldo adeudado es 0', async () => {
-        useConfiguracionMock.mockReturnValue({
-            configClub: { pagoNequi: '300 111 2222' },
-        });
-        resolveLinkedStudentMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 0 })]);
+    it('permite reportar un pago aunque el saldo adeudado sea 0 (adelantar el mes siguiente)', async () => {
+        useConfiguracionMock.mockReturnValue({ configClub: {} });
+        useTenantMock.mockReturnValue({ tenant: { pagoNequi: '300 111 2222' } });
+        resolveLinkedStudentMock.mockResolvedValue([]);
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 0 })]);
 
         renderComponent();
 
-        await waitFor(() => {
-            expect(screen.getByText('Saldo Adeudado')).toBeInTheDocument();
-        });
-        expect(screen.queryByText('Medios de Pago Disponibles')).not.toBeInTheDocument();
+        expect(await screen.findByText('REPORTAR PAGO AHORA')).toBeInTheDocument();
+        expect(screen.getByText('Medios de Pago Directo')).toBeInTheDocument();
     });
 
-    it('no muestra Medios de Pago Disponibles cuando no hay ningún medio de pago configurado', async () => {
-        useConfiguracionMock.mockReturnValue({
-            configClub: { pagoNequi: '', pagoDaviplata: '', pagoBreB: '', pagoBanco: '' },
-        });
-        resolveLinkedStudentMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 50000 })]);
+    it('no muestra Medios de Pago Directo cuando no hay ningún medio de pago configurado', async () => {
+        useConfiguracionMock.mockReturnValue({ configClub: {} });
+        useTenantMock.mockReturnValue({ tenant: { pagoNequi: '', pagoDaviplata: '', pagoBreB: '', pagoBanco: '' } });
+        resolveLinkedStudentMock.mockResolvedValue([]);
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudianteVinculado({ saldoDeudor: 50000 })]);
 
         renderComponent();
 
         await waitFor(() => {
-            expect(screen.getByText('Saldo Adeudado')).toBeInTheDocument();
+            expect(screen.getByText('REPORTAR PAGO AHORA')).toBeInTheDocument();
         });
-        expect(screen.queryByText('Medios de Pago Disponibles')).not.toBeInTheDocument();
+        expect(screen.queryByText('Medios de Pago Directo')).not.toBeInTheDocument();
     });
 });

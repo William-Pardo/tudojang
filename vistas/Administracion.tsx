@@ -4,13 +4,14 @@ import React, { useState } from 'react';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
-import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos } from '../components/Iconos';
+import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos, IconoHistorial } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
 import PanelValidacionPagos from '../components/Pagos/PanelValidacionPagos';
+import HistorialValidaciones from '../components/Pagos/HistorialValidaciones';
 
-type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'analisis';
+type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'historial' | 'analisis';
 
 const VistaAdministracion: React.FC = () => {
     const [activeTab, setActiveTab] = useState<AdminTab>('resumen');
@@ -23,6 +24,7 @@ const VistaAdministracion: React.FC = () => {
         { id: 'resumen', label: 'Resumen', icono: IconoResumenAdministracion, iconScale: 'scale-[1.34]' },
         { id: 'tesoreria', label: 'Tesorería', icono: IconoTesoreria, iconScale: 'scale-[1.45]' },
         { id: 'validar', label: 'Validar Pagos', icono: IconoValidarPagos, iconScale: 'scale-[1.61]' },
+        { id: 'historial', label: 'Historial de Validaciones', icono: IconoHistorial },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda, iconScale: 'scale-[1.62]' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis },
     ];
@@ -96,6 +98,7 @@ const VistaAdministracion: React.FC = () => {
                 {activeTab === 'resumen' && <VistaDashboard isSubView={true} />}
                 {activeTab === 'tesoreria' && <VistaFinanzas isSubView={true} initialView="diario" />}
                 {activeTab === 'validar' && <PanelValidacionPagos />}
+                {activeTab === 'historial' && <HistorialValidaciones />}
                 {activeTab === 'horarios' && <VistaAgenda />}
                 {activeTab === 'analisis' && <VistaFinanzas isSubView={true} initialView="analitica" />}
             </div>

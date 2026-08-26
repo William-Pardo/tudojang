@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useNotificacion } from '../../context/NotificacionContext';
-import { obtenerReportesPendientes, gestionarReportePago } from '../../servicios/pagosEstudiantesApi';
+import { obtenerReportesPendientes, gestionarReportePago, aprobarReportesEnLote } from '../../servicios/pagosEstudiantesApi';
 import { ReportePagoEstudiante, EstadoValidacion } from '../../tipos';
-import { IconoAprobar, IconoRechazar, IconoUsuario, IconoInformacion, IconoLogoOficial } from '../Iconos';
+import { IconoAprobar, IconoRechazar, IconoUsuario, IconoInformacion, IconoLogoOficial, IconoAlertaTriangulo } from '../Iconos';
 import { formatearPrecio, formatearFecha } from '../../utils/formatters';
+
+const tieneAdvertencias = (reporte: ReportePagoEstudiante) => (reporte.datosIA?.advertencias?.length ?? 0) > 0;
 
 const PanelValidacionPagos: React.FC = () => {
     const { usuario } = useAuth();
@@ -15,6 +17,8 @@ const PanelValidacionPagos: React.FC = () => {
     const [reportes, setReportes] = useState<ReportePagoEstudiante[]>([]);
     const [cargando, setCargando] = useState(true);
     const [procesando, setProcesando] = useState<string | null>(null);
+    const [procesandoLote, setProcesandoLote] = useState(false);
+    const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
     const [imagenAmpliada, setImagenAmpliada] = useState<string | null>(null);
 
     const cargarReportes = async () => {
@@ -39,10 +43,70 @@ const PanelValidacionPagos: React.FC = () => {
             await gestionarReportePago(reporte, nuevoEstado, usuario.id);
             mostrarNotificacion(aprobado ? "Pago aprobado y saldo actualizado." : "Pago rechazado.", aprobado ? "success" : "info");
             setReportes(prev => prev.filter(r => r.id !== reporte.id));
+            setSeleccionados(prev => {
+                const next = new Set(prev);
+                next.delete(reporte.id);
+                return next;
+            });
         } catch (e) {
             mostrarNotificacion("Error al procesar el pago.", "error");
         } finally {
             setProcesando(null);
+        }
+    };
+
+    const toggleSeleccion = (id: string) => {
+        setSeleccionados(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    // "Seleccionar todos" NUNCA arrastra reportes con advertencias -- esos requieren que el
+    // admin los revise y los marque a mano, para no aprobar en lote una discrepancia sin ver.
+    const reportesSeleccionablesEnLote = reportes.filter(r => !tieneAdvertencias(r));
+    const todosSeleccionados = reportesSeleccionablesEnLote.length > 0
+        && reportesSeleccionablesEnLote.every(r => seleccionados.has(r.id));
+
+    const toggleSeleccionarTodos = () => {
+        setSeleccionados(prev => {
+            if (todosSeleccionados) {
+                const next = new Set(prev);
+                reportesSeleccionablesEnLote.forEach(r => next.delete(r.id));
+                return next;
+            }
+            const next = new Set(prev);
+            reportesSeleccionablesEnLote.forEach(r => next.add(r.id));
+            return next;
+        });
+    };
+
+    const handleAprobarSeleccionados = async () => {
+        if (!usuario || seleccionados.size === 0) return;
+        setProcesandoLote(true);
+        try {
+            const reportesAAprobar = reportes.filter(r => seleccionados.has(r.id));
+            const resultado = await aprobarReportesEnLote(reportesAAprobar, usuario.id);
+            if (resultado.exitosos.length > 0) {
+                mostrarNotificacion(`${resultado.exitosos.length} pago(s) aprobado(s) y saldo actualizado.`, "success");
+            }
+            if (resultado.fallidos.length > 0) {
+                mostrarNotificacion(
+                    `${resultado.fallidos.length} reporte(s) no se pudieron aprobar: ${resultado.fallidos.map(f => f.error).join(' | ')}`,
+                    "error"
+                );
+            }
+            setReportes(prev => prev.filter(r => !resultado.exitosos.includes(r.id)));
+            setSeleccionados(prev => {
+                const next = new Set(prev);
+                resultado.exitosos.forEach(id => next.delete(id));
+                return next;
+            });
+        } catch (e) {
+            mostrarNotificacion("Error al procesar la aprobación en lote.", "error");
+        } finally {
+            setProcesandoLote(false);
         }
     };
 
@@ -62,9 +126,35 @@ const PanelValidacionPagos: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            {/* Barra de acción en lote */}
+            <div className="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-white/5 shadow-soft p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={todosSeleccionados}
+                        disabled={reportesSeleccionablesEnLote.length === 0}
+                        onChange={toggleSeleccionarTodos}
+                        className="w-5 h-5 rounded-md accent-tkd-blue"
+                    />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-300">
+                        Seleccionar todos ({reportesSeleccionablesEnLote.length} sin advertencias)
+                    </span>
+                </label>
+                <button
+                    onClick={handleAprobarSeleccionados}
+                    disabled={seleccionados.size === 0 || procesandoLote}
+                    className="py-3 px-6 bg-tkd-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                    {procesandoLote ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <IconoAprobar className="w-4 h-4" />}
+                    Aprobar seleccionados ({seleccionados.size})
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <AnimatePresence>
-                    {reportes.map(reporte => (
+                    {reportes.map(reporte => {
+                        const advertencias = reporte.datosIA?.advertencias ?? [];
+                        return (
                         <motion.div
                             key={reporte.id}
                             layout
@@ -73,10 +163,17 @@ const PanelValidacionPagos: React.FC = () => {
                             exit={{ opacity: 0, x: -50 }}
                             className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-soft overflow-hidden flex flex-col sm:flex-row group transition-all hover:shadow-2xl"
                         >
-                            {/* Visual del Comprobante */}
+                            {/* Selección + Visual del Comprobante */}
                             <div className="w-full sm:w-48 h-64 sm:h-auto bg-gray-100 dark:bg-gray-900 relative cursor-zoom-in" onClick={() => setImagenAmpliada(reporte.comprobanteUrl)}>
                                 <img src={reporte.comprobanteUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Recibo" />
                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-black text-[9px] uppercase tracking-widest transition-opacity">Ver Detalle</div>
+                                <input
+                                    type="checkbox"
+                                    checked={seleccionados.has(reporte.id)}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={() => toggleSeleccion(reporte.id)}
+                                    className="absolute top-4 left-4 w-6 h-6 rounded-lg accent-tkd-blue shadow-lg"
+                                />
                             </div>
 
                             {/* Información del Pago */}
@@ -92,7 +189,7 @@ const PanelValidacionPagos: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Resultados de la IA (Placeholder para el futuro) */}
+                                {/* Resultados de la IA */}
                                 <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
                                     <div className="flex items-center gap-2">
                                         <IconoLogoOficial className="w-4 h-4 text-tkd-blue animate-pulse" />
@@ -115,6 +212,21 @@ const PanelValidacionPagos: React.FC = () => {
                                     )}
                                 </div>
 
+                                {/* Advertencias de la IA (discrepancia de monto, referencia duplicada, etc) */}
+                                {advertencias.length > 0 && (
+                                    <div className="bg-tkd-red/10 border border-tkd-red/30 rounded-2xl p-4 space-y-2">
+                                        <div className="flex items-center gap-2 text-tkd-red">
+                                            <IconoAlertaTriangulo className="w-4 h-4" />
+                                            <p className="text-[9px] font-black uppercase tracking-widest">Advertencias -- revisar antes de aprobar</p>
+                                        </div>
+                                        <ul className="space-y-1 list-disc list-inside">
+                                            {advertencias.map((adv, i) => (
+                                                <li key={i} className="text-[10px] font-bold text-tkd-red/90 leading-snug">{adv}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
                                 {/* Acciones */}
                                 <div className="flex gap-3">
                                     <button
@@ -135,7 +247,8 @@ const PanelValidacionPagos: React.FC = () => {
                                 </div>
                             </div>
                         </motion.div>
-                    ))}
+                        );
+                    })}
                 </AnimatePresence>
             </div>
 

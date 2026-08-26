@@ -6,8 +6,8 @@ import type {
     SensibilidadSoporte,
 } from './tipos';
 
-const VERSION = '1.0.6';
-const VERIFIED_AT = '2026-07-30';
+const VERSION = '1.0.7';
+const VERIFIED_AT = '2026-08-25';
 const OWNER = 'Producto y Soporte Tudojang';
 const DEFAULT_ESCALATION = 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.';
 const AUTH_UI_ONLY = 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.';
@@ -183,10 +183,15 @@ export const CATALOGO_SOPORTE_V1 = {
                 authorizationRef: 'components/FilaEstudiante.tsx#usuario.rol === RolUsuario.Admin',
             }),
         entry('finance.payment-validation', 'finanzas', 'Validación de comprobantes de pago', AEAS, '/',
-            ['validar comprobante', 'aprobar pago reportado', 'rechazar comprobante', 'extraccion de recibo'],
-            ['inspeccionar', 'aprobar', 'rechazar', 'emitir'],
-            ['Abre la bandeja de validación de pagos.', 'Compara comprobante, extracción y datos del estudiante.', 'Aprueba o rechaza según la evidencia.'],
-            ['components/Pagos/PanelValidacionPagos.tsx'], { sensitivity: 'privileged' }),
+            ['validar comprobante', 'aprobar pago reportado', 'rechazar comprobante', 'extraccion de recibo', 'aprobar pagos en lote', 'seleccionar varios comprobantes', 'referencia duplicada', 'comprobante repetido', 'advertencia de la ia'],
+            ['inspeccionar', 'aprobar', 'rechazar', 'emitir', 'seleccionar'],
+            ['Abre la bandeja de validación de pagos.', 'Compara comprobante, extracción de la IA y datos del estudiante; revisa cualquier advertencia (discrepancia de monto o referencia duplicada) antes de decidir.', 'Aprueba o rechaza uno a uno, o selecciona varios sin advertencias y usa Aprobar Seleccionados para procesarlos en lote.'],
+            ['components/Pagos/PanelValidacionPagos.tsx', 'servicios/pagosEstudiantesApi.ts'], { sensitivity: 'privileged' }),
+        entry('finance.payment-validation-history', 'finanzas', 'Historial de pagos validados', AEAS, '/',
+            ['historial de pagos', 'quien pago', 'conciliacion de pagos', 'exportar pagos validados', 'pagos aprobados y rechazados'],
+            ['consultar', 'exportar', 'filtrar'],
+            ['Abre Administración > Historial de Validaciones.', 'Revisa estudiante, tutor, monto, canal y estado de cada pago ya resuelto.', 'Exporta el historial a CSV si necesitas conciliarlo contra tus canales de cobro (Nequi, Daviplata, Bre-B, etc).'],
+            ['components/Pagos/HistorialValidaciones.tsx'], { sensitivity: 'privileged' }),
         entry('students.directory', 'estudiantes', 'Directorio de estudiantes', AEA, '/estudiantes',
             ['buscar estudiante', 'directorio de alumnos', 'ficha tecnica', 'datos de pago estudiante'],
             ['buscar', 'filtrar', 'consultar', 'paginar'],
@@ -366,6 +371,12 @@ export const CATALOGO_SOPORTE_V1 = {
             ['consultar', 'abrir', 'escanear'],
             ['Abre Mi Perfil.', 'Consulta las horas trabajadas.', 'Si eres Tutor, abre el escáner QR personal.'],
             ['vistas/MiPerfil.tsx'], { sensitivity: 'sensitive' }),
+        entry('profile.payment-report', 'perfil', 'Reportar pago con comprobante (Tutor)', ['Tutor'], '/mi-perfil',
+            ['reportar pago', 'subir comprobante', 'adjuntar comprobante de pago', 'ya pague la mensualidad', 'informar transferencia', 'pague por nequi', 'pague por daviplata'],
+            ['adjuntar', 'reportar', 'enviar'],
+            ['Abre Mi Perfil.', 'Revisa el saldo adeudado del estudiante y los medios de pago disponibles (Nequi, Daviplata, Bre-B, banco).', 'Adjunta el screenshot del comprobante, confirma el monto transferido y pulsa Reportar Pago Ahora; el Sabonim lo valida y llega el recibo por WhatsApp.'],
+            ['vistas/MiPerfil.tsx', 'components/Pagos/ReportarPagoTutor.tsx', 'servicios/pagosEstudiantesApi.ts'],
+            { sensitivity: 'sensitive', negativeTerms: ['validar comprobante', 'aprobar pago reportado', 'aprobar pagos en lote'] }),
         entry('license.renew', 'licencia', 'Renovación de licencia suspendida', AUTH, '/renovar-licencia',
             ['licencia suspendida', 'renovar suscripcion', 'pagar licencia', 'contactar soporte licencia'],
             ['consultar', 'renovar', 'pagar', 'contactar'],

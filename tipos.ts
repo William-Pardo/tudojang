@@ -580,11 +580,18 @@ export interface ReportePagoEstudiante {
         referencia?: string;
         montoExtraido?: number;
         fechaExtraida?: string;
+        // Ya la devuelve la Cloud Function (functions/index.js::analizarComprobanteEstudiante,
+        // prompt de Gemini) pero faltaba en el tipo -- el campo se guardaba en Firestore sin
+        // que TypeScript lo conociera.
+        entidad?: string;
         confianza?: number;
         advertencias?: string[];
     };
     observaciones?: string;
     validadoPor?: string; // ID del usuario que aprobó
     fechaValidacion?: string;
+    // Vincula el reporte a la cuenta autenticada del tutor que lo envió (flujo con login).
+    // Ausente en reportes creados por el link público /reportar-pago (sin sesión).
+    tutorUsuarioId?: string;
 }
 

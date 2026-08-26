@@ -16,7 +16,7 @@ import {
     IconoContrato, IconoCasa, IconoCampana
 } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
-import MediosPagoResumen from '../components/MediosPagoResumen';
+import ReportarPagoTutor from '../components/Pagos/ReportarPagoTutor';
 
 const VistaMiPerfil: React.FC = () => {
     const { usuario } = useAuth();
@@ -27,7 +27,6 @@ const VistaMiPerfil: React.FC = () => {
 
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
     const [estudianteVinculado, setEstudianteVinculado] = useState<Estudiante | null>(null);
-    const [cargandoEstudiante, setCargandoEstudiante] = useState(false);
 
     const esTutorOperativo = usuario?.rol === RolUsuario.Tutor;
 
@@ -37,7 +36,6 @@ const VistaMiPerfil: React.FC = () => {
     // (estadoPago/saldoDeudor/historialPagos), así que no se re-consulta por id.
     useEffect(() => {
         if (esTutorOperativo && usuario?.tenantId && usuario?.email) {
-            setCargandoEstudiante(true);
             (async () => {
                 try {
                     const estudiantesVinculados = await resolveLinkedStudent(usuario.tenantId, usuario.email);
@@ -46,8 +44,6 @@ const VistaMiPerfil: React.FC = () => {
                     }
                 } catch (err) {
                     console.error('Error cargando estudiante vinculado:', err);
-                } finally {
-                    setCargandoEstudiante(false);
                 }
             })();
         }
@@ -284,51 +280,16 @@ const VistaMiPerfil: React.FC = () => {
                             </div>
                         </section>
                     ) : (
-                        <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
-                            <div className="p-8 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-500/10 text-green-600 rounded-xl shadow-inner"><IconoAprobar className="w-5 h-5" /></div>
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Estado de Pago del Estudiante</h2>
-                                </div>
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-3 px-2">
+                                <div className="p-2 bg-green-500/10 text-green-600 rounded-xl shadow-inner"><IconoAprobar className="w-5 h-5" /></div>
+                                <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Estado de Pago y Reporte de Comprobante</h2>
                             </div>
-                            {cargandoEstudiante ? (
-                                <div className="p-8 text-center text-gray-400">
-                                    <p className="text-sm">Cargando información del estudiante...</p>
-                                </div>
-                            ) : estudianteVinculado ? (
-                                <div className="p-8 grid grid-cols-1 gap-6">
-                                    <div className="group bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-800">
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-start">
-                                                <p className="text-[10px] font-black text-tkd-blue uppercase tracking-widest">Saldo Adeudado</p>
-                                                <LogoDinamico className="w-6 h-6 opacity-20" />
-                                            </div>
-                                            <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">{formatearPrecio(estudianteVinculado.saldoDeudor || 0)}</p>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Estado: <span className={`${
-                                                estudianteVinculado.estadoPago === 'Al día' ? 'text-green-600' :
-                                                estudianteVinculado.estadoPago === 'Pendiente' ? 'text-orange-600' :
-                                                'text-red-600'
-                                            }`}>{estudianteVinculado.estadoPago}</span></p>
-                                        </div>
-                                    </div>
-                                    {(estudianteVinculado.saldoDeudor || 0) > 0 &&
-                                        (configClub?.pagoNequi || configClub?.pagoDaviplata || configClub?.pagoBreB || configClub?.pagoBanco) && (
-                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-800 space-y-3">
-                                            <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Medios de Pago Disponibles</p>
-                                            <MediosPagoResumen
-                                                pagoNequi={configClub?.pagoNequi}
-                                                pagoDaviplata={configClub?.pagoDaviplata}
-                                                pagoBreB={configClub?.pagoBreB}
-                                                pagoBanco={configClub?.pagoBanco}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="p-8 text-center text-gray-400">
-                                    <p className="text-sm">No hay información de estudiante vinculado.</p>
-                                </div>
-                            )}
+                            {/* ReportarPagoTutor resuelve el/los estudiante(s) del tutor por su cuenta
+                                (mismo resolver que ya usa esta vista arriba para los documentos) --
+                                reemplaza al bloque estatico de saldo/medios de pago porque ya incluye
+                                esa misma informacion mas la carga del comprobante. */}
+                            <ReportarPagoTutor />
                         </section>
                     )}
                 </div>
