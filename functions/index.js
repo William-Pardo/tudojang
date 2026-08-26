@@ -8,6 +8,7 @@ const { manejarRequest } = require("./http");
 const { enviarCorreo } = require("./email");
 const { verificarFirmaEventoWompi } = require("./wompi");
 const { crearServicioFirmaCheckoutWompi } = require("./wompiIntegrity");
+const { construirAdvertenciaReferenciaDuplicada } = require("./deteccionDuplicadosPago");
 const {
   crearServicioCrearFuentePagoWompi,
   crearServicioCobroAutomaticoMensual,
@@ -1340,6 +1341,8 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
       // 5b. Detectar comprobante duplicado: misma referencia ya usada en un pago APROBADO.
       // Solo compara contra Aprobado (no Pendiente/ValidadoIA) porque en ese punto es el
       // único estado que confirma que el dinero ya fue acreditado a un estudiante.
+      // La decisión (¿hay o no duplicado, y qué texto arma?) vive en
+      // deteccionDuplicadosPago.js -- pura, testeada sin mockear Firestore.
       if (extractedData.referencia) {
         const dupSnap = await admin.firestore()
           .collection('reportes_pagos_estudiantes')
@@ -1347,9 +1350,9 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
           .where('datosIA.referencia', '==', extractedData.referencia)
           .where('estado', '==', 'Aprobado')
           .get();
-        const duplicado = dupSnap.docs.find((d) => d.id !== reporteId);
-        if (duplicado) {
-          advertencias.push(`Referencia duplicada: ya existe un pago APROBADO (reporte ${duplicado.id}) con esta misma referencia.`);
+        const advertenciaDuplicado = construirAdvertenciaReferenciaDuplicada(extractedData.referencia, dupSnap.docs, reporteId);
+        if (advertenciaDuplicado) {
+          advertencias.push(advertenciaDuplicado);
         }
       }
 
