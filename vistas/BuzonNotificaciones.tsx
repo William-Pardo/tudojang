@@ -3,6 +3,7 @@
 // Fix tutor-role-end-to-end (2026-07-14): el consultor recibe en cola las notificaciones de
 // su(s) estudiante(s) (pagos, avances, eventos, bienvenida...) y las lee acá.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { RolUsuario, TipoNotificacion, type NotificacionHistorial } from '../tipos';
 import { formatearFecha } from '../utils/formatters';
@@ -45,6 +46,7 @@ export const soporteMeta: MarcadorSoporte[] = [
 const VistaBuzonNotificaciones: React.FC = () => {
     const { usuario } = useAuth();
     const { configClub } = useConfiguracion();
+    const navigate = useNavigate();
     const [notificaciones, setNotificaciones] = useState<NotificacionHistorial[]>([]);
     const [cargando, setCargando] = useState(true);
 
@@ -104,16 +106,31 @@ const VistaBuzonNotificaciones: React.FC = () => {
                 </div>
             </header>
 
-            {tienePagoPendiente &&
-                (configClub?.pagoNequi || configClub?.pagoDaviplata || configClub?.pagoBreB || configClub?.pagoBanco) && (
-                <div className="rounded-[2rem] border border-amber-100 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 p-6 space-y-3">
-                    <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-widest">Medios de Pago Disponibles</p>
-                    <MediosPagoResumen
-                        pagoNequi={configClub?.pagoNequi}
-                        pagoDaviplata={configClub?.pagoDaviplata}
-                        pagoBreB={configClub?.pagoBreB}
-                        pagoBanco={configClub?.pagoBanco}
-                    />
+            {/* Cierra el circuito avisar -> pagar -> reportar. El panel ya mostraba CÓMO pagar
+                pero terminaba ahí: el tutor no sabía DÓNDE reportar el comprobante (el módulo
+                vive en /mi-perfil) y tenía que salir a buscarlo. La lista de medios sigue
+                condicionada a que el tenant tenga alguno configurado, pero el CTA NO: "ya pagué,
+                quiero reportarlo" es válido sin importar cómo pagó (efectivo, transferencia
+                manual, link) -- antes, un tenant sin medios cargados dejaba al tutor sin nada. */}
+            {tienePagoPendiente && (
+                <div className="rounded-[2rem] border border-amber-100 dark:border-amber-800/30 bg-amber-50 dark:bg-amber-900/10 p-6 space-y-4">
+                    {(configClub?.pagoNequi || configClub?.pagoDaviplata || configClub?.pagoBreB || configClub?.pagoBanco) && (
+                        <div className="space-y-3">
+                            <p className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400 tracking-widest">Medios de Pago Disponibles</p>
+                            <MediosPagoResumen
+                                pagoNequi={configClub?.pagoNequi}
+                                pagoDaviplata={configClub?.pagoDaviplata}
+                                pagoBreB={configClub?.pagoBreB}
+                                pagoBanco={configClub?.pagoBanco}
+                            />
+                        </div>
+                    )}
+                    <button
+                        onClick={() => navigate('/mi-perfil')}
+                        className="w-full py-4 bg-tkd-blue text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-blue-800 transition-all active:scale-95"
+                    >
+                        Ya pagué: reportar comprobante
+                    </button>
                 </div>
             )}
 
