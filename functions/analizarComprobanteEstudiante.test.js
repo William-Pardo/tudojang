@@ -169,3 +169,36 @@ test('ERR-0017/D2 regression comment documents the sentinel write above the guar
   assert.notEqual(posGuard, -1, 'comprobanteUrl guard not found in index.js');
   assert.ok(posSentinel < posGuard, 'the admin-facing sentinel write must be placed ABOVE the comprobanteUrl guard');
 });
+
+// El sentinel vive DUPLICADO a proposito: functions/ es un paquete separado y no puede
+// importar constantes.ts del frontend (sin bundler compartido). Esa duplicacion solo es
+// segura si algo falla ruidosamente cuando alguien cambia un lado y olvida el otro --
+// sin este test, desincronizarlos rompe el aislamiento del buzon del tutor EN SILENCIO
+// (el aviso admin pasaria a colarse en la bandeja de la familia).
+test('D1: el sentinel de index.js coincide EXACTAMENTE con SENTINEL_NOTIFICACION_ADMIN de constantes.ts', () => {
+  const constantesSource = fs.readFileSync(
+    path.join(__dirname, '..', 'constantes.ts'),
+    'utf8'
+  );
+
+  const enConstantes = constantesSource.match(
+    /export const SENTINEL_NOTIFICACION_ADMIN\s*=\s*'([^']+)'/
+  );
+  assert.ok(
+    enConstantes,
+    'no se encontro `export const SENTINEL_NOTIFICACION_ADMIN = \'...\'` en constantes.ts'
+  );
+
+  const enTrigger = source.match(/estudianteId:\s*'([^']+)'/);
+  assert.ok(
+    enTrigger,
+    "no se encontro la escritura `estudianteId: '...'` del aviso admin en index.js"
+  );
+
+  assert.equal(
+    enTrigger[1],
+    enConstantes[1],
+    `sentinel desincronizado: index.js usa '${enTrigger[1]}' pero constantes.ts declara '${enConstantes[1]}'. ` +
+      'Ambos DEBEN coincidir o el aviso admin se filtra al buzon del tutor.'
+  );
+});
