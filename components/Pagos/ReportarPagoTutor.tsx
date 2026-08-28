@@ -114,7 +114,10 @@ const ReportarPagoTutor: React.FC = () => {
                         <h2 className="text-2xl font-black uppercase tracking-tighter text-tkd-dark dark:text-white">¡Reporte Enviado!</h2>
                         <p className="text-gray-500 font-bold uppercase text-[9px] tracking-widest leading-relaxed">
                             El Sabonim verificará tu pago. <br />
-                            <span className="text-tkd-blue">Recibirás tu recibo oficial por WhatsApp en breve.</span>
+                            {/* SDD notificaciones-pagos (Requirement "Honest Success Copy", spec.md):
+                                Fase A es solo in-app -- ya no se promete un WhatsApp automático
+                                que el sistema nunca envía. */}
+                            <span className="text-tkd-blue">Te avisaremos en tu buzón de la app cuando lo validemos.</span>
                         </p>
                         <button
                             onClick={() => { setExito(false); setImagen(null); }}

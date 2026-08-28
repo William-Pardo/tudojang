@@ -133,3 +133,14 @@ export const DOMINIOS_PASARELAS_PAGO_PERMITIDOS = [
     'secure.payco.co',
 ];
 
+// SDD notificaciones-pagos (D1 design.md): estudianteId reservado para la notificacion
+// admin-facing de `historialNotificaciones` (ComprobantePagoAdmin), escrita por la Cloud
+// Function analizarComprobanteEstudiante (functions/index.js) cuando un tutor/publico
+// reporta un pago. Nunca coincide con el id real de un Estudiante (20 chars sin guiones
+// bajos en un auto-id de Firestore) -- por eso obtenerNotificacionesPorEstudiantes(ids,...)
+// (buzon del tutor, `estudianteId in ids`) jamas la devuelve. Solo obtenerHistorialNotificaciones
+// (buzon del Admin, sin filtro de estudianteId) la lee. IMPORTANTE: functions/index.js NO
+// puede importar este modulo (paquete separado, sin bundler compartido) -- el valor esta
+// duplicado ahi como literal con un comentario de referencia cruzada a esta constante.
+export const SENTINEL_NOTIFICACION_ADMIN = '__admin__';
+

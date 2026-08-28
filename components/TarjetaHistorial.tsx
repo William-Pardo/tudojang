@@ -1,7 +1,7 @@
 // components/TarjetaHistorial.tsx
 import React, { useState } from 'react';
 import type { NotificacionHistorial } from '../tipos';
-import { IconoWhatsApp, IconoEmail, IconoAprobar } from './Iconos';
+import { IconoWhatsApp, IconoEmail, IconoCampana, IconoAprobar } from './Iconos';
 
 interface Props {
     item: NotificacionHistorial;
@@ -28,7 +28,12 @@ const TarjetaHistorial: React.FC<Props> = ({ item, onMarcarLeida }) => {
                     </p>
                 </div>
                 <div className="flex items-center space-x-2 flex-shrink-0">
-                    {item.canal === 'WhatsApp' ? <IconoWhatsApp className="w-6 h-6 text-green-500" /> : <IconoEmail className="w-6 h-6 text-blue-500" />}
+                    {/* SDD notificaciones-pagos (blast radius del canal, design.md): antes,
+                        cualquier canal distinto de 'WhatsApp' caía en el icono de Email --
+                        silenciosamente equivocado para el nuevo 'InApp'. Rama explícita. */}
+                    {item.canal === 'WhatsApp' && <IconoWhatsApp className="w-6 h-6 text-green-500" />}
+                    {item.canal === 'Email' && <IconoEmail className="w-6 h-6 text-blue-500" />}
+                    {item.canal === 'InApp' && <IconoCampana className="w-6 h-6 text-tkd-blue" />}
                     {!item.leida && (
                         <button 
                             onClick={() => onMarcarLeida(item.id)}
