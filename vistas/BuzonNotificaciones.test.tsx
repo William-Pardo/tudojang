@@ -1,6 +1,7 @@
 // vistas/BuzonNotificaciones.test.tsx
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import VistaBuzonNotificaciones from './BuzonNotificaciones';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +28,11 @@ jest.mock('../servicios/academico/tutorStudentResolver', () => ({
 jest.mock('../servicios/notificacionesApi', () => ({
     obtenerNotificacionesPorEstudiantes: jest.fn(),
     marcarNotificacionComoLeida: jest.fn(),
+}));
+
+const navigateMock = jest.fn();
+jest.mock('react-router-dom', () => ({
+    useNavigate: () => navigateMock,
 }));
 
 const useAuthMock = useAuth as jest.Mock;
@@ -114,5 +120,65 @@ describe('VistaBuzonNotificaciones', () => {
             expect(screen.getByText('Tu pago está por vencer')).toBeInTheDocument();
         });
         expect(screen.queryByText('Medios de Pago Disponibles')).not.toBeInTheDocument();
+    });
+
+    // El buzón ya detectaba el pago pendiente y mostraba CÓMO pagar, pero terminaba ahí: el
+    // tutor no sabía DÓNDE reportar el comprobante después (el módulo vive en /mi-perfil) y
+    // tenía que salir a buscarlo. Este CTA cierra el circuito avisar -> pagar -> reportar.
+    describe('CTA de reporte de comprobante', () => {
+        const textoCta = /Ya pagué: reportar comprobante/i;
+
+        it('ofrece el CTA cuando hay un recordatorio de pago', async () => {
+            useConfiguracionMock.mockReturnValue({ configClub: { pagoNequi: '300 111 2222' } });
+            obtenerNotificacionesPorEstudiantesMock.mockResolvedValue([
+                crearNotificacion({ tipo: TipoNotificacion.RecordatorioPago }),
+            ]);
+
+            render(<VistaBuzonNotificaciones />);
+
+            expect(await screen.findByRole('button', { name: textoCta })).toBeInTheDocument();
+        });
+
+        // R2: la acción "ya pagué, quiero reportarlo" es válida sin importar CÓMO pagó
+        // (efectivo, transferencia manual, link). Antes todo el panel se condicionaba a que
+        // el tenant tuviera medios configurados, así que este tutor no veía absolutamente nada.
+        it('ofrece el CTA aunque el tenant no tenga ningún medio de pago configurado', async () => {
+            useConfiguracionMock.mockReturnValue({
+                configClub: { pagoNequi: '', pagoDaviplata: '', pagoBreB: '', pagoBanco: '' },
+            });
+            obtenerNotificacionesPorEstudiantesMock.mockResolvedValue([
+                crearNotificacion({ tipo: TipoNotificacion.AvisoVencimiento, mensaje: 'Tu pago está por vencer' }),
+            ]);
+
+            render(<VistaBuzonNotificaciones />);
+
+            expect(await screen.findByRole('button', { name: textoCta })).toBeInTheDocument();
+            expect(screen.queryByText('Medios de Pago Disponibles')).not.toBeInTheDocument();
+        });
+
+        it('no ofrece el CTA cuando ninguna notificación es de pago', async () => {
+            useConfiguracionMock.mockReturnValue({ configClub: { pagoNequi: '300 111 2222' } });
+            obtenerNotificacionesPorEstudiantesMock.mockResolvedValue([
+                crearNotificacion({ tipo: TipoNotificacion.AvanceAcademico, mensaje: 'Avance académico' }),
+            ]);
+
+            render(<VistaBuzonNotificaciones />);
+
+            await waitFor(() => expect(screen.getByText('Avance académico')).toBeInTheDocument());
+            expect(screen.queryByRole('button', { name: textoCta })).not.toBeInTheDocument();
+        });
+
+        it('lleva a /mi-perfil, donde vive el módulo de reporte', async () => {
+            useConfiguracionMock.mockReturnValue({ configClub: { pagoNequi: '300 111 2222' } });
+            obtenerNotificacionesPorEstudiantesMock.mockResolvedValue([
+                crearNotificacion({ tipo: TipoNotificacion.RecordatorioPago }),
+            ]);
+            const user = userEvent.setup();
+
+            render(<VistaBuzonNotificaciones />);
+            await user.click(await screen.findByRole('button', { name: textoCta }));
+
+            expect(navigateMock).toHaveBeenCalledWith('/mi-perfil');
+        });
     });
 });
