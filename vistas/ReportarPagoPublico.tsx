@@ -107,8 +107,12 @@ const ReportarPagoPublico: React.FC = () => {
                             </div>
                             <h2 className="text-2xl font-black uppercase tracking-tighter text-tkd-dark dark:text-white">¡Reporte Enviado!</h2>
                             <p className="text-gray-500 font-bold uppercase text-[9px] tracking-widest leading-relaxed">
-                                El Sabonim verificará tu pago. <br />
-                                <span className="text-tkd-blue">Recibirás tu recibo oficial por WhatsApp en breve.</span>
+                                {/* SDD notificaciones-pagos (design.md, File Changes -> ReportarPagoPublico.tsx:111):
+                                    este flujo público (link sin login) no tiene buzón in-app --
+                                    copia neutra, sin prometer WhatsApp y SIN referenciar un
+                                    buzón que este flujo no puede mostrar. */}
+                                El Sabonim verificará tu pago pronto. <br />
+                                <span className="text-tkd-blue">Contactá a la academia si tenés dudas sobre el estado.</span>
                             </p>
                         </motion.div>
                     ) : (

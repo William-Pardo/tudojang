@@ -12,6 +12,9 @@ jest.mock('./Iconos', () => ({
   IconoEmail: ({ className }: { className?: string }) => (
     <svg data-testid="email-icon" className={className} />
   ),
+  IconoCampana: ({ className }: { className?: string }) => (
+    <svg data-testid="campana-icon" className={className} />
+  ),
   IconoAprobar: ({ className }: { className?: string }) => (
     <svg data-testid="approve-icon" className={className} />
   ),
@@ -52,6 +55,22 @@ describe('TarjetaHistorial', () => {
     expect(markButton).toContainElement(screen.getByTestId('approve-icon'));
     await user.click(markButton);
     expect(onMarcarLeida).toHaveBeenCalledWith('notification-1');
+  });
+
+  // SDD notificaciones-pagos (5.1 tasks.md / blast radius canal en design.md): antes de este
+  // fix, `canal === 'WhatsApp' ? WA : Email` mostraba el icono de Email para CUALQUIER canal
+  // que no fuera WhatsApp -- incluido el nuevo 'InApp', silenciosamente equivocado.
+  it('renders an InApp notification with its own distinct icon (not WhatsApp, not Email)', () => {
+    render(
+      <TarjetaHistorial
+        item={{ ...baseItem, canal: 'InApp' }}
+        onMarcarLeida={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('campana-icon')).toBeInTheDocument();
+    expect(screen.queryByTestId('whatsapp-icon')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('email-icon')).not.toBeInTheDocument();
   });
 
   it('renders a read Email notification without the mark-as-read action', () => {
