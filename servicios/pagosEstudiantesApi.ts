@@ -22,7 +22,14 @@ const reportesCollection = collection(db, 'reportes_pagos_estudiantes');
  */
 export const obtenerEstudiantesDelTutor = async (tenantId: string, correoTutor: string): Promise<Estudiante[]> => {
     const estudiantes = await resolveLinkedStudent(tenantId, correoTutor);
-    return estudiantes.filter(e => e.estadoMatricula === 'activo');
+    // ERR-0019: se excluye solo al RETIRADO explícito, nunca `!== 'activo'`. `estadoMatricula`
+    // lo introdujo el cambio pricing-cupo-real, así que ningún estudiante dado de alta antes
+    // tiene el campo: un filtro `=== 'activo'` los descartaba en silencio y su tutor veía
+    // "Sin Estudiantes Vinculados" para siempre, sin poder reportar un pago. Ausente significa
+    // que nunca se lo retiró (retirarEstudiante, servicios/estudiantesApi.ts, es el único
+    // writer de 'retirado'), así que cuenta como activo -- mismo criterio que ERR-0015 aplicó
+    // a los estudiantes legacy sin `carnetGenerado`.
+    return estudiantes.filter(e => e.estadoMatricula !== 'retirado');
 };
 
 /**

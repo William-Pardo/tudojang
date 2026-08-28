@@ -273,6 +273,22 @@ describe('obtenerEstudiantesDelTutor', () => {
     expect(where).toHaveBeenCalledWith('tutor.correo', '==', 'tutor@correo.com');
     expect(res).toEqual([{ id: 'e1', tenantId: 'tenant-1', estadoMatricula: 'activo', nombres: 'Ana' }]);
   });
+
+  // ERR-0019: `estadoMatricula` lo introdujo el cambio pricing-cupo-real; TODO estudiante
+  // dado de alta antes NO tiene el campo. Un filtro `=== 'activo'` los descarta en silencio
+  // y su tutor ve "Sin Estudiantes Vinculados" -- no puede reportar un pago nunca. Ausente
+  // significa que nunca se lo retiró (retirarEstudiante es el único writer de 'retirado'),
+  // así que cuenta como activo. Mismo criterio que el fix de carnets legacy (ERR-0015).
+  it('incluye al estudiante legacy que no tiene el campo estadoMatricula (ausente = activo)', async () => {
+    (getDocs as jest.Mock).mockResolvedValue({
+      docs: [
+        { id: 'legacy', data: () => ({ tenantId: 'tenant-1', nombres: 'Samuel' }) },
+        { id: 'retirado', data: () => ({ tenantId: 'tenant-1', estadoMatricula: 'retirado', nombres: 'Luis' }) },
+      ],
+    });
+    const res = await obtenerEstudiantesDelTutor('tenant-1', 'tutor@correo.com');
+    expect(res).toEqual([{ id: 'legacy', tenantId: 'tenant-1', nombres: 'Samuel' }]);
+  });
 });
 
 describe('buscarReferenciaDuplicada', () => {
