@@ -226,6 +226,37 @@ describe('gestionarReportePago — notificación al tutor (R2/R3/R4/R5, D4/D5 de
     await gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin-1');
     expect(obtenerEstudiantePorId).toHaveBeenCalledTimes(1);
   });
+
+  // El rechazo recorre una rama distinta a la aprobación (resuelve el estudiante DENTRO del
+  // try/catch de notificación, no antes) -- que la aprobación tolere el fallo no prueba que
+  // el rechazo también lo haga.
+  it('un fallo al notificar tampoco tumba el RECHAZO -- el reporte igual queda marcado Rechazado', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+    });
+    (guardarNotificacionEnHistorial as jest.Mock).mockRejectedValueOnce(new Error('permission-denied'));
+
+    await expect(gestionarReportePago(reporte, EstadoValidacion.Rechazado, 'admin-1')).resolves.toBeUndefined();
+    expect(updateDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      estado: EstadoValidacion.Rechazado,
+    }));
+  });
+
+  // Frontera del lote: aprobarReportesEnLote usa Promise.allSettled, así que un throw que
+  // escapara del try/catch de notificación marcaría ese reporte como fallido aunque el pago
+  // sí se hubiera acreditado -- el admin vería un falso negativo y podría re-aprobarlo.
+  it('un fallo al notificar no marca el reporte como fallido en la aprobación en lote', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+    });
+    (getDocs as jest.Mock).mockResolvedValue({ docs: [] });
+    (guardarNotificacionEnHistorial as jest.Mock).mockRejectedValue(new Error('permission-denied'));
+
+    const resultado = await aprobarReportesEnLote([reporte], 'admin-1');
+
+    expect(resultado.exitosos).toEqual(['rep-1']);
+    expect(resultado.fallidos).toEqual([]);
+  });
 });
 
 describe('obtenerEstudiantesDelTutor', () => {
