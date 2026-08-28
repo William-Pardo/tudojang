@@ -1,8 +1,9 @@
 import { doc, getDocs, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadString } from 'firebase/storage';
-import { EstadoPago, EstadoValidacion } from '../tipos';
+import { EstadoPago, EstadoValidacion, TipoNotificacion } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
+import { guardarNotificacionEnHistorial } from './notificacionesApi';
 import {
   aprobarReportesEnLote,
   buscarReferenciaDuplicada,
@@ -25,6 +26,7 @@ jest.mock('firebase/storage', () => ({
 jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
 jest.mock('./estudiantesApi', () => ({ obtenerEstudiantePorId: jest.fn() }));
 jest.mock('./finanzasApi', () => ({ agregarMovimiento: jest.fn() }));
+jest.mock('./notificacionesApi', () => ({ guardarNotificacionEnHistorial: jest.fn() }));
 
 const reporte: any = {
   id: 'rep-1', tenantId: 'tenant-1', estudianteId: 'est-1', estudianteNombre: 'Ana',
@@ -125,8 +127,12 @@ describe('pagosEstudiantesApi', () => {
   });
 
   it('rechaza sin modificar estudiante ni finanzas', async () => {
+    // D5 (design.md): rechazar YA NO deja obtenerEstudiantePorId sin llamar -- el paso 7
+    // (notificación al tutor, best-effort) lo necesita para resolver destinatario/tutorNombre,
+    // porque el camino de rechazo nunca hizo esa lectura antes (a diferencia de aprobar).
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({ correo: 'ana@correo.com' });
     await gestionarReportePago(reporte, EstadoValidacion.Rechazado, 'admin');
-    expect(obtenerEstudiantePorId).not.toHaveBeenCalled();
+    expect(obtenerEstudiantePorId).toHaveBeenCalledTimes(1);
     expect(agregarMovimiento).not.toHaveBeenCalled();
     expect(updateDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       estado: EstadoValidacion.Rechazado, observaciones: '',
@@ -140,6 +146,85 @@ describe('pagosEstudiantesApi', () => {
     (updateDoc as jest.Mock).mockResolvedValue(undefined);
     (agregarMovimiento as jest.Mock).mockRejectedValueOnce(new Error('Registro financiero falló'));
     await expect(gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin')).rejects.toThrow('Registro financiero falló');
+  });
+});
+
+// SDD notificaciones-pagos (R2/R3/R4/R5, D4/D5 design.md): notificación tutor-facing al
+// resolver un reporte -- escrita cliente-side (a diferencia del aviso admin-facing, que va
+// desde la Cloud Function per D2) porque quien llama a gestionarReportePago siempre es un
+// Admin autenticado (isInstructor() en firestore.rules), así que la regla de creación de
+// historialNotificaciones lo permite directamente.
+describe('gestionarReportePago — notificación al tutor (R2/R3/R4/R5, D4/D5 design.md)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (updateDoc as jest.Mock).mockResolvedValue(undefined);
+    (agregarMovimiento as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it('al aprobar, escribe PagoAprobado con estudianteId real, canal InApp, el monto y destinatario/tutorNombre desde Estudiante.tutor', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+      tutor: { nombres: 'Carlos', apellidos: 'Gómez', correo: 'carlos@correo.com' },
+    });
+    await gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin-1');
+
+    expect(guardarNotificacionEnHistorial).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: reporte.tenantId,
+      estudianteId: reporte.estudianteId,
+      canal: 'InApp',
+      tipo: TipoNotificacion.PagoAprobado,
+      tutorNombre: 'Carlos Gómez',
+      destinatario: 'carlos@correo.com',
+      leida: false,
+    }));
+    const mensaje = (guardarNotificacionEnHistorial as jest.Mock).mock.calls[0][0].mensaje;
+    expect(mensaje).toMatch(/40/); // reporte.montoInformado del fixture compartido
+  });
+
+  it('al aprobar sin Estudiante.tutor, cae a est.correo con tutorNombre vacío -- nunca queda sin destinatario', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+      correo: 'fallback@correo.com',
+    });
+    await gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin-1');
+
+    expect(guardarNotificacionEnHistorial).toHaveBeenCalledWith(expect.objectContaining({
+      tutorNombre: '',
+      destinatario: 'fallback@correo.com',
+    }));
+  });
+
+  it('al rechazar, escribe PagoRechazado con el mensaje neutro fijo -- NUNCA usa observaciones', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({ correo: 'ana@correo.com' });
+    await gestionarReportePago(reporte, EstadoValidacion.Rechazado, 'admin-1', 'foto ilegible, rechazado');
+
+    expect(guardarNotificacionEnHistorial).toHaveBeenCalledWith(expect.objectContaining({
+      tipo: TipoNotificacion.PagoRechazado,
+      mensaje: 'Tu comprobante no pudo validarse. Contactá a la academia para más información.',
+    }));
+    const mensaje = (guardarNotificacionEnHistorial as jest.Mock).mock.calls[0][0].mensaje;
+    expect(mensaje).not.toMatch(/foto ilegible/);
+  });
+
+  it('un fallo al escribir la notificación NO tumba la operación de pago -- la aprobación sigue resolviendo', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+    });
+    (guardarNotificacionEnHistorial as jest.Mock).mockRejectedValueOnce(new Error('permission-denied'));
+
+    await expect(gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin-1')).resolves.toBeUndefined();
+    // el saldo/finanzas ya se habían confirmado ANTES del try/catch de notificación (D4) --
+    // el fallo de notificación no debe revertirlos ni impedir que se hayan llamado.
+    expect(updateDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ saldoDeudor: 60 }));
+    expect(agregarMovimiento).toHaveBeenCalled();
+  });
+
+  it('la aprobación NO hace una segunda lectura de estudiante para la notificación -- reutiliza la del paso 1 (D5)', async () => {
+    (obtenerEstudiantePorId as jest.Mock).mockResolvedValue({
+      saldoDeudor: 100, estadoPago: EstadoPago.Pendiente, historialPagos: [], sedeId: 's1',
+    });
+    await gestionarReportePago(reporte, EstadoValidacion.Aprobado, 'admin-1');
+    expect(obtenerEstudiantePorId).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -1284,6 +1284,33 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
     const data = snap.data();
     const reporteId = context.params.reporteId;
 
+    // SDD notificaciones-pagos (D1/D2/D6 design.md): aviso admin-facing en el buzón interno
+    // (historialNotificaciones), con `estudianteId: '__admin__'` -- el SENTINEL_NOTIFICACION_ADMIN
+    // de constantes.ts, DUPLICADO acá como literal porque functions/ es un paquete separado
+    // sin bundler compartido con el frontend (sincronizar ambos si cambia). Ese id sentinel
+    // nunca coincide con un Estudiante real, así que obtenerNotificacionesPorEstudiantes(ids,...)
+    // (buzón del tutor, `estudianteId in ids`) jamás lo devuelve -- solo lo lee el Admin vía
+    // obtenerHistorialNotificaciones (sin filtro de estudianteId). Va ANTES del guard de
+    // comprobanteUrl A PROPÓSITO: el staff debe enterarse de todo reporte creado, incluso si
+    // el guard descarta el análisis IA por falta de URL. Best-effort (mismo criterio que
+    // notificarAvance más arriba): un fallo acá nunca debe interrumpir el resto del trigger.
+    try {
+      await admin.firestore().collection('historialNotificaciones').add({
+        tenantId: data.tenantId,
+        estudianteId: '__admin__',
+        estudianteNombre: data.estudianteNombre,
+        tutorNombre: '',
+        destinatario: '',
+        canal: 'InApp',
+        tipo: 'ComprobantePagoAdmin',
+        mensaje: `Nuevo comprobante de pago reportado por ${data.estudianteNombre || 'un estudiante'} por $${Number(data.montoInformado || 0).toLocaleString('es-CO')}. Revísalo en el panel de Validar Pagos.`,
+        leida: false,
+        fecha: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error(`[analizarComprobanteEstudiante] no se pudo crear la notificación admin-facing para ${reporteId}:`, err);
+    }
+
     // ERR-0017 regression guard: reportarPagoEstudiante (servicios/pagosEstudiantesApi.ts)
     // writes comprobanteUrl in the SAME setDoc that creates this document -- never split it
     // back into addDoc(comprobanteUrl:'') + a LATER updateDoc(comprobanteUrl), or this

@@ -352,7 +352,10 @@ export interface NotificacionHistorial {
     estudianteNombre: string;
     tutorNombre: string;
     destinatario: string;
-    canal: 'WhatsApp' | 'Email';
+    // SDD notificaciones-pagos (Fase A, in-app only): 'InApp' se suma para los 3 nuevos tipos
+    // de aviso de pagos (ComprobantePagoAdmin/PagoAprobado/PagoRechazado) -- ninguno usa
+    // WhatsApp/Email real. Ver blast radius del ensanche de esta union en design.md.
+    canal: 'WhatsApp' | 'Email' | 'InApp';
     tipo: TipoNotificacion;
     mensaje: string;
     leida: boolean;
@@ -369,7 +372,14 @@ export enum TipoNotificacion {
     // Plan B #2 (fix tutor-role-end-to-end): avance académico (material completado).
     AvanceAcademico = 'AvanceAcademico',
     // Plan B #3 (fix tutor-role-end-to-end): evento nuevo con inscripción abierta.
-    EventoNuevo = 'EventoNuevo'
+    EventoNuevo = 'EventoNuevo',
+    // SDD notificaciones-pagos (D6): admin-facing (sufijo "...Admin", mismo criterio que
+    // SolicitudCompraAdmin), escrita por la Cloud Function analizarComprobanteEstudiante
+    // (functions/index.js) con el estudianteId sentinel -- ver constantes.ts.
+    ComprobantePagoAdmin = 'ComprobantePagoAdmin',
+    // Tutor-facing, escritas por gestionarReportePago (servicios/pagosEstudiantesApi.ts).
+    PagoAprobado = 'PagoAprobado',
+    PagoRechazado = 'PagoRechazado'
 }
 
 export enum EstadoEntrega {

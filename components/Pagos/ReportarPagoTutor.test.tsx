@@ -173,6 +173,25 @@ describe('ReportarPagoTutor', () => {
         expect(await screen.findByText('¡Reporte Enviado!')).toBeInTheDocument();
     });
 
+    // SDD notificaciones-pagos (Requirement "Honest Success Copy in ReportarPagoTutor", spec.md):
+    // la pantalla de éxito ya NO puede prometer un WhatsApp automático que el sistema nunca
+    // envía (Fase A es únicamente in-app) -- debe dirigir al tutor a su buzón en la app.
+    it('tras reportar el pago, la pantalla de éxito NO promete WhatsApp y dirige al buzón de la app', async () => {
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudiante({ saldoDeudor: 60000 })]);
+        reportarPagoEstudianteMock.mockResolvedValue('reporte-nuevo-1');
+        const user = userEvent.setup();
+        render(<ReportarPagoTutor />);
+        await screen.findByText('Ana García');
+
+        await adjuntarComprobante(user);
+        await waitFor(() => expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeEnabled());
+        await user.click(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i }));
+
+        expect(await screen.findByText('¡Reporte Enviado!')).toBeInTheDocument();
+        expect(screen.queryByText(/WhatsApp/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/buz[oó]n/i)).toBeInTheDocument();
+    });
+
     it('si el envío falla, notifica el error y NO pasa al estado de éxito', async () => {
         obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudiante()]);
         reportarPagoEstudianteMock.mockRejectedValue(new Error('network error'));
