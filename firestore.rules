@@ -713,6 +713,35 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // SDD notificaciones-pagos (ERR-0017, Fase 0): reportes_pagos_estudiantes nunca tuvo
+    // match propio -- caia en el catch-all final (`allow read, write: if false`),
+    // bloqueando TODO el modulo de pagos reportados por Tutor/publico, incluida la
+    // lectura del propio Admin del tenant. `create` cubre dos flujos: (a) el Tutor
+    // autenticado dueño del estudiante (tutor.correo == token.email, mismo patron ya
+    // usado en `estudiantes`/`historialNotificaciones` arriba, resuelto via get()
+    // porque el reporte en si no trae tutor.correo) y (b) el link publico SIN login
+    // (ReportarPagoPublico.tsx / servicios/pagosEstudiantesApi.ts) con la misma
+    // validacion minima ya usada para `registros_temporales` (rules arriba): estado de
+    // arranque fijo + tenant/estudiante existentes, para que el registro nazca siempre
+    // en la bandeja de revision, nunca ya aprobado. `read`/`update` quedan exclusivos de
+    // isInstructor() (Admin/Editor/Asistente/Maestro/SuperAdmin del propio tenant) -- el
+    // Tutor NUNCA lee sus propios reportes desde esta coleccion, se entera del resultado
+    // por `historialNotificaciones` (ver sdd/notificaciones-pagos/design). `delete`
+    // bloqueado sin excepcion: es el registro de auditoria del pago, mismo criterio que
+    // `solicitudes_carnets`.
+    match /reportes_pagos_estudiantes/{reporteId} {
+      allow read, update: if isInstructor() && resource.data.tenantId == currentTenantId();
+      allow create: if request.resource.data.estado == 'Pendiente'
+        && exists(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId))
+        && exists(/databases/$(database)/documents/estudiantes/$(request.resource.data.estudianteId))
+        && (
+          !authenticated()
+          || (isTutor()
+              && get(/databases/$(database)/documents/estudiantes/$(request.resource.data.estudianteId)).data.tutor.correo == request.auth.token.email)
+        );
+      allow delete: if false;
+    }
+
     // =========================================================================
     // Catch-all: denegar todo lo no declarado
     // =========================================================================

@@ -1284,6 +1284,11 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
     const data = snap.data();
     const reporteId = context.params.reporteId;
 
+    // ERR-0017 regression guard: reportarPagoEstudiante (servicios/pagosEstudiantesApi.ts)
+    // writes comprobanteUrl in the SAME setDoc that creates this document -- never split it
+    // back into addDoc(comprobanteUrl:'') + a LATER updateDoc(comprobanteUrl), or this
+    // onCreate trigger fires before the URL exists and the guard below silently discards
+    // every real report, forever. See functions/analizarComprobanteEstudiante.test.js.
     if (!data.comprobanteUrl) {
       console.warn(`Reporte ${reporteId} no tiene URL de imagen.`);
       return null;

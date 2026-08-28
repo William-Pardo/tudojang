@@ -1,6 +1,6 @@
 
 // servicios/pagosEstudiantesApi.ts
-import { collection, addDoc, query, where, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago, Estudiante } from '../tipos';
@@ -40,28 +40,34 @@ export const reportarPagoEstudiante = async (
     /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return "mock-id-reporte";
 
-    // 1. Crear el documento inicial en Pendiente
-    const nuevoReporte: Omit<ReportePagoEstudiante, 'id'> = {
-        tenantId,
-        estudianteId,
-        estudianteNombre,
-        montoInformado: monto,
-        fechaReporte: new Date().toISOString(),
-        comprobanteUrl: '', // Se actualizará tras la subida
-        estado: EstadoValidacion.Pendiente,
-        // Firestore rechaza valores `undefined`: solo se incluye el campo si vino informado.
-        ...(tutorUsuarioId ? { tutorUsuarioId } : {})
-    };
-
-    const docRef = await addDoc(reportesCollection, nuevoReporte);
+    // ERR-0017: el documento se crea con UN SOLO write que YA trae la URL real del
+    // comprobante -- antes se creaba con `addDoc(..., comprobanteUrl: '')` y se
+    // completaba con un `updateDoc` posterior, pero el trigger onCreate
+    // (analizarComprobanteEstudiante, functions/index.js) se dispara en la PRIMERA
+    // escritura: su guard siempre veía comprobanteUrl vacío y descartaba el análisis en
+    // silencio para todo reporte real. 1. Reservar el id del documento localmente para
+    // poder subir a Storage antes de escribir en Firestore.
+    const docRef = doc(reportesCollection);
 
     // 2. Subir imagen a Storage con ruta aislada por tenant
     const storageRef = ref(storage, `tenants/${tenantId}/comprobantes/${docRef.id}_${Date.now()}`);
     const snapshot = await uploadString(storageRef, imagenBase64, 'data_url');
     const downloadURL = await getDownloadURL(snapshot.ref);
 
-    // 3. Actualizar con la URL final
-    await updateDoc(docRef, { comprobanteUrl: downloadURL });
+    // 3. Crear el documento ya con la URL real y en Pendiente
+    const nuevoReporte: Omit<ReportePagoEstudiante, 'id'> = {
+        tenantId,
+        estudianteId,
+        estudianteNombre,
+        montoInformado: monto,
+        fechaReporte: new Date().toISOString(),
+        comprobanteUrl: downloadURL,
+        estado: EstadoValidacion.Pendiente,
+        // Firestore rechaza valores `undefined`: solo se incluye el campo si vino informado.
+        ...(tutorUsuarioId ? { tutorUsuarioId } : {})
+    };
+
+    await setDoc(docRef, nuevoReporte);
 
     return docRef.id;
 };
