@@ -3,9 +3,10 @@
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago, Estudiante } from '../tipos';
+import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago, Estudiante, TipoNotificacion } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
 import { agregarMovimiento } from './finanzasApi';
+import { guardarNotificacionEnHistorial } from './notificacionesApi';
 import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
 import { resolveLinkedStudent } from './academico/tutorStudentResolver';
 
@@ -181,9 +182,15 @@ export const gestionarReportePago = async (
 
     const docRef = doc(reportesCollection, reporte.id);
 
+    // D5 (design.md): hoisteado a `let` para reutilizar la MISMA lectura en el paso 7
+    // (notificación al tutor) -- el camino de aprobación (hot path del lote,
+    // aprobarReportesEnLote) no debe pagar una segunda lectura de Firestore solo para
+    // armar destinatario/tutorNombre.
+    let estudiante: Estudiante | null = null;
+
     if (nuevoEstado === EstadoValidacion.Aprobado) {
         // 1. Obtener estudiante actual para asegurar integridad de saldo
-        const estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
+        estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
 
         // 2. Calcular nuevo saldo
         const nuevoSaldo = calcularSaldoTrasPago(estudiante.saldoDeudor, reporte.montoInformado);
@@ -226,4 +233,39 @@ export const gestionarReportePago = async (
         fechaValidacion: new Date().toISOString(),
         observaciones: observaciones || ''
     });
+
+    // 7. Notificar al tutor (D2/D4/D5 design.md): best-effort, DESPUÉS de que el estado del
+    // reporte ya quedó confirmado arriba -- un fallo acá (incluido un permission-denied de
+    // Firestore) NUNCA debe tumbar la operación de pago ni propagarse a
+    // aprobarReportesEnLote. Aprobado reutiliza el `estudiante` del paso 1 (cero lecturas
+    // extra); Rechazado lo resuelve acá porque ese camino nunca lo necesitó antes.
+    try {
+        if (!estudiante) {
+            estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
+        }
+        const esAprobado = nuevoEstado === EstadoValidacion.Aprobado;
+        const tutorNombre = estudiante.tutor
+            ? [estudiante.tutor.nombres, estudiante.tutor.apellidos].filter(Boolean).join(' ')
+            : '';
+        const destinatario = estudiante.tutor?.correo || estudiante.correo || '';
+
+        await guardarNotificacionEnHistorial({
+            tenantId: reporte.tenantId,
+            estudianteId: reporte.estudianteId,
+            estudianteNombre: reporte.estudianteNombre,
+            tutorNombre,
+            destinatario,
+            canal: 'InApp',
+            tipo: esAprobado ? TipoNotificacion.PagoAprobado : TipoNotificacion.PagoRechazado,
+            // D8 (design.md): el rechazo SIEMPRE usa este texto neutro fijo -- `observaciones`
+            // (notas internas del admin) NUNCA se copia al mensaje del tutor.
+            mensaje: esAprobado
+                ? `Tu pago de $${reporte.montoInformado.toLocaleString('es-CO')} fue aprobado. ¡Gracias por tu puntualidad!`
+                : 'Tu comprobante no pudo validarse. Contactá a la academia para más información.',
+            leida: false,
+            fecha: new Date().toISOString(),
+        });
+    } catch (err) {
+        console.error(`[gestionarReportePago] no se pudo crear la notificación tutor-facing para ${reporte.id}:`, err);
+    }
 };
