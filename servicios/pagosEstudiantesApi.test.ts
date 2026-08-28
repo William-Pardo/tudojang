@@ -1,4 +1,4 @@
-import { addDoc, doc, getDocs, updateDoc, where } from 'firebase/firestore';
+import { doc, getDocs, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import { EstadoPago, EstadoValidacion } from '../tipos';
 import { obtenerEstudiantePorId } from './estudiantesApi';
@@ -14,8 +14,9 @@ import {
 } from './pagosEstudiantesApi';
 
 jest.mock('firebase/firestore', () => ({
-  collection: jest.fn(() => ({ path: 'reportes' })), addDoc: jest.fn(), query: jest.fn(() => 'query'),
-  where: jest.fn(), getDocs: jest.fn(), doc: jest.fn((...args) => ({ args })), updateDoc: jest.fn(), orderBy: jest.fn(),
+  collection: jest.fn(() => ({ path: 'reportes' })), query: jest.fn(() => 'query'),
+  where: jest.fn(), getDocs: jest.fn(), doc: jest.fn((...args) => ({ args, id: 'rep-1' })),
+  setDoc: jest.fn(), updateDoc: jest.fn(), orderBy: jest.fn(),
 }));
 jest.mock('firebase/storage', () => ({
   getStorage: jest.fn(() => ({})), ref: jest.fn(() => 'storage-ref'),
@@ -33,37 +34,51 @@ const reporte: any = {
 describe('pagosEstudiantesApi', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('crea el reporte, sube el comprobante y persiste su URL', async () => {
-    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-1' });
+  // ERR-0017: el reporte se crea con UN SOLO setDoc que YA trae la URL real, no
+  // addDoc(url:'') + updateDoc(url) posterior -- así el trigger onCreate
+  // (analizarComprobanteEstudiante, functions/index.js) siempre ve comprobanteUrl
+  // poblado en la primera (y única) escritura, en vez de ver el guard descartar el
+  // reporte porque la URL todavía no existía.
+  it('crea el reporte con un solo setDoc: sube el comprobante ANTES de escribir, ya con la URL real', async () => {
     (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
     (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
     await expect(reportarPagoEstudiante('tenant-1', 'est-1', 'Ana', 100, 'data:image/png;base64,x')).resolves.toBe('rep-1');
+
     expect(ref).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('tenants/tenant-1/comprobantes/rep-1_'));
-    expect(updateDoc).toHaveBeenCalledWith({ id: 'rep-1' }, { comprobanteUrl: 'https://comprobante' });
+    expect(setDoc).toHaveBeenCalledTimes(1);
+    expect(setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'rep-1' }),
+      expect.objectContaining({ comprobanteUrl: 'https://comprobante', estado: EstadoValidacion.Pendiente })
+    );
+    // El upload debe resolver ANTES de que exista cualquier llamada a setDoc -- si el
+    // orden se invirtiera, setDoc se llamaría con comprobanteUrl vacío otra vez.
+    expect((uploadString as jest.Mock).mock.invocationCallOrder[0])
+      .toBeLessThan((setDoc as jest.Mock).mock.invocationCallOrder[0]);
   });
 
-  it('propaga fallos al escribir el registro o subir el comprobante', async () => {
-    (addDoc as jest.Mock).mockRejectedValueOnce(new Error('Firestore caído'));
-    await expect(reportarPagoEstudiante('t', 'e', 'Ana', 100, 'img')).rejects.toThrow('Firestore caído');
-    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-1' });
+  it('propaga fallos al subir el comprobante o al escribir el registro', async () => {
     (uploadString as jest.Mock).mockRejectedValueOnce(new Error('Storage caído'));
     await expect(reportarPagoEstudiante('t', 'e', 'Ana', 100, 'img')).rejects.toThrow('Storage caído');
+    expect(setDoc).not.toHaveBeenCalled();
+
+    (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
+    (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
+    (setDoc as jest.Mock).mockRejectedValueOnce(new Error('Firestore caído'));
+    await expect(reportarPagoEstudiante('t', 'e', 'Ana', 100, 'img')).rejects.toThrow('Firestore caído');
   });
 
   it('persiste tutorUsuarioId cuando el tutor está autenticado', async () => {
-    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-2' });
     (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
     (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
     await reportarPagoEstudiante('tenant-1', 'est-1', 'Ana', 100, 'data:image/png;base64,x', 'tutor-uid-1');
-    expect(addDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tutorUsuarioId: 'tutor-uid-1' }));
+    expect(setDoc).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tutorUsuarioId: 'tutor-uid-1' }));
   });
 
   it('omite tutorUsuarioId cuando no se informa (link público sin login)', async () => {
-    (addDoc as jest.Mock).mockResolvedValue({ id: 'rep-2' });
     (uploadString as jest.Mock).mockResolvedValue({ ref: 'snapshot-ref' });
     (getDownloadURL as jest.Mock).mockResolvedValue('https://comprobante');
     await reportarPagoEstudiante('tenant-1', 'est-1', 'Ana', 100, 'data:image/png;base64,x');
-    const payload = (addDoc as jest.Mock).mock.calls[0][1];
+    const payload = (setDoc as jest.Mock).mock.calls[0][1];
     expect(payload).not.toHaveProperty('tutorUsuarioId');
   });
 

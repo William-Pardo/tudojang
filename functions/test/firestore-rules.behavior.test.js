@@ -1908,3 +1908,101 @@ test("Cloud Function (Admin SDK) can still read and write the watchdog history -
     assert.deepEqual(snapshot.data().historial, [{ fecha: "2026-07-31", facturables: 70 }]);
   });
 });
+
+// =========================================================================
+// SDD notificaciones-pagos (ERR-0017, Fase 0): reportes_pagos_estudiantes nunca tuvo match
+// propio -- caia en el catch-all final (`allow read, write: if false`), bloqueando TODO el
+// modulo de pagos reportados por Tutor/publico, lectura del propio Admin incluida. `create`
+// cubre dos flujos: (a) Tutor autenticado dueño del estudiante (tutor.correo ==
+// token.email) y (b) el link publico SIN login (ReportarPagoPublico.tsx), con la misma
+// validacion minima ya usada para `registros_temporales` (estado de arranque fijo + tenant/
+// estudiante existentes). `read`/`update` quedan exclusivos de staff (isInstructor()) del
+// propio tenant -- el Tutor se entera del resultado por `historialNotificaciones`, nunca
+// leyendo esta coleccion directamente.
+// =========================================================================
+
+const REPORTE_PAGO_BASE = {
+  tenantId: "tenant-1",
+  estudianteId: "est-hijo-pago",
+  estudianteNombre: "Alejandro Tester",
+  montoInformado: 120000,
+  fechaReporte: "2026-08-27T00:00:00.000Z",
+  comprobanteUrl: "https://storage.example.com/tenants/tenant-1/comprobantes/rep-1.png",
+  estado: "Pendiente",
+};
+
+const sembrarEstudianteConTutor = async (correoTutor) => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-hijo-pago"), {
+      tenantId: "tenant-1",
+      nombres: "Alejandro",
+      apellidos: "Tester",
+      tutor: { correo: correoTutor, nombres: "Papa", apellidos: "Tester" },
+    });
+  });
+};
+
+test("anonymous public link can report a payment with the minimal validation shape (estado Pendiente + tenant + estudiante existentes)", async () => {
+  await sembrarEstudianteConTutor("papa-anon@test.com");
+  const anonDb = environment.unauthenticatedContext().firestore();
+
+  await assertSucceeds(
+    setDoc(doc(anonDb, "reportes_pagos_estudiantes", "rep-anon-1"), REPORTE_PAGO_BASE)
+  );
+});
+
+test("anonymous create is rejected when estado is not Pendiente (no puede autoaprobarse el propio reporte)", async () => {
+  await sembrarEstudianteConTutor("papa-anon-2@test.com");
+  const anonDb = environment.unauthenticatedContext().firestore();
+
+  await assertFails(
+    setDoc(doc(anonDb, "reportes_pagos_estudiantes", "rep-anon-2"), {
+      ...REPORTE_PAGO_BASE,
+      estado: "Aprobado",
+    })
+  );
+});
+
+test("tutor autenticado dueño del estudiante puede reportar su propio pago", async () => {
+  await sembrarEstudianteConTutor("papa-tutor-owner@test.com");
+  const tutorDb = client("tutor-owner-1", "tenant-1", "Tutor", { email: "papa-tutor-owner@test.com" });
+
+  await assertSucceeds(
+    setDoc(doc(tutorDb, "reportes_pagos_estudiantes", "rep-tutor-1"), REPORTE_PAGO_BASE)
+  );
+});
+
+test("tutor autenticado que NO es el acudiente del estudiante no puede reportar el pago", async () => {
+  await sembrarEstudianteConTutor("papa-real@test.com");
+  const otroTutorDb = client("tutor-ajeno-1", "tenant-1", "Tutor", { email: "otro-tutor@test.com" });
+
+  await assertFails(
+    setDoc(doc(otroTutorDb, "reportes_pagos_estudiantes", "rep-tutor-2"), REPORTE_PAGO_BASE)
+  );
+});
+
+test("staff (Admin) del tenant puede leer y actualizar un reporte de pago", async () => {
+  await sembrarEstudianteConTutor("papa-staff@test.com");
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "reportes_pagos_estudiantes", "rep-staff-1"), REPORTE_PAGO_BASE);
+  });
+
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  const snapshot = await assertSucceeds(getDoc(doc(adminDb, "reportes_pagos_estudiantes", "rep-staff-1")));
+  assert.equal(snapshot.data().estudianteNombre, "Alejandro Tester");
+  await assertSucceeds(
+    updateDoc(doc(adminDb, "reportes_pagos_estudiantes", "rep-staff-1"), { estado: "Aprobado" })
+  );
+});
+
+test("tutor no puede leer un reporte de pago (se entera por historialNotificaciones, no por esta coleccion)", async () => {
+  await sembrarEstudianteConTutor("papa-lectura@test.com");
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "reportes_pagos_estudiantes", "rep-lectura-1"), REPORTE_PAGO_BASE);
+  });
+
+  const tutorDb = client("tutor-lectura-1", "tenant-1", "Tutor", { email: "papa-lectura@test.com" });
+
+  await assertFails(getDoc(doc(tutorDb, "reportes_pagos_estudiantes", "rep-lectura-1")));
+});

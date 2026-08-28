@@ -88,6 +88,31 @@ test("clients cannot read or write the billing growth watchdog history", () => {
 // tenant esta presente en el bloque de la coleccion correspondiente -- estos son
 // asserts livianos sobre el TEXTO de las reglas; la cobertura de comportamiento real
 // (permitir mismo tenant / negar otro tenant) vive en firestore-rules.behavior.test.js.
+// SDD notificaciones-pagos (ERR-0017, Fase 0): reportes_pagos_estudiantes nunca tuvo match
+// propio -- caia en el catch-all final (`allow read, write: if false`), bloqueando TODO el
+// modulo de pagos reportados (incluida la lectura del propio Admin del tenant). `create`
+// exige siempre `estado == 'Pendiente'` + tenant/estudiante existentes (mismo shape minimo
+// que `registros_temporales`), y ademas restringe quien puede invocarlo: sin autenticar
+// (link publico) o el Tutor autenticado dueño del estudiante (`tutor.correo == token.email`,
+// mismo patron ya usado en `estudiantes`/`historialNotificaciones`). `read`/`update` quedan
+// exclusivos de staff (`isInstructor()`) del propio tenant; `delete` bloqueado sin excepcion,
+// mismo criterio que `solicitudes_carnets` (registro de auditoria del pago). La cobertura de
+// comportamiento real (permitir/negar por rol y tenant) vive en firestore-rules.behavior.test.js.
+test("ERR-0017: reportes_pagos_estudiantes tiene match propio con create minimo (tutor-owner o publico) y read/update exclusivos de staff", () => {
+  assert.match(
+    rules,
+    /match \/reportes_pagos_estudiantes\/\{reporteId\}[\s\S]*allow read, update: if isInstructor\(\) && resource\.data\.tenantId == currentTenantId\(\);/
+  );
+  assert.match(
+    rules,
+    /match \/reportes_pagos_estudiantes\/\{reporteId\}[\s\S]*allow create: if request\.resource\.data\.estado == 'Pendiente'[\s\S]*exists\(\/databases\/\$\(database\)\/documents\/tenants\/\$\(request\.resource\.data\.tenantId\)\)[\s\S]*exists\(\/databases\/\$\(database\)\/documents\/estudiantes\/\$\(request\.resource\.data\.estudianteId\)\)[\s\S]*!authenticated\(\)[\s\S]*isTutor\(\)[\s\S]*tutor\.correo == request\.auth\.token\.email/
+  );
+  assert.match(
+    rules,
+    /match \/reportes_pagos_estudiantes\/\{reporteId\}[\s\S]*allow delete: if false;/
+  );
+});
+
 test("ERR-0011: usuarios list, estudiantes, programas, finanzas, eventos, solicitudesCompra e historialNotificaciones validan tenant", () => {
   assert.match(
     rules,
