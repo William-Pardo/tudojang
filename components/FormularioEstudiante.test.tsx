@@ -10,6 +10,7 @@ const mockState = {
     valorMatricula: 10000,
     activarMatriculaAnual: true,
   } as any,
+  usuario: null as any,
 };
 
 // Mock del contexto de DataContext para evitar llamadas reales a Firebase y proveer sedes mockeadas
@@ -36,10 +37,13 @@ jest.mock('../components/BrandingProvider', () => ({
   useTenant: jest.fn(),
 }));
 
-// Mock del contexto de Auth para evitar dependencia de Firebase Auth
+// Mock del contexto de Auth para evitar dependencia de Firebase Auth. `usuario` es dinámico
+// (via mockState) porque el chequeo de duplicados en blur (handleBlurDuplicado) exige
+// usuario.tenantId -- los tests preexistentes dependen de usuario:null, así que se resetea en
+// cada beforeEach y solo se sobreescribe en los tests nuevos que necesitan sesión real.
 jest.mock('../context/AuthContext', () => ({
   useAuth: () => ({
-    usuario: null,
+    usuario: mockState.usuario,
     login: jest.fn(),
     logout: jest.fn(),
     enviarEnlaceRecuperacion: jest.fn(),
@@ -50,6 +54,13 @@ jest.mock('../context/AuthContext', () => ({
   AuthProvider: ({ children }: any) => <>{children}</>,
 }));
 
+// Mock de estudiantesApi para controlar buscarEstudianteDuplicado (chequeo de duplicados en
+// blur) sin pegarle a Firestore real -- FormularioEstudiante.tsx solo importa esta función de
+// este módulo.
+jest.mock('../servicios/estudiantesApi', () => ({
+  buscarEstudianteDuplicado: jest.fn(),
+}));
+
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -57,6 +68,7 @@ import FormularioEstudiante, { calcularEdadYGrupo } from './FormularioEstudiante
 import { GrupoEdad, EstadoPago, GradoTKD, type Estudiante } from '../tipos';
 import { DataProvider } from '../context/DataContext';
 import { useTenant } from '../components/BrandingProvider';
+import { buscarEstudianteDuplicado } from '../servicios/estudiantesApi';
 import React from 'react';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 
@@ -71,6 +83,11 @@ jest.mock('../hooks/useAutosave', () => ({
 }));
 
 const useTenantMock = useTenant as jest.Mock;
+// jest.Mock (sin generics) resuelve el tipo de retorno como `unknown` -- ResolveType<T> (el
+// tipo que exige mockResolvedValue/mockResolvedValueOnce) da `never` cuando T no envuelve un
+// Promise explícito. jest.MockedFunction<typeof fn> preserva la firma real (Promise<Estudiante
+// | null>) para que esos métodos tipen correctamente.
+const buscarEstudianteDuplicadoMock = buscarEstudianteDuplicado as jest.MockedFunction<typeof buscarEstudianteDuplicado>;
 
 describe('FormularioEstudiante', () => {
   const onGuardarMock = jest.fn<(estudiante: Estudiante) => Promise<void>>().mockResolvedValue();
@@ -110,6 +127,14 @@ describe('FormularioEstudiante', () => {
       valorMatricula: 10000,
       activarMatriculaAnual: true,
     };
+    mockState.usuario = null;
+    buscarEstudianteDuplicadoMock.mockReset();
+    buscarEstudianteDuplicadoMock.mockResolvedValue(null);
+    // onGuardarMock/onCerrarMock son compartidos por todo el describe (nunca se resetean solos
+    // -- no hay `clearMocks` en jest.config.js) -- sin este reset, un `toHaveBeenCalled()` de un
+    // test de confirmación queda "contaminando" el conteo del siguiente test (ej. el de cancelar).
+    onGuardarMock.mockClear();
+    onCerrarMock.mockClear();
     useTenantMock.mockReturnValue({
       tenant: {
         tenantId: 'test-tenant',
@@ -312,6 +337,99 @@ describe('FormularioEstudiante', () => {
     expect(screen.queryByText('(ANUAL)')).not.toBeInTheDocument();
     expect(screen.getByText(/cada día 5 de mes/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Finalizar y Registrar/i })).toBeDisabled();
+  });
+
+  // --- Validaciones asistenciales (PR #71): chequeo de duplicados en blur + gating del modal
+  // de confirmación en el submit. handleBlurDuplicado exige usuario?.tenantId, así que estos
+  // tests son los únicos del archivo que pisan mockState.usuario (se resetea a null en
+  // beforeEach para no afectar al resto de la suite).
+
+  it('muestra advertencia de duplicado cuando buscarEstudianteDuplicado resuelve un match en el blur de correo', async () => {
+    mockState.usuario = { tenantId: 'test-tenant' };
+    buscarEstudianteDuplicadoMock.mockResolvedValueOnce({ nombres: 'Pedro', apellidos: 'Gómez' } as Estudiante);
+    renderComponent();
+
+    const correoInput = screen.getByPlaceholderText('EMAIL');
+    fireEvent.change(correoInput, { target: { value: 'pedro@test.com' } });
+    fireEvent.blur(correoInput);
+
+    await waitFor(() => {
+      expect(screen.getByText('Ya existe un alumno con este correo: Pedro Gómez')).toBeInTheDocument();
+    });
+    expect(buscarEstudianteDuplicadoMock).toHaveBeenCalledWith('test-tenant', 'correo', 'pedro@test.com', undefined);
+  });
+
+  it('no muestra advertencia de duplicado cuando buscarEstudianteDuplicado resuelve null', async () => {
+    mockState.usuario = { tenantId: 'test-tenant' };
+    buscarEstudianteDuplicadoMock.mockResolvedValueOnce(null);
+    renderComponent();
+
+    const correoInput = screen.getByPlaceholderText('EMAIL');
+    fireEvent.change(correoInput, { target: { value: 'nuevo@test.com' } });
+    fireEvent.blur(correoInput);
+
+    await waitFor(() => expect(buscarEstudianteDuplicadoMock).toHaveBeenCalled());
+    expect(screen.queryByText(/Ya existe un alumno con este correo/)).not.toBeInTheDocument();
+  });
+
+  it('frena el guardado con el modal de confirmación cuando la edad calculada es implausible, y confirma al aceptar', async () => {
+    const user = setupUser();
+    const { container } = renderComponent();
+    const hoy = new Date();
+
+    await llenarCamposRequeridos({
+      nombres: 'Rosa',
+      apellidos: 'Antigua',
+      identificacion: '999888',
+      nacimiento: `${hoy.getFullYear() - 105}-01-01`,
+    });
+
+    fireEvent.submit(container.querySelector('form')!);
+
+    await waitFor(() => expect(screen.getByText('Revisa antes de guardar')).toBeInTheDocument());
+    expect(onGuardarMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /Guardar de todas formas/i }));
+
+    await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('cancela el modal de confirmación sin llamar nunca a onGuardar', async () => {
+    const user = setupUser();
+    const { container } = renderComponent();
+    const hoy = new Date();
+
+    await llenarCamposRequeridos({
+      nombres: 'Rosa',
+      apellidos: 'Antigua',
+      identificacion: '999888',
+      nacimiento: `${hoy.getFullYear() - 105}-01-01`,
+    });
+
+    fireEvent.submit(container.querySelector('form')!);
+
+    await waitFor(() => expect(screen.getByText('Revisa antes de guardar')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    expect(onGuardarMock).not.toHaveBeenCalled();
+  });
+
+  it('con el prop borrador presente, el submit llama a onGuardar directo sin mostrar el modal aunque haya alertas', async () => {
+    const hoy = new Date();
+    const { container } = renderComponent({ borrador: { nombres: 'Precargado' } });
+
+    await llenarCamposRequeridos({
+      nombres: 'Rosa',
+      apellidos: 'Antigua',
+      identificacion: '999888',
+      nacimiento: `${hoy.getFullYear() - 105}-01-01`,
+    });
+
+    fireEvent.submit(container.querySelector('form')!);
+
+    await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Revisa antes de guardar')).not.toBeInTheDocument();
   });
 });
 
