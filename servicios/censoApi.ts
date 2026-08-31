@@ -1,6 +1,7 @@
 
 // servicios/censoApi.ts
 import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
@@ -251,4 +252,29 @@ export const obtenerTodosRegistrosTenant = async (tenantId: string): Promise<Reg
 export const eliminarRegistroTemporal = async (id: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
     await deleteDoc(doc(db, 'registros_temporales', id));
+};
+
+/**
+ * CENSO PÚBLICO (sin login): consulta -- en blur, por campo -- si el correo/teléfono que el
+ * aspirante acaba de escribir ya tiene un registro en el sistema (estudiante real o solicitud
+ * pendiente). Nunca bloquea el envío del formulario: el llamador solo muestra una advertencia
+ * "preguntar y confirmar", nunca un rechazo silencioso. Pasa por la Cloud Function
+ * `verificarDuplicadoAspirante` (Admin SDK, App Check) porque el visitante no tiene sesión --
+ * mismo patrón que buscarTenantPorSlug (servicios/configuracionApi.ts) sobre
+ * resolverTenantPublico. Ver functions/academico/verificacionDuplicados.js: el resultado
+ * NUNCA incluye nombre/id del match, solo los 2 booleanos.
+ */
+export const verificarDuplicadoAspirante = async (
+    tenantId: string,
+    datos: { correo?: string; telefono?: string }
+): Promise<{ correoExiste: boolean; telefonoExiste: boolean }> => {
+    if (!isFirebaseConfigured || (!datos.correo && !datos.telefono)) {
+        return { correoExiste: false, telefonoExiste: false };
+    }
+    const callable = httpsCallable<
+        { tenantId: string; correo?: string; telefono?: string },
+        { correoExiste: boolean; telefonoExiste: boolean }
+    >(getFunctions(), 'verificarDuplicadoAspirante');
+    const { data } = await callable({ tenantId, ...datos });
+    return data;
 };
