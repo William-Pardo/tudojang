@@ -3,6 +3,7 @@ import React from 'react';
 import type { Estudiante } from '../tipos';
 import { FilaEstudiante } from './FilaEstudiante';
 import { AnimatePresence } from 'framer-motion';
+import { detectarContactoDuplicado } from '../utils/contactoDuplicado';
 
 interface Props {
   estudiantes: Estudiante[];
@@ -43,6 +44,7 @@ const TablaEstudiantes: React.FC<Props> = ({
                   <FilaEstudiante
                     key={estudiante.id}
                     estudiante={estudiante}
+                    alertasContacto={detectarContactoDuplicado(estudiante, estudiantes)}
                     onEditar={onEditar}
                     onEliminar={onEliminar}
                     onVerFirma={onVerFirma}
@@ -64,6 +66,7 @@ const TablaEstudiantes: React.FC<Props> = ({
               <FilaEstudiante
                 key={estudiante.id}
                 estudiante={estudiante}
+                alertasContacto={detectarContactoDuplicado(estudiante, estudiantes)}
                 onEditar={onEditar}
                 onEliminar={onEliminar}
                 onVerFirma={onVerFirma}
