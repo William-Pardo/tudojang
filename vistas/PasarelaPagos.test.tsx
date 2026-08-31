@@ -47,6 +47,7 @@ describe('PasarelaPagos', () => {
       } as any,
       estaCargado: true,
       cargarTenant: jest.fn(),
+      actualizarTenantLocal: jest.fn(),
     });
     construirUrlCheckoutWompiMock.mockResolvedValue('https://checkout.wompi.co/p/?ref=test');
   });
