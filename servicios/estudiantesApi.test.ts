@@ -20,6 +20,7 @@ import {
     desvincularTutorDeEstudiante,
     retirarEstudiante,
     reactivarEstudiante,
+    buscarEstudianteDuplicado,
 } from './estudiantesApi';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import {
@@ -32,6 +33,7 @@ import {
     deleteField,
     query,
     where,
+    limit,
     writeBatch,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -50,6 +52,7 @@ jest.mock('firebase/firestore', () => ({
     deleteField: jest.fn(() => 'DELETE_FIELD_SENTINEL'),
     query: jest.fn(),
     where: jest.fn(),
+    limit: jest.fn(),
     writeBatch: jest.fn(),
 }));
 
@@ -817,6 +820,74 @@ describe('estudiantesApi — Suite completa (unitarios + integración + excepci�
             (updateDoc as jest.Mock).mockRejectedValue(new Error('No autorizado'));
 
             await expect(reactivarEstudiante('est-1')).rejects.toThrow('No autorizado');
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════════
+    // 14. buscarEstudianteDuplicado (FormularioEstudiante.tsx, chequeo en blur)
+    // ════════════════════════════════════════════════════════════════════════
+    describe('buscarEstudianteDuplicado', () => {
+        beforeEach(() => {
+            (query as jest.Mock).mockReturnValue({});
+            (where as jest.Mock).mockReturnValue({});
+            (limit as jest.Mock).mockReturnValue({});
+        });
+
+        it('[Integración] retorna el estudiante encontrado con limit(1) cuando no se excluye ningún id', async () => {
+            (getDocs as jest.Mock).mockResolvedValue({
+                docs: [{ id: 'est-1', data: () => ({ nombres: 'Ana', correo: 'ana@test.com', tenantId: 't-1' }) }],
+            });
+
+            const resultado = await buscarEstudianteDuplicado('t-1', 'correo', 'ana@test.com');
+
+            expect(limit).toHaveBeenCalledWith(1);
+            expect(resultado).toMatchObject({ id: 'est-1', nombres: 'Ana' });
+        });
+
+        it('[Integración] usa limit(2) y descarta el propio id al editar (excluirId)', async () => {
+            (getDocs as jest.Mock).mockResolvedValue({
+                docs: [
+                    { id: 'est-editando', data: () => ({ nombres: 'Ana', correo: 'ana@test.com', tenantId: 't-1' }) },
+                    { id: 'est-otro', data: () => ({ nombres: 'Otro', correo: 'ana@test.com', tenantId: 't-1' }) },
+                ],
+            });
+
+            const resultado = await buscarEstudianteDuplicado('t-1', 'correo', 'ana@test.com', 'est-editando');
+
+            expect(limit).toHaveBeenCalledWith(2);
+            expect(resultado).toMatchObject({ id: 'est-otro', nombres: 'Otro' });
+        });
+
+        it('[Unitario] retorna null cuando el único resultado es el propio registro en edición', async () => {
+            (getDocs as jest.Mock).mockResolvedValue({
+                docs: [{ id: 'est-editando', data: () => ({ nombres: 'Ana', tenantId: 't-1' }) }],
+            });
+
+            const resultado = await buscarEstudianteDuplicado('t-1', 'correo', 'ana@test.com', 'est-editando');
+
+            expect(resultado).toBeNull();
+        });
+
+        it('[Unitario] retorna null sin consultar Firestore si el valor está vacío', async () => {
+            const resultado = await buscarEstudianteDuplicado('t-1', 'telefono', '   ');
+
+            expect(getDocs).not.toHaveBeenCalled();
+            expect(resultado).toBeNull();
+        });
+
+        it('[Unitario — Modo simulado] retorna null sin consultar Firestore', async () => {
+            (require('../firebase/config') as any).isFirebaseConfigured = false;
+
+            const resultado = await buscarEstudianteDuplicado('t-1', 'numeroIdentificacion', '123');
+
+            expect(getDocs).not.toHaveBeenCalled();
+            expect(resultado).toBeNull();
+        });
+
+        it('[Excepción] propaga error de Firestore', async () => {
+            (getDocs as jest.Mock).mockRejectedValue(new Error('Red caída'));
+
+            await expect(buscarEstudianteDuplicado('t-1', 'correo', 'ana@test.com')).rejects.toThrow('Red caída');
         });
     });
 });

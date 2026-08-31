@@ -10,6 +10,7 @@ import {
     deleteField,
     query,
     where,
+    limit,
     writeBatch
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -110,6 +111,39 @@ export const obtenerEstudiantePorNumIdentificacion = async (numIdentificacion: s
     }
     const docSnap = querySnapshot.docs[0];
     return { id: docSnap.id, ...docSnap.data() } as Estudiante;
+};
+
+/**
+ * FORMULARIO INTERNO (FormularioEstudiante.tsx, staff autenticado): consulta -- en blur, por
+ * campo -- si ya existe otro estudiante del mismo tenant con ese correo/teléfono/número de
+ * identificación. A diferencia de verificarDuplicadoAspirante (censoApi.ts, censo público sin
+ * auth), acá SÍ hay sesión y permiso real (firestore.rules permite a Instructor leer
+ * `estudiantes` de su propio tenant), así que se consulta Firestore directo -- sin pasar por
+ * Cloud Function -- y se puede devolver el estudiante encontrado completo (el llamador solo
+ * usa nombres/apellidos para el mensaje, nunca se expone a un tercero sin sesión).
+ *
+ * `limit(1)` en el caso general (alta nueva); `limit(2)` cuando se pasa `excluirId` (edición):
+ * si el único resultado con limit(1) fuera justo el registro que se está editando, un
+ * duplicado real y distinto quedaría sin detectar -- se trae uno más y se filtra el propio id
+ * en cliente.
+ */
+export const buscarEstudianteDuplicado = async (
+    tenantId: string,
+    campo: 'correo' | 'telefono' | 'numeroIdentificacion',
+    valor: string,
+    excluirId?: string
+): Promise<Estudiante | null> => {
+    const valorNormalizado = (valor || '').trim();
+    if (!isFirebaseConfigured || !tenantId || !valorNormalizado) return null;
+    const q = query(
+        estudiantesCollection,
+        where('tenantId', '==', tenantId),
+        where(campo, '==', valorNormalizado),
+        limit(excluirId ? 2 : 1)
+    );
+    const snapshot = await getDocs(q);
+    const match = snapshot.docs.find(d => d.id !== excluirId);
+    return match ? ({ id: match.id, ...match.data() } as Estudiante) : null;
 };
 
 // Fix seguridad (2026-07-18, mismo bug real ya resuelto para sedes): el límite del plan
