@@ -1,6 +1,6 @@
 
 // servicios/censoApi.ts
-import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
@@ -136,24 +136,55 @@ export const legalizarLoteKicho = async (misionId: string, firmaBase64: string):
 };
 
 /**
- * SUPERADMIN: Inyecta los datos limpios a la base oficial
+ * SUPERADMIN: Inyecta los datos limpios a la base oficial.
+ *
+ * Fix ERR-0020 (2026-08-31): antes hacía `batch.set()` DIRECTO sobre `estudiantes` dentro de
+ * un writeBatch atómico. firestore.rules bloquea `create` en esa colección sin excepción desde
+ * 2026-07-18 (ver el comentario en servicios/estudiantesApi.ts junto a `agregarEstudiante`) --
+ * este flujo nunca se migró cuando se cerró la regla, así que `batch.commit()` fallaba siempre
+ * con permission-denied y revertía las 199 operaciones del lote entero (N creates + N updates de
+ * `registros_temporales` + 1 de la misión), dejando el lote completo sin aprobar sin importar
+ * cuántos registros trajera.
+ *
+ * Se reemplaza por un loop que llama a la Cloud Function `crearEstudiante` una vez por registro
+ * -- mismo patrón ya probado en ModalImportacionMasiva.tsx para la importación masiva por CSV.
+ * Esa función YA admite a un SuperAdmin creando en cualquier tenant (`assertTenantAutorizado`
+ * hace early-return para rol SuperAdmin, functions/academico/estudiantes.js). `registros_temporales`
+ * y `misiones_kicho` siguen permitiendo `update` directo del cliente para SuperAdmin (reglas sin
+ * cambios) -- solo el `create` de `estudiantes` se movió detrás de la Cloud Function.
+ *
+ * Efecto secundario deseado: ya no es todo-o-nada. Un registro con datos inválidos no tumba a
+ * los demás -- se acumula en `fallos` y se sigue con el resto, mismo criterio que
+ * ModalImportacionMasiva. La misión solo pasa a `estadoLote: 'procesado'` si TODOS los registros
+ * de esta corrida tuvieron éxito; si algo falla, se queda en 'legalizado' (sigue apareciendo en
+ * la bandeja de pendientes de MasterDashboard) para poder reintentar -- el filtro
+ * `estado === 'verificado'` sobre `obtenerRegistrosMision` ya excluye automáticamente los
+ * registros que este mismo loop haya marcado 'procesado', así que un reintento solo reprocesa
+ * los que fallaron.
  */
-export const inyectarEstudiantesKicho = async (misionId: string, registros: RegistroTemporal[]): Promise<void> => {
-    if (!isFirebaseConfigured) return;
+export const inyectarEstudiantesKicho = async (
+    misionId: string,
+    registros: RegistroTemporal[]
+): Promise<{ exitos: number; fallos: { registro: RegistroTemporal; error: unknown }[] }> => {
+    if (!isFirebaseConfigured) return { exitos: 0, fallos: [] };
 
     // Obtener la misión para conocer su sede asignada
     const misionRef = doc(db, 'misiones_kicho', misionId);
     const misionSnap = await getDoc(misionRef);
     const misionData = misionSnap.exists() ? misionSnap.data() as MisionKicho : null;
     const sedeDefault = misionData?.sedeId || '1';
-
-    const batch = writeBatch(db);
     const hoy = new Date().toISOString().split('T')[0];
 
-    registros.forEach(reg => {
-        const estRef = doc(collection(db, 'estudiantes'));
-        const { datos } = reg;
+    const crearEstudianteCallable = httpsCallable<
+        Omit<Estudiante, 'id' | 'historialPagos'>,
+        Estudiante
+    >(getFunctions(), 'crearEstudiante');
 
+    const fallos: { registro: RegistroTemporal; error: unknown }[] = [];
+    let exitos = 0;
+
+    for (const reg of registros) {
+        const { datos } = reg;
         const payload: Omit<Estudiante, 'id'> = {
             tenantId: reg.tenantId,
             nombres: datos.nombres.toUpperCase().trim(),
@@ -189,12 +220,20 @@ export const inyectarEstudiantesKicho = async (misionId: string, registros: Regi
             } : undefined
         };
 
-        batch.set(estRef, payload);
-        batch.update(doc(db, 'registros_temporales', reg.id), { estado: 'procesado' });
-    });
+        try {
+            await crearEstudianteCallable(payload);
+            await updateDoc(doc(db, 'registros_temporales', reg.id), { estado: 'procesado' });
+            exitos++;
+        } catch (error) {
+            fallos.push({ registro: reg, error });
+        }
+    }
 
-    batch.update(misionRef, { estadoLote: 'procesado' });
-    await batch.commit();
+    if (fallos.length === 0 && registros.length > 0) {
+        await updateDoc(misionRef, { estadoLote: 'procesado' });
+    }
+
+    return { exitos, fallos };
 };
 
 /**
