@@ -23,7 +23,18 @@ export const obtenerConfiguracionNotificaciones = async (tenantId: string): Prom
     }
     const docRef = doc(db, 'notificaciones_config', tenantId);
     const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? (docSnap.data() as ConfiguracionNotificaciones) : CONFIGURACION_POR_DEFECTO;
+    if (docSnap.exists()) return docSnap.data() as ConfiguracionNotificaciones;
+
+    // Bug real (2026-08-31, tenant Cocodrilos): acá se devolvía CONFIGURACION_POR_DEFECTO tal
+    // cual, y ese default trae `tenantId: 'escuela-gajog-001'` HARDCODEADO (constantes.ts). Para
+    // CUALQUIER tenant que todavía no tuviera documento en `notificaciones_config`, el cliente se
+    // quedaba con el tenantId de OTRO tenant; al guardar, `guardarConfiguracionNotificaciones`
+    // escribe en `notificaciones_config/{config.tenantId}` -- el documento ajeno -- y
+    // firestore.rules exige `currentTenantId() == tenantId` del path, así que TODA la operación
+    // de guardar configuración fallaba con "Missing or insufficient permissions" (el síntoma se
+    // reportó al cambiar el logo, pero el logo era incidental: fallaba con cualquier campo).
+    // Se estampa el tenantId solicitado: los defaults son PARA ese tenant, no para uno ajeno.
+    return { ...CONFIGURACION_POR_DEFECTO, tenantId } as ConfiguracionNotificaciones;
 };
 
 export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNotificaciones): Promise<void> => {
@@ -32,6 +43,14 @@ export const guardarConfiguracionNotificaciones = async (config: ConfiguracionNo
         return;
     }
     if (!config.tenantId) throw new Error("Falta tenantId en configuración de notificaciones");
+    // Defensa en profundidad del mismo bug: 'PLATFORM_INIT_PENDING' es el sentinel de "todavía no
+    // se identificó el tenant" (CONFIGURACION_CLUB_POR_DEFECTO, constantes.ts), nunca un tenant
+    // real. Escribirlo crea un documento basura -- ya existe uno así en producción -- y para
+    // cualquier usuario logueado la regla lo rechaza igual. Falla acá con un mensaje que dice qué
+    // pasó, en vez de un "Missing or insufficient permissions" opaco desde Firestore.
+    if (config.tenantId === 'PLATFORM_INIT_PENDING') {
+        throw new Error("Tenant sin identificar todavía: recargá la página antes de guardar la configuración");
+    }
     await setDoc(doc(db, 'notificaciones_config', config.tenantId), limpiarObjeto(config), { merge: true });
 };
 
