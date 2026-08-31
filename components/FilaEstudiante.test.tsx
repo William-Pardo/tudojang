@@ -228,4 +228,40 @@ describe('FilaEstudiante', () => {
   // existe en este componente -- eran 5 de los 6 fallos historicos de esta suite. Se
   // trasladaron a components/ModalRegistrarPago.test.tsx (describe "anulación del último
   // pago"), que es donde la funcionalidad vive ahora. NO se borro cobertura.
+
+  it.each([true, false])('muestra el teléfono y el correo del estudiante en vista isCard=%s (antes invisibles en el Directorio)', (isCard) => {
+    renderFila({ estudiante: crearEstudiante({ telefono: '3001112222', correo: 'ana@correo.com' }), isCard });
+    expect(screen.getByText('3001112222')).toBeInTheDocument();
+    expect(screen.getByText('ana@correo.com')).toBeInTheDocument();
+  });
+
+  it('sin alertasContacto, el teléfono y el correo se ven en gris, sin ícono de aviso', () => {
+    renderFila({ estudiante: crearEstudiante({ telefono: '3001112222', correo: 'ana@correo.com' }) });
+    expect(screen.getByText('3001112222')).toHaveClass('text-gray-500');
+    expect(screen.queryByTitle(/Mismo teléfono que/)).not.toBeInTheDocument();
+  });
+
+  it('con alertasContacto de teléfono, resalta el dato en ámbar con el nombre del otro estudiante en el aviso', () => {
+    renderFila({
+      estudiante: crearEstudiante({ telefono: '3001112222', correo: 'ana@correo.com' }),
+      alertasContacto: [{ campo: 'telefono', mensaje: 'Mismo teléfono que: Bruno García' }],
+    });
+    const valor = screen.getByText('3001112222');
+    expect(valor).toHaveClass('text-amber-600');
+    expect(screen.getByTitle('Mismo teléfono que: Bruno García')).toBeInTheDocument();
+    // El correo no tiene alerta propia -- debe seguir en gris, no "contagiarse" del aviso de telefono.
+    expect(screen.getByText('ana@correo.com')).toHaveClass('text-gray-500');
+  });
+
+  it('puede resaltar teléfono y correo a la vez, cada uno con su propio aviso', () => {
+    renderFila({
+      estudiante: crearEstudiante({ telefono: '3001112222', correo: 'carlos@correo.com' }),
+      alertasContacto: [
+        { campo: 'telefono', mensaje: 'Mismo teléfono que: Bruno García' },
+        { campo: 'correo', mensaje: 'Mismo correo que: Carlos Pardo' },
+      ],
+    });
+    expect(screen.getByTitle('Mismo teléfono que: Bruno García')).toBeInTheDocument();
+    expect(screen.getByTitle('Mismo correo que: Carlos Pardo')).toBeInTheDocument();
+  });
 });

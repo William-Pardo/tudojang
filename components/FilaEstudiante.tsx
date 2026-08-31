@@ -6,6 +6,7 @@ import type { Estudiante } from '../tipos';
 import { RolUsuario } from '../tipos';
 import { useAuth } from '../context/AuthContext';
 import { normalizarEstadoMatricula } from '../utils/facturacion';
+import type { AlertaContactoDuplicado } from '../utils/contactoDuplicado';
 import EstadoPagoBadge from './EstadoPagoBadge';
 import ModalRegistrarPago from './ModalRegistrarPago';
 import {
@@ -18,11 +19,15 @@ import {
     IconoBillete,
     IconoLogout,
     IconoAprobar,
+    IconoAlertaTriangulo,
 } from './Iconos';
 import GeneradorQR from './GeneradorQR';
 
 interface Props {
     estudiante: Estudiante;
+    // Precalculadas por TablaEstudiantes.tsx (detectarContactoDuplicado) -- FilaEstudiante no
+    // conoce al resto del Directorio, solo pinta lo que ya le llega resuelto.
+    alertasContacto?: AlertaContactoDuplicado[];
     onEditar: (estudiante: Estudiante) => void;
     onEliminar: (estudiante: Estudiante) => void;
     onVerFirma: (firma: string, tutor: Estudiante['tutor']) => void;
@@ -38,6 +43,7 @@ interface Props {
 
 export const FilaEstudiante: React.FC<Props> = ({
     estudiante,
+    alertasContacto = [],
     onEditar,
     onEliminar,
     onVerFirma,
@@ -47,6 +53,8 @@ export const FilaEstudiante: React.FC<Props> = ({
     isCard,
 }) => {
     const { usuario } = useAuth();
+    const alertaTelefono = alertasContacto.find(a => a.campo === 'telefono');
+    const alertaCorreo = alertasContacto.find(a => a.campo === 'correo');
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
     const [modalPagoAbierto, setModalPagoAbierto] = useState(false);
     const esAdmin = usuario?.rol === RolUsuario.Admin;
@@ -155,6 +163,27 @@ export const FilaEstudiante: React.FC<Props> = ({
         </div>
     );
 
+    // Teléfono/correo del estudiante -- antes invisibles en el Directorio. Se muestran acá
+    // para que el tenant pueda IDENTIFICAR el dato, no solo saber que hay una alerta: si
+    // coincide con otro estudiante (detectarContactoDuplicado, calculado en TablaEstudiantes),
+    // el valor se resalta en ámbar (mismo color que ya usa CensoPublico.tsx para este mismo
+    // aviso) con el ícono y el nombre del otro estudiante en el title -- nunca bloquea nada,
+    // es solo para que decidan si hace falta gestionarlo (típico en hermanos que comparten el
+    // WhatsApp del tutor, o un tutor que también está inscrito como alumno).
+    const lineaContacto = (valor: string, alerta?: AlertaContactoDuplicado) => (
+        <div className="flex items-center gap-1.5" title={alerta?.mensaje}>
+            {alerta && <IconoAlertaTriangulo className="w-3 h-3 flex-shrink-0 text-amber-600 dark:text-amber-500" />}
+            <span className={`text-[10px] font-bold ${alerta ? 'uppercase tracking-wide text-amber-600 dark:text-amber-500' : 'text-gray-500 dark:text-gray-400'}`}>{valor}</span>
+        </div>
+    );
+
+    const contenidoContacto = (
+        <div className="mt-1 space-y-0.5">
+            {estudiante.telefono && lineaContacto(estudiante.telefono, alertaTelefono)}
+            {estudiante.correo && lineaContacto(estudiante.correo, alertaCorreo)}
+        </div>
+    );
+
     return (
         <>
             <ModalRegistrarPago
@@ -181,6 +210,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                                 {estaRetirado && <span className="ml-2 align-middle px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">Retirado</span>}
                             </p>
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">{estudiante.numeroIdentificacion}</p>
+                            {contenidoContacto}
                         </div>
                         {contenidoAcciones}
                     </div>
@@ -221,6 +251,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                             {estaRetirado && <span className="ml-2 align-middle px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">Retirado</span>}
                         </div>
                         <div className="text-[10px] text-gray-600 dark:text-gray-400 font-bold uppercase">{estudiante.numeroIdentificacion}</div>
+                        {contenidoContacto}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-bold text-gray-700 dark:text-gray-300">{estudiante.grupo}</div>
