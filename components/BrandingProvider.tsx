@@ -14,12 +14,14 @@ interface TenantContextType {
     tenant: ConfiguracionClub | null;
     estaCargado: boolean;
     cargarTenant: () => Promise<void>;
+    actualizarTenantLocal: (config: ConfiguracionClub) => void;
 }
 
 const TenantContext = createContext<TenantContextType>({
     tenant: null,
     estaCargado: false,
-    cargarTenant: async () => { }
+    cargarTenant: async () => { },
+    actualizarTenantLocal: () => { }
 });
 
 const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -127,6 +129,21 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         document.documentElement.style.setProperty('--color-acento', a);
     };
 
+    // Actualiza el tenant en memoria con datos que el cliente YA tiene (recién guardados por
+    // guardarConfiguracionClub), sin volver a pegarle a Firestore. Antes, guardar el logo/
+    // colores llamaba a cargarTenant() completo -- eso re-fetchea todo el tenant y cambia la
+    // identidad del objeto `tenant`, lo que reactiva el useEffect de sincronización de
+    // DataContext (deps [tenant, usuario?.rol]) mientras el estado todavía se está
+    // reacomodando, produciendo una ráfaga de "Missing or insufficient permissions" transitorios
+    // en sedes/tienda hasta que la sincronización se re-establece sola un instante después. No
+    // hace falta red: guardarConfiguracionClub ya escribió exactamente este mismo objeto.
+    // No se toca `estado` (cargando/error/vencido/ok) -- guardar branding no cambia la
+    // suscripción, revalidarla acá sería trabajo de más sobre datos que no cambiaron.
+    const actualizarTenantLocal = (config: ConfiguracionClub) => {
+        aplicarEstilos(config);
+        setTenant(config);
+    };
+
     const validarSuscripcion = (config: ConfiguracionClub) => {
         const hoy = new Date();
         const vencimiento = new Date(config.fechaVencimiento);
@@ -157,7 +174,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     // MODO SUSCRIPCIÓN VENCIDA: Fondo Blanco Forzado
     if (estado === 'vencido' && !bypassDev) {
         return (
-            <TenantContext.Provider value={{ tenant, estaCargado: true, cargarTenant }}>
+            <TenantContext.Provider value={{ tenant, estaCargado: true, cargarTenant, actualizarTenantLocal }}>
                 <div className="min-h-screen bg-white dark:bg-tkd-dark flex flex-col">
                     <div className="bg-tkd-red text-white py-2 px-4 flex justify-between items-center z-[100] shadow-md">
                         <div className="flex items-center gap-2">
@@ -180,7 +197,7 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     }
 
     return (
-        <TenantContext.Provider value={{ tenant, estaCargado: true, cargarTenant }}>
+        <TenantContext.Provider value={{ tenant, estaCargado: true, cargarTenant, actualizarTenantLocal }}>
             {children}
             {bypassDev && (
                 <div className="fixed bottom-4 left-4 z-[200] bg-orange-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase shadow-lg animate-bounce">

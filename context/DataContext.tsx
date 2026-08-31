@@ -112,7 +112,7 @@ interface SedesContextType {
 const SedesContext = createContext<SedesContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { tenant, cargarTenant } = useTenant();
+    const { tenant, actualizarTenantLocal } = useTenant();
     const { usuario } = useAuth();
 
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -239,9 +239,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 await api.guardarConfiguracionNotificaciones(cn);
                 await api.guardarConfiguracionClub(cc);
                 setConfigNotificaciones(cn);
-                // Forzar recarga de branding para que el logo y colores cambien inmediatamente
-                console.log("[DataContext] Configuración guardada, refrescando branding...");
-                await cargarTenant();
+                // Fix (2026-08-31): antes esto llamaba a cargarTenant() completo (re-fetch a
+                // Firestore) para que el logo/colores cambiaran inmediatamente. `cc` YA es el
+                // objeto recién guardado -- pedirlo de nuevo por red no trae nada distinto, y
+                // el cambio de identidad del objeto `tenant` reactivaba el useEffect de
+                // sincronización de este mismo contexto (deps [tenant, usuario?.rol]) mientras
+                // el estado todavía se estaba reacomodando, produciendo una ráfaga de
+                // "Missing or insufficient permissions" transitorios en sedes/tienda que se
+                // resolvían solos un instante después (bug reportado: "guarda pero al final
+                // sale un error"). Actualizar localmente evita el round-trip Y el race.
+                console.log("[DataContext] Configuración guardada, refrescando branding localmente...");
+                actualizarTenantLocal(cc);
             },
             agregarUsuario: async (d) => {
                 const currentTenant = tenant || CONFIGURACION_CLUB_POR_DEFECTO;
