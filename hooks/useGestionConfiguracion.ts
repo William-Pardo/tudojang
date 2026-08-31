@@ -225,7 +225,13 @@ export const useGestionConfiguracion = () => {
             setLocalConfigClub(configNormalizada);
             mostrarNotificacion("Configuraciones guardadas exitosamente.", "success");
         } catch (error) {
-            mostrarNotificacion("No se pudieron guardar las configuraciones.", "error");
+            // Antes se tragaba el error real -- ni console.error ni el mensaje del toast lo
+            // mostraban, así que un rechazo de Firestore (regla, tamaño de documento, red) era
+            // indistinguible de cualquier otro fallo. Mismo patrón que guardarUsuarioHandler
+            // arriba: mensaje real en el toast + log en consola para poder diagnosticar sin
+            // reproducir a ciegas.
+            console.error("[useGestionConfiguracion] Error al guardar configuraciones:", error);
+            mostrarNotificacion(`No se pudieron guardar las configuraciones: ${error instanceof Error ? error.message : "Error desconocido"}.`, "error");
         } finally {
             setCargandoAccion(false);
         }
