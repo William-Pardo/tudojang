@@ -75,12 +75,21 @@ export const usePaginaFirma = ({ idEstudiante, tipo }: UsePaginaFirmaProps) => {
             return;
         }
         try {
-            const [estudianteData, configData, sedesList] = await Promise.all([
-                api.obtenerEstudiantePorId(idEstudiante),
-                api.obtenerConfiguracionClub(),
-                api.obtenerSedes() // Obtenemos sedes para resolver el precio específico
+            // Bug real: obtenerConfiguracionClub()/obtenerSedes() se llamaban sin tenantId,
+            // así que quedaban a merced de resolver el tenant por el subdominio de la URL --
+            // si el tutor entra por un link que no está en {slug}.tudojang.com (dominio raíz,
+            // localhost, etc.), esa resolución fallaba en silencio y caía al objeto de
+            // configuración por defecto (CONFIGURACION_CLUB_POR_DEFECTO: "Administrador de
+            // Plataforma", NIT/C.C. en ceros, mensualidad $0 -- exactamente lo que aparecía en
+            // el contrato). Se resuelve primero el estudiante (que sí trae su tenantId propio,
+            // siempre correcto) y con eso se piden config/sedes ya del tenant real -- mismo
+            // patrón que ya usa correctamente usePaginaFirmaContratoColaborador.ts.
+            const estudianteData = await api.obtenerEstudiantePorId(idEstudiante);
+            const [configData, sedesList] = await Promise.all([
+                api.obtenerConfiguracionClub(estudianteData.tenantId),
+                api.obtenerSedes(estudianteData.tenantId) // Obtenemos sedes para resolver el precio específico
             ]);
-            
+
             // Buscar la sede específica del alumno
             const sedeAlumno = sedesList.find(s => s.id === estudianteData.sedeId);
             setSede(sedeAlumno || null);

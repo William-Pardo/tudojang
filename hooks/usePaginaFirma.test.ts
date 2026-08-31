@@ -1,15 +1,22 @@
+import { renderHook, waitFor } from '@testing-library/react';
 import type { ConfiguracionClub, Estudiante, Sede } from '../tipos';
 import * as api from '../servicios/api';
+import { useNotificacion } from '../context/NotificacionContext';
 import {
     generarTextoDocumentoFirma,
     guardarFirmaDocumento,
+    usePaginaFirma,
 } from './usePaginaFirma';
 
 jest.mock('../servicios/api', () => ({
     guardarFirmaConsentimiento: jest.fn(),
     guardarFirmaContrato: jest.fn(),
     guardarFirmaImagen: jest.fn(),
+    obtenerEstudiantePorId: jest.fn(),
+    obtenerConfiguracionClub: jest.fn(),
+    obtenerSedes: jest.fn(),
 }));
+jest.mock('../context/NotificacionContext', () => ({ useNotificacion: jest.fn() }));
 
 const estudiante = {
     id: 'est-1',
@@ -88,5 +95,39 @@ describe('documentos legales de firma pública', () => {
         await expect(
             guardarFirmaDocumento('imagen', estudiante, 'firma-imagen'),
         ).rejects.toThrow('Se requiere una elección de autorización.');
+    });
+});
+
+// Bug real (reporte del tenant, contrato mostraba "ADMINISTRADOR DE PLATAFORMA" / C.C.
+// 00.000.000 / mensualidad $0): obtenerConfiguracionClub()/obtenerSedes() se llamaban sin
+// tenantId dentro de cargarDatos -- quedaban a merced de resolver el tenant por el subdominio
+// de la URL, y si eso fallaba (link fuera de {slug}.tudojang.com) caían en silencio al objeto
+// de configuración por defecto. El fix pasa el tenantId real del estudiante ya resuelto.
+describe('usePaginaFirma — carga de datos scoped por tenant (bug real)', () => {
+    const useNotificacionMock = useNotificacion as jest.Mock;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        useNotificacionMock.mockReturnValue({ mostrarNotificacion: jest.fn() });
+        (api.obtenerEstudiantePorId as jest.Mock).mockResolvedValue(estudiante);
+        (api.obtenerConfiguracionClub as jest.Mock).mockResolvedValue(configClub);
+        (api.obtenerSedes as jest.Mock).mockResolvedValue([sede]);
+    });
+
+    it('pide la configuración del club y las sedes con el tenantId del estudiante ya resuelto, no sin argumentos', async () => {
+        const { result } = renderHook(() => usePaginaFirma({ idEstudiante: 'est-1', tipo: 'contrato' }));
+        await waitFor(() => expect(result.current.cargando).toBe(false));
+
+        expect(api.obtenerConfiguracionClub).toHaveBeenCalledWith('tenant-1');
+        expect(api.obtenerSedes).toHaveBeenCalledWith('tenant-1');
+    });
+
+    it('el texto del contrato refleja los datos reales del club, no queda en blanco/undefined', async () => {
+        const { result } = renderHook(() => usePaginaFirma({ idEstudiante: 'est-1', tipo: 'contrato' }));
+        await waitFor(() => expect(result.current.cargando).toBe(false));
+
+        expect(result.current.textoDocumento).toContain('DOJANG CENTRAL');
+        expect(result.current.textoDocumento).toContain(configClub.nit);
+        expect(result.current.textoDocumento).toContain(configClub.ccRepresentante);
     });
 });
