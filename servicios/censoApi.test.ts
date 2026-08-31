@@ -10,6 +10,7 @@ import {
   legalizarLoteKicho,
   inyectarEstudiantesKicho,
   obtenerRegistrosMision,
+  verificarDuplicadoAspirante,
 } from './censoApi';
 import type { MisionKicho, RegistroTemporal, Estudiante } from '../tipos';
 import { GradoTKD, GrupoEdad, EstadoPago } from '../tipos';
@@ -28,6 +29,16 @@ jest.mock('firebase/firestore', () => ({
     commit: jest.fn(),
   })),
 }));
+
+// Mismo patron de mock que configuracionApi.test.ts (buscarTenantPorSlug sobre
+// resolverTenantPublico): verificarDuplicadoAspirante es un wrapper delgado sobre
+// httpsCallable('verificarDuplicadoAspirante').
+const mockCallable = jest.fn();
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => 'functions-mock'),
+  httpsCallable: jest.fn(() => mockCallable),
+}));
+
 jest.mock('../firebase/config', () => ({ db: {}, isFirebaseConfigured: true }));
 
 describe('censoApi', () => {
@@ -282,6 +293,33 @@ describe('censoApi', () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
       const registros = await obtenerRegistrosMision('m1', 't1');
       expect(registros).toEqual([]);
+    });
+  });
+
+  describe('verificarDuplicadoAspirante', () => {
+    it('llama a la Cloud Function con tenantId + correo/telefono y retorna el resultado', async () => {
+      mockCallable.mockResolvedValueOnce({ data: { correoExiste: true, telefonoExiste: false } });
+
+      const resultado = await verificarDuplicadoAspirante('tenant123', { correo: 'a@b.com', telefono: '3001234567' });
+
+      expect(mockCallable).toHaveBeenCalledWith({ tenantId: 'tenant123', correo: 'a@b.com', telefono: '3001234567' });
+      expect(resultado).toEqual({ correoExiste: true, telefonoExiste: false });
+    });
+
+    it('no llama a la función y devuelve ambos en false si isFirebaseConfigured es falso', async () => {
+      (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
+
+      const resultado = await verificarDuplicadoAspirante('tenant123', { correo: 'a@b.com' });
+
+      expect(mockCallable).not.toHaveBeenCalled();
+      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false });
+    });
+
+    it('no llama a la función si no viene ni correo ni teléfono', async () => {
+      const resultado = await verificarDuplicadoAspirante('tenant123', {});
+
+      expect(mockCallable).not.toHaveBeenCalled();
+      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false });
     });
   });
 });

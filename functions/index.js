@@ -110,6 +110,9 @@ const {
   crearServicioResolverTenantPublico,
 } = require("./academico/tenantPublico");
 const {
+  crearServicioVerificarDuplicadoAspirante,
+} = require("./academico/verificacionDuplicados");
+const {
   crearServicioActualizarExtrasContratados,
 } = require("./academico/capacidad");
 const {
@@ -441,6 +444,10 @@ const servicioResolverTenantPublico = crearServicioResolverTenantPublico({
   firestore: admin.firestore()
 });
 
+const servicioVerificarDuplicadoAspirante = crearServicioVerificarDuplicadoAspirante({
+  firestore: admin.firestore()
+});
+
 const servicioActualizarExtrasContratados = crearServicioActualizarExtrasContratados({
   firestore: admin.firestore()
 });
@@ -756,6 +763,17 @@ exports.actualizarEstadoSolicitudCarnets = functionsV1.https.onCall(
 // cuenta necesita para llegar al formulario.
 exports.resolverTenantPublico = functionsV1.https.onCall(
   crearHandlerCallable(servicioResolverTenantPublico)
+);
+
+// Verificacion PUBLICA de correo/telefono duplicado (SIN auth) para CensoPublico.tsx --
+// A DIFERENCIA de resolverTenantPublico (un slug no es informacion sensible por si sola), esta
+// funcion SI se gatea con App Check: permite enumerar si un correo/telefono puntual ya esta
+// registrado en el sistema de un tenant, asi que sin el gate cualquier script podria barrer
+// una lista de correos/telefonos contra un club. Ver academico/verificacionDuplicados.js.
+exports.verificarDuplicadoAspirante = functionsV1
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(
+  crearHandlerCallable(servicioVerificarDuplicadoAspirante)
 );
 
 // SDD pricing-cupo-real (D7, design.md): unico writer de sedesExtraContratadas/

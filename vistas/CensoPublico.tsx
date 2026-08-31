@@ -3,14 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useTenant } from '../components/BrandingProvider';
-import { registrarAspirantePublico, obtenerMisionPorId } from '../servicios/censoApi';
+import { registrarAspirantePublico, obtenerMisionPorId, verificarDuplicadoAspirante } from '../servicios/censoApi';
 import { MISION_ID_DIRECTO } from '../constantes';
 import { IconoUsuario, IconoEnviar, IconoExitoAnimado, IconoInformacion, IconoAprobar, IconoAlertaTriangulo } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import CountdownTimer from '../components/CountdownTimer';
+import ModalConfirmacion from '../components/ModalConfirmacion';
 import type { MisionKicho } from '../tipos';
 import { formatearPrecio } from '../utils/formatters';
+import { generarAlertasAsistenciales } from '../utils/validacionAsistencial';
 
 const CensoPublico: React.FC = () => {
     const { misionId } = useParams();
@@ -65,14 +67,64 @@ const CensoPublico: React.FC = () => {
         return edadCalculada;
     };
 
+    // Chequeo de duplicados en vivo (on-blur, sin debounce) contra la Cloud Function pública
+    // verificarDuplicadoAspirante -- nunca bloquea el formulario, solo alimenta la advertencia
+    // inline y las alertas de confirmación previas al envío (ver alertasParaConfirmar).
+    const [duplicados, setDuplicados] = useState<{ correoExiste: boolean; telefonoExiste: boolean }>({ correoExiste: false, telefonoExiste: false });
+
+    // Alertas pendientes de confirmar (patrón "preguntar y confirmar", nunca rechazo
+    // silencioso): si hay alguna, el envío real se frena hasta que el aspirante confirme
+    // explícitamente desde el ModalConfirmacion.
+    const [alertasConfirmacion, setAlertasConfirmacion] = useState<string[]>([]);
+    const [confirmandoEnvio, setConfirmandoEnvio] = useState(false);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
         if (name === 'fechaNacimiento') setEdad(calcularEdad(value));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleBlurCorreo = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const correo = e.target.value;
+        if (!correo || !tenant?.tenantId) return;
+        try {
+            const resultado = await verificarDuplicadoAspirante(tenant.tenantId, { correo });
+            setDuplicados(prev => ({ ...prev, correoExiste: resultado.correoExiste }));
+        } catch (err) {
+            // Silencioso: es una ayuda no-bloqueante -- un fallo de red acá no debe frenar
+            // el llenado del formulario.
+            console.error(err);
+        }
+    };
+
+    const handleBlurTelefono = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const telefono = e.target.value;
+        if (!telefono || !tenant?.tenantId) return;
+        try {
+            const resultado = await verificarDuplicadoAspirante(tenant.tenantId, { telefono });
+            setDuplicados(prev => ({ ...prev, telefonoExiste: resultado.telefonoExiste }));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // Combina los flags de duplicado (ya verificados en blur) con las heurísticas de
+    // asistenciales (edad implausible, nombre del alumno calcado del tutor) recalculadas al
+    // momento del envío -- array vacío si no hay nada raro que confirmar.
+    const alertasParaConfirmar = (): string[] => {
+        const alertas = generarAlertasAsistenciales({
+            edad: calcularEdad(formData.fechaNacimiento),
+            nombres: formData.nombres,
+            apellidos: formData.apellidos,
+            tutorNombres: formData.tutorNombre,
+            tutorApellidos: formData.tutorApellidos,
+        });
+        if (duplicados.correoExiste) alertas.push('Ya existe un registro con este correo en nuestro sistema.');
+        if (duplicados.telefonoExiste) alertas.push('Ya existe un registro con este teléfono en nuestro sistema.');
+        return alertas;
+    };
+
+    const enviarFormulario = async () => {
         setCargando(true);
         setErrorEnvio(null);
         try {
@@ -88,6 +140,26 @@ const CensoPublico: React.FC = () => {
             setErrorEnvio('No pudimos enviar tu registro. Verifica tu conexión e intenta de nuevo; si el problema sigue, contacta directamente a tu academia.');
         } finally {
             setCargando(false);
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const alertas = alertasParaConfirmar();
+        if (alertas.length > 0) {
+            setAlertasConfirmacion(alertas);
+            return;
+        }
+        await enviarFormulario();
+    };
+
+    const handleConfirmarEnvio = async () => {
+        setConfirmandoEnvio(true);
+        try {
+            await enviarFormulario();
+        } finally {
+            setConfirmandoEnvio(false);
+            setAlertasConfirmacion([]);
         }
     };
 
@@ -171,11 +243,17 @@ const CensoPublico: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                             <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Email Contacto</label>
-                            <input name="email" type="email" required className={inputClass} placeholder="EMAIL@EJEMPLO.COM" onChange={handleInputChange} />
+                            <input name="email" type="email" required className={inputClass} placeholder="EMAIL@EJEMPLO.COM" onChange={handleInputChange} onBlur={handleBlurCorreo} />
+                            {duplicados.correoExiste && (
+                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este dato en nuestro sistema.</p>
+                            )}
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp</label>
-                            <input name="telefono" type="tel" required className={inputClass} placeholder="3001234567" onChange={handleInputChange} />
+                            <input name="telefono" type="tel" required className={inputClass} placeholder="3001234567" onChange={handleInputChange} onBlur={handleBlurTelefono} />
+                            {duplicados.telefonoExiste && (
+                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este dato en nuestro sistema.</p>
+                            )}
                         </div>
                     </div>
 
@@ -270,6 +348,16 @@ const CensoPublico: React.FC = () => {
             <footer className="mt-12 text-center">
                 <p className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tudojang Core v4.3 • Protocolo de Carga Masiva</p>
             </footer>
+
+            <ModalConfirmacion
+                abierto={alertasConfirmacion.length > 0}
+                titulo="Revisa antes de enviar"
+                mensaje={alertasConfirmacion.join(' · ')}
+                onCerrar={() => setAlertasConfirmacion([])}
+                onConfirmar={handleConfirmarEnvio}
+                cargando={confirmandoEnvio}
+                textoBotonConfirmar="Enviar de todas formas"
+            />
         </div>
     );
 };

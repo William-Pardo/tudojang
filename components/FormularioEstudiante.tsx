@@ -1,6 +1,6 @@
 
 // components/FormularioEstudiante.tsx
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -8,10 +8,13 @@ import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD, RolUsuario } from '../tipos';
 import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar, IconoUsuario } from './Iconos';
 import FormInputError from './FormInputError';
+import ModalConfirmacion from './ModalConfirmacion';
 import { useSedes, useProgramas, useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { formatearPrecio } from '../utils/formatters';
 import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes } from '../utils/calculations';
+import { buscarEstudianteDuplicado } from '../servicios/estudiantesApi';
+import { generarAlertasAsistenciales } from '../utils/validacionAsistencial';
 
 interface Props {
     abierto: boolean;
@@ -141,6 +144,19 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     const watchedMetodoPago = watch('metodoPago') || 'efectivo';
     const watchedCorreo = watch('correo') || '';
     const watchedTutorCorreo = watch('tutor.correo') || '';
+    const watchedTelefono = watch('telefono') || '';
+    const watchedNumeroIdentificacion = watch('numeroIdentificacion') || '';
+    const watchedNombres = watch('nombres') || '';
+    const watchedApellidos = watch('apellidos') || '';
+    const watchedTutorNombres = watch('tutor.nombres') || '';
+    // Firebase Auth exige 1 correo = 1 cuenta = 1 rol: si alumno y tutor comparten correo
+    // (caso típico de menores sin correo propio), NO se puede invitar a ambos -- la segunda
+    // invitación explota en el backend con "Ya existe un usuario con el email X"
+    // (functions/academico/invitaciones.js). El acceso del Tutor ya alcanza el contenido del
+    // hijo (Centro de Estudios/Agenda/Buzón resuelven por tutor.correo == correo del alumno),
+    // así que la invitación al alumno queda bloqueada en este caso.
+    const correoCoincideConTutor = !!watchedCorreo && !!watchedTutorCorreo
+        && watchedCorreo.toLowerCase().trim() === watchedTutorCorreo.toLowerCase().trim();
 
     const { usuario } = useAuth();
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Editor;
@@ -148,9 +164,78 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     const edadCalculada = calcularEdadYGrupo(watchedFechaNacimiento).edad;
     const esMenor = edadCalculada > 0 && edadCalculada < 18;
 
+    // Registro de los 3 campos que se chequean contra duplicados en blur -- se guarda la
+    // referencia para poder envolver su `onBlur` (dispara handleBlurDuplicado) sin perder el
+    // onBlur propio de react-hook-form (que dispara la validación de yup).
+    const campoNumeroIdentificacion = register('numeroIdentificacion');
+    const campoTelefono = register('telefono');
+    const campoCorreo = register('correo');
+
+    // Chequeo de duplicados en vivo (on-blur) contra `estudiantes` del propio tenant -- acá SÍ
+    // hay sesión y permiso real (firestore.rules permite a Instructor leer estudiantes de su
+    // tenant), así que se consulta Firestore directo sin pasar por Cloud Function, y se puede
+    // mostrar el nombre del alumno encontrado (a diferencia del formulario público, sin auth).
+    const [duplicadosEncontrados, setDuplicadosEncontrados] = useState<Partial<Record<'correo' | 'telefono' | 'numeroIdentificacion', string>>>({});
+
+    // Alertas pendientes de confirmar (patrón "preguntar y confirmar", nunca rechazo
+    // silencioso): edad implausible/inusual, nombre calcado del tutor, o un duplicado
+    // detectado. Si hay alguna, se frena el guardado real hasta que el tenant confirme.
+    const [alertasPendientes, setAlertasPendientes] = useState<string[]>([]);
+    const [datosAConfirmar, setDatosAConfirmar] = useState<any | null>(null);
+    const [confirmandoGuardado, setConfirmandoGuardado] = useState(false);
+
+    const handleBlurDuplicado = async (campo: 'correo' | 'telefono' | 'numeroIdentificacion', valor: string) => {
+        if (!usuario?.tenantId || !valor.trim()) {
+            setDuplicadosEncontrados(prev => ({ ...prev, [campo]: undefined }));
+            return;
+        }
+        try {
+            const match = await buscarEstudianteDuplicado(usuario.tenantId, campo, valor, estudianteActual?.id);
+            setDuplicadosEncontrados(prev => ({ ...prev, [campo]: match ? `${match.nombres} ${match.apellidos}` : undefined }));
+        } catch (e) {
+            // Silencioso -- es una ayuda no bloqueante, un fallo de red no debe frenar la carga.
+            console.error(e);
+        }
+    };
+
+    const construirAlertas = (): string[] => {
+        const alertas = generarAlertasAsistenciales({
+            edad: watchedFechaNacimiento ? edadCalculada : null,
+            nombres: watchedNombres,
+            apellidos: watchedApellidos,
+            tutorNombres: watchedTutorNombres
+        });
+        if (duplicadosEncontrados.correo) alertas.push(`Ya existe un alumno con este correo: ${duplicadosEncontrados.correo}`);
+        if (duplicadosEncontrados.telefono) alertas.push(`Ya existe un alumno con este teléfono: ${duplicadosEncontrados.telefono}`);
+        if (duplicadosEncontrados.numeroIdentificacion) alertas.push(`Ya existe un alumno con esta identificación: ${duplicadosEncontrados.numeroIdentificacion}`);
+        return alertas;
+    };
+
+    const handleConfirmarGuardado = async () => {
+        if (!datosAConfirmar) return;
+        setConfirmandoGuardado(true);
+        try {
+            await onGuardar(datosAConfirmar);
+            onCerrar();
+        } finally {
+            setConfirmandoGuardado(false);
+            setAlertasPendientes([]);
+            setDatosAConfirmar(null);
+        }
+    };
+
     useEffect(() => {
         setValue('grupo', calcularEdadYGrupo(watchedFechaNacimiento).grupo, { shouldValidate: true });
     }, [watchedFechaNacimiento, setValue]);
+
+    // Si el checkbox de invitación al alumno quedó marcado de antes y el usuario edita el
+    // correo hasta que coincide con el del tutor, el input se deshabilita pero react-hook-form
+    // no limpia solo su valor -- sin esto, el submit igual mandaría ambas invitaciones.
+    useEffect(() => {
+        if (correoCoincideConTutor) {
+            setValue('enviarInvitacionLoginEstudiante', false);
+        }
+    }, [correoCoincideConTutor, setValue]);
 
     // Cálculos dinámicos de facturación para el resumen
     const resumenCobros = useMemo(() => {
@@ -177,11 +262,28 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         } : crearDefaultsEstudiante());
     }, [abierto, estudianteActual, borrador, reset, configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear, configClub.configuracionCuentasExternas?.invitarTutorAlCrear]);
 
-    const onSubmit = async (data: any) => { await onGuardar(data); onCerrar(); };
+    const onSubmit = async (data: any) => {
+        // Cuando este formulario se abre desde "revisar y aprobar" (Misión Kicho, `borrador`
+        // presente), MisionKicho.handleGuardarAprobacion YA vuelve a chequear con
+        // detectarInconsistencias (más rico: también formato y duplicados contra el resto del
+        // lote) antes de crear el estudiante -- confirmar acá también preguntaría lo mismo dos
+        // veces seguidas. Se deja un solo punto de confirmación, el de MisionKicho, para ese caso.
+        if (!borrador) {
+            const alertas = construirAlertas();
+            if (alertas.length > 0) {
+                setAlertasPendientes(alertas);
+                setDatosAConfirmar(data);
+                return;
+            }
+        }
+        await onGuardar(data);
+        onCerrar();
+    };
 
     if (!abierto) return null;
 
     return (
+        <>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-tkd-dark/80 p-4 animate-fade-in backdrop-blur-sm">
             <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-white/10">
                 <header className="p-8 border-b dark:border-gray-800 flex justify-between items-center">
@@ -207,8 +309,11 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label htmlFor="numeroIdentificacion" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Identificación</label>
-                                <input id="numeroIdentificacion" {...register('numeroIdentificacion')} placeholder="ID / DOCUMENTO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                <input id="numeroIdentificacion" {...campoNumeroIdentificacion} onBlur={(e) => { campoNumeroIdentificacion.onBlur(e); handleBlurDuplicado('numeroIdentificacion', e.target.value); }} placeholder="ID / DOCUMENTO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
                                 <FormInputError mensaje={errors.numeroIdentificacion?.message as string} />
+                                {duplicadosEncontrados.numeroIdentificacion && (
+                                    <p className="text-[10px] font-bold text-amber-600 uppercase mt-1">Ya existe un alumno con esta identificación: {duplicadosEncontrados.numeroIdentificacion}</p>
+                                )}
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="fechaNacimiento" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nacimiento</label>
@@ -303,15 +408,21 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                             </div>
                             <div className="space-y-1">
                                 <label htmlFor="telefono" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
-                                <input id="telefono" {...register('telefono')} placeholder="TELÉFONO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                                <input id="telefono" {...campoTelefono} onBlur={(e) => { campoTelefono.onBlur(e); handleBlurDuplicado('telefono', e.target.value); }} placeholder="TELÉFONO" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
                                 <FormInputError mensaje={errors.telefono?.message as string} />
+                                {duplicadosEncontrados.telefono && (
+                                    <p className="text-[10px] font-bold text-amber-600 uppercase mt-1">Ya existe un alumno con este teléfono: {duplicadosEncontrados.telefono}</p>
+                                )}
                             </div>
                         </div>
 
                         <div className="space-y-1">
                             <label htmlFor="correo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email</label>
-                            <input id="correo" {...register('correo')} placeholder="EMAIL" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
+                            <input id="correo" {...campoCorreo} onBlur={(e) => { campoCorreo.onBlur(e); handleBlurDuplicado('correo', e.target.value); }} placeholder="EMAIL" className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white" />
                             <FormInputError mensaje={errors.correo?.message as string} />
+                            {duplicadosEncontrados.correo && (
+                                <p className="text-[10px] font-bold text-amber-600 uppercase mt-1">Ya existe un alumno con este correo: {duplicadosEncontrados.correo}</p>
+                            )}
                         </div>
 
                         {esMenor && (
@@ -381,17 +492,19 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                     </span>
                                 </label>
 
-                                <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all ${watchedCorreo ? 'bg-white dark:bg-gray-800 border-blue-100 dark:border-blue-900/40 cursor-pointer' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-100 dark:border-white/5 opacity-60 cursor-not-allowed'}`}>
+                                <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all ${watchedCorreo && !correoCoincideConTutor ? 'bg-white dark:bg-gray-800 border-blue-100 dark:border-blue-900/40 cursor-pointer' : 'bg-gray-100 dark:bg-gray-800/50 border-gray-100 dark:border-white/5 opacity-60 cursor-not-allowed'}`}>
                                     <input
                                         type="checkbox"
                                         {...register('enviarInvitacionLoginEstudiante')}
-                                        disabled={!watchedCorreo}
+                                        disabled={!watchedCorreo || correoCoincideConTutor}
                                         className="w-5 h-5 accent-tkd-blue mt-0.5"
                                     />
                                     <span>
                                         <span className="block text-xs font-black uppercase text-gray-900 dark:text-white">Enviar invitación de login al alumno (opcional)</span>
                                         <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
-                                            {watchedCorreo ? `Destino: ${watchedCorreo}` : 'Solo si el alumno tiene correo propio.'}
+                                            {correoCoincideConTutor
+                                                ? 'Es el mismo correo del tutor: ya accede a este contenido con su login de Tutor.'
+                                                : (watchedCorreo ? `Destino: ${watchedCorreo}` : 'Solo si el alumno tiene correo propio.')}
                                         </span>
                                     </span>
                                 </label>
@@ -532,6 +645,16 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                 </form>
             </div>
         </div>
+        <ModalConfirmacion
+            abierto={alertasPendientes.length > 0}
+            titulo="Revisa antes de guardar"
+            mensaje={alertasPendientes.join(' · ')}
+            onCerrar={() => { setAlertasPendientes([]); setDatosAConfirmar(null); }}
+            onConfirmar={handleConfirmarGuardado}
+            cargando={confirmandoGuardado}
+            textoBotonConfirmar="Guardar de todas formas"
+        />
+        </>
     );
 };
 

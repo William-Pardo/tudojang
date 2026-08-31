@@ -26,6 +26,7 @@ import Loader from '../components/Loader';
 import FormularioEstudiante from '../components/FormularioEstudiante';
 import CountdownTimer from '../components/CountdownTimer';
 import ModalEditarRegistroCenso from '../components/ModalEditarRegistroCenso';
+import ModalConfirmacion from '../components/ModalConfirmacion';
 import { MISION_ID_DIRECTO, MISION_KICHO_DURACION_DIAS } from '../constantes';
 
 const mapearRegistroABorrador = (reg: RegistroTemporal): Partial<Estudiante> => {
@@ -116,6 +117,17 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     // (registros, ligados a la campaña) como a "Solicitudes Pendientes" (registrosDirectos).
     const [registroEnEdicion, setRegistroEnEdicion] = useState<RegistroTemporal | null>(null);
     const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
+    // Patrón "preguntar y confirmar" para APROBAR un registro con inconsistencias detectadas
+    // (detectarInconsistencias: formato inválido o posible duplicado contra otros registros /
+    // estudiantes reales) -- nunca bloquea la aprobación, solo la frena hasta que el tenant
+    // confirme explícitamente. `ejecutar` guarda la acción real (aprobar directo vía
+    // handleValidar, o guardar+limpiar vía handleGuardarAprobacion) a correr tras confirmar.
+    const [pendienteConfirmarAprobacion, setPendienteConfirmarAprobacion] = useState<{
+        alertas: AlertaCenso[];
+        ejecutar: () => Promise<void>;
+    } | null>(null);
+    const [confirmandoAprobacion, setConfirmandoAprobacion] = useState(false);
 
     const cargarDatos = async () => {
         if (!usuario) return;
@@ -245,14 +257,28 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
 
     const handleGuardarAprobacion = async (datosEstudiante: any) => {
         if (!solicitudEnRevision) return;
-        await guardarEstudiante(datosEstudiante);
-        try {
-            await eliminarRegistroTemporal(solicitudEnRevision.id);
-        } catch (e) {
-            mostrarNotificacion("Estudiante creado, pero no se pudo limpiar la solicitud pendiente.", "warning");
+        // Se captura el registro objetivo ANTES de cualquier `await`/confirmación diferida --
+        // `solicitudEnRevision` puede quedar en null (ej. FormularioEstudiante cierra su propio
+        // modal) antes de que el tenant confirme la aprobación acá abajo.
+        const registroObjetivo = solicitudEnRevision;
+
+        const ejecutarAprobacion = async () => {
+            await guardarEstudiante(datosEstudiante);
+            try {
+                await eliminarRegistroTemporal(registroObjetivo.id);
+            } catch (e) {
+                mostrarNotificacion("Estudiante creado, pero no se pudo limpiar la solicitud pendiente.", "warning");
+            }
+            setRegistrosDirectos(prev => prev.filter(r => r.id !== registroObjetivo.id));
+            setSolicitudEnRevision(null);
+        };
+
+        const alertas = detectarInconsistencias(registroObjetivo, [...registros, ...registrosDirectos], estudiantes);
+        if (alertas.length > 0) {
+            setPendienteConfirmarAprobacion({ alertas, ejecutar: ejecutarAprobacion });
+            return;
         }
-        setRegistrosDirectos(prev => prev.filter(r => r.id !== solicitudEnRevision.id));
-        setSolicitudEnRevision(null);
+        await ejecutarAprobacion();
     };
 
     const handleActivarKichoAuto = async () => {
@@ -344,11 +370,25 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
     };
 
     const handleValidar = async (regId: string, estado: 'verificado' | 'rechazado') => {
-        try {
-            await validarRegistroTemporal(regId, estado);
-            setRegistros(prev => prev.map(r => r.id === regId ? { ...r, estado } : r));
-            mostrarNotificacion(`Registro ${estado}`, "success");
-        } catch (e) { mostrarNotificacion("Error al procesar", "error"); }
+        const ejecutar = async () => {
+            try {
+                await validarRegistroTemporal(regId, estado);
+                setRegistros(prev => prev.map(r => r.id === regId ? { ...r, estado } : r));
+                mostrarNotificacion(`Registro ${estado}`, "success");
+            } catch (e) { mostrarNotificacion("Error al procesar", "error"); }
+        };
+
+        // Solo se gatea la APROBACIÓN ('verificado') con confirmación -- rechazar un registro
+        // con datos raros no necesita "preguntar y confirmar", ya se está descartando.
+        if (estado === 'verificado') {
+            const reg = registros.find(r => r.id === regId);
+            const alertas = reg ? detectarInconsistencias(reg, [...registros, ...registrosDirectos], estudiantes) : [];
+            if (alertas.length > 0) {
+                setPendienteConfirmarAprobacion({ alertas, ejecutar });
+                return;
+            }
+        }
+        await ejecutar();
     };
 
     const handleGuardarEdicionRegistro = async (id: string, datos: RegistroTemporal['datos']) => {
@@ -489,6 +529,26 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
         />
     );
 
+    const modalConfirmarAprobacion = pendienteConfirmarAprobacion && (
+        <ModalConfirmacion
+            abierto={true}
+            titulo="Confirmar Aprobación"
+            mensaje={`Se detectaron posibles inconsistencias en este registro: ${pendienteConfirmarAprobacion.alertas.map(a => a.mensaje).join(' · ')}`}
+            onCerrar={() => setPendienteConfirmarAprobacion(null)}
+            onConfirmar={async () => {
+                setConfirmandoAprobacion(true);
+                try {
+                    await pendienteConfirmarAprobacion.ejecutar();
+                } finally {
+                    setConfirmandoAprobacion(false);
+                    setPendienteConfirmarAprobacion(null);
+                }
+            }}
+            cargando={confirmandoAprobacion}
+            textoBotonConfirmar="Aprobar de todas formas"
+        />
+    );
+
     if (cargando) return <Loader texto="Escaneando Protocolos..." />;
 
     // LÓGICA DE ONBOARDING: Si no hay misión y el club es nuevo (< 10 alumnos)
@@ -604,6 +664,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
                 </AnimatePresence>
                 {modalAprobarDirecta}
                 {modalEditarRegistro}
+                {modalConfirmarAprobacion}
             </div>
         );
     }
@@ -851,6 +912,7 @@ const VistaMisionKicho: React.FC<Props> = ({ guardarEstudiante, cargandoAccion }
             </AnimatePresence>
             {modalAprobarDirecta}
             {modalEditarRegistro}
+            {modalConfirmarAprobacion}
         </div>
     );
 };
