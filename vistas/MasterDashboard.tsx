@@ -139,12 +139,22 @@ const VistaMasterDashboard: React.FC = () => {
         setMisionAProcesar(mision);
     };
 
+    // Fix ERR-0020: inyectarEstudiantesKicho ya no es todo-o-nada (ver el comentario en
+    // servicios/censoApi.ts) -- devuelve cuántos registros entraron y cuáles fallaron, mismo
+    // criterio de mensaje que ModalImportacionMasiva.tsx para la importación masiva por CSV.
+    // Si algo falla, la misión se queda en 'legalizado' (bandeja de pendientes) y volver a
+    // abrir el homologador solo trae los registros que siguen sin procesar.
     const ejecutarInyeccionAliant = async () => {
         if (!misionAProcesar) return;
         setProcesandoInyeccion(true);
         try {
-            await inyectarEstudiantesKicho(misionAProcesar.id, registrosAProcesar);
-            mostrarNotificacion("Protocolo finalizado. Datos inyectados al núcleo oficial.", "success");
+            const { exitos, fallos } = await inyectarEstudiantesKicho(misionAProcesar.id, registrosAProcesar);
+            if (fallos.length === 0) {
+                mostrarNotificacion(`Protocolo finalizado. ${exitos} estudiantes inyectados al núcleo oficial.`, "success");
+            } else {
+                const detalle = fallos.length === 1 ? '1 registro no se pudo inyectar.' : `${fallos.length} registros no se pudieron inyectar.`;
+                mostrarNotificacion(`Se inyectaron ${exitos} de ${registrosAProcesar.length}. ${detalle} Reabrí el protocolo para reintentar solo esos.`, "error");
+            }
             setMisionAProcesar(null);
             cargarDatos();
         } catch (e) { mostrarNotificacion("Error en proceso de inyección", "error"); }

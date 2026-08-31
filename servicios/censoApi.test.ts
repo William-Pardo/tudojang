@@ -1,4 +1,4 @@
-import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, doc, getDoc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
   crearMisionKicho,
@@ -224,49 +224,55 @@ describe('censoApi', () => {
     });
   });
 
+  // Fix ERR-0020 (2026-08-31): antes escribía `estudiantes` con un writeBatch directo,
+  // bloqueado sin excepción por firestore.rules desde el 2026-07-18. Ahora pasa por la Cloud
+  // Function `crearEstudiante` (mismo callable que agregarEstudiante/ModalImportacionMasiva),
+  // registro por registro, y ya no es todo-o-nada: un fallo se acumula en `fallos` sin tumbar
+  // el resto ni la misión.
   describe('inyectarEstudiantesKicho', () => {
-    it('debería inyectar estudiantes y actualizar la misión y registros', async () => {
-      const mockMision: MisionKicho = { id: 'm1', tenantId: 't1', nombreMision: 'Mision Activa', activa: true, registrosRecibidos: 0, estadoLote: 'captura', fechaExpiracion: '2024-12-31', sedeId: 's1' };
-      (getDoc as jest.Mock).mockResolvedValueOnce({
-        exists: () => true,
-        data: () => mockMision,
-      });
+    const mockMision: MisionKicho = { id: 'm1', tenantId: 't1', nombreMision: 'Mision Activa', activa: true, registrosRecibidos: 0, estadoLote: 'legalizado', fechaExpiracion: '2024-12-31', sedeId: 's1' };
+    const mockRegistros: RegistroTemporal[] = [
+      { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'verificado', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante1', apellidos: 'Apellido1', telefono: '123', email: 'e1@test.com', fechaNacimiento: '2010-01-01' } },
+      { id: 'reg2', misionId: 'm1', tenantId: 't1', estado: 'verificado', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante2', apellidos: 'Apellido2', telefono: '456', email: 'e2@test.com', fechaNacimiento: '2011-02-02' } },
+    ];
 
-      const mockRegistros: RegistroTemporal[] = [
-        { id: 'reg1', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante1', apellidos: 'Apellido1', telefono: '123', email: 'e1@test.com', fechaNacimiento: '2010-01-01' } },
-        { id: 'reg2', misionId: 'm1', tenantId: 't1', estado: 'pendiente', fechaRegistro: 'hoy', datos: { nombres: 'Estudiante2', apellidos: 'Apellido2', telefono: '456', email: 'e2@test.com', fechaNacimiento: '2011-02-02' } },
-      ];
+    it('debería inyectar cada registro vía la Cloud Function crearEstudiante y marcar registros y misión como procesados', async () => {
+      (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => true, data: () => mockMision });
+      mockCallable.mockResolvedValue({ data: { id: 'nuevo' } });
 
-      const mockBatch = {
-        set: jest.fn(),
-        update: jest.fn(),
-        commit: jest.fn(),
-      };
-      (writeBatch as jest.Mock).mockReturnValue(mockBatch);
+      const resultado = await inyectarEstudiantesKicho('m1', mockRegistros);
 
-      await inyectarEstudiantesKicho('m1', mockRegistros);
-
-      expect(mockBatch.set).toHaveBeenCalledTimes(2);
-      expect(mockBatch.update).toHaveBeenCalledTimes(3); // 2 registros + 1 misión
-      expect(mockBatch.commit).toHaveBeenCalled();
-      expect(mockBatch.set).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          nombres: 'ESTUDIANTE1',
-          tenantId: 't1',
-          sedeId: 's1',
-          numeroIdentificacion: '123',
-        })
+      expect(mockCallable).toHaveBeenCalledTimes(2);
+      expect(mockCallable).toHaveBeenCalledWith(
+        expect.objectContaining({ nombres: 'ESTUDIANTE1', tenantId: 't1', sedeId: 's1', numeroIdentificacion: '123' })
       );
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg1'), { estado: 'procesado' });
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg2'), { estado: 'procesado' });
-      expect(mockBatch.update).toHaveBeenCalledWith(doc(db, 'misiones_kicho', 'm1'), { estadoLote: 'procesado' });
+      expect(updateDoc).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg1'), { estado: 'procesado' });
+      expect(updateDoc).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg2'), { estado: 'procesado' });
+      expect(updateDoc).toHaveBeenCalledWith(doc(db, 'misiones_kicho', 'm1'), { estadoLote: 'procesado' });
+      expect(resultado).toEqual({ exitos: 2, fallos: [] });
+    });
+
+    it('no debería tumbar el resto del lote si un registro falla, ni marcar la misión como procesada', async () => {
+      (getDoc as jest.Mock).mockResolvedValueOnce({ exists: () => true, data: () => mockMision });
+      const errorSimulado = new Error('permission-denied');
+      mockCallable
+        .mockResolvedValueOnce({ data: { id: 'nuevo' } })
+        .mockRejectedValueOnce(errorSimulado);
+
+      const resultado = await inyectarEstudiantesKicho('m1', mockRegistros);
+
+      expect(mockCallable).toHaveBeenCalledTimes(2);
+      expect(updateDoc).toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg1'), { estado: 'procesado' });
+      expect(updateDoc).not.toHaveBeenCalledWith(doc(db, 'registros_temporales', 'reg2'), { estado: 'procesado' });
+      expect(updateDoc).not.toHaveBeenCalledWith(doc(db, 'misiones_kicho', 'm1'), { estadoLote: 'procesado' });
+      expect(resultado).toEqual({ exitos: 1, fallos: [{ registro: mockRegistros[1], error: errorSimulado }] });
     });
 
     it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as jest.Mocked<typeof import('../firebase/config')>).isFirebaseConfigured = false;
-      await inyectarEstudiantesKicho('m1', []);
-      expect(writeBatch).not.toHaveBeenCalled();
+      const resultado = await inyectarEstudiantesKicho('m1', []);
+      expect(mockCallable).not.toHaveBeenCalled();
+      expect(resultado).toEqual({ exitos: 0, fallos: [] });
     });
   });
 
