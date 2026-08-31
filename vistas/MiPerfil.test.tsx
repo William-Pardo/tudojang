@@ -59,6 +59,27 @@ const usuarioTutorMock = {
     tenantId: 'test-tenant',
 };
 
+const usuarioEstudianteMock = {
+    id: 'est-uid-1',
+    email: 'estudiante@test.com',
+    nombreUsuario: 'Estudiante Test',
+    numeroIdentificacion: '888',
+    whatsapp: '3000000001',
+    rol: RolUsuario.Estudiante,
+    tenantId: 'test-tenant',
+};
+
+const usuarioAdminMock = {
+    id: 'admin-1',
+    email: 'admin@test.com',
+    nombreUsuario: 'Admin Test',
+    numeroIdentificacion: '777',
+    whatsapp: '3000000002',
+    rol: RolUsuario.Admin,
+    tenantId: 'test-tenant',
+    contrato: { sueldoBase: 3500000, duracionMeses: 12, tipoVinculacion: 'Mes', fechaInicio: '2024-01-01', lugarEjecucion: 'principal', firmado: true },
+};
+
 const crearEstudianteVinculado = (overrides: Partial<Estudiante> = {}): Estudiante => ({
     id: 'est-1',
     tenantId: 'test-tenant',
@@ -140,5 +161,50 @@ describe('VistaMiPerfil', () => {
             expect(screen.getByText('REPORTAR PAGO AHORA')).toBeInTheDocument();
         });
         expect(screen.queryByText('Medios de Pago Directo')).not.toBeInTheDocument();
+    });
+
+    // Bug real (2026-08-31, reportado tenant Cocodrilos): "Mis Talones de Pago" es nómina de
+    // STAFF (usuario.contrato.sueldoBase) -- el gate previo (`!esTutorOperativo`, solo excluía
+    // Tutor) dejaba pasar a Estudiante, que veía montos de sueldo hardcodeados sin sentido para
+    // su rol. Ningún consultor (Tutor NI Estudiante) debe ver esta sección.
+    describe('Mis Talones de Pago -- visibilidad por rol', () => {
+        it('Estudiante NO ve la sección de Talones de Pago (nómina de staff)', async () => {
+            useAuthMock.mockReturnValue({ usuario: usuarioEstudianteMock });
+            useConfiguracionMock.mockReturnValue({ configClub: {} });
+            useTenantMock.mockReturnValue({ tenant: {} });
+            resolveLinkedStudentMock.mockResolvedValue([]);
+            obtenerEstudiantesDelTutorMock.mockResolvedValue([]);
+
+            renderComponent();
+
+            await waitFor(() => expect(screen.queryByText('Cargando')).not.toBeInTheDocument());
+            expect(screen.queryByText('Mis Talones de Pago')).not.toBeInTheDocument();
+            // Tampoco debe caer en el flujo de reporte de pago del Tutor (resuelve por
+            // tutor.correo, no le corresponde a un Estudiante).
+            expect(screen.queryByText('Estado de Pago y Reporte de Comprobante')).not.toBeInTheDocument();
+        });
+
+        it('Estudiante NO ve montos de sueldo de staff en ningún lado de la vista', async () => {
+            useAuthMock.mockReturnValue({ usuario: usuarioEstudianteMock });
+            useConfiguracionMock.mockReturnValue({ configClub: {} });
+            useTenantMock.mockReturnValue({ tenant: {} });
+            resolveLinkedStudentMock.mockResolvedValue([]);
+            obtenerEstudiantesDelTutorMock.mockResolvedValue([]);
+
+            renderComponent();
+
+            await waitFor(() => expect(screen.queryByText('Cargando')).not.toBeInTheDocument());
+            expect(screen.queryByText('$1.200.000')).not.toBeInTheDocument();
+        });
+
+        it('Admin (staff) SÍ ve la sección de Talones de Pago', async () => {
+            useAuthMock.mockReturnValue({ usuario: usuarioAdminMock });
+            useConfiguracionMock.mockReturnValue({ configClub: {} });
+            useTenantMock.mockReturnValue({ tenant: {} });
+
+            renderComponent();
+
+            expect(await screen.findByText('Mis Talones de Pago')).toBeInTheDocument();
+        });
     });
 });
