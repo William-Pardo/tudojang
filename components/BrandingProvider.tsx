@@ -9,6 +9,7 @@ import Loader from './Loader';
 import { IconoAlertaTriangulo } from './Iconos';
 import VistaPasarelaPagos from '../vistas/PasarelaPagos';
 import { useAuth } from '../context/AuthContext';
+import { usePwaInstallBranding } from '../hooks/usePwaInstallBranding';
 
 interface TenantContextType {
     tenant: ConfiguracionClub | null;
@@ -160,6 +161,11 @@ const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     useEffect(() => {
         cargarTenant();
     }, [usuario?.tenantId, clubParam]);
+
+    // Mantiene el ícono/nombre que iOS y Chrome usan al instalar el PWA sincronizados con el
+    // tenant resuelto arriba (post-login o vía ?club=slug). Debe llamarse sin condicionar en
+    // `estado` para respetar las reglas de hooks (los early returns de abajo son posteriores).
+    usePwaInstallBranding(tenant);
 
     if (estado === 'cargando') return <div className="h-screen flex items-center justify-center bg-tkd-dark"><Loader texto="Sincronizando..." /></div>;
 
