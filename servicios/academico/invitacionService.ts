@@ -102,14 +102,23 @@ export const createInvitation = async (
   } as InvitacionUsuario;
 };
 
+// Orden mas reciente primero (creadoEn desc). Bug real (2026-09-01): tutores/alumnos
+// reenviados terminan con 2+ documentos en `invitaciones` (el viejo `revocada` que deja
+// resendInvitation + el nuevo `pendiente`). Sin este orden, cualquier consumidor que se
+// quede con "la" invitacion de un correo (InvitacionesView usa `.find()`) podia agarrar la
+// vieja revocada -- una fila muerta, sin boton de accion, escondiendo la invitacion valida.
+const porCreadoEnDesc = (a: InvitacionUsuario, b: InvitacionUsuario) => b.creadoEn.localeCompare(a.creadoEn);
+
 export const listInvitations = async (tenantId: string): Promise<InvitacionUsuario[]> => {
   if (!isFirebaseConfigured) {
-    return mockInvitations.filter(inv => inv.tenantId === tenantId);
+    return mockInvitations.filter(inv => inv.tenantId === tenantId).sort(porCreadoEnDesc);
   }
 
   const colRef = collection(db, 'tenants', tenantId, 'invitaciones');
   const snap = await getDocs(colRef);
-  return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as InvitacionUsuario));
+  return snap.docs
+    .map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as InvitacionUsuario))
+    .sort(porCreadoEnDesc);
 };
 
 export const resendInvitation = async (
