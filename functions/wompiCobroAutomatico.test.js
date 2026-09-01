@@ -924,10 +924,10 @@ test('cobroAutomaticoMensual: cobra el monto MEDIDO segun el conteo facturable i
   await servicio(new Date());
 
   // Con descuentoVolumenActivo=false (ajuste de precios, 2026-08-25) los 60 facturables se
-  // cobran a tarifa plana: 60*4.500 = 270.000; + 1 sede extra ($89.900) = 359.900 pesos =
-  // 35.990.000 centavos (calcularFacturacionMensual, facturacion.js).
+  // cobran a tarifa plana: 60*5.000 = 300.000; + 1 sede extra ($89.900) = 389.900 pesos =
+  // 38.990.000 centavos (calcularFacturacionMensual, facturacion.js).
   assert.equal(tenantIdContado, 'tnt-1');
-  assert.equal(amountRecibido, 35990000);
+  assert.equal(amountRecibido, 38990000);
 });
 
 test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra solo el tramo de estudiantes', async () => {
@@ -950,8 +950,8 @@ test('cobroAutomaticoMensual: un tenant sin extras contratados ni bono cobra sol
 
   await servicio(new Date());
 
-  // Tarifa plana (descuentoVolumenActivo=false): 30*4.500 = 135.000 pesos = 13.500.000 centavos.
-  assert.equal(amountRecibido, 13500000);
+  // Tarifa plana (descuentoVolumenActivo=false): 30*5.000 = 150.000 pesos = 15.000.000 centavos.
+  assert.equal(amountRecibido, 15000000);
 });
 
 test('cobroAutomaticoMensual: 0 estudiantes facturables cobra $0 (Scenario facturacion-metered: fin de la prueba sin estudiantes matriculados)', async () => {

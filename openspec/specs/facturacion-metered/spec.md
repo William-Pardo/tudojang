@@ -47,9 +47,9 @@ El sistema MUST soportar desactivar el esquema marginal por tramos sin eliminar 
 
 #### Scenario: Descuento por volumen desactivado (estado vigente desde 2026-08-25)
 
-- GIVEN `descuentoVolumenActivo: false` y `tarifaEstandarPorEstudiante: 4500`
+- GIVEN `descuentoVolumenActivo: false` y `tarifaEstandarPorEstudiante: 5000`
 - WHEN se calcula el monto de un tenant con N estudiantes facturables
-- THEN el monto por estudiantes MUST ser N × $4.500, sin aplicar tramos ni descuento marginal
+- THEN el monto por estudiantes MUST ser N × $5.000, sin aplicar tramos ni descuento marginal
 
 ### Requirement: Extras de sede y equipo técnico se suman al monto
 
