@@ -145,6 +145,22 @@ describe('Configuracion - medios de pago (pagoNequi/pagoDaviplata/pagoBreB/pagoB
 
         expect(inputNequi).toHaveValue('300 111 2222');
     });
+
+    // Cobro Justo (opt-in por tenant, ver components/FormularioEstudiante.tsx::aplicaCobroJusto):
+    // el switch vive en la misma sección que medios de pago/Formulario de Inscripción.
+    it('el switch de Cobro Justo refleja el estado guardado y se puede activar', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<VistaConfiguracion />);
+
+        const switchCobroJusto = container.querySelector('input[name="cobroJustoActivo"]') as HTMLInputElement;
+        expect(switchCobroJusto).toBeInTheDocument();
+        expect(switchCobroJusto).not.toBeChecked();
+        expect(screen.getByText('Cobro Justo')).toBeInTheDocument();
+
+        await user.click(switchCobroJusto);
+
+        expect(switchCobroJusto).toBeChecked();
+    });
 });
 
 // SDD pricing-cupo-real (Bloque 4b, tareas 4.5/4.6): panel de uso + extras en el tab

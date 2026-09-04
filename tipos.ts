@@ -171,6 +171,10 @@ export interface ConfiguracionClub {
     cobroAutomaticoActivo?: boolean;
     cobroAutomaticoIntentosFallidos?: number; // se resetea a 0 tras un cobro exitoso
     linkPagoMensualidad?: string; // URL de Payment Link externo (Wompi/PayU/ePayco) de la CUENTA de la academia, para que sus alumnos paguen mensualidad en línea. Tudojang no procesa ni recibe este dinero -- ver Términos de Servicio. Debe pertenecer a un dominio de DOMINIOS_PASARELAS_PAGO_PERMITIDOS (constantes.ts).
+    // "Cobro Justo": evoluciona la Regla de Fin de Mes (cobrarMesSiguiente, día 26+, todo o
+    // nada) a un prorrateo diario desde el día 10. Opt-in por tenant -- si no está activo, el
+    // formulario de alta mantiene exactamente el comportamiento anterior.
+    cobroJustoActivo?: boolean;
     // Campos de pricing por cupo real (SDD pricing-cupo-real, Bloque 2 -- capacidad-tenant /
     // facturacion-metered). Corte final (Bloque 4, tasks.md 4.13): `plan`/`limiteEstudiantes`/
     // `limiteUsuarios`/`limiteSedes` fueron RETIRADOS de esta interfaz -- cualquier lector que
@@ -246,6 +250,11 @@ export interface Estudiante {
     };
     metodoPago?: 'efectivo' | 'link';
     cobrarMesSiguiente?: boolean;
+    // Registro del monto que se le informó al staff al momento del alta, cuando el tenant
+    // tiene "Cobro Justo" activo y el ingreso fue día 10+ del mes (ver calcularMontoCobroJusto
+    // en utils/calculations.ts). Puramente informativo/auditoría -- igual que
+    // cobrarMesSiguiente, no dispara ningún cálculo automático de saldoDeudor.
+    montoCobroJustoAlIngreso?: number;
     estadoMatricula: 'activo' | 'retirado';
     fechaRetiro?: string;
     fechaReactivacion?: string;

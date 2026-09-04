@@ -30,6 +30,18 @@ export const calcularSumaProgramasRecurrentes = (estudiante: Estudiante, program
 };
 
 /**
+ * "Cobro Justo": calcula el monto proporcional de la mensualidad para un estudiante que
+ * ingresa el día 10 o después del mes -- solo se le cobra por los días que le quedan de mes
+ * (incluyendo el día de ingreso), no el mes completo. Redondeado al peso más cercano.
+ */
+export const calcularMontoCobroJusto = (valorMensualidad: number, fecha: Date = new Date()): number => {
+    const diaHoy = fecha.getDate();
+    const diasEnElMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).getDate();
+    const diasRestantes = diasEnElMes - diaHoy + 1;
+    return Math.round((valorMensualidad * diasRestantes) / diasEnElMes);
+};
+
+/**
  * Retorna el valor TOTAL que el estudiante debe pagar cada mes
  */
 export const calcularTotalMensualidadEstudiante = (

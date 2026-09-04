@@ -65,12 +65,12 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FormularioEstudiante, { calcularEdadYGrupo } from './FormularioEstudiante';
-import { GrupoEdad, EstadoPago, GradoTKD, type Estudiante } from '../tipos';
+import { GrupoEdad, EstadoPago, GradoTKD, RolUsuario, type Estudiante } from '../tipos';
 import { DataProvider } from '../context/DataContext';
 import { useTenant } from '../components/BrandingProvider';
 import { buscarEstudianteDuplicado } from '../servicios/estudiantesApi';
 import React from 'react';
-import { describe, it, jest, beforeEach, expect } from '@jest/globals';
+import { describe, it, jest, beforeEach, afterEach, expect } from '@jest/globals';
 
 // Mock del hook de autosave
 jest.mock('../hooks/useAutosave', () => ({
@@ -430,6 +430,61 @@ describe('FormularioEstudiante', () => {
 
     await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByText('Revisa antes de guardar')).not.toBeInTheDocument();
+  });
+
+  // Cobro Justo (evolución opt-in de la Regla de Fin de Mes, ver utils/calculations.ts::
+  // calcularMontoCobroJusto): día 10+ del mes, solo si el tenant activó configClub.cobroJustoActivo.
+  describe('Cobro Justo', () => {
+    beforeEach(() => {
+      mockState.usuario = { rol: RolUsuario.Admin, tenantId: 'test-tenant' };
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('con Cobro Justo activo y alta el día 15, muestra el monto prorrateado y NO el toggle viejo', () => {
+      jest.useFakeTimers().setSystemTime(new Date(2026, 3, 15)); // abril, 30 días -> quedan 16
+      mockState.configClub.cobroJustoActivo = true;
+
+      renderComponent();
+
+      expect(screen.getByText('Cobro Justo (Día 10+)')).toBeInTheDocument();
+      expect(screen.getByText(/26[.,]667/)).toBeInTheDocument(); // round(50000*16/30)
+      expect(screen.queryByText('Gestión de Fin de Mes (Día 26+)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Abonar a mes siguiente')).not.toBeInTheDocument();
+    });
+
+    it('con Cobro Justo activo pero antes del día 10, no muestra ningún bloque de fin de mes', () => {
+      jest.useFakeTimers().setSystemTime(new Date(2026, 3, 5));
+      mockState.configClub.cobroJustoActivo = true;
+
+      renderComponent();
+
+      expect(screen.queryByText('Cobro Justo (Día 10+)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Gestión de Fin de Mes (Día 26+)')).not.toBeInTheDocument();
+    });
+
+    it('sin Cobro Justo activo, el día 27 sigue mostrando el toggle viejo tal cual estaba', () => {
+      jest.useFakeTimers().setSystemTime(new Date(2026, 3, 27));
+      mockState.configClub.cobroJustoActivo = false;
+
+      renderComponent();
+
+      expect(screen.getByText('Gestión de Fin de Mes (Día 26+)')).toBeInTheDocument();
+      expect(screen.getByText('Abonar a mes siguiente')).toBeInTheDocument();
+      expect(screen.queryByText('Cobro Justo (Día 10+)')).not.toBeInTheDocument();
+    });
+
+    it('sin rol Admin, ningún bloque de fin de mes se muestra aunque el día y la config apliquen', () => {
+      jest.useFakeTimers().setSystemTime(new Date(2026, 3, 15));
+      mockState.configClub.cobroJustoActivo = true;
+      mockState.usuario = { rol: RolUsuario.Maestro, tenantId: 'test-tenant' };
+
+      renderComponent();
+
+      expect(screen.queryByText('Cobro Justo (Día 10+)')).not.toBeInTheDocument();
+    });
   });
 });
 
