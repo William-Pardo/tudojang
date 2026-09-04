@@ -13,6 +13,7 @@
 // `components/academico/EscanerAsistenciaClase.tsx` (flujo nuevo de Clase en
 // Vivo, callable `registrarAsistenciaJornada`).
 import React, { useEffect, useRef, useState } from 'react';
+import jsQR from 'jsqr';
 import { useNotificacion } from '../../context/NotificacionContext';
 import Loader from '../Loader';
 import { IconoCerrar, IconoAlertaTriangulo, IconoAprobar, IconoLogoOficial } from '../Iconos';
@@ -72,22 +73,46 @@ const EscanerQR: React.FC<EscanerQRProps> = ({
                 document.cookie = `${DEVICE_AUTH_KEY}=true; max-age=31536000; path=/`;
 
                 setCargando(false);
+
+                // Bug real (2026-09-04): Safari -- y por extension CUALQUIER navegador en
+                // iOS, obligados por Apple a correr sobre WebKit -- nunca implemento
+                // BarcodeDetector (Shape Detection API). Sin este fallback, la camara se
+                // activaba pero jamas detectaba nada: el usuario se quedaba mirando el
+                // video indefinidamente, sin ningun mensaje, porque el bloque `if (Detector)`
+                // completo se saltaba en silencio. jsQR (JS puro, sin dependencia de APIs
+                // nativas del navegador) decodifica manualmente cada frame capturado en un
+                // canvas offscreen -- mas lento que la API nativa, pero funciona en
+                // cualquier navegador. Se usa la API nativa cuando existe (mas eficiente en
+                // Chrome/Edge/Android) y jsQR solo como respaldo.
                 const Detector = (window as any).BarcodeDetector;
-                if (Detector) {
-                    const detector = new Detector({ formats: ['qr_code'] });
-                    scannerTimerRef.current = window.setInterval(async () => {
-                        if (!videoRef.current || procesandoRef.current) return;
-                        try {
-                            const codes = await detector.detect(videoRef.current);
-                            if (codes[0]?.rawValue) {
-                                procesandoRef.current = true;
-                                await procesarCodigoQR(codes[0].rawValue);
-                            }
-                        } catch {
-                            setErrorCamara("Error del hardware de la cámara.");
+                const detectorNativo = Detector ? new Detector({ formats: ['qr_code'] }) : null;
+                const canvasOffscreen = document.createElement('canvas');
+                const contextoOffscreen = canvasOffscreen.getContext('2d', { willReadFrequently: true });
+
+                const detectarConJsQR = (video: HTMLVideoElement): string | null => {
+                    if (!contextoOffscreen || video.readyState !== video.HAVE_ENOUGH_DATA) return null;
+                    canvasOffscreen.width = video.videoWidth;
+                    canvasOffscreen.height = video.videoHeight;
+                    contextoOffscreen.drawImage(video, 0, 0, canvasOffscreen.width, canvasOffscreen.height);
+                    const imageData = contextoOffscreen.getImageData(0, 0, canvasOffscreen.width, canvasOffscreen.height);
+                    const codigo = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                    return codigo?.data || null;
+                };
+
+                scannerTimerRef.current = window.setInterval(async () => {
+                    if (!videoRef.current || procesandoRef.current) return;
+                    try {
+                        const valorDetectado = detectorNativo
+                            ? (await detectorNativo.detect(videoRef.current))[0]?.rawValue
+                            : detectarConJsQR(videoRef.current);
+                        if (valorDetectado) {
+                            procesandoRef.current = true;
+                            await procesarCodigoQR(valorDetectado);
                         }
-                    }, 500);
-                }
+                    } catch {
+                        setErrorCamara("Error del hardware de la cámara.");
+                    }
+                }, 500);
             } catch (err) {
                 console.error("Error acceso cámara:", err);
                 setErrorCamara("No se pudo acceder a la cámara. Verifique los permisos del navegador.");
@@ -146,11 +171,18 @@ const EscanerQR: React.FC<EscanerQRProps> = ({
 
     return (
         <div className="fixed inset-0 z-[200] bg-tkd-dark/95 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-fade-in">
+            {/* Bug real (2026-09-04, reportado por el usuario): la camara se activaba sin
+                ninguna forma evidente de cerrarla -- el boton SI existia, pero con opacidad
+                50% sobre fondo oscuro y sin texto, facil de no ver (sobre todo en celular).
+                Se sube la opacidad base, se agrega fondo/borde para que se perciba como
+                boton (no solo un icono flotante), y una etiqueta visible junto al icono. */}
             <button
                 onClick={onClose}
-                className="absolute top-8 right-8 text-white/50 hover:text-white p-2 transition-colors"
+                aria-label="Cerrar escáner"
+                className="absolute top-8 right-8 flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white/90 hover:text-white pl-4 pr-3 py-2 rounded-full border border-white/20 transition-colors z-10"
             >
-                <IconoCerrar className="w-8 h-8" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Cerrar</span>
+                <IconoCerrar className="w-6 h-6" />
             </button>
 
             <div className="w-full max-w-sm space-y-8">
