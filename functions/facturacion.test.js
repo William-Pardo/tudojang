@@ -60,26 +60,26 @@ test('calcularCapacidad nunca lee un conteo de estudiantes del input (pureza, D4
 // todo el cambio (design.md). Ya cubierto por pares de vectores arriba; estas 3 asserts lo
 // hacen explicito como delta, no solo implicito por comparacion manual de dos vectores. Con
 // descuentoVolumenActivo=false (ajuste de precios, 2026-08-25) TODOS los estudiantes pagan
-// tarifaEstandarPorEstudiante ($4.500) sin importar el tramo historico: el delta de agregar 1
+// tarifaEstandarPorEstudiante ($5.000) sin importar el tramo historico: el delta de agregar 1
 // estudiante en cualquier ex-limite de tramo debe ser exactamente esa tarifa plana, no la
 // tarifa marginal vieja ($3.600/$3.400/$3.000). Cuando descuentoVolumenActivo vuelva a true,
 // estos deltas vuelven a ser la tarifa marginal del tramo siguiente.
 const sinExtras = (estudiantesFacturables) => ({ estudiantesFacturables, sedesExtraContratadas: 0, equipoTecnicoExtraContratado: 0 });
 
-test('continuidad exacta: 70 -> 71 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
+test('continuidad exacta: 70 -> 71 suma exactamente la tarifa plana ($5.000), tramo desactivado', () => {
   const en70 = calcularFacturacionMensual(sinExtras(70));
   const en71 = calcularFacturacionMensual(sinExtras(71));
-  assert.equal(en71.totalPesos - en70.totalPesos, 4500);
+  assert.equal(en71.totalPesos - en70.totalPesos, 5000);
 });
 
-test('continuidad exacta: 150 -> 151 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
+test('continuidad exacta: 150 -> 151 suma exactamente la tarifa plana ($5.000), tramo desactivado', () => {
   const en150 = calcularFacturacionMensual(sinExtras(150));
   const en151 = calcularFacturacionMensual(sinExtras(151));
-  assert.equal(en151.totalPesos - en150.totalPesos, 4500);
+  assert.equal(en151.totalPesos - en150.totalPesos, 5000);
 });
 
-test('continuidad exacta: 350 -> 351 suma exactamente la tarifa plana ($4.500), tramo desactivado', () => {
+test('continuidad exacta: 350 -> 351 suma exactamente la tarifa plana ($5.000), tramo desactivado', () => {
   const en350 = calcularFacturacionMensual(sinExtras(350));
   const en351 = calcularFacturacionMensual(sinExtras(351));
-  assert.equal(en351.totalPesos - en350.totalPesos, 4500);
+  assert.equal(en351.totalPesos - en350.totalPesos, 5000);
 });

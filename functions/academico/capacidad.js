@@ -65,6 +65,27 @@ function assertCantidadValida(cantidad) {
   }
 }
 
+// Bug real (2026-09-02, reportado sobre el tenant Gajog): este callable siempre asumio que
+// "el proximo corte de cobroAutomaticoMensual ya factura la capacidad ampliada" (comentario
+// original de vistas/Configuracion.tsx) -- pero ese cron (wompiCobroAutomatico.js) filtra
+// `where('cobroAutomaticoActivo', '==', true)`, asi que NUNCA cobra a un tenant en modalidad
+// efectivo/manual. El Admin del club podia autoservirse una sede o cupo de equipo tecnico
+// extra que quedaba activo gratis para siempre, sin ningun aviso -- no era exclusivo de
+// Gajog, afecta a cualquier tenant sin cobro automatico. Se bloquea el AUMENTO (cantidad > 0)
+// para el propio Admin cuando el tenant no tiene `cobroAutomaticoActivo`; SuperAdmin sigue
+// pudiendo otorgar el extra (el pago ya se coordino manualmente por fuera del sistema, mismo
+// criterio de "SuperAdmin opera cross-tenant" ya usado en assertTenantAutorizado). Reducir
+// (cantidad <= 0) nunca genera deuda nueva, no se bloquea para nadie.
+function assertPuedeContratarExtra(auth, tenantData, cantidad) {
+  if (auth.token?.rol === 'SuperAdmin') return;
+  if (cantidad > 0 && tenantData.cobroAutomaticoActivo !== true) {
+    throw crearError(
+      'failed-precondition',
+      'Este club no tiene cobro automático activo -- para contratar una sede o cupo de equipo técnico extra, contacta a soporte de Tudojang para coordinar el pago.'
+    );
+  }
+}
+
 /**
  * Suma (o resta) `cantidad` al campo de extras contratados indicado, re-validando
  * server-side lo que antes se escribia directo desde el cliente con
@@ -97,6 +118,8 @@ function crearServicioActualizarExtrasContratados({ firestore }) {
     if (!tenantSnap.exists) {
       throw crearError('not-found', 'El tenant especificado no existe');
     }
+
+    assertPuedeContratarExtra(auth, tenantSnap.data(), cantidad);
 
     const actual = Number(tenantSnap.data()[campo]) || 0;
     const nuevo = actual + cantidad;

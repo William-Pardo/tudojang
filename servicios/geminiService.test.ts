@@ -91,3 +91,19 @@ describe('generarMensajePersonalizado - medios de pago ({{MEDIOS_PAGO}})', () =>
         expect(mensaje).not.toContain('{{MEDIOS_PAGO}}');
     });
 });
+
+// Bug real (2026-09-02): el link de reporte usaba estudiante.numeroIdentificacion (dato no
+// secreto, potencialmente adivinable/enumerable) -- ahora usa el ID REAL del documento de
+// Firestore (opaco, no enumerable), resuelto server-side por la Cloud Function pública
+// resolverEstudiantePublico (ver servicios/pagosEstudiantesApi.ts). Mismo patrón "link como
+// capability" que ya usa Misión KICHO en este repo.
+describe('generarMensajePersonalizado - link de reporte de pago (/reportar-pago?id=)', () => {
+    it('el link usa estudiante.id (ID del documento), NUNCA estudiante.numeroIdentificacion', async () => {
+        const configClub = { ...configClubBase, pagoNequi: '300 111 2222' } as ConfiguracionClub;
+
+        const mensaje = await generarMensajePersonalizado(TipoNotificacion.AvisoVencimiento, estudianteBase, configClub);
+
+        expect(mensaje).toContain(`/reportar-pago?id=${estudianteBase.id}`);
+        expect(mensaje).not.toContain(`id=${estudianteBase.numeroIdentificacion}`);
+    });
+});

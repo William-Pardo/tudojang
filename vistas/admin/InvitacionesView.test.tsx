@@ -226,6 +226,76 @@ describe('InvitacionesView', () => {
     expect(vincularTutorAEstudiantesMock).toHaveBeenCalledWith(['est-3'], tutorAna);
   });
 
+  it('tutor reenviado (revocada vieja + pendiente nueva, mismo correo) muestra la pendiente con acciones, no la revocada muerta', async () => {
+    // Regresion del bug real 2026-09-01: gisell recibio "Reenviar" y quedo con 2 documentos
+    // para el mismo correo. listInvitations entrega mas reciente primero; la fila debe
+    // reflejar esa (pendiente, con Reenviar/Copiar enlace), no la revocada sin acciones.
+    useEstudiantesMock.mockReturnValue({ estudiantes: [], cargarEstudiantes });
+    listInvitationsMock.mockResolvedValue([
+      {
+        id: 'inv-nueva-pendiente',
+        email: 'gisell@test.com',
+        rol: 'Tutor',
+        tenantId: 'tenant-123',
+        estado: 'pendiente',
+        creadoPor: 'admin',
+        creadoEn: '2026-09-01T17:24:37.969Z',
+        expiraEn: '2026-09-08T17:24:37.969Z',
+        activationLink: 'http://localhost/activar-nueva'
+      },
+      {
+        id: 'inv-vieja-revocada',
+        email: 'gisell@test.com',
+        rol: 'Tutor',
+        tenantId: 'tenant-123',
+        estado: 'revocada',
+        creadoPor: 'admin',
+        creadoEn: '2026-09-01T17:22:57.415Z',
+        expiraEn: '2026-09-08T17:22:57.415Z'
+      }
+    ]);
+
+    render(<InvitacionesView />);
+
+    expect(await screen.findByText('gisell@test.com')).toBeInTheDocument();
+    expect(screen.getByText('pendiente')).toBeInTheDocument();
+    expect(screen.queryByText('revocada')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reenviar/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copiar enlace/i })).toBeInTheDocument();
+  });
+
+  it('un correo Estudiante reenviado (revocada vieja + pendiente nueva) muestra una sola fila con la mas reciente', async () => {
+    listInvitationsMock.mockResolvedValue([
+      {
+        id: 'inv-est-nueva',
+        email: 'alumno@test.com',
+        rol: 'Estudiante',
+        tenantId: 'tenant-123',
+        estado: 'pendiente',
+        creadoPor: 'admin',
+        creadoEn: '2026-09-01T17:24:37.969Z',
+        expiraEn: '2026-09-08T17:24:37.969Z'
+      },
+      {
+        id: 'inv-est-vieja',
+        email: 'alumno@test.com',
+        rol: 'Estudiante',
+        tenantId: 'tenant-123',
+        estado: 'revocada',
+        creadoPor: 'admin',
+        creadoEn: '2026-09-01T17:22:57.415Z',
+        expiraEn: '2026-09-08T17:22:57.415Z'
+      }
+    ]);
+
+    render(<InvitacionesView />);
+
+    expect(await screen.findByText('alumno@test.com')).toBeInTheDocument();
+    expect(screen.getAllByText('alumno@test.com')).toHaveLength(1);
+    expect(screen.getByText('pendiente')).toBeInTheDocument();
+    expect(screen.queryByText('revocada')).not.toBeInTheDocument();
+  });
+
   it('clic en "✕" de un chip vinculado llama a desvincularTutorDeEstudiante', async () => {
     const user = userEvent.setup();
     useEstudiantesMock.mockReturnValue({ estudiantes: buildEstudiantesConTutorCompartido(), cargarEstudiantes });

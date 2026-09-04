@@ -130,6 +130,49 @@ service cloud.firestore {
             && request.time < timestamp.value(get(ref).data.fechaExpiracion));
     }
 
+    // Bug real (2026-09-01): el Tutor podia LEER el estudiante (rama isTutor() de `read`,
+    // mas abajo) pero NUNCA firmar consentimiento/contrato/autorizacion de imagen -- las 3
+    // funciones de hooks/usePaginaFirma.ts::guardarFirmaDocumento hacen un `updateDoc` sobre
+    // este mismo documento, y `update` solo aceptaba isInstructor() (Admin/Editor/Asistente/
+    // Maestro/SuperAdmin). El Tutor jamas pasa esa condicion sin importar su custom claim de
+    // tenant -- por eso el tutor podia leer y firmar el lienzo, pero el enviarFirma() final
+    // siempre terminaba en permission-denied. `affectedKeys()` no ve dentro de mapas anidados
+    // (un update con dot-notation tipo 'tutor.firmaContratoDigital' reporta como afectada la
+    // clave de nivel superior 'tutor' completa), asi que se congelan explicitamente los 5
+    // campos de identificacion del tutor para que este update NO sirva como via lateral para
+    // que el propio Tutor reescriba sus datos de contacto.
+    function esFirmaTutorValida() {
+      let camposPermitidos = ['consentimientoInformado', 'contratoServiciosFirmado', 'consentimientoImagenFirmado', 'consentimientoFotosVideos', 'tutor'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(camposPermitidos)
+        && request.resource.data.tutor.nombres == resource.data.tutor.nombres
+        && request.resource.data.tutor.apellidos == resource.data.tutor.apellidos
+        && request.resource.data.tutor.numeroIdentificacion == resource.data.tutor.numeroIdentificacion
+        && request.resource.data.tutor.telefono == resource.data.tutor.telefono
+        && request.resource.data.tutor.correo == resource.data.tutor.correo;
+    }
+
+    // Bug real (2026-09-02, mismo patron que esFirmaTutorValida() arriba): un colaborador
+    // (Asistente/Editor/Maestro/Admin) firmando su propio Contrato Laboral/Prestacion de
+    // Servicios (hooks/usePaginaFirmaContratoColaborador.ts -> usuariosApi.ts::
+    // guardarFirmaContratoUsuario) hace un `updateDoc` sobre usuarios/{uid}, pero esa
+    // coleccion tenia `allow update: if false` SIN excepcion -- ni siquiera el propio Admin
+    // podia. A diferencia de estudiantes/{docId} (que ya distinguia isTutor() en `read`),
+    // usuarios/{uid} nunca tuvo ninguna rama de auto-escritura: el bug bloqueaba a CUALQUIER
+    // rol de colaborador, no solo a uno. Se acota a que solo cambie la clave de nivel
+    // superior `contrato`, y dentro de ese mapa solo `firmado`/`firmaDigital` -- el resto
+    // (sueldoBase, duracionMeses, tipoVinculacion, fechaInicio, lugarEjecucion, el legacy
+    // valorPago) son datos que solo administracion configura, nunca el propio colaborador.
+    function esFirmaColaboradorValida() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contrato'])
+        && request.resource.data.contrato.get('valorPago', null) == resource.data.contrato.get('valorPago', null)
+        && request.resource.data.contrato.sueldoBase == resource.data.contrato.sueldoBase
+        && request.resource.data.contrato.duracionMeses == resource.data.contrato.duracionMeses
+        && request.resource.data.contrato.tipoVinculacion == resource.data.contrato.tipoVinculacion
+        && request.resource.data.contrato.get('tipoVinculacionOtro', null) == resource.data.contrato.get('tipoVinculacionOtro', null)
+        && request.resource.data.contrato.fechaInicio == resource.data.contrato.fechaInicio
+        && request.resource.data.contrato.lugarEjecucion == resource.data.contrato.lugarEjecucion;
+    }
+
     // =========================================================================
     // Colecciones existentes
     // =========================================================================
@@ -176,7 +219,14 @@ service cloud.firestore {
       // completa se rechaza en cuanto exista un solo documento de otro tenant en la
       // coleccion -- exactamente el comportamiento fail-closed que buscamos.
       allow list: if isAdmin() && resource.data.tenantId == currentTenantId();
-      allow create, update, delete: if false;
+      allow create, delete: if false;
+      // Bug real (2026-09-02, ver esFirmaColaboradorValida() arriba): el propio colaborador
+      // puede firmar su Contrato Laboral/Prestacion de Servicios, acotado a los 2 campos de
+      // firma dentro de `contrato`. Cualquier otro update directo sigue bloqueado (staff
+      // incluido) -- toda otra escritura de `usuarios` pasa por Cloud Functions.
+      allow update: if authenticated()
+        && request.auth.uid == uid
+        && esFirmaColaboradorValida();
     }
 
     match /tenants/{tenantId} {
@@ -265,7 +315,14 @@ service cloud.firestore {
       allow create: if false;
       // ERR-0011: update/delete tampoco validaban tenant -- un Instructor de OTRO tenant
       // podia editar/borrar estudiantes ajenos conociendo (o adivinando) el docId.
-      allow update, delete: if isInstructor() && resource.data.tenantId == currentTenantId();
+      // Bug real (2026-09-01, ver esFirmaTutorValida() arriba): se agrega una segunda rama
+      // para que el Tutor dueño del estudiante (mismo criterio de pertenencia que `read`)
+      // pueda ejecutar el `updateDoc` de enviarFirma(), acotado a los campos de firma.
+      allow update: if (isInstructor() && resource.data.tenantId == currentTenantId())
+        || (isTutor() && resource.data.tenantId == currentTenantId()
+            && resource.data.tutor.correo == request.auth.token.email
+            && esFirmaTutorValida());
+      allow delete: if isInstructor() && resource.data.tenantId == currentTenantId();
     }
 
     // Misión KICHO: censo masivo de aspirantes (link/QR público -> revisión del tenant ->
