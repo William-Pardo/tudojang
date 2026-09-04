@@ -142,12 +142,16 @@ function crearServicioGestionarReportePago({ firestore }) {
           historialPagos: [pagoHistorial, ...(estudianteData.historialPagos || [])],
         });
 
+        // Nota de saldo a favor en la descripcion (nuevoSaldo < 0) para que el libro de
+        // tesoreria quede trazable sin cruzar contra la ficha del estudiante -- mismo criterio
+        // que servicios/pagosApi.ts (registro manual de pago en Tesoreria).
+        const notaSaldoAFavor = nuevoSaldo < 0 ? ` [Genera saldo a favor de $${Math.abs(nuevoSaldo)}]` : '';
         tx.set(firestore.collection('finanzas').doc(), {
           tenantId: reporte.tenantId,
           tipo: 'Ingreso',
           categoria: 'Mensualidad',
           monto: reporte.montoInformado,
-          descripcion: `PAGO REPORTADO APP: ${reporte.estudianteNombre}`,
+          descripcion: `PAGO REPORTADO APP: ${reporte.estudianteNombre}${notaSaldoAFavor}`,
           fecha: new Date().toISOString().split('T')[0],
           sedeId: estudianteData.sedeId || '1',
         });

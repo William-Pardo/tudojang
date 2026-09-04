@@ -152,4 +152,26 @@ describe('ReportarPagoPublico', () => {
         await screen.findByText('Ana García');
         expect(screen.getByRole('spinbutton')).toHaveValue(45000);
     });
+
+    // Bug real (2026-09-04): con saldoDeudor negativo (pagó de más en un abono anterior, ver
+    // utils/finanzas.ts::calcularMontoSugeridoPago), el sistema ignoraba el crédito y sugería
+    // la mensualidad completa otra vez -- el tutor pagaría el mes completo sin que se le
+    // descontara lo que ya había pagado de más.
+    it('con saldo a favor (negativo) y mensualidad configurada, sugiere la mensualidad menos el crédito y lo etiqueta como "Saldo a favor"', async () => {
+        useTenantMock.mockReturnValue({
+            tenant: { tenantId: 'test-tenant', nombreClub: 'Test Club', colorPrimario: '#111111', valorMensualidad: 50000 },
+            estaCargado: true,
+        });
+        resolverEstudiantePublicoMock.mockResolvedValue({ ...estudianteMock, saldoDeudor: -20000 });
+
+        render(
+            <MemoryRouter initialEntries={['/reportar-pago?id=est-1']}>
+                <ReportarPagoPublico />
+            </MemoryRouter>
+        );
+
+        await screen.findByText('Ana García');
+        expect(screen.getByText(/Saldo a favor/i)).toBeInTheDocument();
+        expect(screen.getByRole('spinbutton')).toHaveValue(30000); // 50000 - 20000
+    });
 });

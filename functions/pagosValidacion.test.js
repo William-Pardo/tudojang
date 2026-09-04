@@ -289,6 +289,23 @@ test('gestionarReportePago: aprobar crea el movimiento en finanzas con los campo
   assert.equal(movimiento.sedeId, '1');
 });
 
+// Bug real (2026-09-04): un pago que supera la deuda deja saldoDeudor negativo (saldo a
+// favor) sin ninguna nota en el libro de tesorería -- quien lo auditara no podía saber por
+// qué el ingreso era mayor a lo que el estudiante debía.
+test('gestionarReportePago: si el pago genera saldo a favor, lo anota en la descripción del movimiento en finanzas', async () => {
+  const firestore = crearFirestoreFake({
+    reportes: { r1: REPORTE_BASE }, // montoInformado 40000
+    estudiantes: { 'est-1': { ...ESTUDIANTE_BASE, saldoDeudor: 10000 } },
+  });
+  const servicio = crearServicioGestionarReportePago({ firestore });
+
+  await servicio({ reporteId: 'r1', nuevoEstado: 'Aprobado' }, crearContexto('Admin'));
+
+  assert.equal(firestore._estudiantes.get('est-1').saldoDeudor, -30000);
+  const movimiento = Array.from(firestore._finanzas.values())[0];
+  assert.equal(movimiento.descripcion, 'PAGO REPORTADO APP: Alejandro Tester [Genera saldo a favor de $30000]');
+});
+
 test('gestionarReportePago: aprobar marca el reporte con validadoPor/fechaValidacion/observaciones', async () => {
   const firestore = crearFirestoreFake({ reportes: { r1: REPORTE_BASE }, estudiantes: { 'est-1': ESTUDIANTE_BASE } });
   const servicio = crearServicioGestionarReportePago({ firestore });

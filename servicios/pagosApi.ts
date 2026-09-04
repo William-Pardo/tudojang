@@ -242,6 +242,11 @@ export const procesarPagoEfectivo = async (
         });
 
         // 4. Crear Registro en Finanzas
+        // Nota de saldo a favor en la descripcion (nuevoSaldo < 0, ver
+        // utils/finanzas.ts::calcularSaldoTrasPago) para que el libro de tesoreria quede
+        // trazable sin tener que cruzar contra la ficha del estudiante: por que este ingreso
+        // es mayor a lo que se debia.
+        const notaSaldoAFavor = nuevoSaldo < 0 ? ` [Genera saldo a favor de $${Math.abs(nuevoSaldo)}]` : '';
         const finanzaRef = doc(collection(db, 'finanzas'));
         const nuevoIngreso: MovimientoFinanciero = {
             id: finanzaRef.id,
@@ -249,7 +254,7 @@ export const procesarPagoEfectivo = async (
             tipo: TipoMovimiento.Ingreso,
             categoria: categoriaFinanciera,
             monto: montoTotalRecibido,
-            descripcion: `${concepto} (${descripcionItems.join(', ')}) - Notas: ${notas || ''}`,
+            descripcion: `${concepto} (${descripcionItems.join(', ')}) - Notas: ${notas || ''}${notaSaldoAFavor}`,
             fecha: fechaHora.split('T')[0],
             sedeId: estudiante.sedeId
         };

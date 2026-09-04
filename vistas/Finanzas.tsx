@@ -37,11 +37,16 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
     const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
     const [movimientoAEliminar, setMovimientoAEliminar] = useState<MovimientoFinanciero | null>(null);
     const [cargandoAccion, setCargandoAccion] = useState(false);
-    const [seccion, setSeccion] = useState<'resumen' | 'pagos' | 'deudores'>('resumen');
+    const [seccion, setSeccion] = useState<'resumen' | 'pagos' | 'deudores' | 'saldo-a-favor'>('resumen');
     const [estudiantePago, setEstudiantePago] = useState<(typeof estudiantes)[number] | null>(null);
 
     const esAdmin = usuario?.rol === RolUsuario.Admin;
     const estudiantesDeudores = estudiantes.filter(estudiante => estudiante.saldoDeudor > 0);
+    // Saldo a favor: un pago anterior que superó la deuda deja saldoDeudor negativo (ver
+    // utils/finanzas.ts::calcularSaldoTrasPago/calcularMontoSugeridoPago). Sin esta sección
+    // quedaba invisible en Tesorería -- el filtro de "deudores" lo excluye por construcción.
+    const estudiantesConSaldoAFavor = estudiantes.filter(estudiante => estudiante.saldoDeudor < 0);
+    const totalSaldoAFavor = estudiantesConSaldoAFavor.reduce((acc, e) => acc + Math.abs(e.saldoDeudor), 0);
 
     const notificarDeuda = async (estudiante: (typeof estudiantes)[number]) => {
         const destinatario = estudiante.tutor?.telefono || estudiante.telefono;
@@ -139,7 +144,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
             )}
 
             <div className="flex gap-2">
-                {(['resumen', 'pagos', 'deudores'] as const).map(item => (
+                {(['resumen', 'pagos', 'deudores', 'saldo-a-favor'] as const).map(item => (
                     <button
                         key={item}
                         onClick={() => setSeccion(item)}
@@ -149,7 +154,7 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
                                 : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/20'
                         }`}
                     >
-                        {item}
+                        {item === 'saldo-a-favor' ? 'Saldo a Favor' : item}
                     </button>
                 ))}
             </div>
@@ -172,6 +177,30 @@ const VistaFinanzas: React.FC<Props> = ({ isSubView = false, initialView = 'diar
                             <button onClick={() => notificarDeuda(estudiante)}>Notificar Deuda</button>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {seccion === 'saldo-a-favor' && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-100 dark:border-gray-700 p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Estudiantes con Saldo a Favor</h2>
+                        <span className="text-sm font-black text-green-600">Total: {formatearPrecio(totalSaldoAFavor)}</span>
+                    </div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                        Pagaron de más en un abono anterior. Se descuenta automáticamente del monto sugerido la próxima vez que reporten o registres un pago.
+                    </p>
+                    {estudiantesConSaldoAFavor.length === 0 ? (
+                        <p className="text-xs text-gray-400 font-bold uppercase text-center py-6">Ningún estudiante tiene saldo a favor.</p>
+                    ) : (
+                        <div className="divide-y dark:divide-gray-700">
+                            {estudiantesConSaldoAFavor.map(estudiante => (
+                                <div key={estudiante.id} className="flex items-center justify-between py-3">
+                                    <span className="text-sm font-bold text-gray-900 dark:text-white">{estudiante.nombres} {estudiante.apellidos}</span>
+                                    <span className="text-sm font-black text-green-600">{formatearPrecio(Math.abs(estudiante.saldoDeudor))}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

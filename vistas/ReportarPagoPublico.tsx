@@ -10,6 +10,7 @@ import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAp
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
+import { calcularMontoSugeridoPago } from '../utils/finanzas';
 import type { Estudiante } from '../tipos';
 
 type EstudiantePublico = Pick<Estudiante, 'id' | 'nombres' | 'apellidos' | 'saldoDeudor'>;
@@ -45,7 +46,11 @@ const ReportarPagoPublico: React.FC = () => {
                         // ninguna pista visual -- el botón de enviar se ve activo pero permanece
                         // disabled por `!monto` indefinidamente. Se pre-llena con la mensualidad
                         // configurada por la academia; si tampoco existe, el placeholder cubre el resto.
-                        setMonto(res.saldoDeudor > 0 ? res.saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
+                        // Si saldoDeudor es negativo (saldo A FAVOR de un pago anterior de más),
+                        // calcularMontoSugeridoPago descuenta ese crédito de la mensualidad en vez
+                        // de ignorarlo y sugerir el valor completo otra vez.
+                        const sugerido = calcularMontoSugeridoPago(res.saldoDeudor, tenant?.valorMensualidad ?? 0);
+                        setMonto(sugerido > 0 ? sugerido.toString() : '');
                     }
                 } catch (e) {
                     console.error("Error en carga inicial", e);
@@ -137,7 +142,11 @@ const ReportarPagoPublico: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-black uppercase leading-none">{estudiante.nombres} {estudiante.apellidos}</h3>
-                                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest mt-1">Saldo a pagar: {formatearPrecio(estudiante.saldoDeudor)}</p>
+                                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest mt-1">
+                                            {estudiante.saldoDeudor < 0
+                                                ? `Saldo a favor: ${formatearPrecio(Math.abs(estudiante.saldoDeudor))}`
+                                                : `Saldo a pagar: ${formatearPrecio(estudiante.saldoDeudor)}`}
+                                        </p>
                                     </div>
                                 </div>
                             )}
