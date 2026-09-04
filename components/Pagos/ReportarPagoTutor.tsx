@@ -37,7 +37,12 @@ const ReportarPagoTutor: React.FC = () => {
                 setEstudiantes(propios);
                 if (propios.length === 1) {
                     setEstudianteId(propios[0].id);
-                    setMonto(propios[0].saldoDeudor > 0 ? propios[0].saldoDeudor.toString() : '');
+                    // Bug real (2026-09-03): con saldoDeudor <= 0 (alumno al día, adelantando el
+                    // mes siguiente) el campo quedaba vacío sin ninguna pista visual -- el botón
+                    // de enviar permanecía disabled por `!monto` indefinidamente. Se pre-llena con
+                    // la mensualidad configurada por la academia; si tampoco existe, el placeholder
+                    // del input cubre el resto.
+                    setMonto(propios[0].saldoDeudor > 0 ? propios[0].saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
                 }
             } catch (e) {
                 mostrarNotificacion("Error al cargar tus estudiantes vinculados.", "error");
@@ -46,13 +51,13 @@ const ReportarPagoTutor: React.FC = () => {
             }
         };
         cargar();
-    }, [usuario]);
+    }, [usuario, tenant]);
 
     const estudiante = estudiantes.find(e => e.id === estudianteId) || null;
 
     const seleccionarEstudiante = (e: Estudiante) => {
         setEstudianteId(e.id);
-        setMonto(e.saldoDeudor > 0 ? e.saldoDeudor.toString() : '');
+        setMonto(e.saldoDeudor > 0 ? e.saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,8 +174,12 @@ const ReportarPagoTutor: React.FC = () => {
                                         type="number"
                                         value={monto}
                                         onChange={(e) => setMonto(e.target.value)}
+                                        placeholder="Ej: 50000"
                                         className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl py-4 px-6 font-black text-2xl text-tkd-blue focus:border-tkd-blue transition-all dark:text-white"
                                     />
+                                    {!monto && (
+                                        <p className="text-[9px] font-bold text-tkd-red text-center mt-2">Escribí el monto que transferiste para poder enviar el reporte</p>
+                                    )}
                                 </div>
 
                                 {/* Link de Pago en Línea (Opcional, lo configura la academia) */}

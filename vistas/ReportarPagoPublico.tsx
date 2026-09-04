@@ -40,7 +40,12 @@ const ReportarPagoPublico: React.FC = () => {
                     const res = await resolverEstudiantePublico(idUrl, tenant.tenantId);
                     if (res) {
                         setEstudiante(res);
-                        setMonto(res.saldoDeudor > 0 ? res.saldoDeudor.toString() : '');
+                        // Bug real (2026-09-03, reportado vía WhatsApp/iPhone): con saldoDeudor <= 0
+                        // (alumno al día, adelantando el mes siguiente) el campo quedaba vacío sin
+                        // ninguna pista visual -- el botón de enviar se ve activo pero permanece
+                        // disabled por `!monto` indefinidamente. Se pre-llena con la mensualidad
+                        // configurada por la academia; si tampoco existe, el placeholder cubre el resto.
+                        setMonto(res.saldoDeudor > 0 ? res.saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
                     }
                 } catch (e) {
                     console.error("Error en carga inicial", e);
@@ -152,8 +157,12 @@ const ReportarPagoPublico: React.FC = () => {
                                             type="number"
                                             value={monto}
                                             onChange={(e) => setMonto(e.target.value)}
+                                            placeholder="Ej: 50000"
                                             className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl py-4 px-6 font-black text-2xl text-tkd-blue focus:border-tkd-blue transition-all dark:text-white"
                                         />
+                                        {!monto && (
+                                            <p className="text-[9px] font-bold text-tkd-red text-center mt-2">Escribí el monto que transferiste para poder enviar el reporte</p>
+                                        )}
                                     </div>
 
                                     {/* Link de Pago en Línea (Opcional, lo configura la academia) */}

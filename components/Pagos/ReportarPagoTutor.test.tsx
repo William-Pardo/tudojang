@@ -106,12 +106,38 @@ describe('ReportarPagoTutor', () => {
         expect(screen.queryByText('Cambiar')).not.toBeInTheDocument();
     });
 
-    it('con saldo deudor en 0, el monto queda vacío y el botón de envío queda deshabilitado hasta adjuntar comprobante', async () => {
+    // Bug real (2026-09-03, reportado vía WhatsApp/iPhone): con saldoDeudor 0 y sin
+    // valorMensualidad configurado en el tenant, el monto queda vacío -- el botón se queda
+    // deshabilitado por `!monto` aunque el tutor ya haya adjuntado el comprobante, y sin ningún
+    // aviso visible no hay forma de que note qué le falta. La ayuda visible y escribir el monto
+    // a mano deben desbloquear el envío.
+    it('con saldo deudor en 0 y sin mensualidad configurada, el monto queda vacío pero muestra ayuda visible; escribirlo y adjuntar comprobante habilita el envío', async () => {
         obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudiante({ saldoDeudor: 0 })]);
+        const user = userEvent.setup();
         render(<ReportarPagoTutor />);
         await screen.findByText('Ana García');
         expect(screen.getByRole('spinbutton')).toHaveValue(null);
+        expect(screen.getByText(/Escrib.* el monto que transferiste/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeDisabled();
+
+        await adjuntarComprobante(user);
+        expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeDisabled();
+
+        await user.type(screen.getByRole('spinbutton'), '30000');
+        expect(screen.queryByText(/Escrib.* el monto que transferiste/i)).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeEnabled());
+    });
+
+    it('con saldo deudor en 0 y mensualidad configurada en el tenant, pre-llena el monto y no requiere que el tutor lo escriba', async () => {
+        useTenantMock.mockReturnValue({ tenant: { valorMensualidad: 45000 } });
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudiante({ saldoDeudor: 0 })]);
+        const user = userEvent.setup();
+        render(<ReportarPagoTutor />);
+        await screen.findByText('Ana García');
+        expect(screen.getByRole('spinbutton')).toHaveValue(45000);
+
+        await adjuntarComprobante(user);
+        await waitFor(() => expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeEnabled());
     });
 
     it('con más de un estudiante, no autoselecciona ninguno y muestra la lista para elegir', async () => {

@@ -104,4 +104,52 @@ describe('ReportarPagoPublico', () => {
         expect(screen.queryByText(/buz[oó]n/i)).not.toBeInTheDocument();
         expect(reportarPagoPublicoMock).toHaveBeenCalledWith('est-1', 'test-tenant', 50000, expect.stringContaining('data:'));
     });
+
+    // Bug real (2026-09-03, reportado vía WhatsApp/iPhone): con saldoDeudor 0 (alumno al día,
+    // adelantando el mes siguiente) y sin valorMensualidad configurado en el tenant, el monto
+    // quedaba vacío sin ninguna pista visual -- el botón permanecía disabled por `!monto`
+    // aunque el tutor ya hubiera adjuntado el comprobante.
+    it('con saldo en 0 y sin mensualidad configurada, el monto queda vacío pero muestra ayuda visible; escribirlo habilita el envío', async () => {
+        useTenantMock.mockReturnValue({
+            tenant: { tenantId: 'test-tenant', nombreClub: 'Test Club', colorPrimario: '#111111' },
+            estaCargado: true,
+        });
+        resolverEstudiantePublicoMock.mockResolvedValue({ ...estudianteMock, saldoDeudor: 0 });
+
+        const user = userEvent.setup();
+        render(
+            <MemoryRouter initialEntries={['/reportar-pago?id=est-1']}>
+                <ReportarPagoPublico />
+            </MemoryRouter>
+        );
+
+        await screen.findByText('Ana García');
+        expect(screen.getByRole('spinbutton')).toHaveValue(null);
+        expect(screen.getByText(/Escrib.* el monto que transferiste/i)).toBeInTheDocument();
+
+        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+        const file = new File(['contenido'], 'comprobante.png', { type: 'image/png' });
+        await user.upload(input, file);
+        expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeDisabled();
+
+        await user.type(screen.getByRole('spinbutton'), '30000');
+        await waitFor(() => expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeEnabled());
+    });
+
+    it('con saldo en 0 y mensualidad configurada en el tenant, pre-llena el monto automáticamente', async () => {
+        useTenantMock.mockReturnValue({
+            tenant: { tenantId: 'test-tenant', nombreClub: 'Test Club', colorPrimario: '#111111', valorMensualidad: 45000 },
+            estaCargado: true,
+        });
+        resolverEstudiantePublicoMock.mockResolvedValue({ ...estudianteMock, saldoDeudor: 0 });
+
+        render(
+            <MemoryRouter initialEntries={['/reportar-pago?id=est-1']}>
+                <ReportarPagoPublico />
+            </MemoryRouter>
+        );
+
+        await screen.findByText('Ana García');
+        expect(screen.getByRole('spinbutton')).toHaveValue(45000);
+    });
 });
