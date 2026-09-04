@@ -175,13 +175,21 @@ const PanelValidacionPagos: React.FC = () => {
                             <div className="w-full sm:w-48 h-64 sm:h-auto bg-gray-100 dark:bg-gray-900 relative cursor-zoom-in" onClick={() => setImagenAmpliada(reporte.comprobanteUrl)}>
                                 <img src={reporte.comprobanteUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt="Recibo" />
                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-black text-[9px] uppercase tracking-widest transition-opacity">Ver Detalle</div>
-                                <input
-                                    type="checkbox"
-                                    checked={seleccionados.has(reporte.id)}
+                                {/* Bug real (2026-09-04, reportado con captura): el checkbox nativo, sin fondo
+                                    propio, flotaba directo sobre los píxeles del comprobante -- en mobile tapaba
+                                    datos reales de la imagen (monto, número de operación) sin contraste que lo
+                                    distinguiera como control de UI. Se envuelve en un contenedor con fondo sólido. */}
+                                <div
                                     onClick={e => e.stopPropagation()}
-                                    onChange={() => toggleSeleccion(reporte.id)}
-                                    className="absolute top-4 left-4 w-6 h-6 rounded-lg accent-tkd-blue shadow-lg"
-                                />
+                                    className="absolute top-3 left-3 bg-white/95 dark:bg-gray-900/95 rounded-xl p-1.5 shadow-lg"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={seleccionados.has(reporte.id)}
+                                        onChange={() => toggleSeleccion(reporte.id)}
+                                        className="block w-5 h-5 rounded-md accent-tkd-blue"
+                                    />
+                                </div>
                             </div>
 
                             {/* Información del Pago */}
@@ -206,13 +214,17 @@ const PanelValidacionPagos: React.FC = () => {
 
                                     {reporte.datosIA ? (
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div>
+                                            <div className="min-w-0">
                                                 <p className="text-[8px] font-bold text-gray-400 uppercase">Ref. Extraída</p>
-                                                <p className="text-[11px] font-black dark:text-white font-mono">{reporte.datosIA.referencia || 'NO DETECTADA'}</p>
+                                                {/* Bug real (2026-09-04, reportado con captura): la referencia bancaria es un
+                                                    identificador larguísimo sin espacios (~35 dígitos) -- sin break-all/min-w-0,
+                                                    el texto se desborda de su columna del grid y se superpone visualmente con
+                                                    "Monto por IA" en pantallas angostas (mobile). */}
+                                                <p className="text-[11px] font-black dark:text-white font-mono break-all">{reporte.datosIA.referencia || 'NO DETECTADA'}</p>
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <p className="text-[8px] font-bold text-gray-400 uppercase">Monto por IA</p>
-                                                <p className="text-[11px] font-black text-green-600">{reporte.datosIA.montoExtraido ? formatearPrecio(reporte.datosIA.montoExtraido) : '---'}</p>
+                                                <p className="text-[11px] font-black text-green-600 break-words">{reporte.datosIA.montoExtraido ? formatearPrecio(reporte.datosIA.montoExtraido) : '---'}</p>
                                             </div>
                                         </div>
                                     ) : (

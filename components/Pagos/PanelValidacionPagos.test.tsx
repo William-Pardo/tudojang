@@ -190,4 +190,24 @@ describe('PanelValidacionPagos', () => {
         const tarjetaFalla = screen.getByText('Reporte Con Falla').closest('.group') as HTMLElement;
         expect(within(tarjetaFalla).getByRole('checkbox')).toBeChecked();
     });
+
+    // Bug real (2026-09-04, reportado con captura en mobile): la referencia bancaria es un
+    // identificador larguísimo sin espacios -- sin control de desborde, se superponía
+    // visualmente con "Monto por IA" en pantallas angostas. Y el checkbox nativo, sin fondo
+    // propio, tapaba datos reales de la imagen del comprobante.
+    it('la referencia larga de la IA tiene control de desborde (no invade la columna vecina) y el checkbox tiene fondo propio', async () => {
+        const referenciaLarga = '649032927851716444546758905930443 50'; // ~37 caracteres, sin espacios internos reales
+        obtenerReportesPendientesMock.mockResolvedValue([
+            crearReporte({ datosIA: { referencia: referenciaLarga, montoExtraido: 305000 } }),
+        ]);
+        render(<PanelValidacionPagos />);
+
+        const textoReferencia = await screen.findByText(referenciaLarga);
+        expect(textoReferencia).toHaveClass('break-all');
+        expect(textoReferencia.parentElement).toHaveClass('min-w-0');
+
+        const tarjeta = screen.getByText('Ana García').closest('.group') as HTMLElement;
+        const checkbox = within(tarjeta).getByRole('checkbox');
+        expect(checkbox.parentElement).toHaveClass('bg-white/95');
+    });
 });
