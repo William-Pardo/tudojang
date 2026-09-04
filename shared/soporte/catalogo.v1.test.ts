@@ -34,6 +34,7 @@ const INVENTARIO_ESPERADO = [
     'alerts.history',
     'config.identity-payments',
     'config.annual-enrollment-fee',
+    'config.cobro-justo',
     'config.branches',
     'config.staff',
     'config.programs',
@@ -61,11 +62,11 @@ const INVENTARIO_ESPERADO = [
 ] as const;
 
 describe('CATALOGO_SOPORTE_V1', () => {
-    it('cubre las 57 entradas resultantes de separar rutas y permisos incompatibles', () => {
+    it('cubre las 58 entradas resultantes de separar rutas y permisos incompatibles', () => {
         expect(CATALOGO_SOPORTE_V1.entries.map(entry => entry.inventoryId).sort()).toEqual(
             [...INVENTARIO_ESPERADO].sort(),
         );
-        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(57);
+        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(58);
     });
 
     it.each(INVENTARIO_ESPERADO)('declara metadatos verificables para %s', inventoryId => {
