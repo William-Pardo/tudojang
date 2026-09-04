@@ -319,6 +319,13 @@ const VistaConfiguracion: React.FC = () => {
     // vía un checkout de Wompi puntual (ModalPagoCheckout, eliminado) -- se contratan de
     // inmediato con la Cloud Function actualizarExtrasContratados.
     const [comprandoExtra, setComprandoExtra] = useState<'sedesExtraContratadas' | 'equipoTecnicoExtraContratado' | null>(null);
+    // Bug real (2026-09-02, tenant Gajog): el self-service de sede/equipo tecnico extra
+    // asumia "se cobra en el proximo corte", pero ese corte (cobroAutomaticoMensual) solo
+    // procesa tenants con cobroAutomaticoActivo -- un club en modalidad efectivo/manual
+    // quedaba con la capacidad activa gratis para siempre. La Cloud Function ya lo rechaza
+    // server-side (unica defensa real); esto solo evita el viaje redondo al servidor y el
+    // toast de error confuso.
+    const puedeContratarExtra = !!localConfigClub?.cobroAutomaticoActivo;
     const [modalCuentasAbierto, setModalCuentasAbierto] = useState(false);
 
     const cerrarModalSede = () => {
@@ -1124,6 +1131,11 @@ const VistaConfiguracion: React.FC = () => {
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/5 px-4 py-1 rounded-full inline-block">
                                     Efecto inmediato — se refleja en el próximo corte de facturación
                                 </p>
+                                {!puedeContratarExtra && (
+                                    <p className="text-[10px] font-black text-tkd-red uppercase tracking-widest bg-red-50 dark:bg-red-900/10 px-4 py-1 rounded-full inline-block">
+                                        Este club no tiene cobro automático activo — contacta a soporte de Tudojang para contratar un extra
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1139,7 +1151,7 @@ const VistaConfiguracion: React.FC = () => {
                                     <div className="mt-8 flex gap-3">
                                         <button
                                             onClick={() => handleAjustarExtra('sedesExtraContratadas', 1)}
-                                            disabled={comprandoExtra === 'sedesExtraContratadas'}
+                                            disabled={comprandoExtra === 'sedesExtraContratadas' || !puedeContratarExtra}
                                             className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {comprandoExtra === 'sedesExtraContratadas' ? 'Ampliando...' : '+1 Sede Adicional'}
@@ -1166,7 +1178,7 @@ const VistaConfiguracion: React.FC = () => {
                                     <div className="mt-8 flex gap-3">
                                         <button
                                             onClick={() => handleAjustarExtra('equipoTecnicoExtraContratado', 1)}
-                                            disabled={comprandoExtra === 'equipoTecnicoExtraContratado'}
+                                            disabled={comprandoExtra === 'equipoTecnicoExtraContratado' || !puedeContratarExtra}
                                             className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 rounded-xl font-black uppercase text-[9px] tracking-widest text-gray-500 hover:bg-tkd-blue hover:text-white transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {comprandoExtra === 'equipoTecnicoExtraContratado' ? 'Ampliando...' : '+1 Cupo de Equipo Técnico'}
