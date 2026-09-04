@@ -1399,15 +1399,26 @@ exports.analizarComprobanteEstudiante = geminiFunctions.firestore
       const imageBase64 = Buffer.from(response.data, 'binary').toString('base64');
 
       // 4. Prompt estratégico para Nequi/Daviplata/Bancos CO
-      const prompt = `Analiza este comprobante de pago de una entidad bancaria Colombiana (Nequi, Daviplata, Bancolombia, etc). 
+      // Bug real (2026-09-04, reportado por el usuario con captura): "valor numérico sin
+      // puntos ni comas" es ambiguo -- en el formato colombiano el punto es separador de MILES
+      // (se descarta) pero la coma es separador DECIMAL (los centavos se truncan, no se
+      // concatenan). El modelo interpretaba mal esa instrucción y concatenaba TODOS los
+      // dígitos: $305.000,00 -> 30500000 en vez de 305000 (error de escala x100). Se reemplaza
+      // la instrucción ambigua por una regla explícita + un ejemplo concreto (ancla el
+      // comportamiento mucho más confiable que una regla abstracta sola).
+      const prompt = `Analiza este comprobante de pago de una entidad bancaria Colombiana (Nequi, Daviplata, Bancolombia, etc).
       Extrae exactamente estos datos en formato JSON puro:
       {
         "referencia": "Identificador único de la operación",
-        "montoExtraido": valor numérico sin puntos ni comas,
+        "montoExtraido": valor numérico entero en pesos colombianos (ver regla de formato abajo),
         "fechaExtraida": "Fecha en formato YYYY-MM-DD",
         "entidad": "Nombre de la app o banco",
         "confianza": valor entre 0 y 1
       }
+      Regla de formato para montoExtraido: en Colombia el PUNTO separa miles (descártalo) y la
+      COMA separa los decimales/centavos (descarta también la coma y todo lo que la sigue,
+      NUNCA concatenes esos dígitos al entero). Por ejemplo, si el comprobante muestra
+      "$305.000,00" o "$ 305.000", montoExtraido debe ser 305000 (NO 30500000, NO 30500).
       Si algún dato no es legible, pon null. No incluyas texto explicativo, solo el JSON.`;
 
       const result = await model.generateContent([
