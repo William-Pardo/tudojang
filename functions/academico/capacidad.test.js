@@ -90,6 +90,46 @@ test('actualizarExtrasContratados: SuperAdmin puede operar cross-tenant', async 
   assert.equal(resultado.valor, 1);
 });
 
+// Bug real (2026-09-02, tenant Gajog): el Admin del propio club se autoservia una sede/
+// equipo tecnico extra sin cobro automatico activo -- el cron cobroAutomaticoMensual filtra
+// `cobroAutomaticoActivo == true`, asi que un tenant en modalidad efectivo/manual jamas era
+// facturado por ese extra. Queda gratis para siempre, sin ningun aviso.
+test('actualizarExtrasContratados: rechaza al Admin si el tenant no tiene cobroAutomaticoActivo (contratar, no reducir)', async () => {
+  const servicio = crearServicioActualizarExtrasContratados({
+    firestore: crearFirestoreFake({ tenants: { 'tenant-1': { sedesExtraContratadas: 0 } } }),
+  });
+
+  await assert.rejects(
+    () => servicio({ tenantId: 'tenant-1', campo: 'sedesExtraContratadas', cantidad: 1 }, crearContextoAdmin()),
+    /cobro automático activo/i,
+  );
+});
+
+test('actualizarExtrasContratados: SuperAdmin puede otorgar el extra aunque el tenant no tenga cobroAutomaticoActivo (pago ya coordinado por fuera)', async () => {
+  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': { sedesExtraContratadas: 0 } } });
+  const servicio = crearServicioActualizarExtrasContratados({ firestore });
+
+  const resultado = await servicio(
+    { tenantId: 'tenant-1', campo: 'sedesExtraContratadas', cantidad: 1 },
+    crearContextoAdmin({ tenantId: 'otro-tenant-del-superadmin', rol: 'SuperAdmin' }),
+  );
+
+  assert.equal(resultado.valor, 1);
+});
+
+test('actualizarExtrasContratados: el Admin SI puede reducir un extra ya comprado aunque no tenga cobroAutomaticoActivo (no genera deuda nueva)', async () => {
+  const servicio = crearServicioActualizarExtrasContratados({
+    firestore: crearFirestoreFake({ tenants: { 'tenant-1': { sedesExtraContratadas: 2 } } }),
+  });
+
+  const resultado = await servicio(
+    { tenantId: 'tenant-1', campo: 'sedesExtraContratadas', cantidad: -1 },
+    crearContextoAdmin(),
+  );
+
+  assert.equal(resultado.valor, 1);
+});
+
 test('actualizarExtrasContratados: rechaza si el tenant no existe', async () => {
   const servicio = crearServicioActualizarExtrasContratados({
     firestore: crearFirestoreFake({ tenants: {} }),
@@ -146,7 +186,7 @@ test('actualizarExtrasContratados: rechaza si la operacion dejaria el campo en u
 // ─── escritura correcta ─────────────────────────────────────────────────────
 
 test('actualizarExtrasContratados: incrementa sedesExtraContratadas desde 0', async () => {
-  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': {} } });
+  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': { cobroAutomaticoActivo: true } } });
   const servicio = crearServicioActualizarExtrasContratados({ firestore });
 
   const resultado = await servicio(
@@ -159,7 +199,7 @@ test('actualizarExtrasContratados: incrementa sedesExtraContratadas desde 0', as
 });
 
 test('actualizarExtrasContratados: incrementa equipoTecnicoExtraContratado sobre un valor ya existente', async () => {
-  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': { equipoTecnicoExtraContratado: 2 } } });
+  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': { equipoTecnicoExtraContratado: 2, cobroAutomaticoActivo: true } } });
   const servicio = crearServicioActualizarExtrasContratados({ firestore });
 
   const resultado = await servicio(
@@ -184,7 +224,7 @@ test('actualizarExtrasContratados: acepta cantidad negativa para reducir un extr
 
 test('actualizarExtrasContratados: no toca ningun otro campo del tenant', async () => {
   const firestore = crearFirestoreFake({
-    tenants: { 'tenant-1': { nombreClub: 'Tudojang', plan: 'starter', sedesExtraContratadas: 0 } },
+    tenants: { 'tenant-1': { nombreClub: 'Tudojang', plan: 'starter', sedesExtraContratadas: 0, cobroAutomaticoActivo: true } },
   });
   const servicio = crearServicioActualizarExtrasContratados({ firestore });
 
@@ -204,7 +244,7 @@ test('actualizarExtrasContratados: no toca ningun otro campo del tenant', async 
 // incluidos) contado como si fuera un extra: `incluido.equipoTecnico=3` es un piso fijo que
 // el callable jamas reemplaza, solo le suma unidades por encima.
 test('D8: tras comprar equipo tecnico extra via el callable, calcularCapacidad sigue contando al dueño DENTRO de los 3 incluidos, no como extra', async () => {
-  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': {} } });
+  const firestore = crearFirestoreFake({ tenants: { 'tenant-1': { cobroAutomaticoActivo: true } } });
   const servicio = crearServicioActualizarExtrasContratados({ firestore });
 
   await servicio({ tenantId: 'tenant-1', campo: 'equipoTecnicoExtraContratado', cantidad: 2 }, crearContextoAdmin());
