@@ -1,13 +1,10 @@
 
 // servicios/pagosEstudiantesApi.ts
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db, isFirebaseConfigured } from '../firebase/config';
-import { ReportePagoEstudiante, EstadoValidacion, TipoMovimiento, CategoriaFinanciera, EstadoPago, Estudiante, TipoNotificacion } from '../tipos';
-import { obtenerEstudiantePorId } from './estudiantesApi';
-import { agregarMovimiento } from './finanzasApi';
-import { guardarNotificacionEnHistorial } from './notificacionesApi';
-import { calcularSaldoTrasPago, estadoPagoPorSaldo } from '../utils/finanzas';
+import { ReportePagoEstudiante, EstadoValidacion, Estudiante } from '../tipos';
 import { resolveLinkedStudent } from './academico/tutorStudentResolver';
 
 const storage = getStorage();
@@ -81,6 +78,51 @@ export const reportarPagoEstudiante = async (
 };
 
 /**
+ * PUBLICO (sin login, link de WhatsApp): resuelve el estudiante por su ID de documento
+ * (opaco) para ReportarPagoPublico.tsx. Bug real (2026-09-02): antes se resolvía con
+ * obtenerEstudiantePorNumIdentificacion, un query directo del cliente que SIEMPRE fallaba con
+ * permission-denied (firestore.rules exige authenticated() para leer `estudiantes`, sin
+ * excepción para este caso) -- el link de WhatsApp nunca funcionaba, ni para el tutor
+ * legítimo. Ahora pasa por la Cloud Function `resolverEstudiantePublico` (Admin SDK, bypasea
+ * las reglas), que además proyecta SOLO nombres/apellidos/saldoDeudor -- nunca el documento
+ * completo (tutor, historialPagos, progreso) -- ver functions/pagosPublicos.js. Devuelve null
+ * si no existe o no pertenece al tenant, mismo contrato que resolverTenantPublico.
+ */
+export const resolverEstudiantePublico = async (
+    estudianteId: string,
+    tenantId: string
+): Promise<Pick<Estudiante, 'id' | 'nombres' | 'apellidos' | 'saldoDeudor'> | null> => {
+    if (!isFirebaseConfigured) return null;
+    const callable = httpsCallable<
+        { estudianteId: string; tenantId: string },
+        Pick<Estudiante, 'id' | 'nombres' | 'apellidos' | 'saldoDeudor'> | null
+    >(getFunctions(), 'resolverEstudiantePublico');
+    const { data } = await callable({ estudianteId, tenantId });
+    return data;
+};
+
+/**
+ * PUBLICO (sin login): reporta un pago desde el link de WhatsApp -- mismo resultado final que
+ * reportarPagoEstudiante (reporte Pendiente + comprobante en Storage), pero corrido server-side
+ * vía la Cloud Function `reportarPagoPublico` (Admin SDK) porque ni Storage ni Firestore
+ * permiten esta escritura sin sesión. Ver functions/pagosPublicos.js.
+ */
+export const reportarPagoPublico = async (
+    estudianteId: string,
+    tenantId: string,
+    monto: number,
+    imagenBase64: string
+): Promise<string> => {
+    if (!isFirebaseConfigured) return "mock-id-reporte";
+    const callable = httpsCallable<
+        { estudianteId: string; tenantId: string; monto: number; imagenBase64: string },
+        { reporteId: string }
+    >(getFunctions(), 'reportarPagoPublico');
+    const { data } = await callable({ estudianteId, tenantId, monto, imagenBase64 });
+    return data.reporteId;
+};
+
+/**
  * ADMIN: Obtener reportes pendientes de su Tenant
  */
 export const obtenerReportesPendientes = async (tenantId: string): Promise<ReportePagoEstudiante[]> => {
@@ -114,47 +156,14 @@ export const obtenerHistorialReportes = async (tenantId: string): Promise<Report
 };
 
 /**
- * ADMIN: Busca otro reporte del mismo Tenant con la misma referencia de IA (excluyendo el
- * propio). Chequeo cliente previo a aprobar en lote, para no acreditar dos veces el mismo
- * comprobante -- complementa (no reemplaza) la advertencia que ya calcula la Cloud Function
- * analizarComprobanteEstudiante contra pagos ya Aprobados.
- */
-export const buscarReferenciaDuplicada = async (
-    tenantId: string,
-    referencia: string,
-    reporteIdExcluir: string
-): Promise<ReportePagoEstudiante | null> => {
-    /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
-    if (!isFirebaseConfigured) return null;
-    const q = query(
-        reportesCollection,
-        where("tenantId", "==", tenantId),
-        where("datosIA.referencia", "==", referencia)
-    );
-    const snap = await getDocs(q);
-    const duplicado = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as ReportePagoEstudiante))
-        .find(r => r.id !== reporteIdExcluir);
-    return duplicado || null;
-};
-
-/**
- * ADMIN: Aprobar varios reportes en lote. Antes de aprobar cada uno, revalida que su
- * referencia (si la IA la extrajo) no esté duplicada -- un fallo individual (duplicado o
- * cualquier error de gestionarReportePago) no aborta el resto del lote.
+ * ADMIN: Aprobar varios reportes en lote -- un fallo individual (referencia duplicada
+ * detectada por la Cloud Function, o cualquier otro error) no aborta el resto del lote.
  */
 export const aprobarReportesEnLote = async (
     reportes: ReportePagoEstudiante[],
     adminId: string
 ): Promise<{ exitosos: string[]; fallidos: { id: string; error: string }[] }> => {
     const resultados = await Promise.allSettled(reportes.map(async (reporte) => {
-        const referencia = reporte.datosIA?.referencia;
-        if (referencia) {
-            const duplicado = await buscarReferenciaDuplicada(reporte.tenantId, referencia, reporte.id);
-            if (duplicado) {
-                throw new Error(`Referencia duplicada con el reporte ${duplicado.id}.`);
-            }
-        }
         await gestionarReportePago(reporte, EstadoValidacion.Aprobado, adminId);
     }));
 
@@ -175,104 +184,32 @@ export const aprobarReportesEnLote = async (
 };
 
 /**
- * ADMIN: Gestionar un reporte (Aprobar/Rechazar)
- * Al aprobar, se actualiza el saldo del estudiante y se inyecta en finanzas.
+ * ADMIN: Gestionar un reporte (Aprobar/Rechazar). Wrapper delgado sobre la Cloud Function
+ * `gestionarReportePago` (Admin SDK, mismo patrón ya usado en resolverTenantPublico/
+ * verificarDuplicadoAspirante) -- bug real (2026-09-03): esto antes eran 3 escrituras
+ * SEPARADAS desde el cliente (updateDoc estudiante, addDoc finanzas, updateDoc reporte). La
+ * regla de `finanzas` exige isAdmin() (solo Admin/SuperAdmin), pero el panel de "Validar
+ * Pagos" también es accesible para Editor/Asistente -- para ellos, el saldo del estudiante
+ * quedaba descontado sin ningún registro contable, y el reporte nunca se marcaba como
+ * procesado. Ahora todo el ciclo corre server-side dentro de una única transacción de
+ * Firestore -- o se aplican las 3 escrituras completas, o ninguna. Ver
+ * functions/pagosValidacion.js para el detalle completo (incluye el chequeo de referencia
+ * duplicada, que ahora vive dentro de esa misma transacción).
+ * `adminId` ya no se usa (la Cloud Function toma el uid del token de auth, no del cliente) --
+ * se mantiene en la firma para no tocar los call-sites existentes (PanelValidacionPagos.tsx).
  */
 export const gestionarReportePago = async (
     reporte: ReportePagoEstudiante,
     nuevoEstado: EstadoValidacion.Aprobado | EstadoValidacion.Rechazado,
-    adminId: string,
+    _adminId: string,
     observaciones?: string
 ): Promise<void> => {
     /* istanbul ignore next -- rama exclusiva del modo demo, sin Firebase */
     if (!isFirebaseConfigured) return;
 
-    const docRef = doc(reportesCollection, reporte.id);
-
-    // D5 (design.md): hoisteado a `let` para reutilizar la MISMA lectura en el paso 7
-    // (notificación al tutor) -- el camino de aprobación (hot path del lote,
-    // aprobarReportesEnLote) no debe pagar una segunda lectura de Firestore solo para
-    // armar destinatario/tutorNombre.
-    let estudiante: Estudiante | null = null;
-
-    if (nuevoEstado === EstadoValidacion.Aprobado) {
-        // 1. Obtener estudiante actual para asegurar integridad de saldo
-        estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
-
-        // 2. Calcular nuevo saldo
-        const nuevoSaldo = calcularSaldoTrasPago(estudiante.saldoDeudor, reporte.montoInformado);
-        const nuevoEstadoPago = estadoPagoPorSaldo(nuevoSaldo);
-
-        // 3. Preparar entrada de historial
-        const pagoHistorial = {
-            id: `PAGO-REP-${reporte.id}`,
-            fecha: new Date().toISOString(),
-            monto: reporte.montoInformado,
-            metodo: 'Transferencia (IA)',
-            referencia: reporte.datosIA?.referencia || 'REPORTE-APP',
-            reporteId: reporte.id
-        };
-
-        // 4. Actualizar Estudiante (Saldo + Historial)
-        const estudianteRef = doc(db, 'estudiantes', reporte.estudianteId);
-        await updateDoc(estudianteRef, {
-            saldoDeudor: nuevoSaldo,
-            estadoPago: nuevoEstadoPago,
-            historialPagos: [pagoHistorial, ...(estudiante.historialPagos || [])]
-        });
-
-        // 5. Inyectar en Finanzas
-        await agregarMovimiento({
-            tenantId: reporte.tenantId,
-            tipo: TipoMovimiento.Ingreso,
-            categoria: CategoriaFinanciera.Mensualidad,
-            monto: reporte.montoInformado,
-            descripcion: `PAGO REPORTADO APP: ${reporte.estudianteNombre}`,
-            fecha: new Date().toISOString().split('T')[0],
-            sedeId: estudiante.sedeId || '1'
-        });
-    }
-
-    // 6. Actualizar estado del reporte
-    await updateDoc(docRef, {
-        estado: nuevoEstado,
-        validadoPor: adminId,
-        fechaValidacion: new Date().toISOString(),
-        observaciones: observaciones || ''
-    });
-
-    // 7. Notificar al tutor (D2/D4/D5 design.md): best-effort, DESPUÉS de que el estado del
-    // reporte ya quedó confirmado arriba -- un fallo acá (incluido un permission-denied de
-    // Firestore) NUNCA debe tumbar la operación de pago ni propagarse a
-    // aprobarReportesEnLote. Aprobado reutiliza el `estudiante` del paso 1 (cero lecturas
-    // extra); Rechazado lo resuelve acá porque ese camino nunca lo necesitó antes.
-    try {
-        if (!estudiante) {
-            estudiante = await obtenerEstudiantePorId(reporte.estudianteId);
-        }
-        const esAprobado = nuevoEstado === EstadoValidacion.Aprobado;
-        const tutorNombre = estudiante.tutor
-            ? [estudiante.tutor.nombres, estudiante.tutor.apellidos].filter(Boolean).join(' ')
-            : '';
-        const destinatario = estudiante.tutor?.correo || estudiante.correo || '';
-
-        await guardarNotificacionEnHistorial({
-            tenantId: reporte.tenantId,
-            estudianteId: reporte.estudianteId,
-            estudianteNombre: reporte.estudianteNombre,
-            tutorNombre,
-            destinatario,
-            canal: 'InApp',
-            tipo: esAprobado ? TipoNotificacion.PagoAprobado : TipoNotificacion.PagoRechazado,
-            // D8 (design.md): el rechazo SIEMPRE usa este texto neutro fijo -- `observaciones`
-            // (notas internas del admin) NUNCA se copia al mensaje del tutor.
-            mensaje: esAprobado
-                ? `Tu pago de $${reporte.montoInformado.toLocaleString('es-CO')} fue aprobado. ¡Gracias por tu puntualidad!`
-                : 'Tu comprobante no pudo validarse. Contactá a la academia para más información.',
-            leida: false,
-            fecha: new Date().toISOString(),
-        });
-    } catch (err) {
-        console.error(`[gestionarReportePago] no se pudo crear la notificación tutor-facing para ${reporte.id}:`, err);
-    }
+    const callable = httpsCallable<
+        { reporteId: string; nuevoEstado: EstadoValidacion.Aprobado | EstadoValidacion.Rechazado; observaciones?: string },
+        { ok: boolean }
+    >(getFunctions(), 'gestionarReportePago');
+    await callable({ reporteId: reporte.id, nuevoEstado, observaciones });
 };
