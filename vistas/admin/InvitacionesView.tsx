@@ -299,10 +299,20 @@ const InvitacionesView: React.FC = () => {
     cargarInvitaciones();
   }, [tenantId]);
 
-  const invitacionesEstudiante = useMemo(
-    () => invitaciones.filter((i) => i.rol === 'Estudiante'),
-    [invitaciones]
-  );
+  // Una fila por correo (la mas reciente): reenviar una invitacion de Estudiante deja el
+  // mismo rastro que la de Tutor -- vieja `revocada` + nueva `pendiente` en `invitaciones`.
+  // `listInvitations` ya entrega el arreglo ordenado por creadoEn desc, asi que quedarse con
+  // la primera aparicion de cada correo es quedarse con la mas reciente.
+  const invitacionesEstudiante = useMemo(() => {
+    const correosVistos = new Set<string>();
+    return invitaciones.filter((i) => {
+      if (i.rol !== 'Estudiante') return false;
+      const correo = i.email.trim().toLowerCase();
+      if (correosVistos.has(correo)) return false;
+      correosVistos.add(correo);
+      return true;
+    });
+  }, [invitaciones]);
 
   const invitacionesTutor = useMemo(
     () => invitaciones.filter((i) => i.rol === 'Tutor'),

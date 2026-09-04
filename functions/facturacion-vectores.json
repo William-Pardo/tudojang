@@ -9,74 +9,74 @@
       "esperado": { "estudiantes": { "cantidad": 0, "subtotal": 0, "tramos": [] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 0 }
     },
     {
-      "nombre": "1 estudiante facturable -- tarifa plana $4.500 (descuento por volumen desactivado)",
+      "nombre": "1 estudiante facturable -- tarifa plana $5.000 (descuento por volumen desactivado)",
       "entrada": { "estudiantesFacturables": 1, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 1, "subtotal": 4500, "tramos": [ { "desde": 1, "hasta": 1, "cantidad": 1, "tarifa": 4500, "subtotal": 4500 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 4500 }
+      "esperado": { "estudiantes": { "cantidad": 1, "subtotal": 5000, "tramos": [ { "desde": 1, "hasta": 1, "cantidad": 1, "tarifa": 5000, "subtotal": 5000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 5000 }
     },
     {
-      "nombre": "30 estudiantes -- tarifa plana $4.500/estudiante, descuento por volumen desactivado",
+      "nombre": "30 estudiantes -- tarifa plana $5.000/estudiante, descuento por volumen desactivado",
       "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 135000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 4500, "subtotal": 135000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 135000 }
+      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 150000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 5000, "subtotal": 150000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 150000 }
     },
     {
-      "nombre": "69 estudiantes -- tarifa plana $4.500, sin cruce de tramo posible con el descuento desactivado",
+      "nombre": "69 estudiantes -- tarifa plana $5.000, sin cruce de tramo posible con el descuento desactivado",
       "entrada": { "estudiantesFacturables": 69, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 69, "subtotal": 310500, "tramos": [ { "desde": 1, "hasta": 69, "cantidad": 69, "tarifa": 4500, "subtotal": 310500 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 310500 }
+      "esperado": { "estudiantes": { "cantidad": 69, "subtotal": 345000, "tramos": [ { "desde": 1, "hasta": 69, "cantidad": 69, "tarifa": 5000, "subtotal": 345000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 345000 }
     },
     {
-      "nombre": "70 estudiantes -- tarifa plana $4.500 (limite del viejo tramo 1-70 ya no aplica)",
+      "nombre": "70 estudiantes -- tarifa plana $5.000 (limite del viejo tramo 1-70 ya no aplica)",
       "entrada": { "estudiantesFacturables": 70, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 70, "subtotal": 315000, "tramos": [ { "desde": 1, "hasta": 70, "cantidad": 70, "tarifa": 4500, "subtotal": 315000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 315000 }
+      "esperado": { "estudiantes": { "cantidad": 70, "subtotal": 350000, "tramos": [ { "desde": 1, "hasta": 70, "cantidad": 70, "tarifa": 5000, "subtotal": 350000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 350000 }
     },
     {
-      "nombre": "71 estudiantes -- tarifa plana $4.500; ya NO cruza a un tramo con tarifa distinta (descuento desactivado)",
+      "nombre": "71 estudiantes -- tarifa plana $5.000; ya NO cruza a un tramo con tarifa distinta (descuento desactivado)",
       "entrada": { "estudiantesFacturables": 71, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 71, "subtotal": 319500, "tramos": [ { "desde": 1, "hasta": 71, "cantidad": 71, "tarifa": 4500, "subtotal": 319500 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 319500 }
+      "esperado": { "estudiantes": { "cantidad": 71, "subtotal": 355000, "tramos": [ { "desde": 1, "hasta": 71, "cantidad": 71, "tarifa": 5000, "subtotal": 355000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 355000 }
     },
     {
-      "nombre": "80 estudiantes -- tarifa plana $4.500 x 80, sin combinar tramos (descuento por volumen desactivado)",
+      "nombre": "80 estudiantes -- tarifa plana $5.000 x 80, sin combinar tramos (descuento por volumen desactivado)",
       "entrada": { "estudiantesFacturables": 80, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 80, "subtotal": 360000, "tramos": [ { "desde": 1, "hasta": 80, "cantidad": 80, "tarifa": 4500, "subtotal": 360000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 360000 }
+      "esperado": { "estudiantes": { "cantidad": 80, "subtotal": 400000, "tramos": [ { "desde": 1, "hasta": 80, "cantidad": 80, "tarifa": 5000, "subtotal": 400000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 400000 }
     },
     {
-      "nombre": "150 estudiantes -- tarifa plana $4.500",
+      "nombre": "150 estudiantes -- tarifa plana $5.000",
       "entrada": { "estudiantesFacturables": 150, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 150, "subtotal": 675000, "tramos": [ { "desde": 1, "hasta": 150, "cantidad": 150, "tarifa": 4500, "subtotal": 675000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 675000 }
+      "esperado": { "estudiantes": { "cantidad": 150, "subtotal": 750000, "tramos": [ { "desde": 1, "hasta": 150, "cantidad": 150, "tarifa": 5000, "subtotal": 750000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 750000 }
     },
     {
-      "nombre": "151 estudiantes -- tarifa plana $4.500; sin cruce de tramo (descuento desactivado)",
+      "nombre": "151 estudiantes -- tarifa plana $5.000; sin cruce de tramo (descuento desactivado)",
       "entrada": { "estudiantesFacturables": 151, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 151, "subtotal": 679500, "tramos": [ { "desde": 1, "hasta": 151, "cantidad": 151, "tarifa": 4500, "subtotal": 679500 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 679500 }
+      "esperado": { "estudiantes": { "cantidad": 151, "subtotal": 755000, "tramos": [ { "desde": 1, "hasta": 151, "cantidad": 151, "tarifa": 5000, "subtotal": 755000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 755000 }
     },
     {
-      "nombre": "350 estudiantes -- tarifa plana $4.500",
+      "nombre": "350 estudiantes -- tarifa plana $5.000",
       "entrada": { "estudiantesFacturables": 350, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 350, "subtotal": 1575000, "tramos": [ { "desde": 1, "hasta": 350, "cantidad": 350, "tarifa": 4500, "subtotal": 1575000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 1575000 }
+      "esperado": { "estudiantes": { "cantidad": 350, "subtotal": 1750000, "tramos": [ { "desde": 1, "hasta": 350, "cantidad": 350, "tarifa": 5000, "subtotal": 1750000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 1750000 }
     },
     {
-      "nombre": "351 estudiantes -- tarifa plana $4.500; sin cruce de tramo (descuento desactivado)",
+      "nombre": "351 estudiantes -- tarifa plana $5.000; sin cruce de tramo (descuento desactivado)",
       "entrada": { "estudiantesFacturables": 351, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 351, "subtotal": 1579500, "tramos": [ { "desde": 1, "hasta": 351, "cantidad": 351, "tarifa": 4500, "subtotal": 1579500 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 1579500 }
+      "esperado": { "estudiantes": { "cantidad": 351, "subtotal": 1755000, "tramos": [ { "desde": 1, "hasta": 351, "cantidad": 351, "tarifa": 5000, "subtotal": 1755000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 1755000 }
     },
     {
-      "nombre": "500 estudiantes -- tarifa plana $4.500 sin tope superior",
+      "nombre": "500 estudiantes -- tarifa plana $5.000 sin tope superior",
       "entrada": { "estudiantesFacturables": 500, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 500, "subtotal": 2250000, "tramos": [ { "desde": 1, "hasta": 500, "cantidad": 500, "tarifa": 4500, "subtotal": 2250000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 2250000 }
+      "esperado": { "estudiantes": { "cantidad": 500, "subtotal": 2500000, "tramos": [ { "desde": 1, "hasta": 500, "cantidad": 500, "tarifa": 5000, "subtotal": 2500000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 2500000 }
     },
     {
       "nombre": "30 estudiantes + 1 sede extra -- tarifa plana + $89.900 de sede extra",
       "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 1, "equipoTecnicoExtraContratado": 0 },
-      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 135000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 4500, "subtotal": 135000 } ] }, "sedesExtra": { "cantidad": 1, "subtotal": 89900 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 224900 }
+      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 150000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 5000, "subtotal": 150000 } ] }, "sedesExtra": { "cantidad": 1, "subtotal": 89900 }, "equipoTecnicoExtra": { "cantidad": 0, "subtotal": 0 }, "totalPesos": 239900 }
     },
     {
       "nombre": "30 estudiantes + 2 cupos de equipo tecnico extra -- tarifa plana + $90.000 (2 x $45.000)",
       "entrada": { "estudiantesFacturables": 30, "sedesExtraContratadas": 0, "equipoTecnicoExtraContratado": 2 },
-      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 135000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 4500, "subtotal": 135000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 2, "subtotal": 90000 }, "totalPesos": 225000 }
+      "esperado": { "estudiantes": { "cantidad": 30, "subtotal": 150000, "tramos": [ { "desde": 1, "hasta": 30, "cantidad": 30, "tarifa": 5000, "subtotal": 150000 } ] }, "sedesExtra": { "cantidad": 0, "subtotal": 0 }, "equipoTecnicoExtra": { "cantidad": 2, "subtotal": 90000 }, "totalPesos": 240000 }
     },
     {
       "nombre": "80 estudiantes + 1 sede extra + 1 equipo tecnico extra -- tarifa plana + combo de extras",
       "entrada": { "estudiantesFacturables": 80, "sedesExtraContratadas": 1, "equipoTecnicoExtraContratado": 1 },
-      "esperado": { "estudiantes": { "cantidad": 80, "subtotal": 360000, "tramos": [ { "desde": 1, "hasta": 80, "cantidad": 80, "tarifa": 4500, "subtotal": 360000 } ] }, "sedesExtra": { "cantidad": 1, "subtotal": 89900 }, "equipoTecnicoExtra": { "cantidad": 1, "subtotal": 45000 }, "totalPesos": 494900 }
+      "esperado": { "estudiantes": { "cantidad": 80, "subtotal": 400000, "tramos": [ { "desde": 1, "hasta": 80, "cantidad": 80, "tarifa": 5000, "subtotal": 400000 } ] }, "sedesExtra": { "cantidad": 1, "subtotal": 89900 }, "equipoTecnicoExtra": { "cantidad": 1, "subtotal": 45000 }, "totalPesos": 534900 }
     },
     {
       "nombre": "0 estudiantes + 5 sedes extra + 10 equipos tecnicos extra -- extras aislados de la matricula, sin interaccion con la tarifa de estudiantes",

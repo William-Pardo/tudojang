@@ -162,6 +162,11 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
         sedeBonusOtorgada: false,
         sedesExtraContratadas: 1,
         equipoTecnicoExtraContratado: 0,
+        // Bug real (2026-09-02, tenant Gajog): el self-service de sede/equipo tecnico extra
+        // solo debe habilitarse con cobro automatico activo -- ver capacidad.js::
+        // assertPuedeContratarExtra. Este describe representa el caso normal (Wompi activo);
+        // el caso sin cobro automatico tiene su propio test mas abajo.
+        cobroAutomaticoActivo: true,
     };
 
     beforeEach(() => {
@@ -289,6 +294,34 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
         await waitFor(() => {
             expect(actualizarCapacidadClubMock).toHaveBeenCalledWith('test-tenant', 'equipoTecnicoExtraContratado', -1);
         });
+    });
+
+    // Bug real (2026-09-02, tenant Gajog): un club sin cobro automatico activo (pago
+    // efectivo/manual) se autoservia sedes/equipo tecnico extra que jamas se cobraban --
+    // cobroAutomaticoMensual (functions/wompiCobroAutomatico.js) solo procesa tenants con
+    // cobroAutomaticoActivo. Los botones "+1" deben quedar deshabilitados en ese caso; la
+    // Cloud Function (capacidad.js) es la defensa real, esto solo evita el viaje redondo.
+    it('sin cobroAutomaticoActivo, los botones "+1" quedan deshabilitados y muestran el aviso de contactar soporte', async () => {
+        useConfiguracionMock.mockReturnValue({
+            usuarios: [],
+            configNotificaciones: {},
+            configClub: { ...configClubConExtras, cobroAutomaticoActivo: false },
+            cargando: false,
+            error: null,
+            guardarConfiguraciones: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+            agregarUsuario: jest.fn(),
+            actualizarUsuario: jest.fn(),
+            eliminarUsuario: jest.fn(),
+            cargarConfiguracion: jest.fn(),
+        });
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+        await irATabLicencia(user);
+
+        expect(screen.getByText(/\+1 Sede Adicional/i)).toBeDisabled();
+        expect(screen.getByText(/\+1 Cupo de Equipo Técnico/i)).toBeDisabled();
+        expect(screen.getByText(/no tiene cobro automático activo/i)).toBeInTheDocument();
+        expect(actualizarCapacidadClubMock).not.toHaveBeenCalled();
     });
 });
 

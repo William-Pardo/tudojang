@@ -314,7 +314,10 @@ const AppLayout: React.FC = () => {
             </main>
             <BotonVolverArriba scrollContainerRef={scrollableContainerRef} />
             <ModalBusquedaGlobal abierto={busquedaAbierta} onCerrar={() => setBusquedaAbierta(false)} />
-            <AsistenteVirtual />
+            {/* Fix (2026-08-31, reportado tenant Cocodrilos): el asistente virtual es una
+                herramienta operativa del staff (consulta datos administrativos del tenant) --
+                Tutor/Estudiante son consultores sin ese contexto y no deben verlo. */}
+            {usuario.rol !== RolUsuario.Tutor && usuario.rol !== RolUsuario.Estudiante && <AsistenteVirtual />}
         </div>
     );
 };

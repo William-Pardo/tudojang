@@ -30,6 +30,13 @@ const VistaMiPerfil: React.FC = () => {
 
     const esTutorOperativo = usuario?.rol === RolUsuario.Tutor;
 
+    // Fix (2026-08-31, reportado tenant Cocodrilos): "Mis Talones de Pago" es nómina de STAFF
+    // (sueldoBase/contrato, tipos.ts) -- solo tiene sentido para Admin/Editor/Asistente/Maestro/
+    // SuperAdmin. `esTutorOperativo` solo excluía a Tutor; Estudiante caía en el `!esTutorOperativo`
+    // y veía montos de sueldo hardcodeados que no le pertenecen. Ningún consultor (Tutor o
+    // Estudiante) debe ver esta sección.
+    const esConsultor = usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Estudiante;
+
     // Fix tutor-role-end-to-end (2026-07-14): cargar datos reales del estudiante
     // vinculado resolviendo por el EMAIL de login del tutor (el vínculo vive en
     // estudiante.tutor.correo). El resolver ya devuelve el Estudiante completo
@@ -50,7 +57,7 @@ const VistaMiPerfil: React.FC = () => {
     }, [esTutorOperativo, usuario?.tenantId, usuario?.email]);
 
     // Para Tutores: usar datos reales del estudiante. Para otros roles: usar mocks
-    const talonesPago = !esTutorOperativo
+    const talonesPago = !esConsultor
         ? [
             { id: '1', periodo: 'Mes Actual', monto: usuario?.rol === RolUsuario.Admin ? 3500000 : 1200000, fecha: new Date().toISOString().split('T')[0] },
             { id: '2', periodo: 'Mes Anterior', monto: usuario?.rol === RolUsuario.Admin ? 3500000 : 1150000, fecha: '2024-04-30' },
@@ -244,7 +251,7 @@ const VistaMiPerfil: React.FC = () => {
                         </section>
                     )}
 
-                    {!esTutorOperativo ? (
+                    {!esConsultor ? (
                         <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
                             <div className="p-8 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
                                 <div className="flex items-center gap-3">
@@ -279,7 +286,7 @@ const VistaMiPerfil: React.FC = () => {
                                 ))}
                             </div>
                         </section>
-                    ) : (
+                    ) : esTutorOperativo ? (
                         <section className="space-y-4">
                             <div className="flex items-center gap-3 px-2">
                                 <div className="p-2 bg-green-500/10 text-green-600 rounded-xl shadow-inner"><IconoAprobar className="w-5 h-5" /></div>
@@ -288,10 +295,15 @@ const VistaMiPerfil: React.FC = () => {
                             {/* ReportarPagoTutor resuelve el/los estudiante(s) del tutor por su cuenta
                                 (mismo resolver que ya usa esta vista arriba para los documentos) --
                                 reemplaza al bloque estatico de saldo/medios de pago porque ya incluye
-                                esa misma informacion mas la carga del comprobante. */}
+                                esa misma informacion mas la carga del comprobante. Es EXCLUSIVO de
+                                Tutor: resuelve por tutor.correo == usuario.email (obtenerEstudiantesDelTutor),
+                                así que para un Estudiante logueado no resolvería nada útil -- se separa
+                                del caso general `!esConsultor` de arriba en vez de tratarlos igual. */}
                             <ReportarPagoTutor />
                         </section>
-                    )}
+                    ) : null /* Estudiante: sin sección de pagos propia todavía -- ni la nómina de
+                                staff (era el bug reportado) ni el flujo de reporte del Tutor (no le
+                                aplica, resuelve por tutor.correo). */}
                 </div>
             </div>
 

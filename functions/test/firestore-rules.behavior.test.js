@@ -1205,6 +1205,170 @@ test("tutor cannot read a student where they are NOT the acudiente", async () =>
   );
 });
 
+// Bug real (2026-09-01): el Tutor podía LEER al estudiante donde figura como acudiente pero
+// nunca podía firmar consentimiento/contrato/autorización de imagen -- enviarFirma()
+// (hooks/usePaginaFirma.ts) hace un updateDoc sobre este mismo documento, y `update` solo
+// aceptaba isInstructor(). El tutor leía el documento, dibujaba la firma, y al dar "Aceptar"
+// el updateDoc final siempre terminaba en permission-denied.
+test("tutor can sign the contract (updateDoc limited to the signature fields)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-hijo-firma"), {
+      tenantId: "tenant-1",
+      nombres: "Alejandro",
+      apellidos: "Tester",
+      contratoServiciosFirmado: false,
+      tutor: {
+        correo: "papa@test.com", nombres: "Papa", apellidos: "Tester",
+        numeroIdentificacion: "123", telefono: "3000000000",
+      },
+    });
+  });
+
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor", { email: "papa@test.com" });
+
+  await assertSucceeds(updateDoc(doc(tutorDb, "estudiantes", "est-hijo-firma"), {
+    contratoServiciosFirmado: true,
+    "tutor.firmaContratoDigital": "https://storage.example/firma.png",
+  }));
+});
+
+test("tutor signing the contract cannot smuggle changes to their own identification data", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-hijo-firma-2"), {
+      tenantId: "tenant-1",
+      nombres: "Alejandro",
+      apellidos: "Tester",
+      contratoServiciosFirmado: false,
+      tutor: {
+        correo: "papa2@test.com", nombres: "Papa", apellidos: "Tester",
+        numeroIdentificacion: "123", telefono: "3000000000",
+      },
+    });
+  });
+
+  const tutorDb = client("tutor-2", "tenant-1", "Tutor", { email: "papa2@test.com" });
+
+  await assertFails(updateDoc(doc(tutorDb, "estudiantes", "est-hijo-firma-2"), {
+    contratoServiciosFirmado: true,
+    "tutor.firmaContratoDigital": "https://storage.example/firma.png",
+    "tutor.numeroIdentificacion": "999999",
+  }));
+
+  await assertFails(updateDoc(doc(tutorDb, "estudiantes", "est-hijo-firma-2"), {
+    nombres: "Otro Nombre",
+  }));
+});
+
+test("tutor who is NOT the acudiente cannot sign another student's contract", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-ajeno-firma"), {
+      tenantId: "tenant-1",
+      nombres: "Otro",
+      apellidos: "Nino",
+      contratoServiciosFirmado: false,
+      tutor: {
+        correo: "papa@test.com", nombres: "Papa", apellidos: "Tester",
+        numeroIdentificacion: "123", telefono: "3000000000",
+      },
+    });
+  });
+
+  const otroTutorDb = client("tutor-3", "tenant-1", "Tutor", { email: "distinto@test.com" });
+
+  await assertFails(updateDoc(doc(otroTutorDb, "estudiantes", "est-ajeno-firma"), {
+    contratoServiciosFirmado: true,
+    "tutor.firmaContratoDigital": "https://storage.example/firma.png",
+  }));
+});
+
+// Bug real (2026-09-02): mismo patrón que la firma de tutor arriba, pero sobre
+// usuarios/{uid} -- un colaborador (Asistente/Editor/Maestro/Admin) firmando su propio
+// Contrato Laboral/Prestación de Servicios (usuariosApi.ts::guardarFirmaContratoUsuario)
+// siempre chocaba con `allow update: if false` sin excepción, para CUALQUIER rol.
+const CONTRATO_COLABORADOR_BASE = {
+  sueldoBase: 1500000,
+  duracionMeses: 12,
+  tipoVinculacion: "Prestacion de Servicios",
+  fechaInicio: "2026-01-01",
+  lugarEjecucion: "Sede Principal",
+  firmado: false,
+};
+
+test("collaborator (Asistente) can sign their own labor contract (updateDoc limited to contrato.firmado/firmaDigital)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "asistente-1"), {
+      tenantId: "tenant-1",
+      email: "asistente@test.com",
+      rol: "Asistente",
+      contrato: CONTRATO_COLABORADOR_BASE,
+    });
+  });
+
+  const asistenteDb = client("asistente-1", "tenant-1", "Asistente", { email: "asistente@test.com" });
+
+  await assertSucceeds(updateDoc(doc(asistenteDb, "usuarios", "asistente-1"), {
+    "contrato.firmado": true,
+    "contrato.firmaDigital": "https://storage.example/firma-colaborador.png",
+  }));
+});
+
+test("collaborator signing their contract cannot smuggle changes to sueldoBase/duracionMeses/etc", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "maestro-1"), {
+      tenantId: "tenant-1",
+      email: "maestro@test.com",
+      rol: "Maestro",
+      contrato: CONTRATO_COLABORADOR_BASE,
+    });
+  });
+
+  const maestroDb = client("maestro-1", "tenant-1", "Maestro", { email: "maestro@test.com" });
+
+  await assertFails(updateDoc(doc(maestroDb, "usuarios", "maestro-1"), {
+    "contrato.firmado": true,
+    "contrato.firmaDigital": "https://storage.example/firma-colaborador.png",
+    "contrato.sueldoBase": 99999999,
+  }));
+
+  await assertFails(updateDoc(doc(maestroDb, "usuarios", "maestro-1"), {
+    email: "otro-correo@test.com",
+  }));
+});
+
+test("collaborator cannot sign another collaborator's labor contract", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "editor-ajeno"), {
+      tenantId: "tenant-1",
+      email: "editor-ajeno@test.com",
+      rol: "Editor",
+      contrato: CONTRATO_COLABORADOR_BASE,
+    });
+  });
+
+  const otroDb = client("editor-2", "tenant-1", "Editor", { email: "editor-2@test.com" });
+
+  await assertFails(updateDoc(doc(otroDb, "usuarios", "editor-ajeno"), {
+    "contrato.firmado": true,
+    "contrato.firmaDigital": "https://storage.example/firma-colaborador.png",
+  }));
+});
+
+test("even Admin cannot update usuarios/{uid} outside the collaborator self-signature exception", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "usuarios", "staff-1"), {
+      tenantId: "tenant-1",
+      email: "staff@test.com",
+      rol: "Editor",
+    });
+  });
+
+  const adminDb = client("admin-1", "tenant-1", "Admin", { email: "admin@test.com" });
+
+  await assertFails(updateDoc(doc(adminDb, "usuarios", "staff-1"), {
+    rol: "Admin",
+  }));
+});
+
 // Bug real (2026-09-02): confirma la causa raiz de que ReportarPagoPublico.tsx estuviera
 // completamente roto (nadie podia usarlo, ni siquiera el tutor legitimo). El componente
 // resolvia el estudiante con un query directo del cliente

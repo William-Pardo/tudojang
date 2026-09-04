@@ -62,6 +62,17 @@ describe('invitacionService', () => {
       expect(list2[0].email).toBe('test2@test.com');
     });
 
+    it('listInvitations ordena por creadoEn descendente (la mas reciente primero)', async () => {
+      const vieja = await createInvitation('tenant-123', 'gisell@test.com', 'Tutor');
+      vieja.creadoEn = '2026-09-01T17:22:57.415Z';
+      const nueva = await createInvitation('tenant-123', 'gisell@test.com', 'Tutor');
+      nueva.creadoEn = '2026-09-01T17:24:37.969Z';
+
+      const lista = await listInvitations('tenant-123');
+      expect(lista[0].creadoEn).toBe('2026-09-01T17:24:37.969Z');
+      expect(lista[1].creadoEn).toBe('2026-09-01T17:22:57.415Z');
+    });
+
     it('resendInvitation actualiza expiracion', async () => {
       const inv = await createInvitation('tenant-123', 'test@test.com', 'Estudiante');
       const oldExp = inv.expiraEn;
@@ -110,6 +121,28 @@ describe('invitacionService', () => {
       const res = await listInvitations('tenant-123');
       expect(res.length).toBe(1);
       expect(res[0].id).toBe('inv-1');
+    });
+
+    it('listInvitations ordena por creadoEn desc aunque Firestore los devuelva en otro orden', async () => {
+      // Reproduce el caso real: `resendInvitation` deja una `revocada` vieja y una
+      // `pendiente` nueva para el mismo correo. Firestore no garantiza orden de insercion,
+      // asi que el mock las devuelve deliberadamente vieja-primero.
+      (getDocs as jest.Mock).mockResolvedValueOnce({
+        docs: [
+          {
+            id: 'inv-vieja-revocada',
+            data: () => ({ email: 'gisell@test.com', estado: 'revocada', creadoEn: '2026-09-01T17:22:57.415Z' })
+          },
+          {
+            id: 'inv-nueva-pendiente',
+            data: () => ({ email: 'gisell@test.com', estado: 'pendiente', creadoEn: '2026-09-01T17:24:37.969Z' })
+          }
+        ]
+      });
+
+      const res = await listInvitations('tenant-123');
+      expect(res[0].id).toBe('inv-nueva-pendiente');
+      expect(res[1].id).toBe('inv-vieja-revocada');
     });
 
     it('resendInvitation llama a inviteUser y marca la anterior como revocada', async () => {

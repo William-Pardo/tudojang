@@ -236,8 +236,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         <ConfiguracionContext.Provider value={{
             usuarios, configNotificaciones, configClub: tenant || CONFIGURACION_CLUB_POR_DEFECTO as ConfiguracionClub, cargando, error,
             guardarConfiguraciones: async (cn, cc) => {
-                await api.guardarConfiguracionNotificaciones(cn);
-                await api.guardarConfiguracionClub(cc);
+                // Fix (2026-08-31, diagnóstico "no se pudieron guardar las configuraciones"):
+                // son 2 escrituras Firestore distintas seguidas -- sin distinguir cuál lanza,
+                // el toast (ver useGestionConfiguracion.ts) mostraba el mismo mensaje genérico
+                // sin importar cuál de las dos rechazó el permiso. Se etiqueta cada una.
+                try {
+                    await api.guardarConfiguracionNotificaciones(cn);
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    throw new Error(`[notificaciones_config] ${msg}`);
+                }
+                try {
+                    await api.guardarConfiguracionClub(cc);
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    throw new Error(`[tenants] ${msg}`);
+                }
                 setConfigNotificaciones(cn);
                 // Fix (2026-08-31): antes esto llamaba a cargarTenant() completo (re-fetch a
                 // Firestore) para que el logo/colores cambiaran inmediatamente. `cc` YA es el

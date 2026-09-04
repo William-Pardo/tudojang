@@ -49,14 +49,32 @@ describe('configuracionApi', () => {
   });
 
   describe('obtenerConfiguracionNotificaciones', () => {
-    it('debería retornar la configuración por defecto si el documento no existe', async () => {
+    // Bug real (2026-08-31, tenant Cocodrilos): este test afirmaba `toEqual(CONFIGURACION_POR_DEFECTO)`
+    // tal cual -- o sea, fijaba el bug como si fuera el contrato. CONFIGURACION_POR_DEFECTO tiene
+    // `tenantId: 'escuela-gajog-001'` HARDCODEADO (constantes.ts), así que cualquier tenant SIN
+    // documento en `notificaciones_config` recibía la config de OTRO tenant. Ese tenantId ajeno
+    // viajaba hasta guardarConfiguracionNotificaciones, que escribe en
+    // `notificaciones_config/{config.tenantId}` -- y firestore.rules exige `currentTenantId() ==`
+    // el tenantId del path, así que TODO intento de guardar configuración fallaba con
+    // "Missing or insufficient permissions" (ver functions/test/firestore-rules.notificaciones-config.test.js).
+    it('debería retornar la configuración por defecto CON el tenantId solicitado si el documento no existe', async () => {
       (getDoc as jest.Mock).mockResolvedValueOnce({
         exists: () => false,
       });
 
       const config = await obtenerConfiguracionNotificaciones('tenant123');
       expect(getDoc).toHaveBeenCalledWith(doc(db, 'notificaciones_config', 'tenant123'));
-      expect(config).toEqual(CONFIGURACION_POR_DEFECTO);
+      expect(config).toEqual({ ...CONFIGURACION_POR_DEFECTO, tenantId: 'tenant123' });
+    });
+
+    it('NUNCA devuelve el tenantId hardcodeado del default cuando se pide otro tenant', async () => {
+      (getDoc as jest.Mock).mockResolvedValueOnce({
+        exists: () => false,
+      });
+
+      const config = await obtenerConfiguracionNotificaciones('tnt-1770762462159');
+      expect(config.tenantId).toBe('tnt-1770762462159');
+      expect(config.tenantId).not.toBe(CONFIGURACION_POR_DEFECTO.tenantId);
     });
 
     it('debería retornar la configuración existente si el documento existe', async () => {
