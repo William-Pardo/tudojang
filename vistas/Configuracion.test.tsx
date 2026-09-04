@@ -146,6 +146,21 @@ describe('Configuracion - medios de pago (pagoNequi/pagoDaviplata/pagoBreB/pagoB
         expect(inputNequi).toHaveValue('300 111 2222');
     });
 
+    // Bug real (2026-09-04, descubierto al construir Cobro Justo): el onChange sintético de
+    // este switch pasaba `value` en vez de `checked` -- handleConfigChange (useGestionConfiguracion.ts:180)
+    // destructura `checked` de e.target para checkboxes, así que el toggle nunca reflejaba el clic.
+    it('el switch de Formulario de Inscripción refleja el estado guardado y se puede desactivar', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<VistaConfiguracion />);
+
+        const switchFormulario = container.querySelector('input[name="activarFormularioInscripcion"]') as HTMLInputElement;
+        expect(switchFormulario).toBeChecked(); // configClubBase.activarFormularioInscripcion: true
+
+        await user.click(switchFormulario);
+
+        expect(switchFormulario).not.toBeChecked();
+    });
+
     // Cobro Justo (opt-in por tenant, ver components/FormularioEstudiante.tsx::aplicaCobroJusto):
     // el switch vive en la misma sección que medios de pago/Formulario de Inscripción.
     it('el switch de Cobro Justo refleja el estado guardado y se puede activar', async () => {
