@@ -6,13 +6,13 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import type { Estudiante } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD, RolUsuario } from '../tipos';
-import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar, IconoUsuario } from './Iconos';
+import { IconoCerrar, IconoInformacion, IconoLogoOficial, IconoAprobar, IconoUsuario, IconoProrateo } from './Iconos';
 import FormInputError from './FormInputError';
 import ModalConfirmacion from './ModalConfirmacion';
 import { useSedes, useProgramas, useConfiguracion } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { formatearPrecio } from '../utils/formatters';
-import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes } from '../utils/calculations';
+import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes, calcularMontoCobroJusto } from '../utils/calculations';
 import { buscarEstudianteDuplicado } from '../servicios/estudiantesApi';
 import { generarAlertasAsistenciales } from '../utils/validacionAsistencial';
 
@@ -88,6 +88,7 @@ export const schemaEstudiante = yup.object({
     cobrarInscripcion: yup.boolean().default(true),
     metodoPago: yup.string().oneOf(['efectivo', 'link']).default('efectivo'),
     cobrarMesSiguiente: yup.boolean().default(false),
+    montoCobroJustoAlIngreso: yup.number().optional(),
     enviarInvitacionLoginEstudiante: yup.boolean().default(false),
     enviarInvitacionLoginTutor: yup.boolean().default(false)
 }).required();
@@ -160,7 +161,12 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
 
     const { usuario } = useAuth();
     const esAdmin = usuario?.rol === RolUsuario.Admin || usuario?.rol === RolUsuario.SuperAdmin || usuario?.rol === RolUsuario.Editor;
-    const esFinDeMes = new Date().getDate() >= 26;
+    const diaHoy = new Date().getDate();
+    const esFinDeMes = diaHoy >= 26;
+    // "Cobro Justo" (evolución opt-in de la Regla de Fin de Mes): si el tenant la activó,
+    // desde el día 10 se reemplaza el toggle "todo o nada" por el monto real prorrateado.
+    const esCobroJustoActivo = !!configClub.cobroJustoActivo;
+    const aplicaCobroJusto = esCobroJustoActivo && diaHoy >= 10;
     const edadCalculada = calcularEdadYGrupo(watchedFechaNacimiento).edad;
     const esMenor = edadCalculada > 0 && edadCalculada < 18;
 
@@ -243,6 +249,17 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         const extras = calcularSumaProgramasRecurrentes({ programasInscritos: watchedProgramas } as any, programas);
         return { base, extras, total: base + extras };
     }, [watchedSedeId, watchedProgramas, configClub, sedesVisibles, programas]);
+
+    const montoCobroJusto = useMemo(
+        () => calcularMontoCobroJusto(resumenCobros.base),
+        [resumenCobros.base]
+    );
+
+    // Se persiste junto con el resto del estudiante (igual que cobrarMesSiguiente) solo cuando
+    // realmente aplica -- es el mismo monto ya mostrado al staff en el bloque "Cobro Justo".
+    useEffect(() => {
+        setValue('montoCobroJustoAlIngreso', (!estudianteActual && aplicaCobroJusto) ? montoCobroJusto : undefined);
+    }, [estudianteActual, aplicaCobroJusto, montoCobroJusto, setValue]);
 
     const togglePrograma = (prog: any) => {
         const yaInscrito = watchedProgramas.find((i: any) => i.idPrograma === prog.id);
@@ -606,8 +623,9 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                 </div>
                             )}
 
-                            {/* Regla de Fin de Mes (a partir del día 26) */}
-                            {!estudianteActual && esFinDeMes && esAdmin && (
+                            {/* Regla de Fin de Mes (a partir del día 26) -- solo si el tenant NO activó
+                                Cobro Justo. Con Cobro Justo activo, el bloque de abajo la reemplaza. */}
+                            {!estudianteActual && !esCobroJustoActivo && esFinDeMes && esAdmin && (
                                 <div className="space-y-4 p-6 bg-amber-50 dark:bg-amber-900/10 rounded-3xl border border-amber-100 dark:border-amber-900/30">
                                     <div className="flex gap-3">
                                         <span className="text-2xl">⚠️</span>
@@ -628,6 +646,30 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                             <input type="checkbox" {...register('cobrarMesSiguiente')} className="sr-only peer" />
                                             <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-100 dark:peer-focus:ring-amber-900 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-500 peer-checked:bg-amber-500"></div>
                                         </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cobro Justo (a partir del día 10, opt-in por tenant): reemplaza el
+                                toggle "todo o nada" por el monto real prorrateado, informativo. */}
+                            {!estudianteActual && aplicaCobroJusto && esAdmin && (
+                                <div className="space-y-4 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30">
+                                    <div className="flex gap-3">
+                                        <IconoProrateo className="w-8 h-8 text-tkd-blue flex-shrink-0" />
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-tkd-blue tracking-wider">Cobro Justo (Día 10+)</p>
+                                            <p className="text-xs text-blue-900 dark:text-blue-200 font-bold mt-1 leading-relaxed">
+                                                Como el ingreso es del día 10 en adelante, solo se cobra lo que queda del mes.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="h-px bg-blue-200/50 dark:bg-blue-900/50 my-1"></div>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-black uppercase text-gray-900 dark:text-white">Primera mensualidad prorrateada</p>
+                                            <p className="text-[9px] font-bold text-gray-400 mt-0.5">En vez de {formatearPrecio(resumenCobros.base)} del mes completo.</p>
+                                        </div>
+                                        <p className="text-lg font-black text-tkd-blue">{formatearPrecio(montoCobroJusto)}</p>
                                     </div>
                                 </div>
                             )}

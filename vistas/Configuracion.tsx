@@ -9,7 +9,8 @@ import {
     IconoLogoOficial, IconoInformacion, IconoEditar, IconoEliminar,
     IconoProgramasExtra, IconoConfiguracionAlertas,
     IconoCasa, IconoEstudiantes, IconoEnviar, IconoExitoAnimado,
-    IconoHistorial, IconoEmail, IconoAlertaTriangulo, IconoConfiguracionCuentas
+    IconoHistorial, IconoEmail, IconoAlertaTriangulo, IconoConfiguracionCuentas,
+    IconoProrateo
 } from '../components/Iconos';
 import { useGestionConfiguracion } from '../hooks/useGestionConfiguracion';
 import { useNotificacion } from '../context/NotificacionContext';
@@ -693,10 +694,32 @@ const VistaConfiguracion: React.FC = () => {
                                             type="checkbox"
                                             name="activarFormularioInscripcion"
                                             checked={localConfigClub.activarFormularioInscripcion !== false}
-                                            onChange={(e) => handleConfigChange({ target: { name: 'activarFormularioInscripcion', value: e.target.checked, type: 'checkbox' } } as any, setLocalConfigClub)}
+                                            onChange={(e) => handleConfigChange({ target: { name: 'activarFormularioInscripcion', checked: e.target.checked, type: 'checkbox' } } as any, setLocalConfigClub)}
                                             className="sr-only peer"
                                         />
                                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600"></div>
+                                    </label>
+                                </div>
+
+                                <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-800/20 flex items-center justify-between gap-4">
+                                    <div className="flex items-start gap-3">
+                                        <IconoProrateo className="w-8 h-8 text-tkd-blue flex-shrink-0" />
+                                        <div className="space-y-1">
+                                            <h4 className="text-xs font-black uppercase text-tkd-blue">Cobro Justo</h4>
+                                            <p className="text-[9px] font-bold text-gray-500 leading-relaxed">
+                                                Si un estudiante se inscribe el día 10 del mes o después, esta función calcula automáticamente cuánto debe pagar por los días que le quedan de mes, en vez de cobrarle el mes completo o esperar hasta el próximo mes.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                                        <input
+                                            type="checkbox"
+                                            name="cobroJustoActivo"
+                                            checked={!!localConfigClub.cobroJustoActivo}
+                                            onChange={(e) => handleConfigChange({ target: { name: 'cobroJustoActivo', checked: e.target.checked, type: 'checkbox' } } as any, setLocalConfigClub)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-200 dark:peer-focus:ring-blue-900 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-tkd-blue"></div>
                                     </label>
                                 </div>
                             </div>
