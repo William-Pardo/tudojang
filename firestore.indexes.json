@@ -184,6 +184,15 @@
       ]
     },
     {
+      "collectionGroup": "reportes_pagos_estudiantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "fechaReporte", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "tickets_soporte",
       "queryScope": "COLLECTION",
       "fields": [

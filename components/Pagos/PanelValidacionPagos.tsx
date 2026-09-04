@@ -27,6 +27,14 @@ const PanelValidacionPagos: React.FC = () => {
             const data = await obtenerReportesPendientes(usuario.tenantId);
             setReportes(data);
         } catch (e) {
+            // Bug real (2026-09-04, tenant Gajog): este catch silenciaba el error real de
+            // Firestore detrás de un toast genérico -- la causa real (índice compuesto
+            // faltante para tenantId+estado+fechaReporte, ver firestore.indexes.json) nunca
+            // llegó a verse en ningún lado, así que el módulo de Validar Pagos pudo estar
+            // roto sin que nadie lo notara. console.error deja el mensaje real de Firestore
+            // (que para un índice faltante incluye el link directo para crearlo) visible en
+            // DevTools, sin cambiar el toast que ve el usuario.
+            console.error('[PanelValidacionPagos] Error al cargar reportes de pago:', e);
             mostrarNotificacion("Error al cargar reportes de pago.", "error");
         } finally {
             setCargando(false);
