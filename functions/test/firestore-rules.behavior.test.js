@@ -1205,6 +1205,42 @@ test("tutor cannot read a student where they are NOT the acudiente", async () =>
   );
 });
 
+// Bug real (2026-09-02): confirma la causa raiz de que ReportarPagoPublico.tsx estuviera
+// completamente roto (nadie podia usarlo, ni siquiera el tutor legitimo). El componente
+// resolvia el estudiante con un query directo del cliente
+// (where('numeroIdentificacion', '==', X) sobre TODA la coleccion estudiantes, sin auth) --
+// esa query SIEMPRE fallaba con permission-denied, sin importar login, porque no hay forma
+// de acotarla por tenant/tutor.correo para que Firestore pueda probar la regla `read` contra
+// el resultado potencial. Los 2 tests de UI existentes mockeaban la llamada, por eso nunca se
+// detecto. Fix real: functions/pagosPublicos.js (Cloud Functions publicas, Admin SDK) --
+// estos 2 tests quedan como regresion permanente de que la via de cliente directo sigue (y
+// debe seguir) fallando.
+test("regression: anonymous query by numeroIdentificacion over the whole estudiantes collection always fails (why ReportarPagoPublico moved to Cloud Functions)", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-x"), {
+      tenantId: "tenant-1", numeroIdentificacion: "12345", nombres: "Ale", apellidos: "Test",
+      tutor: { correo: "papa@test.com" },
+    });
+  });
+  const anonDb = environment.unauthenticatedContext().firestore();
+  await assertFails(
+    getDocs(query(collection(anonDb, "estudiantes"), where("numeroIdentificacion", "==", "12345")))
+  );
+});
+
+test("regression: same query authenticated as the owning Tutor STILL fails -- the query itself never filters by tutor.correo", async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "estudiantes", "est-y"), {
+      tenantId: "tenant-1", numeroIdentificacion: "67890", nombres: "Beto", apellidos: "Test",
+      tutor: { correo: "papa2@test.com" },
+    });
+  });
+  const tutorDb = client("tutor-inv-1", "tenant-1", "Tutor", { email: "papa2@test.com" });
+  await assertFails(
+    getDocs(query(collection(tutorDb, "estudiantes"), where("numeroIdentificacion", "==", "67890")))
+  );
+});
+
 // Fix 2026-07-16 (bug reportado: Estudiante no veía material ni clases): a diferencia de
 // Tutor (que ya tenía su caso desde el fix 2026-07-14), nunca se agregó el caso análogo
 // para que el propio Estudiante lea SU PROPIO doc por `correo == su email` -- la query real
@@ -1994,6 +2030,29 @@ test("staff (Admin) del tenant puede leer y actualizar un reporte de pago", asyn
   await assertSucceeds(
     updateDoc(doc(adminDb, "reportes_pagos_estudiantes", "rep-staff-1"), { estado: "Aprobado" })
   );
+});
+
+// Bug real (2026-09-03): confirma la causa raiz de por que Editor/Asistente rompian la
+// integridad de datos al aprobar un pago. El flujo client-side (ya reemplazado) hacia 3
+// escrituras separadas: updateDoc estudiantes (permitido por isInstructor()), create finanzas
+// (SOLO isAdmin() -- Editor/Asistente rechazados aca), updateDoc del reporte. El saldo quedaba
+// descontado sin registro contable, y el reporte nunca se marcaba procesado. Fix real:
+// functions/pagosValidacion.js (Cloud Function, Admin SDK, transaccion atomica) -- el cliente
+// ya NO escribe directo a ninguna de estas 3 colecciones para aprobar/rechazar un pago. Este
+// test queda como regresion permanente de POR QUE se necesitaba ese fix, no como el camino que
+// el codigo real usa hoy.
+test("regression: Editor writing directly to finanzas (the old client-side path) still fails -- why gestionarReportePago moved to a Cloud Function transaction", async () => {
+  await sembrarEstudianteConTutor("papa-editor@test.com");
+  const editorDb = client("editor-1", "tenant-1", "Editor");
+
+  await assertSucceeds(updateDoc(doc(editorDb, "estudiantes", "est-hijo-pago"), {
+    saldoDeudor: 0, estadoPago: "AlDia", historialPagos: [],
+  }));
+
+  await assertFails(setDoc(doc(editorDb, "finanzas", "mov-1"), {
+    tenantId: "tenant-1", tipo: "Ingreso", categoria: "Mensualidad", monto: 120000,
+    descripcion: "PAGO REPORTADO APP: Alejandro Tester", fecha: "2026-08-27", sedeId: "1",
+  }));
 });
 
 test("tutor no puede leer un reporte de pago (se entera por historialNotificaciones, no por esta coleccion)", async () => {

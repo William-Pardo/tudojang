@@ -113,6 +113,13 @@ const {
   crearServicioVerificarDuplicadoAspirante,
 } = require("./academico/verificacionDuplicados");
 const {
+  crearServicioResolverEstudiantePublico,
+  crearServicioReportarPagoPublico,
+} = require("./pagosPublicos");
+const {
+  crearServicioGestionarReportePago,
+} = require("./pagosValidacion");
+const {
   crearServicioActualizarExtrasContratados,
 } = require("./academico/capacidad");
 const {
@@ -448,6 +455,19 @@ const servicioVerificarDuplicadoAspirante = crearServicioVerificarDuplicadoAspir
   firestore: admin.firestore()
 });
 
+const servicioResolverEstudiantePublico = crearServicioResolverEstudiantePublico({
+  firestore: admin.firestore()
+});
+
+const servicioReportarPagoPublico = crearServicioReportarPagoPublico({
+  firestore: admin.firestore(),
+  storage: admin.storage()
+});
+
+const servicioGestionarReportePago = crearServicioGestionarReportePago({
+  firestore: admin.firestore()
+});
+
 const servicioActualizarExtrasContratados = crearServicioActualizarExtrasContratados({
   firestore: admin.firestore()
 });
@@ -763,6 +783,27 @@ exports.actualizarEstadoSolicitudCarnets = functionsV1.https.onCall(
 // cuenta necesita para llegar al formulario.
 exports.resolverTenantPublico = functionsV1.https.onCall(
   crearHandlerCallable(servicioResolverTenantPublico)
+);
+
+// Callables PUBLICAS (SIN auth) del flujo de reporte de pago via link de WhatsApp -- ver
+// pagosPublicos.js para el detalle completo del bug real que resuelven (2026-09-02): tanto
+// leer el estudiante como subir el comprobante SIEMPRE fallaban con permission-denied sin
+// sesion, dejando /reportar-pago completamente inutilizable para el tutor sin cuenta.
+exports.resolverEstudiantePublico = functionsV1.https.onCall(
+  crearHandlerCallable(servicioResolverEstudiantePublico)
+);
+exports.reportarPagoPublico = functionsV1.https.onCall(
+  crearHandlerCallable(servicioReportarPagoPublico)
+);
+
+// Aprobar/rechazar un reporte de pago -- bug real (2026-09-03): antes era 3 escrituras
+// separadas desde el cliente (updateDoc estudiante, addDoc finanzas, updateDoc reporte);
+// finanzas exige isAdmin() en firestore.rules, asi que Editor/Asistente (que SI tienen acceso
+// al panel de Validar Pagos) dejaban el saldo del estudiante descontado sin registro
+// contable. Ahora corre entero, atomico, dentro de una transaccion server-side. Ver
+// pagosValidacion.js para el detalle completo.
+exports.gestionarReportePago = functionsV1.https.onCall(
+  crearHandlerCallable(servicioGestionarReportePago)
 );
 
 // Verificacion PUBLICA de correo/telefono duplicado (SIN auth) para CensoPublico.tsx --

@@ -64,9 +64,13 @@ export const generarMensajePersonalizado = async (
     .replace(/{{CLUB}}/g, configClub.nombreClub)
     .replace(/{{MEDIOS_PAGO}}/g, mediosPago);
 
-  // Agregar link de reporte si es un cobro
+  // Agregar link de reporte si es un cobro. Bug real (2026-09-02): el link usaba
+  // numeroIdentificacion (dato no secreto, potencialmente adivinable) -- ahora usa el ID
+  // REAL del documento de Firestore (opaco, no enumerable), resuelto por la Cloud Function
+  // pública resolverEstudiantePublico (ver servicios/pagosEstudiantesApi.ts), mismo patrón
+  // "link como capability" ya usado en Misión KICHO.
   if (tipo === TipoNotificacion.RecordatorioPago || tipo === TipoNotificacion.AvisoVencimiento) {
-    const linkReporte = generarUrlAbsoluta(`/reportar-pago?id=${estudiante.numeroIdentificacion}`);
+    const linkReporte = generarUrlAbsoluta(`/reportar-pago?id=${estudiante.id}`);
     msj += `\n\n✅ Reporta tu pago aquí: ${linkReporte}`;
   }
 

@@ -6,52 +6,33 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, jest, beforeEach, expect } from '@jest/globals';
 import ReportarPagoPublico from './ReportarPagoPublico';
 import { useTenant } from '../components/BrandingProvider';
-import { obtenerEstudiantePorNumIdentificacion } from '../servicios/estudiantesApi';
-import { reportarPagoEstudiante } from '../servicios/pagosEstudiantesApi';
-import { EstadoPago, GradoTKD, GrupoEdad, type Estudiante } from '../tipos';
+import { resolverEstudiantePublico, reportarPagoPublico } from '../servicios/pagosEstudiantesApi';
 
 // Mock del contexto de Branding (mismo patrón que Login.test.tsx / FormularioEstudiante.test.tsx)
 jest.mock('../components/BrandingProvider', () => ({
     useTenant: jest.fn(),
 }));
 
-jest.mock('../servicios/estudiantesApi', () => ({
-    obtenerEstudiantePorNumIdentificacion: jest.fn(),
-}));
-
-// reportarPagoEstudiante solo se invoca al enviar el reporte de pago (no ejercitado por esta
-// suite) -- se mockea para evitar cargar el módulo real (que llama a Firebase Storage/Functions).
+// Bug real (2026-09-02): el flujo público resolvía el estudiante con
+// obtenerEstudiantePorNumIdentificacion (query directo del cliente), que SIEMPRE fallaba con
+// permission-denied sin sesión -- ver servicios/pagosEstudiantesApi.ts. Ahora pasa por las
+// Cloud Functions públicas resolverEstudiantePublico/reportarPagoPublico (Admin SDK).
 jest.mock('../servicios/pagosEstudiantesApi', () => ({
-    reportarPagoEstudiante: jest.fn(),
+    resolverEstudiantePublico: jest.fn(),
+    reportarPagoPublico: jest.fn(),
 }));
 
 const useTenantMock = useTenant as jest.Mock;
-const obtenerEstudiantePorNumIdentificacionMock = obtenerEstudiantePorNumIdentificacion as jest.Mock<() => Promise<Estudiante>>;
-const reportarPagoEstudianteMock = reportarPagoEstudiante as jest.Mock<(...args: unknown[]) => Promise<string>>;
+const resolverEstudiantePublicoMock = resolverEstudiantePublico as jest.Mock<
+    () => Promise<{ id: string; nombres: string; apellidos: string; saldoDeudor: number } | null>
+>;
+const reportarPagoPublicoMock = reportarPagoPublico as jest.Mock<(...args: unknown[]) => Promise<string>>;
 
-const estudianteMock: Estudiante = {
+const estudianteMock = {
     id: 'est-1',
-    tenantId: 'test-tenant',
     nombres: 'Ana',
     apellidos: 'García',
-    numeroIdentificacion: '12345',
-    fechaNacimiento: '2010-01-01',
-    grado: GradoTKD.Blanco,
-    grupo: GrupoEdad.Precadetes,
-    horasAcumuladasGrado: 0,
-    sedeId: '1',
-    estadoPago: EstadoPago.Pendiente,
-    fechaIngreso: '2022-01-01',
     saldoDeudor: 50000,
-    historialPagos: [],
-    consentimientoInformado: false,
-    contratoServiciosFirmado: false,
-    consentimientoImagenFirmado: false,
-    consentimientoFotosVideos: false,
-    telefono: '3001234567',
-    correo: 'ana@test.com',
-    carnetGenerado: false,
-    estadoMatricula: 'activo', // requerido en Estudiante (SDD pricing-cupo-real, Bloque 1)
 };
 
 describe('ReportarPagoPublico', () => {
@@ -72,15 +53,16 @@ describe('ReportarPagoPublico', () => {
             },
             estaCargado: true,
         });
-        obtenerEstudiantePorNumIdentificacionMock.mockResolvedValue(estudianteMock);
+        resolverEstudiantePublicoMock.mockResolvedValue(estudianteMock);
 
         render(
-            <MemoryRouter initialEntries={['/reportar-pago?id=12345']}>
+            <MemoryRouter initialEntries={['/reportar-pago?id=est-1']}>
                 <ReportarPagoPublico />
             </MemoryRouter>
         );
 
         expect(await screen.findByText('Medios de Pago Directo')).toBeInTheDocument();
+        expect(resolverEstudiantePublicoMock).toHaveBeenCalledWith('est-1', 'test-tenant');
         expect(screen.getByText('Nequi')).toBeInTheDocument();
         expect(screen.getByText('300 111 2222')).toBeInTheDocument();
         expect(screen.getByText('Daviplata')).toBeInTheDocument();
@@ -100,12 +82,12 @@ describe('ReportarPagoPublico', () => {
             tenant: { tenantId: 'test-tenant', nombreClub: 'Test Club', colorPrimario: '#111111' },
             estaCargado: true,
         });
-        obtenerEstudiantePorNumIdentificacionMock.mockResolvedValue(estudianteMock);
-        reportarPagoEstudianteMock.mockResolvedValue('reporte-1');
+        resolverEstudiantePublicoMock.mockResolvedValue(estudianteMock);
+        reportarPagoPublicoMock.mockResolvedValue('reporte-1');
 
         const user = userEvent.setup();
         render(
-            <MemoryRouter initialEntries={['/reportar-pago?id=12345']}>
+            <MemoryRouter initialEntries={['/reportar-pago?id=est-1']}>
                 <ReportarPagoPublico />
             </MemoryRouter>
         );
@@ -120,5 +102,6 @@ describe('ReportarPagoPublico', () => {
         expect(await screen.findByText('¡Reporte Enviado!')).toBeInTheDocument();
         expect(screen.queryByText(/WhatsApp/i)).not.toBeInTheDocument();
         expect(screen.queryByText(/buz[oó]n/i)).not.toBeInTheDocument();
+        expect(reportarPagoPublicoMock).toHaveBeenCalledWith('est-1', 'test-tenant', 50000, expect.stringContaining('data:'));
     });
 });

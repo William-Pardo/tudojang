@@ -4,21 +4,26 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTenant } from '../components/BrandingProvider';
-import { obtenerEstudiantePorNumIdentificacion } from '../servicios/estudiantesApi';
 import MediosPagoResumen from '../components/MediosPagoResumen';
-import { reportarPagoEstudiante } from '../servicios/pagosEstudiantesApi';
+import { resolverEstudiantePublico, reportarPagoPublico } from '../servicios/pagosEstudiantesApi';
 import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAprobar, IconoLogoOficial, IconoBillete } from '../components/Iconos';
 import LogoDinamico from '../components/LogoDinamico';
 import Loader from '../components/Loader';
 import { formatearPrecio } from '../utils/formatters';
 import type { Estudiante } from '../tipos';
 
+type EstudiantePublico = Pick<Estudiante, 'id' | 'nombres' | 'apellidos' | 'saldoDeudor'>;
+
 const ReportarPagoPublico: React.FC = () => {
     const [searchParams] = useSearchParams();
     const { tenant, estaCargado } = useTenant();
 
+    // El valor de `id` es el ID REAL del documento de Firestore (opaco, no enumerable) --
+    // bug real (2026-09-02): antes era el numeroIdentificacion del estudiante (dato no
+    // secreto) y el query que lo resolvía SIEMPRE fallaba con permission-denied, sin importar
+    // login. Ver servicios/pagosEstudiantesApi.ts::resolverEstudiantePublico.
     const [idUrl] = useState(searchParams.get('id') || '');
-    const [estudiante, setEstudiante] = useState<Estudiante | null>(null);
+    const [estudiante, setEstudiante] = useState<EstudiantePublico | null>(null);
     const [buscando, setBuscando] = useState(false);
     const [monto, setMonto] = useState<string>('');
     const [imagen, setImagen] = useState<string | null>(null);
@@ -29,11 +34,11 @@ const ReportarPagoPublico: React.FC = () => {
     // Búsqueda automática e instantánea si viene ID en el link
     useEffect(() => {
         const cargarInicial = async () => {
-            if (idUrl && estaCargado) {
+            if (idUrl && estaCargado && tenant) {
                 setBuscando(true);
                 try {
-                    const res = await obtenerEstudiantePorNumIdentificacion(idUrl);
-                    if (res && res.tenantId === tenant?.tenantId) {
+                    const res = await resolverEstudiantePublico(idUrl, tenant.tenantId);
+                    if (res) {
                         setEstudiante(res);
                         setMonto(res.saldoDeudor > 0 ? res.saldoDeudor.toString() : '');
                     }
@@ -64,10 +69,9 @@ const ReportarPagoPublico: React.FC = () => {
         setEnviando(true);
         setError(null);
         try {
-            await reportarPagoEstudiante(
-                tenant.tenantId,
+            await reportarPagoPublico(
                 estudiante.id,
-                `${estudiante.nombres} ${estudiante.apellidos}`,
+                tenant.tenantId,
                 parseInt(monto),
                 imagen
             );
