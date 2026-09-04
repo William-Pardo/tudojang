@@ -140,6 +140,17 @@ describe('ReportarPagoTutor', () => {
         await waitFor(() => expect(screen.getByRole('button', { name: /REPORTAR PAGO AHORA/i })).toBeEnabled());
     });
 
+    // Bug real (2026-09-04): con saldoDeudor negativo (pagó de más en un abono anterior), el
+    // sistema ignoraba el crédito y sugería la mensualidad completa otra vez.
+    it('con saldo a favor (negativo) y mensualidad configurada, sugiere la mensualidad menos el crédito y lo etiqueta como "Saldo a favor"', async () => {
+        useTenantMock.mockReturnValue({ tenant: { valorMensualidad: 50000 } });
+        obtenerEstudiantesDelTutorMock.mockResolvedValue([crearEstudiante({ saldoDeudor: -20000 })]);
+        render(<ReportarPagoTutor />);
+        await screen.findByText('Ana García');
+        expect(screen.getByText(/Saldo a favor/i)).toBeInTheDocument();
+        expect(screen.getByRole('spinbutton')).toHaveValue(30000); // 50000 - 20000
+    });
+
     it('con más de un estudiante, no autoselecciona ninguno y muestra la lista para elegir', async () => {
         obtenerEstudiantesDelTutorMock.mockResolvedValue([
             crearEstudiante({ id: 'est-1', nombres: 'Ana', apellidos: 'García', saldoDeudor: 50000 }),

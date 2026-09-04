@@ -9,6 +9,7 @@ import { obtenerEstudiantesDelTutor, reportarPagoEstudiante } from '../../servic
 import MediosPagoResumen from '../MediosPagoResumen';
 import { IconoExitoAnimado, IconoEnviar, IconoUsuario, IconoInformacion, IconoAprobar, IconoLogoOficial, IconoBillete } from '../Iconos';
 import { formatearPrecio } from '../../utils/formatters';
+import { calcularMontoSugeridoPago } from '../../utils/finanzas';
 import type { Estudiante } from '../../tipos';
 
 // Flujo autenticado equivalente a vistas/ReportarPagoPublico.tsx (link público sin login),
@@ -41,8 +42,10 @@ const ReportarPagoTutor: React.FC = () => {
                     // mes siguiente) el campo quedaba vacío sin ninguna pista visual -- el botón
                     // de enviar permanecía disabled por `!monto` indefinidamente. Se pre-llena con
                     // la mensualidad configurada por la academia; si tampoco existe, el placeholder
-                    // del input cubre el resto.
-                    setMonto(propios[0].saldoDeudor > 0 ? propios[0].saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
+                    // del input cubre el resto. Si saldoDeudor es negativo (saldo A FAVOR),
+                    // calcularMontoSugeridoPago descuenta ese crédito en vez de ignorarlo.
+                    const sugerido = calcularMontoSugeridoPago(propios[0].saldoDeudor, tenant?.valorMensualidad ?? 0);
+                    setMonto(sugerido > 0 ? sugerido.toString() : '');
                 }
             } catch (e) {
                 mostrarNotificacion("Error al cargar tus estudiantes vinculados.", "error");
@@ -57,7 +60,8 @@ const ReportarPagoTutor: React.FC = () => {
 
     const seleccionarEstudiante = (e: Estudiante) => {
         setEstudianteId(e.id);
-        setMonto(e.saldoDeudor > 0 ? e.saldoDeudor.toString() : (tenant?.valorMensualidad ? tenant.valorMensualidad.toString() : ''));
+        const sugerido = calcularMontoSugeridoPago(e.saldoDeudor, tenant?.valorMensualidad ?? 0);
+        setMonto(sugerido > 0 ? sugerido.toString() : '');
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,7 +150,9 @@ const ReportarPagoTutor: React.FC = () => {
                                         className="w-full flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent hover:border-tkd-blue transition-all text-left"
                                     >
                                         <span className="text-sm font-black uppercase text-tkd-dark dark:text-white">{e.nombres} {e.apellidos}</span>
-                                        <span className="text-[10px] font-bold text-gray-400">{formatearPrecio(e.saldoDeudor)}</span>
+                                        <span className="text-[10px] font-bold text-gray-400">
+                                            {e.saldoDeudor < 0 ? `A favor: ${formatearPrecio(Math.abs(e.saldoDeudor))}` : formatearPrecio(e.saldoDeudor)}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
@@ -160,7 +166,11 @@ const ReportarPagoTutor: React.FC = () => {
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="text-sm font-black uppercase leading-none">{estudiante.nombres} {estudiante.apellidos}</h3>
-                                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest mt-1">Saldo a pagar: {formatearPrecio(estudiante.saldoDeudor)}</p>
+                                        <p className="text-[9px] font-bold opacity-80 uppercase tracking-widest mt-1">
+                                            {estudiante.saldoDeudor < 0
+                                                ? `Saldo a favor: ${formatearPrecio(Math.abs(estudiante.saldoDeudor))}`
+                                                : `Saldo a pagar: ${formatearPrecio(estudiante.saldoDeudor)}`}
+                                        </p>
                                     </div>
                                     {estudiantes.length > 1 && (
                                         <button onClick={() => setEstudianteId(null)} className="text-[8px] font-black uppercase underline opacity-80 flex-shrink-0">Cambiar</button>

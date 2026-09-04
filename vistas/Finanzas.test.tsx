@@ -155,6 +155,32 @@ describe('VistaFinanzas', () => {
     expect(screen.queryByTestId('confirmacion')).not.toBeInTheDocument();
   });
 
+  // Bug real (2026-09-04): un pago que supera la deuda deja saldoDeudor negativo (saldo a
+  // favor, ver utils/finanzas.ts::calcularSaldoTrasPago) -- sin esta sección, el filtro de
+  // "deudores" (saldoDeudor > 0) lo excluía por construcción y quedaba invisible en Tesorería.
+  it('muestra la sección Saldo a Favor con el total correcto, excluyendo a los deudores', async () => {
+    const user = userEvent.setup();
+    const conCredito = { id: 'e3', nombres: 'Sofía', apellidos: 'R', saldoDeudor: -30000, telefono: '302' };
+    mockEstudiantes = [deudor, conCredito, { id: 'e2', nombres: 'Luis', saldoDeudor: 0, telefono: '' }];
+    render(<VistaFinanzas />);
+
+    await user.click(screen.getByText('Saldo a Favor'));
+
+    expect(screen.getByText('Sofía R')).toBeInTheDocument();
+    expect(screen.queryByText('Ana P')).not.toBeInTheDocument(); // deudor, no tiene saldo a favor
+    expect(screen.getByText(/Total:/)).toBeInTheDocument();
+  });
+
+  it('sin ningún estudiante con saldo a favor, muestra el estado vacío', async () => {
+    const user = userEvent.setup();
+    mockEstudiantes = [deudor];
+    render(<VistaFinanzas />);
+
+    await user.click(screen.getByText('Saldo a Favor'));
+
+    expect(screen.getByText('Ningún estudiante tiene saldo a favor.')).toBeInTheDocument();
+  });
+
   it('oculta eliminar a no admin, maneja loading y subview', () => {
     // Fix 2026-07-21 (`npm run typecheck`): RolUsuario.Instructor NO EXISTE (ver enum en
     // tipos.ts). Evaluaba a `undefined` -- el test pasaba por accidente, no por rol real.

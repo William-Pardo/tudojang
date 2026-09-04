@@ -82,12 +82,17 @@ describe('pagosApi - Sistema Financiero (con Triangulación)', () => {
             });
 
             const res = await procesarPagoEfectivo('est-1', [], 120, 'Pago Excesivo');
-            
+
             expect(res.exito).toBe(true);
             expect(res.nuevoSaldo).toBe(-20);
             expect(mockBatch.update).toHaveBeenCalledWith(mockEstudianteRef, expect.objectContaining({
                 saldoDeudor: -20,
                 estadoPago: 'Al día'
+            }));
+            // Bug real (2026-09-04): sin esta nota, el libro de tesorería no dejaba trazable
+            // por qué el ingreso registrado era mayor a la deuda del estudiante.
+            expect(mockBatch.set).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+                descripcion: expect.stringContaining('[Genera saldo a favor de $20]')
             }));
         });
 
