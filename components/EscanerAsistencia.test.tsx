@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import EscanerAsistencia from './EscanerAsistencia';
 import * as api from '../servicios/api';
+import jsQR from 'jsqr';
 
 const notify = jest.fn();
 const detect = jest.fn();
@@ -16,6 +17,9 @@ jest.mock('../servicios/api', () => ({
   registrarEntrada: jest.fn(),
 }));
 jest.mock('./Loader', () => () => <div>Iniciando Lente...</div>);
+// Bug real (2026-09-04): jsQR es el fallback puro-JS para navegadores sin BarcodeDetector
+// (Safari/iOS). Se mockea para no depender del canvas 2D real de jsdom (no implementado).
+jest.mock('jsqr', () => jest.fn());
 
 describe('EscanerAsistencia', () => {
   beforeEach(() => {
@@ -31,6 +35,13 @@ describe('EscanerAsistencia', () => {
     (window as any).BarcodeDetector = class {
       detect = detect;
     };
+    // jsdom no implementa Canvas 2D real -- se mockea getContext para que el fallback jsQR
+    // (usado solo cuando BarcodeDetector no existe) pueda ejercitarse sin depender de eso.
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: jest.fn(),
+      getImageData: jest.fn(() => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 })),
+    } as unknown as CanvasRenderingContext2D);
+    (jsQR as jest.Mock).mockReset().mockReturnValue(null);
     // Fix 2026-07-21 (`npm run typecheck`): `window.setInterval` colisiona entre la firma
     // del DOM (devuelve `number`) y la de @types/node (devuelve `Timeout`), ambas cargadas
     // via `types: ["jest", "node"]` en tsconfig. Gana la de Node, que no admite este mock.
@@ -108,19 +119,32 @@ describe('EscanerAsistencia', () => {
     expect(close).toHaveBeenCalledTimes(2);
   });
 
-  it('captura la excepción del detector y cubre detector no disponible', async () => {
+  it('captura la excepción del detector', async () => {
     detect.mockRejectedValue(new Error('hardware'));
     const first = render(<EscanerAsistencia sedeId="s" onClose={jest.fn()} />);
     await waitFor(() => expect(scan).toBeDefined());
     await act(async () => scan?.());
     expect(await screen.findByText('Error del hardware de la cámara.')).toBeInTheDocument();
     first.unmount();
+  });
 
+  // Bug real (2026-09-04): Safari/iOS (WebKit) nunca implementó BarcodeDetector -- antes,
+  // sin él, el escáner NUNCA iniciaba ningún intervalo de detección: la cámara se activaba
+  // y se quedaba así para siempre, sin ningún mensaje, porque el bloque completo se saltaba
+  // en silencio. Ahora usa jsQR (JS puro) como respaldo -- el intervalo de escaneo debe
+  // seguir iniciándose igual, con o sin BarcodeDetector.
+  it('sin BarcodeDetector (Safari/iOS), el escaneo igual se inicia usando el fallback jsQR', async () => {
     delete (window as any).BarcodeDetector;
     scan = undefined;
     (window.setInterval as jest.Mock).mockClear();
+
     render(<EscanerAsistencia sedeId="s" onClose={jest.fn()} />);
-    await screen.findByText('Simular Captura');
-    expect((window.setInterval as jest.Mock).mock.calls.some(([, delay]) => delay === 500)).toBe(false);
+
+    await waitFor(() => expect(scan).toBeDefined());
+    expect((window.setInterval as jest.Mock).mock.calls.some(([, delay]) => delay === 500)).toBe(true);
+    // El video en jsdom nunca tiene datos reales (readyState 0) -- el fallback debe no
+    // reventar en ese caso, simplemente no detectar nada esta vuelta.
+    await act(async () => scan?.());
+    expect(jsQR).not.toHaveBeenCalled();
   });
 });

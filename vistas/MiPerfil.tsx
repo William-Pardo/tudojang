@@ -9,7 +9,9 @@ import { RolUsuario, type Estudiante } from '../tipos';
 import { formatearPrecio, formatearFecha } from '../utils/formatters';
 import { obtenerEtiquetaRol } from '../utils/roles';
 import { generarReciboPagoPdf } from '../utils/receiptGenerator';
-import { resolveLinkedStudent } from '../servicios/academico/tutorStudentResolver';
+import { resolveStudentsForConsultor } from '../servicios/academico/tutorStudentResolver';
+import { obtenerMetricasAsistencia } from '../servicios/academico/metricasAsistenciaService';
+import type { MetricasAsistencia } from '../models/academico/metricasAsistencia';
 import {
     IconoUsuario, IconoWhatsApp, IconoEmail,
     IconoAprobar, IconoExportar, IconoDashboard,
@@ -27,8 +29,10 @@ const VistaMiPerfil: React.FC = () => {
 
     const [descargandoId, setDescargandoId] = useState<string | null>(null);
     const [estudianteVinculado, setEstudianteVinculado] = useState<Estudiante | null>(null);
+    const [metricasAsistencia, setMetricasAsistencia] = useState<MetricasAsistencia | null>(null);
 
     const esTutorOperativo = usuario?.rol === RolUsuario.Tutor;
+    const esEstudianteOperativo = usuario?.rol === RolUsuario.Estudiante;
 
     // Fix (2026-08-31, reportado tenant Cocodrilos): "Mis Talones de Pago" es nómina de STAFF
     // (sueldoBase/contrato, tipos.ts) -- solo tiene sentido para Admin/Editor/Asistente/Maestro/
@@ -41,11 +45,19 @@ const VistaMiPerfil: React.FC = () => {
     // vinculado resolviendo por el EMAIL de login del tutor (el vínculo vive en
     // estudiante.tutor.correo). El resolver ya devuelve el Estudiante completo
     // (estadoPago/saldoDeudor/historialPagos), así que no se re-consulta por id.
+    //
+    // Bug real (2026-09-04): antes solo corría para Tutor -- el propio Estudiante
+    // nunca resolvía su registro, así que "Mis Horas Realizadas" (mas abajo) no tenía
+    // forma de cargar datos reales para él. resolveStudentsForConsultor ya soporta
+    // ambos casos (esTutor=true busca por tutor.correo, esTutor=false por correo
+    // propio), mismo resolver ya usado por el buzón de notificaciones.
     useEffect(() => {
-        if (esTutorOperativo && usuario?.tenantId && usuario?.email) {
+        if ((esTutorOperativo || esEstudianteOperativo) && usuario?.tenantId && usuario?.email) {
             (async () => {
                 try {
-                    const estudiantesVinculados = await resolveLinkedStudent(usuario.tenantId, usuario.email);
+                    const estudiantesVinculados = await resolveStudentsForConsultor(
+                        usuario.tenantId, usuario.email, esTutorOperativo
+                    );
                     if (estudiantesVinculados.length > 0) {
                         setEstudianteVinculado(estudiantesVinculados[0]);
                     }
@@ -54,7 +66,24 @@ const VistaMiPerfil: React.FC = () => {
                 }
             })();
         }
-    }, [esTutorOperativo, usuario?.tenantId, usuario?.email]);
+    }, [esTutorOperativo, esEstudianteOperativo, usuario?.tenantId, usuario?.email]);
+
+    // Bug real (2026-09-04, reportado por el usuario): "Mis Horas Realizadas" mostraba 2
+    // filas hardcodeadas de mayo 2024 a Tutor||Asistente -- nunca leyó Firestore. El dato
+    // REAL (acumulado por registrarAsistenciaJornada en cada check-out) vive en
+    // tenants/{tenantId}/metricasAsistencia/{estudianteId} -- se carga en cuanto se resuelve
+    // el estudianteId (hijo del Tutor, o el propio Estudiante).
+    useEffect(() => {
+        if (!estudianteVinculado || !usuario?.tenantId) return;
+        (async () => {
+            try {
+                const metricas = await obtenerMetricasAsistencia(usuario.tenantId, estudianteVinculado.id);
+                setMetricasAsistencia(metricas);
+            } catch (err) {
+                console.error('Error cargando métricas de asistencia:', err);
+            }
+        })();
+    }, [estudianteVinculado, usuario?.tenantId]);
 
     // Para Tutores: usar datos reales del estudiante. Para otros roles: usar mocks
     const talonesPago = !esConsultor
@@ -70,13 +99,6 @@ const VistaMiPerfil: React.FC = () => {
                 monto: estudianteVinculado.saldoDeudor || 0,
                 fecha: new Date().toISOString().split('T')[0],
             }
-        ]
-        : [];
-
-    const miAsistencia = !esTutorOperativo
-        ? [
-            { fecha: '2024-05-20', entrada: '08:00 AM', salida: '12:00 PM', horas: 4 },
-            { fecha: '2024-05-19', entrada: '08:05 AM', salida: '12:10 PM', horas: 4.1 },
         ]
         : [];
 
@@ -213,40 +235,49 @@ const VistaMiPerfil: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-2 space-y-8">
-                    {(usuario?.rol === RolUsuario.Tutor || usuario?.rol === RolUsuario.Asistente) && (
+                    {/* Bug real (2026-09-04, reportado por el usuario): esta seccion mostraba 2
+                        filas hardcodeadas de mayo 2024, visible a Tutor||Asistente (Asistente es
+                        personal, no tiene "sus horas de clase" como alumno -- condicion nunca
+                        actualizada cuando se separaron los roles). Ahora es esConsultor
+                        (Tutor||Estudiante) con el acumulado REAL de metricasAsistencia, escrito
+                        server-side por registrarAsistenciaJornada en cada check-out. No hay un
+                        historial fila-por-fila disponible (metricasAsistencia es un acumulado
+                        total, no un registro por clase) -- se muestra el resumen real en vez de
+                        inventar un detalle que la coleccion no guarda. */}
+                    {esConsultor && (
                         <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden">
                             <div className="p-8 border-b dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-tkd-blue/10 text-tkd-blue rounded-xl shadow-inner"><IconoDashboard className="w-5 h-5" /></div>
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">Mis Horas Realizadas</h2>
+                                    <h2 className="text-sm font-black uppercase tracking-widest text-gray-900 dark:text-white">
+                                        {esTutorOperativo ? 'Horas Realizadas del Estudiante' : 'Mis Horas Realizadas'}
+                                    </h2>
                                 </div>
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Mayo 2024</span>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                                        <tr>
-                                            <th className="px-8 py-4">Fecha</th>
-                                            <th className="px-6 py-4">Ingreso</th>
-                                            <th className="px-6 py-4">Salida</th>
-                                            <th className="px-8 py-4 text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y dark:divide-gray-700">
-                                        {miAsistencia.map((a, i) => (
-                                            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                                <td className="px-8 py-5 text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">{formatearFecha(a.fecha)}</td>
-                                                <td className="px-6 py-5 text-xs font-bold text-gray-500 uppercase">{a.entrada}</td>
-                                                <td className="px-6 py-5 text-xs font-bold text-gray-500 uppercase">{a.salida}</td>
-                                                <td className="px-8 py-5 text-right">
-                                                    <span className="bg-blue-50 text-tkd-blue dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border border-blue-100 dark:border-blue-800">
-                                                        {a.horas}h
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="p-8">
+                                {!estudianteVinculado ? (
+                                    <p className="text-[11px] font-bold text-gray-400">Cargando información del estudiante...</p>
+                                ) : !metricasAsistencia ? (
+                                    <p className="text-[11px] font-bold text-gray-400">Todavía no hay clases con entrada y salida registradas.</p>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-2xl p-6 text-center">
+                                            <p className="text-3xl font-black text-tkd-blue tracking-tighter">
+                                                {(metricasAsistencia.minutosTotales / 60).toFixed(1)}h
+                                            </p>
+                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-2">Horas Totales</p>
+                                        </div>
+                                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-2xl p-6 text-center">
+                                            <p className="text-3xl font-black text-green-600 tracking-tighter">
+                                                {metricasAsistencia.clasesAsistidas}
+                                            </p>
+                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-2">Clases Asistidas</p>
+                                        </div>
+                                        <p className="col-span-2 text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">
+                                            Última clase registrada: {formatearFecha(metricasAsistencia.actualizadoEn.split('T')[0])}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </section>
                     )}
