@@ -1,6 +1,7 @@
 
 // vistas/Administracion.tsx
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
@@ -10,11 +11,20 @@ import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
 import PanelValidacionPagos from '../components/Pagos/PanelValidacionPagos';
 import HistorialValidaciones from '../components/Pagos/HistorialValidaciones';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'historial' | 'analisis';
 
+// Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+// components/navegacion/menuMobileHijos.tsx::hijosAdministracion) -- MISMO orden y valores
+// que el array `tabs` de mas abajo.
+const ADMIN_TAB_IDS: readonly AdminTab[] = ['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis'];
+
 const VistaAdministracion: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<AdminTab>('resumen');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState<AdminTab>(() =>
+        resolverTabInicial(ADMIN_TAB_IDS, searchParams.get('tab'), 'resumen')
+    );
     const { estudiantes, actualizarEstudiante } = useEstudiantes();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();

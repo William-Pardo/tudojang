@@ -17,6 +17,10 @@ const mockReactivarEstudiante = jest.fn();
 
 jest.mock('../context/AuthContext', () => ({ useAuth: () => ({ usuario: mockUsuario }) }));
 jest.mock('../context/DataContext', () => ({ useConfiguracion: () => ({ configClub: mockConfigClub }) }));
+// Menú mobile acordeon (deep-link `?tab=`): VistaEstudiantes ahora lee useSearchParams() de
+// react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
+// que se mockea sin query params -- equivalente al comportamiento previo (fallback por rol).
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [new URLSearchParams()] }));
 jest.mock('../context/NotificacionContext', () => ({ useNotificacion: () => ({ mostrarNotificacion: mockMostrarNotificacion }) }));
 jest.mock('../servicios/censoApi', () => ({ obtenerMisionActivaTenant: jest.fn() }));
 jest.mock('../utils/userSeeder', () => ({ generarEstudiantesFicticios: (...args: any[]) => mockGenerar(...args) }));
