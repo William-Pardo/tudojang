@@ -27,6 +27,11 @@ import { RolUsuario, GrupoEdad, GradoTKD } from '../tipos';
 
 jest.mock('firebase/firestore', () => require('../test-utils/fakeFirestore').crearApiFirestoreFake());
 
+// Menú mobile acordeon (deep-link `?tab=`): CentroEstudios ahora lee useSearchParams() de
+// react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
+// que se mockea sin query params -- equivalente al comportamiento previo (fallback 'flujo').
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [new URLSearchParams()] }));
+
 jest.mock('../firebase/config', () => ({
   db: {},
   auth: {},

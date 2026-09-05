@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { IconoProgresoEstudiante, IconoFlujoAcademico } from '../components/Iconos';
 import { useAuth } from '../context/AuthContext';
 import { useConfiguracion } from '../context/DataContext';
@@ -16,8 +17,13 @@ import BibliotecaView from './admin/BibliotecaView';
 import PanelMetricasEstudiantes from '../components/academico/PanelMetricasEstudiantes';
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 type TabGestion = 'flujo' | 'metricas';
+
+// Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+// components/navegacion/menuMobileHijos.tsx::hijosCentroEstudios).
+const CENTRO_ESTUDIOS_TAB_IDS: readonly TabGestion[] = ['flujo', 'metricas'];
 
 const pasosCentroEstudios = [
   {
@@ -40,11 +46,26 @@ const pasosCentroEstudios = [
 const CentroEstudios: React.FC = () => {
   const { usuario } = useAuth();
   const { configClub } = useConfiguracion();
+  const [searchParams] = useSearchParams();
+  // Movido antes del useState de `tabGestion` (originalmente vivia mas abajo, junto a
+  // `actualizarEstadoBiblioteca`) porque el nuevo inicializador de `tabGestion` lo necesita
+  // para forzar 'flujo' cuando el rol no puede gestionar jornadas, sin importar `?tab=`
+  // (regla del plan "menu mobile acordeon unificado"). Solo depende de `usuario`, ya
+  // disponible arriba -- no altera el orden de los hooks.
+  const puedeGestionarJornadas =
+    usuario?.rol === RolUsuario.Admin ||
+    usuario?.rol === RolUsuario.SuperAdmin ||
+    usuario?.rol === RolUsuario.Editor;
   const [asignaciones, setAsignaciones] = React.useState<AsignacionCentroEstudios[]>([]);
   const [asignacionAbierta, setAsignacionAbierta] = React.useState<AsignacionCentroEstudios | null>(null);
   const [cargando, setCargando] = React.useState(true);
   const [triggerRecursos, setTriggerRecursos] = React.useState(0);
-  const [tabGestion, setTabGestion] = React.useState<TabGestion>('flujo');
+  // Si el rol no puede gestionar jornadas, se fuerza 'flujo' sin importar el query param --
+  // 'metricas' no existe para ese rol (mismo criterio que ya usaba esta vista para no
+  // mostrarle el tab switcher). Si puede, se valida `?tab=` contra los 2 ids conocidos.
+  const [tabGestion, setTabGestion] = React.useState<TabGestion>(() =>
+    !puedeGestionarJornadas ? 'flujo' : resolverTabInicial(CENTRO_ESTUDIOS_TAB_IDS, searchParams.get('tab'), 'flujo')
+  );
   const [estudianteResueltoId, setEstudianteResueltoId] = React.useState<string | null>(null);
   const [estudianteResueltoNombre, setEstudianteResueltoNombre] = React.useState<string | null>(null);
   const [estadoBiblioteca, setEstadoBiblioteca] = React.useState({
@@ -130,10 +151,6 @@ const CentroEstudios: React.FC = () => {
     () => calcularMetricasCentroEstudios(asignaciones),
     [asignaciones]
   );
-  const puedeGestionarJornadas =
-    usuario?.rol === RolUsuario.Admin ||
-    usuario?.rol === RolUsuario.SuperAdmin ||
-    usuario?.rol === RolUsuario.Editor;
   const actualizarEstadoBiblioteca = React.useCallback((estado: typeof estadoBiblioteca) => {
     setEstadoBiblioteca(estado);
   }, []);

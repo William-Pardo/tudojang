@@ -1,6 +1,7 @@
 
 // vistas/Estudiantes.tsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,7 @@ import { TablaEstudiantesSkeleton } from '../components/skeletons/TablaEstudiant
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import ModalImportacionMasiva from '../components/ModalImportacionMasiva';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 // Sub-vistas integradas
 import VistaGestionClase from './GestionClase';
@@ -29,8 +31,13 @@ import VistaMisionKicho from './MisionKicho';
 
 type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho';
 
+// Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+// components/navegacion/menuMobileHijos.tsx::hijosEstudiantes).
+const ESTUDIANTES_TAB_IDS: readonly TabId[] = ['directorio', 'asistencia', 'carnets', 'certificados', 'kicho'];
+
 export const VistaEstudiantes: React.FC = () => {
     const { usuario } = useAuth();
+    const [searchParams] = useSearchParams();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
     const {
@@ -86,7 +93,12 @@ export const VistaEstudiantes: React.FC = () => {
     const [generandoData, setGenerandoData] = useState(false);
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
-    const [activeTab, setActiveTab] = useState<TabId>(esTutor ? 'asistencia' : 'directorio');
+    // Preserva el fallback actual por rol (esTutor ? 'asistencia' : 'directorio') cuando el
+    // query param `?tab=` esta ausente o trae un id invalido -- nunca confia ciegamente en
+    // el query string (regla dura del plan "menu mobile acordeon unificado").
+    const [activeTab, setActiveTab] = useState<TabId>(() =>
+        resolverTabInicial(ESTUDIANTES_TAB_IDS, searchParams.get('tab'), esTutor ? 'asistencia' : 'directorio')
+    );
 
     // Cargar misión activa para el banner global
     useEffect(() => {

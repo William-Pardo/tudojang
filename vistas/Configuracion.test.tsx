@@ -16,6 +16,11 @@ jest.mock('../servicios/configuracionApi', () => ({
   actualizarCapacidadClub: jest.fn(),
 }));
 
+// Menú mobile acordeon (deep-link `?tab=`): VistaConfiguracion ahora lee useSearchParams() de
+// react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
+// que se mockea sin query params -- equivalente al comportamiento previo (fallback 'branding').
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [new URLSearchParams()] }));
+
 // Este test se limita a los 4 campos nuevos de medios de pago (pagoNequi/pagoDaviplata/
 // pagoBreB/pagoBanco) dentro de la pestaña "branding" (tab por defecto de la vista, ver
 // vistas/Configuracion.tsx líneas 632-737). No se ejercitan otras pestañas ni el flujo de

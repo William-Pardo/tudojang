@@ -1,6 +1,7 @@
 
 // vistas/Configuracion.tsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede, ConfiguracionClub } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
@@ -28,6 +29,7 @@ import InvitacionesView from './admin/InvitacionesView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 import { calcularCapacidad } from '../utils/facturacion';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -308,8 +310,20 @@ const VistaConfiguracion: React.FC = () => {
     const { estudiantes } = useEstudiantes();
     const { sedes, sedesVisibles, totalSedesActivas, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
+    const [searchParams] = useSearchParams();
 
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>('branding');
+    // Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+    // components/navegacion/menuMobileHijos.tsx::hijosConfiguracion). Sin guard de wizard
+    // extra: cada seccion del wizard de onboarding se gatea por `currentStep` (ver mas abajo),
+    // no por `activeTab` solo, asi que un `?tab=` invalido/ausente durante el wizard es
+    // seguro -- cae al fallback 'branding' de siempre y el wizard sigue su propio flujo.
+    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>(() =>
+        resolverTabInicial(
+            ['branding', 'equipo', 'sedes', 'programas', 'alertas', 'accesos', 'licencia'] as const,
+            searchParams.get('tab'),
+            'branding',
+        )
+    );
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);

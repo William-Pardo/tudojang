@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 
 import { isFirebaseConfigured } from './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider, useEventos } from './context/DataContext';
+import { DataProvider, useEventos, useConfiguracion } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
 import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
 import { useNotificacion } from './context/NotificacionContext';
@@ -61,12 +61,23 @@ import {
     IconoAgenda, IconoConfiguracion, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion,
-    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia
+    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia,
+    IconoFlechaArriba, IconoCerrar
 } from './components/Iconos';
+import { obtenerHijosDeEnlace } from './components/navegacion/menuMobileHijos';
 
 const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
     const location = ReactRouterDOM.useLocation();
+    const [searchParams] = ReactRouterDOM.useSearchParams();
+    const { configClub } = useConfiguracion();
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
+
+    // Menu mobile acordeon (adaptado del mockup Figma "Mejorar UX version mobil"): un solo
+    // panel expandido a la vez, local a este componente. Guarda el `id` del enlace cuyo
+    // panel de hijos esta abierto (ver components/navegacion/menuMobileHijos.tsx), o null si
+    // ninguno lo esta. Mecanica CSS pura (max-h + transition), NO framer-motion -- no es el
+    // patron que usa el resto de la app para acordeones.
+    const [panelExpandido, setPanelExpandido] = useState<string | null>(null);
 
     // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): ventana horaria dinamica real,
     // reemplaza el placeholder `showClaseEnVivo=true` (siempre visible). El link solo se activa
@@ -90,13 +101,18 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         (ev) => ev.fechaInicioInscripcion <= hoyIsoNav && hoyIsoNav <= ev.fechaFinInscripcion
     );
 
+    // `id`: campo estable agregado para el acordeon mobile (menuMobileHijos.tsx usa este id
+    // como clave para saber que enlace tiene hijos navegables) -- NO reemplaza `texto`/`ruta`
+    // en la logica de filtrado ya existente mas abajo (enlacesVisibles), que sigue intacta.
+    // "Control de Asistencia" usa `ruta` DINAMICA (rutaClaseEnVivo) por eso no podia usarse
+    // como clave estable; por eso este id explicito.
     const todosLosEnlaces = [
-        { ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
+        { id: 'administracion', ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
         // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
         // Centro de Estudios (materiales del hijo) + Alertas.
-        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'estudiantes', ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { id: 'centroEstudios', ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
         // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
         // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
         // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
@@ -104,16 +120,16 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         // tutor-role-end-to-end) NO tienen acceso a Administracion, asi que necesitan seguir
         // llegando a su agenda por este link. La ruta /agenda en si NO se elimina (sigue
         // gateada igual mas abajo), solo se recorta a quien realmente la necesita en el menu.
-        { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
-        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
-        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        { id: 'agenda', ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
+        { id: 'tienda', ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
+        { id: 'eventos', ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'controlAsistencia', ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { id: 'alertas', ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
         // gestión de Alertas del staff.
-        { ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
+        { id: 'buzon', ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'configuracion', ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => {
@@ -131,6 +147,20 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     });
     const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
 
+    // Auto-expandir, al abrir el drawer mobile, el panel del acordeon cuyo enlace coincide
+    // con la ruta actual (regla del plan aprobado: "al abrir el drawer, auto-expandir el
+    // panel cuyo idEnlace matchea la ruta actual"). Corre solo cuando `estaAbierta` pasa a
+    // true -- no en cada cambio de ruta con el drawer ya abierto, para no pelearle al click
+    // manual del usuario sobre otro panel.
+    useEffect(() => {
+        if (!estaAbierta) return;
+        const enlaceActivo = enlacesVisibles.find((enlace) => enlace.ruta === location.pathname);
+        if (enlaceActivo && obtenerHijosDeEnlace(enlaceActivo.id, { usuario, configClub }).length > 0) {
+            setPanelExpandido(enlaceActivo.id);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [estaAbierta]);
+
     const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
         const isActive = location.pathname === ruta;
         const isPC = window.innerWidth >= 768;
@@ -145,16 +175,89 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
 
     return (
         <aside className={`bg-tkd-blue text-white flex flex-col fixed inset-y-0 left-0 z-40 h-screen transition-all duration-500 ease-in-out md:relative md:translate-x-0 ${sidebarWidthClass} ${estaAbierta ? 'translate-x-0' : '-translate-x-full shadow-2xl'}`}>
-            <div className={`flex items-center justify-center h-28 border-b border-white/10 transition-all ${estaAbierta ? 'p-8' : 'p-2'}`}>
+            <div className={`relative flex items-center justify-center h-28 border-b border-white/10 transition-all ${estaAbierta ? 'p-8' : 'p-2'}`}>
                 <LogoDinamico className={estaAbierta ? "h-16 w-auto" : "h-10 w-10"} />
+                {/* Cierre explicito del drawer, solo mobile (mockup Figma "Mejorar UX version
+                    mobil" adaptado -- regla 10 del plan: reusar IconoCerrar, no traer iconos
+                    nuevos). En desktop el rail no se cierra desde aca, sigue igual que hoy. */}
+                <button
+                    type="button"
+                    onClick={onCerrar}
+                    aria-label="Cerrar menú"
+                    className="md:hidden absolute right-4 top-4 w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20 transition-colors"
+                >
+                    <IconoCerrar className="w-4 h-4 text-white" />
+                </button>
             </div>
-            <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
+            {/* Desktop (>=768px, breakpoint md): rail de iconos SIN cambios -- mismos
+                estilos isPC de getButtonStyle. Solo se le agrega `hidden md:block`, la rama
+                acordeon de abajo (md:hidden) es la que reemplaza esto en mobile. */}
+            <nav className="hidden md:block flex-grow mt-6 overflow-y-auto no-scrollbar">
                 {enlacesVisibles.map((enlace) => (
                     <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
                         <enlace.icono className="w-10 h-10 flex-shrink-0" />
                         <span className={`${estaAbierta ? 'block' : 'hidden'}`}>{enlace.texto}</span>
                     </ReactRouterDOM.Link>
                 ))}
+            </nav>
+            {/* Menu mobile en acordeon (<768px): reemplaza el <nav> plano de arriba SOLO en
+                mobile. Para las 4 vistas con tabs internas (Administracion, Estudiantes,
+                Centro Estudios, Configuracion -- ver menuMobileHijos.tsx) expone sus
+                sub-secciones como hijos navegables; el resto sigue como leaf plano igual que
+                en el <nav> de desktop. Mecanica: CSS puro (max-h + transition), un solo panel
+                abierto a la vez (`panelExpandido`, arriba). */}
+            <nav className="md:hidden flex-grow mt-2 overflow-y-auto no-scrollbar space-y-1.5">
+                {enlacesVisibles.map((enlace) => {
+                    const hijos = obtenerHijosDeEnlace(enlace.id, { usuario, configClub });
+                    const isActive = location.pathname === enlace.ruta;
+
+                    if (hijos.length === 0) {
+                        // Leaf directo: enlaces sin sub-navegacion propia (Agenda, Tienda,
+                        // Eventos, Control de Asistencia top-level, Alertas, Notificaciones) y,
+                        // por rol, "Centro Estudios" para Tutor/Estudiante (regla 6 del plan:
+                        // sin chevron/hijos para quien no puede gestionar jornadas).
+                        return (
+                            <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
+                                <enlace.icono className="w-8 h-8 flex-shrink-0" />
+                                <span>{enlace.texto}</span>
+                            </ReactRouterDOM.Link>
+                        );
+                    }
+
+                    const isExpanded = panelExpandido === enlace.id;
+                    return (
+                        <div key={enlace.ruta}>
+                            <button
+                                type="button"
+                                onClick={() => setPanelExpandido(isExpanded ? null : enlace.id)}
+                                aria-expanded={isExpanded}
+                                className={getButtonStyle(enlace.ruta)}
+                            >
+                                <enlace.icono className="w-8 h-8 flex-shrink-0" />
+                                <span className="flex-1 text-left">{enlace.texto}</span>
+                                <IconoFlechaArriba className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${isExpanded ? '' : 'rotate-180'}`} />
+                            </button>
+                            <div className={`overflow-hidden transition-all duration-200 mx-4 ${isExpanded ? 'max-h-[600px]' : 'max-h-0'}`}>
+                                <div className="pl-6 pt-1.5 pb-1 space-y-1">
+                                    {hijos.map((hijo) => {
+                                        const subitemActivo = isActive && searchParams.get('tab') === hijo.id;
+                                        return (
+                                            <ReactRouterDOM.Link
+                                                key={hijo.id}
+                                                to={hijo.ruta}
+                                                onClick={onCerrar}
+                                                className={`flex items-center gap-4 px-5 py-3 rounded-2xl uppercase font-black text-[10px] tracking-widest transition-all ${subitemActivo ? 'bg-tkd-red/20 border border-tkd-red/40 text-white' : 'text-white/70 border border-transparent hover:bg-white/10 hover:text-white'}`}
+                                            >
+                                                <hijo.icono className="w-6 h-6 flex-shrink-0" />
+                                                <span>{hijo.label}</span>
+                                            </ReactRouterDOM.Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
             </nav>
             <div className="border-t border-white/10 flex flex-col">
                 {esMaster && (
