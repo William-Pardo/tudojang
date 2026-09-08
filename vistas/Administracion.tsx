@@ -1,6 +1,7 @@
 
 // vistas/Administracion.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
@@ -10,11 +11,32 @@ import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
 import PanelValidacionPagos from '../components/Pagos/PanelValidacionPagos';
 import HistorialValidaciones from '../components/Pagos/HistorialValidaciones';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'historial' | 'analisis';
 
+// Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+// components/navegacion/menuMobileHijos.tsx::hijosAdministracion) -- MISMO orden y valores
+// que el array `tabs` de mas abajo.
+const ADMIN_TAB_IDS: readonly AdminTab[] = ['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis'];
+
 const VistaAdministracion: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<AdminTab>('resumen');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState<AdminTab>(() =>
+        resolverTabInicial(ADMIN_TAB_IDS, searchParams.get('tab'), 'resumen')
+    );
+    // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR. Como esta
+    // vista suele ya estar montada (ruta "/", entrada por defecto de varios roles), tocar un
+    // subitem del acordeon mobile que apunta aca (ej. "/?tab=validar") no remonta el
+    // componente -- sin este efecto, `activeTab` nunca se actualizaba y el deep-link no hacia
+    // nada (siempre quedaba en la pestaña con la que se monto la primera vez).
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && (ADMIN_TAB_IDS as readonly string[]).includes(tab) && tab !== activeTab) {
+            setActiveTab(tab as AdminTab);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
     const { estudiantes, actualizarEstudiante } = useEstudiantes();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
@@ -74,8 +96,12 @@ const VistaAdministracion: React.FC = () => {
                 </button>
             </header>
 
-            {/* SUBMENÚ PREMIUM: Estilo Hardware Segmented Control */}
-            <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit">
+            {/* SUBMENÚ PREMIUM: Estilo Hardware Segmented Control -- oculto en mobile (<768px):
+                el acordeón del drawer ya cubre esta navegación con texto completo y sin scroll
+                horizontal escondido (este switcher ni siquiera mostraba el label en mobile,
+                solo íconos). Mantener las DOS navegaciones visibles era redundante y confuso;
+                queda solo en desktop, sin cambios ahí. */}
+            <div className="hidden md:block bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full md:w-fit">
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
                         <button

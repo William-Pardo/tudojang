@@ -1,6 +1,7 @@
 
 // vistas/Estudiantes.tsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,7 @@ import { TablaEstudiantesSkeleton } from '../components/skeletons/TablaEstudiant
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import ModalImportacionMasiva from '../components/ModalImportacionMasiva';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 // Sub-vistas integradas
 import VistaGestionClase from './GestionClase';
@@ -29,8 +31,13 @@ import VistaMisionKicho from './MisionKicho';
 
 type TabId = 'directorio' | 'asistencia' | 'carnets' | 'certificados' | 'kicho';
 
+// Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+// components/navegacion/menuMobileHijos.tsx::hijosEstudiantes).
+const ESTUDIANTES_TAB_IDS: readonly TabId[] = ['directorio', 'asistencia', 'carnets', 'certificados', 'kicho'];
+
 export const VistaEstudiantes: React.FC = () => {
     const { usuario } = useAuth();
+    const [searchParams] = useSearchParams();
     const { configClub } = useConfiguracion();
     const { mostrarNotificacion } = useNotificacion();
     const {
@@ -86,7 +93,22 @@ export const VistaEstudiantes: React.FC = () => {
     const [generandoData, setGenerandoData] = useState(false);
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
-    const [activeTab, setActiveTab] = useState<TabId>(esTutor ? 'asistencia' : 'directorio');
+    // Preserva el fallback actual por rol (esTutor ? 'asistencia' : 'directorio') cuando el
+    // query param `?tab=` esta ausente o trae un id invalido -- nunca confia ciegamente en
+    // el query string (regla dura del plan "menu mobile acordeon unificado").
+    const [activeTab, setActiveTab] = useState<TabId>(() =>
+        resolverTabInicial(ESTUDIANTES_TAB_IDS, searchParams.get('tab'), esTutor ? 'asistencia' : 'directorio')
+    );
+    // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR -- si esta vista
+    // ya estaba montada, tocar otro subitem del acordeon mobile (mismo "/estudiantes", distinto
+    // ?tab=) no la remonta, y `activeTab` nunca se actualizaba.
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && (ESTUDIANTES_TAB_IDS as readonly string[]).includes(tab) && tab !== activeTab) {
+            setActiveTab(tab as TabId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     // Cargar misión activa para el banner global
     useEffect(() => {
@@ -273,8 +295,10 @@ export const VistaEstudiantes: React.FC = () => {
                 }
             </header >
 
-            {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
-            < div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden" >
+            {/* BARRA DE NAVEGACIÓN: oculta en mobile (<768px) -- el acordeón del drawer ya
+                cubre esta navegación con texto completo, sin duplicar switcher ni depender de
+                scroll horizontal con solo íconos. Sigue igual en desktop. */}
+            < div className="hidden md:block bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden" >
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
                         <button

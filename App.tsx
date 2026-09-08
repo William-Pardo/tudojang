@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 
 import { isFirebaseConfigured } from './firebase/config';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider, useEventos } from './context/DataContext';
+import { DataProvider, useEventos, useConfiguracion } from './context/DataContext';
 import { NotificacionProvider } from './context/NotificacionContext';
 import { AnalyticsProvider, useAnalytics } from './context/AnalyticsContext';
 import { useNotificacion } from './context/NotificacionContext';
@@ -61,12 +61,39 @@ import {
     IconoAgenda, IconoConfiguracion, IconoEstudiantes, IconoEventos,
     IconoLogout, IconoLuna, IconoMenu, IconoSol, IconoTienda,
     IconoBuscar, IconoUsuario, IconoAprobar, IconoInformacion,
-    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia
+    IconoAdministracion, IconoAlertas, IconoCentroEstudios, IconoControlAsistencia,
+    IconoFlechaArriba, IconoCerrar
 } from './components/Iconos';
+import { obtenerHijosDeEnlace } from './components/navegacion/menuMobileHijos';
 
-const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
+// Exportado (sin cambiar comportamiento) para poder testear el acordeon mobile de forma
+// aislada -- ver App.BarraLateral.test.tsx. Mismo criterio que ya se usa con las funciones
+// puras de mas abajo (resolverRutaInicial, debePersistirRuta, etc.).
+export const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
     const location = ReactRouterDOM.useLocation();
+    const [searchParams] = ReactRouterDOM.useSearchParams();
+    const { configClub } = useConfiguracion();
     const esMaster = usuario?.email.toLowerCase() === 'aliantlab@gmail.com';
+
+    // Menu mobile acordeon (adaptado del mockup Figma "Mejorar UX version mobil"): un solo
+    // panel expandido a la vez, local a este componente. Guarda el `id` del enlace cuyo
+    // panel de hijos esta abierto (ver components/navegacion/menuMobileHijos.tsx), o null si
+    // ninguno lo esta. Mecanica CSS pura (max-h + transition), NO framer-motion -- no es el
+    // patron que usa el resto de la app para acordeones.
+    const [panelExpandido, setPanelExpandido] = useState<string | null>(null);
+    // Refs de cada panel del acordeon (bug reportado en vivo: al expandir un panel cerca del
+    // final de la lista -- ej. Configuracion -- sus hijos quedaban fuera del viewport visible
+    // del nav, sin pista de que habia que scrollear porque el scrollbar esta oculto a proposito
+    // (no-scrollbar). Se usa para el scrollIntoView del efecto de abajo.
+    const panelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    // Ref del subitem actualmente seleccionado (si hay uno), junto con el id del enlace padre
+    // al que pertenece. Bug reportado en vivo: al reabrir el drawer con Configuracion ya
+    // activa, el scroll llevaba a la vista el INICIO del panel (boton + primeros hijos) -- con
+    // 7 sub-secciones eso deja a "Alertas"/"Licencia" (las ultimas) fuera de la pantalla. Si
+    // hay un subitem activo hay que priorizar ESE, no el inicio del panel -- pero solo cuando
+    // pertenece al panel que se esta expandiendo (si el usuario expande a mano OTRA seccion,
+    // no hay que saltar al subitem activo de una seccion distinta).
+    const subitemActivoRef = useRef<{ enlaceId: string; el: HTMLAnchorElement | null }>({ enlaceId: '', el: null });
 
     // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): ventana horaria dinamica real,
     // reemplaza el placeholder `showClaseEnVivo=true` (siempre visible). El link solo se activa
@@ -90,13 +117,18 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         (ev) => ev.fechaInicioInscripcion <= hoyIsoNav && hoyIsoNav <= ev.fechaFinInscripcion
     );
 
+    // `id`: campo estable agregado para el acordeon mobile (menuMobileHijos.tsx usa este id
+    // como clave para saber que enlace tiene hijos navegables) -- NO reemplaza `texto`/`ruta`
+    // en la logica de filtrado ya existente mas abajo (enlacesVisibles), que sigue intacta.
+    // "Control de Asistencia" usa `ruta` DINAMICA (rutaClaseEnVivo) por eso no podia usarse
+    // como clave estable; por eso este id explicito.
     const todosLosEnlaces = [
-        { ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
+        { id: 'administracion', ruta: "/", texto: "Administración", icono: IconoAdministracion, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.SuperAdmin] },
         // Fix tutor-role-end-to-end (2026-07-14): "Estudiantes" es el roster de recepcion
         // (staff), no una vista de padre -> Tutor removido. El Tutor ve su experiencia por
         // Centro de Estudios (materiales del hijo) + Alertas.
-        { ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'estudiantes', ruta: "/estudiantes", texto: "Estudiantes", icono: IconoEstudiantes, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { id: 'centroEstudios', ruta: "/centro-estudios", texto: "Centro Estudios", icono: IconoCentroEstudios, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente, RolUsuario.Tutor, RolUsuario.Estudiante] },
         // Pedido explicito del usuario (post-cierre modulo 12): el diseno nuevo de Agenda ya
         // quedo embebido en la pestana "Agenda" de Administracion.tsx ("Agenda Maestro"), asi
         // que Admin/Editor/Asistente/SuperAdmin lo alcanzan desde ahi -- se les quita esta
@@ -104,16 +136,16 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
         // tutor-role-end-to-end) NO tienen acceso a Administracion, asi que necesitan seguir
         // llegando a su agenda por este link. La ruta /agenda en si NO se elimina (sigue
         // gateada igual mas abajo), solo se recorta a quien realmente la necesita en el menu.
-        { ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
-        { ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
-        { ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
-        { ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
+        { id: 'agenda', ruta: "/agenda", texto: "Agenda", icono: IconoAgenda, roles: [RolUsuario.Maestro, RolUsuario.Estudiante, RolUsuario.Tutor] },
+        { id: 'tienda', ruta: "/tienda", texto: "Tienda", icono: IconoTienda, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor] },
+        { id: 'eventos', ruta: "/eventos", texto: "Eventos", icono: IconoEventos, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'controlAsistencia', ruta: rutaClaseEnVivo, texto: "Control de Asistencia", icono: IconoControlAsistencia, roles: [RolUsuario.Admin, RolUsuario.Editor, RolUsuario.Asistente] },
+        { id: 'alertas', ruta: "/notificaciones", texto: "Alertas", icono: IconoAlertas, roles: [RolUsuario.Admin, RolUsuario.Editor] },
         // Fix tutor-role-end-to-end (2026-07-14): buzón del consultor (Tutor/Estudiante) — cola
         // de notificaciones de su estudiante (pagos, avances, eventos). Distinto del módulo de
         // gestión de Alertas del staff.
-        { ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
-        { ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
+        { id: 'buzon', ruta: "/buzon", texto: "Notificaciones", icono: IconoAlertas, roles: [RolUsuario.Tutor, RolUsuario.Estudiante] },
+        { id: 'configuracion', ruta: "/configuracion", texto: "Configuración", icono: IconoConfiguracion, roles: [RolUsuario.Admin] },
     ];
 
     const enlacesVisibles = todosLosEnlaces.filter(enlace => {
@@ -131,24 +163,83 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     });
     const sidebarWidthClass = estaAbierta ? 'w-64' : 'w-20';
 
-    const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
-        const isActive = location.pathname === ruta;
+    // Auto-expandir, al abrir el drawer mobile, el panel del acordeon cuyo enlace coincide
+    // con la ruta actual (regla del plan aprobado: "al abrir el drawer, auto-expandir el
+    // panel cuyo idEnlace matchea la ruta actual"). Corre solo cuando `estaAbierta` pasa a
+    // true -- no en cada cambio de ruta con el drawer ya abierto, para no pelearle al click
+    // manual del usuario sobre otro panel.
+    //
+    // Bug reportado en vivo: antes esto SOLO asignaba panelExpandido cuando encontraba un
+    // match con hijos, pero nunca lo LIMPIABA en caso contrario. Si navegabas a una seccion sin
+    // submenu (ej. "Alertas"/notificaciones) despues de haber tenido "Configuracion" expandida,
+    // panelExpandido se quedaba pegado en 'configuracion' -- y como getButtonStyle ahora tambien
+    // resalta por `isExpandido` (no solo por ruta activa), Configuracion seguia viendose
+    // resaltada y expandida aunque ya no tuviera nada que ver con la pagina actual. Ahora
+    // siempre se decide explicitamente: expandido si la ruta actual pertenece a una seccion con
+    // hijos, null (colapsado) en cualquier otro caso.
+    useEffect(() => {
+        if (!estaAbierta) return;
+        const enlaceActivo = enlacesVisibles.find((enlace) => enlace.ruta === location.pathname);
+        const hijosDelActivo = enlaceActivo ? obtenerHijosDeEnlace(enlaceActivo.id, { usuario, configClub }) : [];
+        setPanelExpandido(hijosDelActivo.length > 0 ? enlaceActivo!.id : null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [estaAbierta]);
+
+    // Al expandir un panel (manual, por el auto-expandido de arriba, o al reabrir el drawer
+    // con un panel que YA estaba expandido de una apertura anterior), lo desplaza a la vista.
+    // Bug reportado en vivo: dependía solo de [panelExpandido], que no cambia de valor si el
+    // panel ya estaba expandido desde antes (ej. entraste a "Licencia", cerraste el drawer, lo
+    // reabriste -- "configuracion" nunca deja de ser el valor, asi que este efecto no corria y
+    // el scroll se quedaba donde estuviera). Por eso tambien depende de `estaAbierta`: asi
+    // corre en CADA apertura del drawer, no solo la primera vez que un panel se expande.
+    // El delay sincroniza con los 200ms de `transition-all duration-200` del panel (abajo),
+    // para no scrollear a mitad de la animacion de apertura.
+    useEffect(() => {
+        if (!estaAbierta || !panelExpandido) return;
+        const timer = setTimeout(() => {
+            // Prioridad: si hay un subitem seleccionado dentro del panel (ej. "Licencia"),
+            // ese es el que importa mostrar -- no el inicio del panel, que para paneles largos
+            // (Configuracion, 7 items) dejaba justo a los ultimos fuera de la pantalla.
+            const activo = subitemActivoRef.current;
+            const target = (activo.enlaceId === panelExpandido ? activo.el : null) ?? panelRefs.current[panelExpandido];
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 210);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [estaAbierta, panelExpandido]);
+
+    const getButtonStyle = (ruta: string, isLogout: boolean = false, isExpandido: boolean = false) => {
+        const isActive = location.pathname === ruta || isExpandido;
         const isPC = window.innerWidth >= 768;
         let baseClasses = `flex items-center transition-all duration-300 uppercase font-black text-[11px] tracking-[0.2em] w-full text-white`;
 
         if (isPC) {
             return `${baseClasses} py-5 border-r-4 ${estaAbierta ? 'px-8 gap-4' : 'px-0 justify-center'} ${isActive ? 'bg-white/10 border-tkd-red' : 'bg-transparent border-transparent hover:bg-white/5 opacity-80 hover:opacity-100'}`;
         } else {
-            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border gap-5 justify-start ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
+            return `${baseClasses} px-6 py-4 my-2 rounded-2xl border gap-5 justify-start ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
         }
     };
 
     return (
         <aside className={`bg-tkd-blue text-white flex flex-col fixed inset-y-0 left-0 z-40 h-screen transition-all duration-500 ease-in-out md:relative md:translate-x-0 ${sidebarWidthClass} ${estaAbierta ? 'translate-x-0' : '-translate-x-full shadow-2xl'}`}>
-            <div className={`flex items-center justify-center h-28 border-b border-white/10 transition-all ${estaAbierta ? 'p-8' : 'p-2'}`}>
+            <div className={`relative flex items-center justify-center h-28 border-b border-white/10 transition-all ${estaAbierta ? 'p-8' : 'p-2'}`}>
                 <LogoDinamico className={estaAbierta ? "h-16 w-auto" : "h-10 w-10"} />
+                {/* Cierre explicito del drawer, solo mobile (mockup Figma "Mejorar UX version
+                    mobil" adaptado -- regla 10 del plan: reusar IconoCerrar, no traer iconos
+                    nuevos). En desktop el rail no se cierra desde aca, sigue igual que hoy. */}
+                <button
+                    type="button"
+                    onClick={onCerrar}
+                    aria-label="Cerrar menú"
+                    className="md:hidden absolute right-4 top-4 w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20 transition-colors"
+                >
+                    <IconoCerrar className="w-4 h-4 text-white" />
+                </button>
             </div>
-            <nav className="flex-grow mt-6 overflow-y-auto no-scrollbar">
+            {/* Desktop (>=768px, breakpoint md): rail de iconos SIN cambios -- mismos
+                estilos isPC de getButtonStyle. Solo se le agrega `hidden md:block`, la rama
+                acordeon de abajo (md:hidden) es la que reemplaza esto en mobile. */}
+            <nav className="hidden md:block flex-grow mt-6 overflow-y-auto no-scrollbar">
                 {enlacesVisibles.map((enlace) => (
                     <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
                         <enlace.icono className="w-10 h-10 flex-shrink-0" />
@@ -156,7 +247,86 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     </ReactRouterDOM.Link>
                 ))}
             </nav>
-            <div className="border-t border-white/10 flex flex-col">
+            {/* Menu mobile en acordeon (<768px): reemplaza el <nav> plano de arriba SOLO en
+                mobile. Para las 4 vistas con tabs internas (Administracion, Estudiantes,
+                Centro Estudios, Configuracion -- ver menuMobileHijos.tsx) expone sus
+                sub-secciones como hijos navegables; el resto sigue como leaf plano igual que
+                en el <nav> de desktop. Mecanica: CSS puro (max-h + transition), un solo panel
+                abierto a la vez (`panelExpandido`, arriba). */}
+            <nav className="md:hidden flex-grow mt-2 overflow-y-auto no-scrollbar space-y-1.5 px-4">
+                {enlacesVisibles.map((enlace) => {
+                    const hijos = obtenerHijosDeEnlace(enlace.id, { usuario, configClub });
+                    const isActive = location.pathname === enlace.ruta;
+
+                    if (hijos.length === 0) {
+                        // Leaf directo: enlaces sin sub-navegacion propia (Agenda, Tienda,
+                        // Eventos, Control de Asistencia top-level, Alertas, Notificaciones) y,
+                        // por rol, "Centro Estudios" para Tutor/Estudiante (regla 6 del plan:
+                        // sin chevron/hijos para quien no puede gestionar jornadas).
+                        return (
+                            <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
+                                <enlace.icono className="w-8 h-8 flex-shrink-0" />
+                                {/* Mismo riesgo que el span de los botones con submenu (ver mas
+                                    abajo): una etiqueta de una sola palabra larga (ej.
+                                    "Notificaciones") podria empujar el contenido fuera del boton
+                                    sin min-w-0. Preventivo -- no medido directamente en este caso. */}
+                                <span className="min-w-0 break-words [hyphens:auto] [-webkit-hyphens:auto]" lang="es">{enlace.texto}</span>
+                            </ReactRouterDOM.Link>
+                        );
+                    }
+
+                    const isExpanded = panelExpandido === enlace.id;
+                    return (
+                        <div key={enlace.ruta} ref={(el) => { panelRefs.current[enlace.id] = el; }}>
+                            <button
+                                type="button"
+                                onClick={() => setPanelExpandido(isExpanded ? null : enlace.id)}
+                                aria-expanded={isExpanded}
+                                className={getButtonStyle(enlace.ruta, false, isExpanded)}
+                            >
+                                <enlace.icono className="w-8 h-8 flex-shrink-0" />
+                                {/* Bug reportado en vivo: "Administración"/"Configuración" son
+                                    una sola palabra sin espacio -- sin min-w-0 el span se niega a
+                                    encogerse por debajo de su ancho natural y empuja la flechita
+                                    fuera del boton. break-words deja que la palabra se parta en 2
+                                    lineas si hace falta, mismo tratamiento que ya tenia "Centro
+                                    Estudios" (que sí tiene espacio y ya envolvía sola).
+                                    Segundo bug reportado en vivo: break-words solo corta por
+                                    donde alcanza a entrar, no por silaba ("ADMINISTR-ACIÓN",
+                                    "ESTUDIANT-ES") -- hyphens:auto usa el diccionario de
+                                    silabacion real del navegador para el idioma indicado en
+                                    lang="es" (heredado de index.html, pero se repite explicito
+                                    aca porque hyphens:auto lo requiere en el elemento mismo para
+                                    activarse de forma confiable). break-words queda como
+                                    respaldo para palabras que el diccionario no cubra. */}
+                                <span className="flex-1 text-left min-w-0 break-words [hyphens:auto] [-webkit-hyphens:auto]" lang="es">{enlace.texto}</span>
+                                <IconoFlechaArriba className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${isExpanded ? '' : 'rotate-180'}`} />
+                            </button>
+                            <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[600px]' : 'max-h-0'}`}>
+                                <div className="pl-6 pt-1.5 pb-1 space-y-1">
+                                    {hijos.map((hijo) => {
+                                        const subitemActivo = isActive && searchParams.get('tab') === hijo.id;
+                                        return (
+                                            <ReactRouterDOM.Link
+                                                key={hijo.id}
+                                                to={hijo.ruta}
+                                                onClick={onCerrar}
+                                                ref={(el) => { if (subitemActivo) subitemActivoRef.current = { enlaceId: enlace.id, el }; }}
+                                                className={`flex items-center gap-4 px-5 py-3 rounded-2xl uppercase font-black text-[10px] tracking-widest transition-all ${subitemActivo ? 'bg-tkd-red/20 border border-tkd-red/40 text-white' : 'text-white/70 border border-transparent hover:bg-white/10 hover:text-white'}`}
+                                            >
+                                                <hijo.icono className="w-6 h-6 flex-shrink-0" />
+                                                <span>{hijo.label}</span>
+                                            </ReactRouterDOM.Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </nav>
+            {/* Footer desktop (>=768px): sin cambios respecto al original. */}
+            <div className="hidden md:flex border-t border-white/10 flex-col">
                 {esMaster && (
                     <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className={getButtonStyle('/aliant-control')}>
                         <IconoAprobar className="w-5 h-5 flex-shrink-0" />
@@ -171,6 +341,36 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     <IconoLogout className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
                 </button>
+            </div>
+            {/* Footer mobile (<768px): Mi Perfil y Cerrar Sesion comparten renglon (feedback del
+                usuario tras ver el drawer corriendo -- ocupaban una fila entera cada uno sin
+                aportar jerarquia). Consola Aliant sigue como fila propia arriba, sin cambio de
+                comportamiento -- solo reempaquetado para esta rama mobile-only. */}
+            <div className="md:hidden border-t border-white/10 flex flex-col px-4 pt-2 pb-3">
+                {esMaster && (
+                    <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className="flex items-center gap-4 px-2 py-3 mb-1 uppercase font-black text-[11px] tracking-[0.2em] text-white">
+                        <IconoAprobar className="w-5 h-5 flex-shrink-0" />
+                        <span>Consola Aliant</span>
+                    </ReactRouterDOM.Link>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                    <ReactRouterDOM.Link
+                        to="/mi-perfil"
+                        onClick={onCerrar}
+                        className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border transition-all ${location.pathname === '/mi-perfil' ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`}
+                    >
+                        <IconoUsuario className="w-6 h-6 text-white" />
+                        <span className="text-white text-[9px] font-black uppercase tracking-widest">Mi Perfil</span>
+                    </ReactRouterDOM.Link>
+                    <button
+                        type="button"
+                        onClick={onLogout}
+                        className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border bg-white/5 border-white/5 opacity-80"
+                    >
+                        <IconoLogout className="w-6 h-6 text-white" />
+                        <span className="text-white text-[9px] font-black uppercase tracking-widest">Cerrar Sesión</span>
+                    </button>
+                </div>
             </div>
         </aside>
     );

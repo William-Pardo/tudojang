@@ -1,6 +1,7 @@
 
 // vistas/Configuracion.tsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede, ConfiguracionClub } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
@@ -28,6 +29,7 @@ import InvitacionesView from './admin/InvitacionesView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
 import { calcularCapacidad } from '../utils/facturacion';
+import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 // --- SUB-COMPONENTES DE CONFIGURACIÓN ---
 
@@ -308,8 +310,27 @@ const VistaConfiguracion: React.FC = () => {
     const { estudiantes } = useEstudiantes();
     const { sedes, sedesVisibles, totalSedesActivas, eliminarSede, agregarSede, actualizarSede } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
+    const [searchParams] = useSearchParams();
 
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>('branding');
+    // Ids validos para el deep-link `?tab=` del acordeon mobile (ver
+    // components/navegacion/menuMobileHijos.tsx::hijosConfiguracion). Sin guard de wizard
+    // extra: cada seccion del wizard de onboarding se gatea por `currentStep` (ver mas abajo),
+    // no por `activeTab` solo, asi que un `?tab=` invalido/ausente durante el wizard es
+    // seguro -- cae al fallback 'branding' de siempre y el wizard sigue su propio flujo.
+    const CONFIG_TAB_IDS = ['branding', 'equipo', 'sedes', 'programas', 'alertas', 'accesos', 'licencia'] as const;
+    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>(() =>
+        resolverTabInicial(CONFIG_TAB_IDS, searchParams.get('tab'), 'branding')
+    );
+    // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR -- si esta vista
+    // ya estaba montada, tocar otro subitem del acordeon mobile (mismo "/configuracion",
+    // distinto ?tab=) no la remonta, y `activeTab` nunca se actualizaba.
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && (CONFIG_TAB_IDS as readonly string[]).includes(tab) && tab !== activeTab) {
+            setActiveTab(tab as typeof activeTab);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
     const [programaEdit, setProgramaEdit] = useState<Partial<Programa> | null>(null);
     const [modalProgramaAbierto, setModalProgramaAbierto] = useState(false);
     const [sedeEdit, setSedeEdit] = useState<Partial<Sede> | null>(null);
@@ -565,8 +586,11 @@ const VistaConfiguracion: React.FC = () => {
                 </div>
             )}
 
+            {/* Oculto en mobile (<768px) -- el acordeón del drawer ya cubre esta navegación
+                (y en mobile este switcher se apilaba en varias filas, inconsistente con el
+                scroll horizontal de Administración/Estudiantes). Sigue igual en desktop. */}
             {!isWizardMode && (
-                <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full overflow-visible">
+                <div className="hidden md:block bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-full overflow-visible">
                     <div className="flex flex-row flex-wrap gap-1">
                         {[
                             { id: 'branding', label: 'Identidad & Pagos', icon: IconoImagen },
@@ -574,7 +598,11 @@ const VistaConfiguracion: React.FC = () => {
                             { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
                             { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra, iconScale: 'scale-[1.46]' },
-                            { id: 'alertas', label: 'Alertas', icon: IconoConfiguracionAlertas, iconScale: 'scale-[1.72]' },
+                            // Renombrado a pedido del usuario: se confundía con el leaf top-level
+                            // "Alertas" del menú (donde llegan las notificaciones) -- esto es la
+                            // configuración del motor que las genera. Coincide con el título real
+                            // de esta sección ("Motor de Notificaciones", más abajo).
+                            { id: 'alertas', label: 'Motor de Notificaciones', icon: IconoConfiguracionAlertas, iconScale: 'scale-[1.72]' },
                             { id: 'licencia', label: 'Licencia', icon: IconoAprobar }
                         ]
                             // Modo demo comercial (marketing, ver tipos.ts ConfiguracionClub.esDemoComercial):

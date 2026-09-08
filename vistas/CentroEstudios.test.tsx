@@ -7,6 +7,14 @@ jest.mock('../hooks/useCentroEstudios', () => ({
   useCentroEstudios: jest.fn(),
 }));
 
+// Menú mobile acordeon (deep-link `?tab=`): CentroEstudios ahora lee useSearchParams() de
+// react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
+// que se mockea sin query params -- equivalente al comportamiento previo (fallback 'flujo').
+// Mutable (no una funcion fija) para poder simular, en el describe de mas abajo, que el query
+// param cambia con la vista ya montada.
+let mockSearchParams = new URLSearchParams();
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [mockSearchParams] }));
+
 jest.mock('../context/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
@@ -108,6 +116,7 @@ const asignacionBase = {
 describe('CentroEstudios', () => {
   beforeEach(() => {
     localStorage.clear();
+    mockSearchParams = new URLSearchParams();
     mockUseCentroEstudios.mockReturnValue({ centroEstudiosActivo: true });
     mockUseAuth.mockReturnValue({ usuario: { id: 'est-1', tenantId: 'tenant-1', rol: RolUsuario.Asistente } });
     mockListarRecursosAprobados.mockResolvedValue([
@@ -273,6 +282,21 @@ describe('CentroEstudios', () => {
     await user.click(screen.getByRole('tab', { name: /flujo académico/i }));
 
     expect(screen.getByRole('list', { name: /flujo principal de centro de estudios/i })).toBeInTheDocument();
+  });
+
+  // BUG REAL (reportado en vivo): igual que Administracion/Configuracion/Estudiantes, el
+  // useState de tabGestion solo leia `?tab=` al MONTAR -- tocar otro subitem del acordeon
+  // mobile con la vista ya montada nunca cambiaba de pestaña.
+  it('BUG REAL (reportado en vivo): cambia de tab cuando `?tab=` cambia con la vista ya montada, sin necesitar un remount', async () => {
+    mockUseAuth.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'tenant-1', rol: RolUsuario.Admin } });
+    const { rerender } = render(<CentroEstudios />);
+
+    expect(screen.getByRole('tab', { name: /progreso estudiantes/i })).toHaveAttribute('aria-selected', 'false');
+
+    mockSearchParams = new URLSearchParams('tab=metricas');
+    rerender(<CentroEstudios />);
+
+    expect(screen.getByRole('tab', { name: /progreso estudiantes/i })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('muestra exactamente 3 pasos en el flujo de Centro de Estudios, en orden', async () => {

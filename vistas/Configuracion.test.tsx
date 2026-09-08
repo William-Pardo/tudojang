@@ -16,6 +16,15 @@ jest.mock('../servicios/configuracionApi', () => ({
   actualizarCapacidadClub: jest.fn(),
 }));
 
+// Menú mobile acordeon (deep-link `?tab=`): VistaConfiguracion ahora lee useSearchParams() de
+// react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
+// que se mockea sin query params -- equivalente al comportamiento previo (fallback 'branding').
+// `mockSearchParams` es mutable (no una funcion fija) para poder simular, en el describe de
+// mas abajo, que el query param CAMBIA con la vista ya montada -- exactamente el escenario que
+// exponia el bug real ("cualquier subitem de Administracion llevaba siempre a Resumen").
+let mockSearchParams = new URLSearchParams();
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [mockSearchParams] }));
+
 // Este test se limita a los 4 campos nuevos de medios de pago (pagoNequi/pagoDaviplata/
 // pagoBreB/pagoBanco) dentro de la pestaña "branding" (tab por defecto de la vista, ver
 // vistas/Configuracion.tsx líneas 632-737). No se ejercitan otras pestañas ni el flujo de
@@ -81,6 +90,7 @@ const configClubBase: ConfiguracionClub = {
 describe('Configuracion - medios de pago (pagoNequi/pagoDaviplata/pagoBreB/pagoBanco)', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSearchParams = new URLSearchParams();
         useConfiguracionMock.mockReturnValue({
             usuarios: [],
             configNotificaciones: {},
@@ -202,6 +212,7 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
 
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSearchParams = new URLSearchParams();
         actualizarCapacidadClubMock.mockResolvedValue(undefined);
         useConfiguracionMock.mockReturnValue({
             usuarios: [],
@@ -230,6 +241,25 @@ describe('Configuracion - tab Licencia (panel de uso + extras, capacidad-tenant)
     const irATabLicencia = async (user: ReturnType<typeof userEvent.setup>) => {
         await user.click(screen.getByText('Licencia'));
     };
+
+    // BUG REAL (reportado en vivo): el useState de activeTab solo leia `?tab=` al MONTAR --
+    // si el usuario ya estaba en "/configuracion" (ej. llego por otra pestaña) y tocaba
+    // "Licencia" desde el acordeon del drawer mobile, la vista NUNCA cambiaba de tab: React
+    // Router no remonta el componente para un cambio de query string en la misma ruta, asi
+    // que "cualquier subitem elegido llevaba siempre al tab por defecto" (branding). Este test
+    // simula exactamente eso: la vista ya esta montada en 'branding', y el query param cambia
+    // DESPUES, sin desmontar.
+    it('BUG REAL (reportado en vivo): cambia de tab cuando `?tab=` cambia con la vista ya montada, sin necesitar un remount', () => {
+        const { rerender } = render(<VistaConfiguracion />);
+        expect(screen.queryByText('Estado de Suscripción')).not.toBeInTheDocument();
+
+        // MISMA instancia montada (rerender, no un render nuevo) -- si esto fuera un mount
+        // fresco, hasta la version vieja con bug (useState lazy solamente) pasaria de casualidad.
+        mockSearchParams = new URLSearchParams('tab=licencia');
+        rerender(<VistaConfiguracion />);
+
+        expect(screen.getByText('Estado de Suscripción')).toBeInTheDocument();
+    });
 
     it('no renderiza el grid de planes fijos (starter/growth/pro) ni las tarjetas de addon', async () => {
         const user = userEvent.setup();
@@ -384,6 +414,7 @@ describe('Configuracion - modo demo comercial (esDemoComercial)', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSearchParams = new URLSearchParams();
     });
 
     it('oculta la pestaña "Programas Extra" cuando esDemoComercial es true', () => {
