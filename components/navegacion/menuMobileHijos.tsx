@@ -113,7 +113,13 @@ function hijosConfiguracion(ctx: ContextoMenuMobile): SubitemMenuMobile[] {
         { id: 'accesos', label: 'Cuentas Externas', icono: IconoEmail, ruta: '/configuracion?tab=accesos' },
         { id: 'sedes', label: 'Sedes Adicionales', icono: IconoCasa, ruta: '/configuracion?tab=sedes' },
         { id: 'programas', label: 'Programas Extra', icono: IconoProgramasExtra, ruta: '/configuracion?tab=programas' },
-        { id: 'alertas', label: 'Alertas', icono: IconoConfiguracionAlertas, ruta: '/configuracion?tab=alertas' },
+        // Renombrado a pedido del usuario (confusión real en vivo): "Alertas" a secas se
+        // confundía con el leaf top-level "Alertas" (todosLosEnlaces, ruta /notificaciones,
+        // donde LLEGAN las alertas) -- esto es la CONFIGURACIÓN del motor que las genera, no
+        // el buzón. Coincide a propósito con el título real de la página destino ("Motor de
+        // Notificaciones", ver Configuracion.tsx) para que el texto del drawer y el de la
+        // vista sean el mismo, sin traducción mental de por medio.
+        { id: 'alertas', label: 'Motor de Notificaciones', icono: IconoConfiguracionAlertas, ruta: '/configuracion?tab=alertas' },
         { id: 'licencia', label: 'Licencia', icono: IconoAprobar, ruta: '/configuracion?tab=licencia' },
     ];
     // Modo demo comercial: mismo filtro que la vista real (tab.id !== 'programas' || !esDemoComercial).

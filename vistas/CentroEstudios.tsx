@@ -66,6 +66,17 @@ const CentroEstudios: React.FC = () => {
   const [tabGestion, setTabGestion] = React.useState<TabGestion>(() =>
     !puedeGestionarJornadas ? 'flujo' : resolverTabInicial(CENTRO_ESTUDIOS_TAB_IDS, searchParams.get('tab'), 'flujo')
   );
+  // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR -- si esta vista
+  // ya estaba montada, tocar otro subitem del acordeon mobile (mismo "/centro-estudios",
+  // distinto ?tab=) no la remonta, y `tabGestion` nunca se actualizaba.
+  React.useEffect(() => {
+    if (!puedeGestionarJornadas) return;
+    const tab = searchParams.get('tab');
+    if (tab && (CENTRO_ESTUDIOS_TAB_IDS as readonly string[]).includes(tab) && tab !== tabGestion) {
+      setTabGestion(tab as TabGestion);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [estudianteResueltoId, setEstudianteResueltoId] = React.useState<string | null>(null);
   const [estudianteResueltoNombre, setEstudianteResueltoNombre] = React.useState<string | null>(null);
   const [estadoBiblioteca, setEstadoBiblioteca] = React.useState({
@@ -217,8 +228,11 @@ const CentroEstudios: React.FC = () => {
       {/* Tab switcher: se ubica antes del stepper para que, al entrar a "Progreso
           estudiantes", no quede debajo un stepper de un flujo distinto (bug reportado:
           el stepper de Flujo académico seguía visible en la pestaña de Métricas). */}
+      {/* Oculto en mobile (<768px) para no duplicar la navegación del acordeón del drawer --
+          mismo criterio aplicado a los switchers de Administración/Estudiantes/Configuración.
+          Sigue igual en desktop. */}
       {puedeGestionarJornadas && (
-        <div className="bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-fit" role="tablist" aria-label="Secciones de gestión">
+        <div className="hidden md:block bg-white dark:bg-gray-800/50 p-1.5 rounded-[2rem] shadow-soft border border-gray-100 dark:border-white/5 w-fit" role="tablist" aria-label="Secciones de gestión">
           <div className="flex flex-row gap-1">
             <button
               role="tab"

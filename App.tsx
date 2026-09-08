@@ -66,7 +66,10 @@ import {
 } from './components/Iconos';
 import { obtenerHijosDeEnlace } from './components/navegacion/menuMobileHijos';
 
-const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
+// Exportado (sin cambiar comportamiento) para poder testear el acordeon mobile de forma
+// aislada -- ver App.BarraLateral.test.tsx. Mismo criterio que ya se usa con las funciones
+// puras de mas abajo (resolverRutaInicial, debePersistirRuta, etc.).
+export const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLogout: () => void, usuario: Usuario }> = ({ estaAbierta, onCerrar, onLogout, usuario }) => {
     const location = ReactRouterDOM.useLocation();
     const [searchParams] = ReactRouterDOM.useSearchParams();
     const { configClub } = useConfiguracion();
@@ -78,6 +81,19 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     // ninguno lo esta. Mecanica CSS pura (max-h + transition), NO framer-motion -- no es el
     // patron que usa el resto de la app para acordeones.
     const [panelExpandido, setPanelExpandido] = useState<string | null>(null);
+    // Refs de cada panel del acordeon (bug reportado en vivo: al expandir un panel cerca del
+    // final de la lista -- ej. Configuracion -- sus hijos quedaban fuera del viewport visible
+    // del nav, sin pista de que habia que scrollear porque el scrollbar esta oculto a proposito
+    // (no-scrollbar). Se usa para el scrollIntoView del efecto de abajo.
+    const panelRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    // Ref del subitem actualmente seleccionado (si hay uno), junto con el id del enlace padre
+    // al que pertenece. Bug reportado en vivo: al reabrir el drawer con Configuracion ya
+    // activa, el scroll llevaba a la vista el INICIO del panel (boton + primeros hijos) -- con
+    // 7 sub-secciones eso deja a "Alertas"/"Licencia" (las ultimas) fuera de la pantalla. Si
+    // hay un subitem activo hay que priorizar ESE, no el inicio del panel -- pero solo cuando
+    // pertenece al panel que se esta expandiendo (si el usuario expande a mano OTRA seccion,
+    // no hay que saltar al subitem activo de una seccion distinta).
+    const subitemActivoRef = useRef<{ enlaceId: string; el: HTMLAnchorElement | null }>({ enlaceId: '', el: null });
 
     // Fase 4 (clase-en-vivo-checkin-trigger-agenda, Bloque A): ventana horaria dinamica real,
     // reemplaza el placeholder `showClaseEnVivo=true` (siempre visible). El link solo se activa
@@ -152,24 +168,55 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
     // panel cuyo idEnlace matchea la ruta actual"). Corre solo cuando `estaAbierta` pasa a
     // true -- no en cada cambio de ruta con el drawer ya abierto, para no pelearle al click
     // manual del usuario sobre otro panel.
+    //
+    // Bug reportado en vivo: antes esto SOLO asignaba panelExpandido cuando encontraba un
+    // match con hijos, pero nunca lo LIMPIABA en caso contrario. Si navegabas a una seccion sin
+    // submenu (ej. "Alertas"/notificaciones) despues de haber tenido "Configuracion" expandida,
+    // panelExpandido se quedaba pegado en 'configuracion' -- y como getButtonStyle ahora tambien
+    // resalta por `isExpandido` (no solo por ruta activa), Configuracion seguia viendose
+    // resaltada y expandida aunque ya no tuviera nada que ver con la pagina actual. Ahora
+    // siempre se decide explicitamente: expandido si la ruta actual pertenece a una seccion con
+    // hijos, null (colapsado) en cualquier otro caso.
     useEffect(() => {
         if (!estaAbierta) return;
         const enlaceActivo = enlacesVisibles.find((enlace) => enlace.ruta === location.pathname);
-        if (enlaceActivo && obtenerHijosDeEnlace(enlaceActivo.id, { usuario, configClub }).length > 0) {
-            setPanelExpandido(enlaceActivo.id);
-        }
+        const hijosDelActivo = enlaceActivo ? obtenerHijosDeEnlace(enlaceActivo.id, { usuario, configClub }) : [];
+        setPanelExpandido(hijosDelActivo.length > 0 ? enlaceActivo!.id : null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [estaAbierta]);
 
-    const getButtonStyle = (ruta: string, isLogout: boolean = false) => {
-        const isActive = location.pathname === ruta;
+    // Al expandir un panel (manual, por el auto-expandido de arriba, o al reabrir el drawer
+    // con un panel que YA estaba expandido de una apertura anterior), lo desplaza a la vista.
+    // Bug reportado en vivo: dependía solo de [panelExpandido], que no cambia de valor si el
+    // panel ya estaba expandido desde antes (ej. entraste a "Licencia", cerraste el drawer, lo
+    // reabriste -- "configuracion" nunca deja de ser el valor, asi que este efecto no corria y
+    // el scroll se quedaba donde estuviera). Por eso tambien depende de `estaAbierta`: asi
+    // corre en CADA apertura del drawer, no solo la primera vez que un panel se expande.
+    // El delay sincroniza con los 200ms de `transition-all duration-200` del panel (abajo),
+    // para no scrollear a mitad de la animacion de apertura.
+    useEffect(() => {
+        if (!estaAbierta || !panelExpandido) return;
+        const timer = setTimeout(() => {
+            // Prioridad: si hay un subitem seleccionado dentro del panel (ej. "Licencia"),
+            // ese es el que importa mostrar -- no el inicio del panel, que para paneles largos
+            // (Configuracion, 7 items) dejaba justo a los ultimos fuera de la pantalla.
+            const activo = subitemActivoRef.current;
+            const target = (activo.enlaceId === panelExpandido ? activo.el : null) ?? panelRefs.current[panelExpandido];
+            target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 210);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [estaAbierta, panelExpandido]);
+
+    const getButtonStyle = (ruta: string, isLogout: boolean = false, isExpandido: boolean = false) => {
+        const isActive = location.pathname === ruta || isExpandido;
         const isPC = window.innerWidth >= 768;
         let baseClasses = `flex items-center transition-all duration-300 uppercase font-black text-[11px] tracking-[0.2em] w-full text-white`;
 
         if (isPC) {
             return `${baseClasses} py-5 border-r-4 ${estaAbierta ? 'px-8 gap-4' : 'px-0 justify-center'} ${isActive ? 'bg-white/10 border-tkd-red' : 'bg-transparent border-transparent hover:bg-white/5 opacity-80 hover:opacity-100'}`;
         } else {
-            return `${baseClasses} px-6 py-4 my-2 rounded-2xl mx-4 border gap-5 justify-start ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
+            return `${baseClasses} px-6 py-4 my-2 rounded-2xl border gap-5 justify-start ${isActive ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`;
         }
     };
 
@@ -206,7 +253,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                 sub-secciones como hijos navegables; el resto sigue como leaf plano igual que
                 en el <nav> de desktop. Mecanica: CSS puro (max-h + transition), un solo panel
                 abierto a la vez (`panelExpandido`, arriba). */}
-            <nav className="md:hidden flex-grow mt-2 overflow-y-auto no-scrollbar space-y-1.5">
+            <nav className="md:hidden flex-grow mt-2 overflow-y-auto no-scrollbar space-y-1.5 px-4">
                 {enlacesVisibles.map((enlace) => {
                     const hijos = obtenerHijosDeEnlace(enlace.id, { usuario, configClub });
                     const isActive = location.pathname === enlace.ruta;
@@ -219,25 +266,43 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                         return (
                             <ReactRouterDOM.Link key={enlace.ruta} to={enlace.ruta} onClick={onCerrar} className={getButtonStyle(enlace.ruta)}>
                                 <enlace.icono className="w-8 h-8 flex-shrink-0" />
-                                <span>{enlace.texto}</span>
+                                {/* Mismo riesgo que el span de los botones con submenu (ver mas
+                                    abajo): una etiqueta de una sola palabra larga (ej.
+                                    "Notificaciones") podria empujar el contenido fuera del boton
+                                    sin min-w-0. Preventivo -- no medido directamente en este caso. */}
+                                <span className="min-w-0 break-words [hyphens:auto] [-webkit-hyphens:auto]" lang="es">{enlace.texto}</span>
                             </ReactRouterDOM.Link>
                         );
                     }
 
                     const isExpanded = panelExpandido === enlace.id;
                     return (
-                        <div key={enlace.ruta}>
+                        <div key={enlace.ruta} ref={(el) => { panelRefs.current[enlace.id] = el; }}>
                             <button
                                 type="button"
                                 onClick={() => setPanelExpandido(isExpanded ? null : enlace.id)}
                                 aria-expanded={isExpanded}
-                                className={getButtonStyle(enlace.ruta)}
+                                className={getButtonStyle(enlace.ruta, false, isExpanded)}
                             >
                                 <enlace.icono className="w-8 h-8 flex-shrink-0" />
-                                <span className="flex-1 text-left">{enlace.texto}</span>
+                                {/* Bug reportado en vivo: "Administración"/"Configuración" son
+                                    una sola palabra sin espacio -- sin min-w-0 el span se niega a
+                                    encogerse por debajo de su ancho natural y empuja la flechita
+                                    fuera del boton. break-words deja que la palabra se parta en 2
+                                    lineas si hace falta, mismo tratamiento que ya tenia "Centro
+                                    Estudios" (que sí tiene espacio y ya envolvía sola).
+                                    Segundo bug reportado en vivo: break-words solo corta por
+                                    donde alcanza a entrar, no por silaba ("ADMINISTR-ACIÓN",
+                                    "ESTUDIANT-ES") -- hyphens:auto usa el diccionario de
+                                    silabacion real del navegador para el idioma indicado en
+                                    lang="es" (heredado de index.html, pero se repite explicito
+                                    aca porque hyphens:auto lo requiere en el elemento mismo para
+                                    activarse de forma confiable). break-words queda como
+                                    respaldo para palabras que el diccionario no cubra. */}
+                                <span className="flex-1 text-left min-w-0 break-words [hyphens:auto] [-webkit-hyphens:auto]" lang="es">{enlace.texto}</span>
                                 <IconoFlechaArriba className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${isExpanded ? '' : 'rotate-180'}`} />
                             </button>
-                            <div className={`overflow-hidden transition-all duration-200 mx-4 ${isExpanded ? 'max-h-[600px]' : 'max-h-0'}`}>
+                            <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[600px]' : 'max-h-0'}`}>
                                 <div className="pl-6 pt-1.5 pb-1 space-y-1">
                                     {hijos.map((hijo) => {
                                         const subitemActivo = isActive && searchParams.get('tab') === hijo.id;
@@ -246,6 +311,7 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                                                 key={hijo.id}
                                                 to={hijo.ruta}
                                                 onClick={onCerrar}
+                                                ref={(el) => { if (subitemActivo) subitemActivoRef.current = { enlaceId: enlace.id, el }; }}
                                                 className={`flex items-center gap-4 px-5 py-3 rounded-2xl uppercase font-black text-[10px] tracking-widest transition-all ${subitemActivo ? 'bg-tkd-red/20 border border-tkd-red/40 text-white' : 'text-white/70 border border-transparent hover:bg-white/10 hover:text-white'}`}
                                             >
                                                 <hijo.icono className="w-6 h-6 flex-shrink-0" />
@@ -259,7 +325,8 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     );
                 })}
             </nav>
-            <div className="border-t border-white/10 flex flex-col">
+            {/* Footer desktop (>=768px): sin cambios respecto al original. */}
+            <div className="hidden md:flex border-t border-white/10 flex-col">
                 {esMaster && (
                     <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className={getButtonStyle('/aliant-control')}>
                         <IconoAprobar className="w-5 h-5 flex-shrink-0" />
@@ -274,6 +341,36 @@ const BarraLateral: React.FC<{ estaAbierta: boolean; onCerrar: () => void; onLog
                     <IconoLogout className="w-10 h-10 flex-shrink-0" />
                     <span className={`${estaAbierta ? 'block' : 'hidden'}`}>Cerrar Sesión</span>
                 </button>
+            </div>
+            {/* Footer mobile (<768px): Mi Perfil y Cerrar Sesion comparten renglon (feedback del
+                usuario tras ver el drawer corriendo -- ocupaban una fila entera cada uno sin
+                aportar jerarquia). Consola Aliant sigue como fila propia arriba, sin cambio de
+                comportamiento -- solo reempaquetado para esta rama mobile-only. */}
+            <div className="md:hidden border-t border-white/10 flex flex-col px-4 pt-2 pb-3">
+                {esMaster && (
+                    <ReactRouterDOM.Link to="/aliant-control" onClick={onCerrar} className="flex items-center gap-4 px-2 py-3 mb-1 uppercase font-black text-[11px] tracking-[0.2em] text-white">
+                        <IconoAprobar className="w-5 h-5 flex-shrink-0" />
+                        <span>Consola Aliant</span>
+                    </ReactRouterDOM.Link>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                    <ReactRouterDOM.Link
+                        to="/mi-perfil"
+                        onClick={onCerrar}
+                        className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border transition-all ${location.pathname === '/mi-perfil' ? 'bg-white/20 border-white/30' : 'bg-white/5 border-white/5 opacity-80'}`}
+                    >
+                        <IconoUsuario className="w-6 h-6 text-white" />
+                        <span className="text-white text-[9px] font-black uppercase tracking-widest">Mi Perfil</span>
+                    </ReactRouterDOM.Link>
+                    <button
+                        type="button"
+                        onClick={onLogout}
+                        className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border bg-white/5 border-white/5 opacity-80"
+                    >
+                        <IconoLogout className="w-6 h-6 text-white" />
+                        <span className="text-white text-[9px] font-black uppercase tracking-widest">Cerrar Sesión</span>
+                    </button>
+                </div>
             </div>
         </aside>
     );

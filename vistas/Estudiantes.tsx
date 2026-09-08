@@ -99,6 +99,16 @@ export const VistaEstudiantes: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabId>(() =>
         resolverTabInicial(ESTUDIANTES_TAB_IDS, searchParams.get('tab'), esTutor ? 'asistencia' : 'directorio')
     );
+    // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR -- si esta vista
+    // ya estaba montada, tocar otro subitem del acordeon mobile (mismo "/estudiantes", distinto
+    // ?tab=) no la remonta, y `activeTab` nunca se actualizaba.
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && (ESTUDIANTES_TAB_IDS as readonly string[]).includes(tab) && tab !== activeTab) {
+            setActiveTab(tab as TabId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     // Cargar misión activa para el banner global
     useEffect(() => {
@@ -285,8 +295,10 @@ export const VistaEstudiantes: React.FC = () => {
                 }
             </header >
 
-            {/* BARRA DE NAVEGACIÓN: ICONOS EN MÓVIL (H/V), ICONO+TEXTO EN PC */}
-            < div className="bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden" >
+            {/* BARRA DE NAVEGACIÓN: oculta en mobile (<768px) -- el acordeón del drawer ya
+                cubre esta navegación con texto completo, sin duplicar switcher ni depender de
+                scroll horizontal con solo íconos. Sigue igual en desktop. */}
+            < div className="hidden md:block bg-white dark:bg-gray-800 p-1.5 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 w-full md:w-fit overflow-hidden" >
                 <div className="flex flex-row overflow-x-auto no-scrollbar gap-1">
                     {tabs.map(tab => (
                         <button

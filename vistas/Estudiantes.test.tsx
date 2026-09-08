@@ -20,7 +20,10 @@ jest.mock('../context/DataContext', () => ({ useConfiguracion: () => ({ configCl
 // Menú mobile acordeon (deep-link `?tab=`): VistaEstudiantes ahora lee useSearchParams() de
 // react-router-dom para su tab inicial. Este archivo no renderiza dentro de un <Router>, asi
 // que se mockea sin query params -- equivalente al comportamiento previo (fallback por rol).
-jest.mock('react-router-dom', () => ({ useSearchParams: () => [new URLSearchParams()] }));
+// Mutable (no una funcion fija) para poder simular, en el describe de mas abajo, que el query
+// param cambia con la vista ya montada.
+let mockSearchParams = new URLSearchParams();
+jest.mock('react-router-dom', () => ({ useSearchParams: () => [mockSearchParams] }));
 jest.mock('../context/NotificacionContext', () => ({ useNotificacion: () => ({ mostrarNotificacion: mockMostrarNotificacion }) }));
 jest.mock('../servicios/censoApi', () => ({ obtenerMisionActivaTenant: jest.fn() }));
 jest.mock('../utils/userSeeder', () => ({ generarEstudiantesFicticios: (...args: any[]) => mockGenerar(...args) }));
@@ -160,7 +163,26 @@ describe('VistaEstudiantes', () => {
     mockEscenario = {};
     mockUsuario = { id: 'admin-1', tenantId: 'tenant-1', sedeId: 'sede-1', rol: RolUsuario.Admin, email: 'admin@test.com' };
     mockConfigClub = { esDemoComercial: false };
+    mockSearchParams = new URLSearchParams();
     misionMock.mockResolvedValue(null);
+  });
+
+  // BUG REAL (reportado en vivo): igual que en Configuracion/Administracion, el useState de
+  // activeTab solo leia `?tab=` al MONTAR -- tocar un subitem del acordeon mobile mientras la
+  // vista ya estaba montada nunca cambiaba de pestaña. Se verifica sobre el resaltado de la
+  // propia barra de tabs (no sobre el contenido de la sub-vista destino, que aca no esta
+  // mockeada y podria depender de contexto no cubierto por este archivo).
+  it('BUG REAL (reportado en vivo): cambia de tab cuando `?tab=` cambia con la vista ya montada, sin necesitar un remount', async () => {
+    const { rerender } = render(<VistaEstudiantes />);
+    await waitFor(() => expect(misionMock).toHaveBeenCalled());
+
+    const botonCertificados = screen.getByText('Certificaciones').closest('button')!;
+    expect(botonCertificados.className).not.toMatch(/bg-tkd-dark/);
+
+    mockSearchParams = new URLSearchParams('tab=certificados');
+    rerender(<VistaEstudiantes />);
+
+    expect(botonCertificados.className).toMatch(/bg-tkd-dark/);
   });
 
   it('inyecta cinco estudiantes y filtra por búsqueda, grupo, estado y sede', async () => {
