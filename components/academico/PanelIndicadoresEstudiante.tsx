@@ -118,7 +118,7 @@ const PanelIndicadoresEstudiante: React.FC = () => {
     };
 
     if (cargando) {
-        return <div className="p-10 text-center text-gray-400 font-black uppercase text-xs animate-pulse">Analizando Indicadores...</div>;
+        return <div className="p-10 text-center text-gray-400 font-black uppercase text-xs animate-pulse">Cargando Radar de Alumnos...</div>;
     }
 
     if (hallazgosOrdenados.length === 0) {

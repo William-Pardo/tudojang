@@ -63,7 +63,7 @@ describe('PanelIndicadoresEstudiante', () => {
     it('muestra el estado de carga mientras resuelve la consulta', () => {
         obtenerIndicadoresPendientesMock.mockReturnValue(new Promise(() => { }));
         render(<PanelIndicadoresEstudiante />);
-        expect(screen.getByText(/Analizando Indicadores/i)).toBeInTheDocument();
+        expect(screen.getByText(/Cargando Radar de Alumnos/i)).toBeInTheDocument();
     });
 
     it('muestra el estado vacío cuando no hay hallazgos pendientes', async () => {

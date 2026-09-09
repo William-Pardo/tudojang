@@ -50,7 +50,7 @@ const VistaAdministracion: React.FC = () => {
         { id: 'historial', label: 'Historial de Validaciones', icono: IconoHistorial },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda, iconScale: 'scale-[1.62]' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis },
-        { id: 'indicadores', label: 'Indicadores', icono: IconoAlertas },
+        { id: 'indicadores', label: 'Radar de Alumnos', icono: IconoAlertas },
     ];
 
     const aplicarRecargosMora = async () => {

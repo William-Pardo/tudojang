@@ -55,7 +55,7 @@ function hijosAdministracion(_ctx: ContextoMenuMobile): SubitemMenuMobile[] {
         { id: 'historial', label: 'Historial de Validaciones', icono: IconoHistorial, ruta: '/?tab=historial' },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda, ruta: '/?tab=horarios' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis, ruta: '/?tab=analisis' },
-        { id: 'indicadores', label: 'Indicadores', icono: IconoAlertas, ruta: '/?tab=indicadores' },
+        { id: 'indicadores', label: 'Radar de Alumnos', icono: IconoAlertas, ruta: '/?tab=indicadores' },
     ];
 }
 

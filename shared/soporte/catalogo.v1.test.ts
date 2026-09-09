@@ -4,6 +4,7 @@ const INVENTARIO_ESPERADO = [
     'shell.session',
     'admin.summary',
     'admin.late-fees',
+    'admin.student-radar',
     'finance.ledger',
     'finance.delete',
     'finance.student-payments',
@@ -62,11 +63,11 @@ const INVENTARIO_ESPERADO = [
 ] as const;
 
 describe('CATALOGO_SOPORTE_V1', () => {
-    it('cubre las 58 entradas resultantes de separar rutas y permisos incompatibles', () => {
+    it('cubre las 59 entradas resultantes de separar rutas y permisos incompatibles', () => {
         expect(CATALOGO_SOPORTE_V1.entries.map(entry => entry.inventoryId).sort()).toEqual(
             [...INVENTARIO_ESPERADO].sort(),
         );
-        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(58);
+        expect(CATALOGO_SOPORTE_V1.entries).toHaveLength(59);
     });
 
     it.each(INVENTARIO_ESPERADO)('declara metadatos verificables para %s', inventoryId => {
