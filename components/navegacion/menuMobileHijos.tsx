@@ -26,6 +26,7 @@ import {
     IconoCampana, IconoEstudiantes, IconoControlAsistencia, IconoCertificados, IconoCarnets,
     IconoFlujoAcademico, IconoProgresoEstudiante,
     IconoImagen, IconoUsuario, IconoEmail, IconoCasa, IconoProgramasExtra, IconoConfiguracionAlertas, IconoAprobar,
+    IconoAlertas,
 } from '../Iconos';
 
 export interface SubitemMenuMobile {
@@ -45,7 +46,7 @@ export interface ContextoMenuMobile {
 // --- Administracion ("/") ---------------------------------------------------------------
 // Espejo exacto de vistas/Administracion.tsx (const tabs). Sin condiciones de
 // rol/visibilidad adicionales: quien llega a "/" (roles ya filtrados en todosLosEnlaces) ve
-// las 6 pestañas completas, igual que hoy en la barra de tabs de esa vista.
+// las 7 pestañas completas, igual que hoy en la barra de tabs de esa vista.
 function hijosAdministracion(_ctx: ContextoMenuMobile): SubitemMenuMobile[] {
     return [
         { id: 'resumen', label: 'Resumen', icono: IconoResumenAdministracion, ruta: '/?tab=resumen' },
@@ -54,6 +55,7 @@ function hijosAdministracion(_ctx: ContextoMenuMobile): SubitemMenuMobile[] {
         { id: 'historial', label: 'Historial de Validaciones', icono: IconoHistorial, ruta: '/?tab=historial' },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda, ruta: '/?tab=horarios' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis, ruta: '/?tab=analisis' },
+        { id: 'indicadores', label: 'Radar de Alumnos', icono: IconoAlertas, ruta: '/?tab=indicadores' },
     ];
 }
 

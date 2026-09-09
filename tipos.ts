@@ -614,3 +614,41 @@ export interface ReportePagoEstudiante {
     tutorUsuarioId?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Indicadores de Estudiante (analítica descriptiva 100% determinística, SIN IA)
+// ---------------------------------------------------------------------------
+// Decisión de arquitectura: el cálculo de estos patrones corre server-side, en código puro
+// (functions/academico/indicadoresEstudiante.js), nunca vía un LLM -- un LLM no es confiable
+// para aritmética exacta sobre datos de negocio (ver ERR-0029, bitacora.json). Persistido en
+// tenants/{tenantId}/indicadoresEstudiante/{estudianteId}.
+//
+// Bitácora de hallazgos VERSIONADOS (no un score recalculado al vuelo): cada hallazgo guarda
+// desde cuándo está activo (`fechaDeteccion`, nunca se pisa) y se actualiza mientras el patrón
+// siga vigente (`fechaActualizacion`). El Admin es quien decide cerrarlo (`resuelto` + nota) --
+// la app nunca lo resuelve sola, para no perder trazabilidad si el patrón reaparece.
+export interface HallazgoIndicador {
+    /** Determinístico: `${tipo}-${fechaDeteccion.slice(0,10)}` -- permite upsert idempotente. */
+    id: string;
+    tipo: 'riesgo_desercion' | 'candidato_fidelizacion';
+    /** ISO. La PRIMERA vez que se detectó este patrón -- nunca se pisa una vez creado. */
+    fechaDeteccion: string;
+    /** ISO. Se actualiza cada vez que el cron reconfirma que el patrón sigue vigente. */
+    fechaActualizacion: string;
+    severidad: 'baja' | 'media' | 'alta';
+    /** Los números exactos que dispararon el hallazgo (auditable). */
+    metricas: Record<string, number>;
+    resuelto: boolean;
+    resueltoEn?: string;
+    /** uid del Admin/staff que lo marcó resuelto. */
+    resueltoPor?: string;
+    notaAdmin?: string;
+}
+
+export interface IndicadorEstudiante {
+    estudianteId: string;
+    tenantId: string;
+    hallazgos: HallazgoIndicador[];
+    /** ISO. Última vez que el cron evaluó a este estudiante (haya o no generado hallazgos). */
+    ultimaEvaluacion: string;
+}
+

@@ -6,8 +6,8 @@ import type {
     SensibilidadSoporte,
 } from './tipos';
 
-const VERSION = '1.0.8';
-const VERIFIED_AT = '2026-09-04';
+const VERSION = '1.0.9';
+const VERIFIED_AT = '2026-09-09';
 const OWNER = 'Producto y Soporte Tudojang';
 const DEFAULT_ESCALATION = 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.';
 const AUTH_UI_ONLY = 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.';
@@ -136,6 +136,12 @@ export const CATALOGO_SOPORTE_V1 = {
             ['aplicar', 'calcular', 'confirmar'],
             ['Abre Administración.', 'Ubica la acción de recargos vencidos.', 'Revisa el alcance antes de confirmar el proceso masivo.'],
             ['vistas/Administracion.tsx'], { sensitivity: 'privileged', authorizationRef: AUTH_UI_ONLY }),
+        entry('admin.student-radar', 'administracion', 'Radar de Alumnos: riesgo de deserción y candidatos a fidelización', ['Admin', 'Editor', 'Asistente', 'Maestro', 'SuperAdmin'], '/',
+            ['radar de alumnos', 'alumnos en riesgo', 'quien se va a ir', 'estudiante que falta mucho', 'candidatos a fidelizar', 'detectar desercion', 'indicadores de estudiantes', 'quien esta por desertar', 'alumno modelo'],
+            ['consultar', 'revisar', 'resolver'],
+            ['Abre Administración > Radar de Alumnos.', 'Revisa los hallazgos: alumnos en riesgo de deserción (poca asistencia o tardanzas frecuentes) y candidatos a fidelización (asistencia excelente y sostenida).', 'Cada hallazgo muestra los datos reales que lo generaron -- no es una sugerencia automática ni usa IA, es un cálculo transparente sobre la asistencia ya registrada. El sistema no envía mensajes ni decide nada: marca el hallazgo como resuelto (con una nota opcional) una vez que decidas y actúes por tu cuenta.'],
+            ['vistas/Administracion.tsx', 'components/academico/PanelIndicadoresEstudiante.tsx', 'functions/academico/indicadoresEstudiante.js'],
+            { sensitivity: 'sensitive' }),
         entry('finance.ledger', 'finanzas', 'Libro de tesorería', AEAS, '/',
             ['libro de tesoreria', 'movimiento financiero', 'ingreso general', 'egreso general', 'csv financiero'],
             ['consultar', 'filtrar', 'registrar', 'editar', 'exportar'],

@@ -2229,3 +2229,83 @@ test("tutor no puede leer un reporte de pago (se entera por historialNotificacio
 
   await assertFails(getDoc(doc(tutorDb, "reportes_pagos_estudiantes", "rep-lectura-1")));
 });
+
+// =========================================================================
+// Modulo "Indicadores de Estudiante" (deteccion determinista de riesgo_desercion/
+// candidato_fidelizacion, ver functions/academico/indicadoresEstudiante.js). La bitacora
+// completa (create/update/delete) corre exclusivamente server-side via Admin SDK (el cron
+// diario y el callable resolverHallazgoIndicador) -- ningun cliente, ni siquiera Admin,
+// puede escribir esta coleccion directo: un array dentro de un doc no se puede validar
+// parcialmente en Security Rules ("solo cambiaron 4 campos DENTRO de un elemento"), asi que
+// permitir cualquier write dejaria reescribir fechaDeteccion/metricas de cualquier hallazgo.
+// =========================================================================
+
+const INDICADOR_BASE = {
+  estudianteId: "est-indicador-1",
+  tenantId: "tenant-1",
+  hallazgos: [{
+    id: "riesgo_desercion-2026-09-01",
+    tipo: "riesgo_desercion",
+    fechaDeteccion: "2026-09-01T06:00:00.000Z",
+    fechaActualizacion: "2026-09-01T06:00:00.000Z",
+    severidad: "media",
+    metricas: { porcentajeAsistencia4Semanas: 0.4, clasesEsperadas4Semanas: 10, tardanzas2Semanas: 1 },
+    resuelto: false,
+  }],
+  ultimaEvaluacion: "2026-09-01T06:00:00.000Z",
+};
+
+const sembrarIndicador = async (tenantId, estudianteId, datos = INDICADOR_BASE) => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), "tenants", tenantId, "indicadoresEstudiante", estudianteId),
+      datos
+    );
+  });
+};
+
+test("staff (Admin) del propio tenant puede leer un indicador de estudiante", async () => {
+  await sembrarIndicador("tenant-1", "est-indicador-1");
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  const snapshot = await assertSucceeds(
+    getDoc(doc(adminDb, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-1"))
+  );
+  assert.equal(snapshot.data().hallazgos[0].tipo, "riesgo_desercion");
+});
+
+test("staff de OTRO tenant no puede leer el indicador (aislamiento por tenant)", async () => {
+  await sembrarIndicador("tenant-1", "est-indicador-1");
+  const adminOtroTenant = client("user-2", "tenant-2", "Admin");
+
+  await assertFails(
+    getDoc(doc(adminOtroTenant, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-1"))
+  );
+});
+
+test("Tutor no puede leer indicadores de estudiante (es informacion interna para staff, no para consultores)", async () => {
+  await sembrarIndicador("tenant-1", "est-indicador-1");
+  const tutorDb = client("tutor-1", "tenant-1", "Tutor");
+
+  await assertFails(
+    getDoc(doc(tutorDb, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-1"))
+  );
+});
+
+test("ni siquiera Admin puede crear/actualizar/borrar un indicador directo desde el cliente -- solo el cron/callable (Admin SDK)", async () => {
+  const adminDb = client("user-1", "tenant-1", "Admin");
+
+  await assertFails(
+    setDoc(doc(adminDb, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-nuevo"), INDICADOR_BASE)
+  );
+
+  await sembrarIndicador("tenant-1", "est-indicador-1");
+  await assertFails(
+    updateDoc(doc(adminDb, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-1"), {
+      ultimaEvaluacion: "2026-09-02T06:00:00.000Z",
+    })
+  );
+  await assertFails(
+    deleteDoc(doc(adminDb, "tenants", "tenant-1", "indicadoresEstudiante", "est-indicador-1"))
+  );
+});

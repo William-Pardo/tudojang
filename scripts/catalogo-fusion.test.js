@@ -21,6 +21,7 @@ const INVENTARIO_MANUAL_ESPERADO = [
   'shell.session',
   'admin.summary',
   'admin.late-fees',
+  'admin.student-radar',
   'finance.ledger',
   'finance.delete',
   'finance.student-payments',
@@ -96,10 +97,10 @@ async function construirCatalogoFusionadoReal() {
   return fusionarCatalogo(nucleo, marcadores);
 }
 
-test('catalogo fusionado real: expone exactamente las 63 entradas esperadas (58 manuales + 4 migradas + jornadas.manage)', async () => {
+test('catalogo fusionado real: expone exactamente las 64 entradas esperadas (59 manuales + 4 migradas + jornadas.manage)', async () => {
   const catalogo = await construirCatalogoFusionadoReal();
 
-  assert.equal(catalogo.entries.length, 63);
+  assert.equal(catalogo.entries.length, 64);
   assert.deepEqual(
     catalogo.entries.map((entrada) => entrada.inventoryId).sort(),
     [...INVENTARIO_FUSIONADO_ESPERADO].sort(),
