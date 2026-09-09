@@ -88,9 +88,9 @@ describe('resolverTabInicial', () => {
 });
 
 describe('HIJOS_POR_ID_ENLACE (menú mobile acordeon)', () => {
-  it('Administracion expone las 6 pestañas reales sin condición de rol/config', () => {
+  it('Administracion expone las 7 pestañas reales sin condición de rol/config', () => {
     const hijos = HIJOS_POR_ID_ENLACE.administracion({ usuario: { rol: RolUsuario.Asistente } });
-    expect(hijos.map((h) => h.id)).toEqual(['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis']);
+    expect(hijos.map((h) => h.id)).toEqual(['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis', 'indicadores']);
   });
 
   it('Estudiantes: Admin ve las 5 pestañas (sin demo comercial)', () => {

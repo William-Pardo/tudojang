@@ -739,6 +739,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Indicadores de Estudiante: bitácora de hallazgos (riesgo_desercion/candidato_fidelizacion)
+    // calculada 100% server-side por el cron `indicadoresEstudianteDiarios` (Admin SDK, bypasa
+    // estas reglas) -- ver functions/academico/indicadoresEstudiante.js. Solo lectura para el
+    // staff del propio tenant (mismo criterio isInstructor()+tenant ya usado en el resto de
+    // este archivo, ver ERR-0011).
+    //
+    // `update` es `false` a propósito, aunque el diseño original contemplaba un update acotado
+    // (solo resuelto/resueltoEn/resueltoPor/notaAdmin) directo desde el cliente: `hallazgos` es
+    // un ARRAY dentro de un único documento, y Firestore Security Rules no puede comparar
+    // "solo cambiaron esos 4 campos DENTRO de un elemento de un array de tamaño variable" --
+    // solo puede tratar `hallazgos` como bloque completo. Permitir `update` validando nada más
+    // que "solo cambió la clave hallazgos" dejaría que un cliente comprometido reescriba
+    // fechaDeteccion/metricas/severidad/tipo de CUALQUIER hallazgo, rompiendo la bitácora
+    // auditable que es el propósito central del módulo. Por eso la resolución de un hallazgo
+    // corre server-side, vía el callable `resolverHallazgoIndicador` (Admin SDK, bypasa estas
+    // reglas), que sí valida el diff exacto en código.
+    match /tenants/{tenantId}/indicadoresEstudiante/{estudianteId} {
+      allow read: if isInstructor()
+        && currentTenantId() == tenantId;
+      allow create, update, delete: if false;
+    }
+
     // Buzón de notificaciones (fix tutor-role-end-to-end 2026-07-14). Colección raíz
     // `historialNotificaciones`: cada doc referencia un `estudianteId`. Staff ve todo; un
     // consultor (Tutor/Estudiante) ve SOLO las de su(s) estudiante(s), validando contra el

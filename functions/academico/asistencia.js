@@ -372,4 +372,8 @@ async function debugPerteneceAEjecucion({ firestore, tenant, tenantId, jornadaId
 module.exports = {
   crearServicioRegistrarAsistencia,
   debugPerteneceAEjecucion,
+  // Reusada por indicadoresEstudiante.js (functions/index.js, obtenerHistorialClasesFirestore)
+  // para aproximar "clases que le correspondían" a un estudiante por grupo+sede -- se exporta
+  // en vez de duplicarla para que ambos módulos no se desincronicen si cambia la slugificación.
+  grupoASlug,
 };

@@ -5,20 +5,21 @@ import { useSearchParams } from 'react-router-dom';
 import VistaDashboard from './Dashboard';
 import VistaFinanzas from './Finanzas';
 import VistaAgenda from './admin/AgendaView';
-import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos, IconoHistorial } from '../components/Iconos';
+import { IconoResumenAdministracion, IconoTesoreria, IconoAnalisis, IconoAgenda, IconoLogoOficial, IconoValidarPagos, IconoHistorial, IconoAlertas } from '../components/Iconos';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion } from '../context/DataContext';
 import { EstadoPago } from '../tipos';
 import PanelValidacionPagos from '../components/Pagos/PanelValidacionPagos';
 import HistorialValidaciones from '../components/Pagos/HistorialValidaciones';
 import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
+import PanelIndicadoresEstudiante from '../components/academico/PanelIndicadoresEstudiante';
 
-type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'historial' | 'analisis';
+type AdminTab = 'resumen' | 'tesoreria' | 'horarios' | 'validar' | 'historial' | 'analisis' | 'indicadores';
 
 // Ids validos para el deep-link `?tab=` del acordeon mobile (ver
 // components/navegacion/menuMobileHijos.tsx::hijosAdministracion) -- MISMO orden y valores
 // que el array `tabs` de mas abajo.
-const ADMIN_TAB_IDS: readonly AdminTab[] = ['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis'];
+const ADMIN_TAB_IDS: readonly AdminTab[] = ['resumen', 'tesoreria', 'validar', 'historial', 'horarios', 'analisis', 'indicadores'];
 
 const VistaAdministracion: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -49,6 +50,7 @@ const VistaAdministracion: React.FC = () => {
         { id: 'historial', label: 'Historial de Validaciones', icono: IconoHistorial },
         { id: 'horarios', label: 'Agenda', icono: IconoAgenda, iconScale: 'scale-[1.62]' },
         { id: 'analisis', label: 'Análisis', icono: IconoAnalisis },
+        { id: 'indicadores', label: 'Indicadores', icono: IconoAlertas },
     ];
 
     const aplicarRecargosMora = async () => {
@@ -127,6 +129,7 @@ const VistaAdministracion: React.FC = () => {
                 {activeTab === 'historial' && <HistorialValidaciones />}
                 {activeTab === 'horarios' && <VistaAgenda />}
                 {activeTab === 'analisis' && <VistaFinanzas isSubView={true} initialView="analitica" />}
+                {activeTab === 'indicadores' && <PanelIndicadoresEstudiante />}
             </div>
         </div>
     );

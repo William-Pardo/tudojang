@@ -79,6 +79,7 @@ const {
 const {
   crearServicioRegistrarAsistencia,
   debugPerteneceAEjecucion,
+  grupoASlug,
 } = require("./academico/asistencia");
 const {
   crearServicioVencerAsignaciones,
@@ -133,6 +134,12 @@ const {
 const {
   crearServicioRecordatoriosPago,
 } = require("./academico/recordatoriosPago");
+const {
+  crearServicioIndicadoresEstudiante,
+  crearServicioResolverHallazgoIndicador,
+  fusionarHallazgos,
+  VENTANA_HISTORIAL_DIAS: VENTANA_HISTORIAL_INDICADORES_DIAS,
+} = require("./academico/indicadoresEstudiante");
 const {
   crearServicioRecordatoriosEstudio,
 } = require("./academico/recordatoriosEstudio");
@@ -517,6 +524,121 @@ const servicioRecordatoriosPago = crearServicioRecordatoriosPago({
   },
 });
 
+const ESTADOS_JORNADA_OPERADA_INDICADORES = ['cerrada', 'parcial'];
+
+// Historial de clases de UN estudiante para indicadoresEstudiante.js: un registro por cada
+// jornada YA OPERADA (estado 'cerrada'/'parcial') de su grupo+sede, dentro de la ventana total
+// que el modulo necesita (VENTANA_HISTORIAL_INDICADORES_DIAS = la mayor de sus ventanas).
+//
+// Decision de diseno (aproximacion documentada, ver tambien el comentario de metricas/severidad
+// en indicadoresEstudiante.js): "clases esperadas" se aproxima con un simple match de
+// grupoId+sedeId, NO con la logica completa de matricula automatica de asistencia.js
+// (perteneceAEjecucion: inscripciones explicitas, gradosExcluidos, estadoPago). Repetir esa
+// logica completa por cada estudiante activo, cada dia, multiplicaria las lecturas de
+// Firestore (join contra ejecucionesPrograma/inscripciones por jornada) para un modulo que es
+// SOLO informativo (nunca bloquea nada, a diferencia del check-in real) -- el match simple de
+// grupo+sede es una aproximacion razonable y auditable (las metricas guardadas en el hallazgo
+// muestran exactamente cuantas clases se contaron).
+//
+// Un solo rango sobre 'fecha' (sin filtro adicional en la query) no requiere indice compuesto,
+// mismo patron ya documentado en jornadaRepository.ts::listarJornadasPorRangoFechas -- el
+// filtro de grupo/sede/estado se aplica en memoria.
+async function obtenerHistorialClasesFirestore(tenantId, estudiante, ahora) {
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const desde = new Date(ahora.getTime() - VENTANA_HISTORIAL_INDICADORES_DIAS * msPorDia).toISOString().slice(0, 10);
+  const hoy = ahora.toISOString().slice(0, 10);
+
+  const snapJornadas = await admin.firestore()
+    .collection("tenants").doc(tenantId)
+    .collection("jornadas")
+    .where("fecha", ">=", desde)
+    .where("fecha", "<=", hoy)
+    .get();
+
+  const grupoSlug = grupoASlug(estudiante.grupo);
+  const jornadasRelevantes = snapJornadas.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((j) => j.grupoId === grupoSlug
+      && j.sedeId === estudiante.sedeId
+      && ESTADOS_JORNADA_OPERADA_INDICADORES.includes(j.estado));
+
+  if (jornadasRelevantes.length === 0) return [];
+
+  const refsAsistencia = jornadasRelevantes.map((jornada) => admin.firestore()
+    .collection("tenants").doc(tenantId)
+    .collection("jornadas").doc(jornada.id)
+    .collection("asistencias").doc(estudiante.id));
+  const snapsAsistencia = await admin.firestore().getAll(...refsAsistencia);
+
+  return jornadasRelevantes.map((jornada, i) => {
+    const asistenciaSnap = snapsAsistencia[i];
+    const asistencia = asistenciaSnap.exists ? asistenciaSnap.data() : null;
+    return {
+      fecha: jornada.fecha,
+      // "asistio" = existe registro de check-in, exista o no el checkout completo -- un
+      // checkout faltante (instructor que olvido escanear la salida) es un hueco operativo, no
+      // evidencia de que el estudiante no vino. Exigir horaSalida generaria falsos positivos de
+      // desercion por un dato incompleto, no por ausencia real.
+      asistio: !!asistencia,
+      tarde: !!(asistencia && asistencia.isLate),
+    };
+  });
+}
+
+// Modulo "Indicadores de Estudiante" (analitica determinista, SIN IA -- ver
+// functions/academico/indicadoresEstudiante.js para el detalle completo de las reglas).
+const servicioIndicadoresEstudiante = crearServicioIndicadoresEstudiante({
+  // Mismo patron flat que recordatoriosPago/recordatoriosEstudio: `estudiantes` es una
+  // coleccion raiz con `tenantId` por doc, no una subcoleccion por tenant.
+  listarEstudiantesActivos: async () => {
+    const snap = await admin.firestore().collection("estudiantes").get();
+    // ERR-0019: 'retirado' es el UNICO valor que excluye -- ausente (estudiantes legacy sin el
+    // campo) cuenta como activo, mismo criterio ya usado en pagosEstudiantesApi.ts/
+    // wompiCobroAutomatico.js.
+    return snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((e) => e.estadoMatricula !== "retirado");
+  },
+  obtenerHistorialClases: obtenerHistorialClasesFirestore,
+  // Read-modify-write ATOMICO del doc de indicador: mismo patron runTransaction que
+  // crearServicioResolverHallazgoIndicador usa para el MISMO documento (ver WHY detallado en
+  // el JSDoc de crearServicioIndicadoresEstudiante) -- evita que el cron pise en silencio una
+  // resolucion de Admin que ocurrio justo entre la lectura y la escritura.
+  actualizarIndicadorTransaccional: async (tenantId, estudianteId, candidatos, ahora) => {
+    const ref = admin.firestore()
+      .collection("tenants").doc(tenantId)
+      .collection("indicadoresEstudiante").doc(estudianteId);
+
+    return admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const indicadorExistente = snap.exists ? snap.data() : null;
+
+      // Sin candidatos hoy y sin indicador previo: no se crea ruido (un doc por cada
+      // estudiante sano, la mayoria). `obtenerIndicadoresPendientes` (servicio cliente) asume
+      // que solo existen docs de estudiantes que alguna vez tuvieron un hallazgo.
+      if (candidatos.length === 0 && !indicadorExistente) {
+        return { actualizado: false };
+      }
+
+      const hallazgosExistentes = indicadorExistente ? indicadorExistente.hallazgos : [];
+      const hallazgos = fusionarHallazgos({ hallazgosExistentes, candidatosDetectados: candidatos, ahora });
+
+      tx.set(ref, {
+        estudianteId,
+        tenantId,
+        hallazgos,
+        ultimaEvaluacion: ahora.toISOString(),
+      });
+
+      return { actualizado: true };
+    });
+  },
+});
+
+const servicioResolverHallazgoIndicador = crearServicioResolverHallazgoIndicador({
+  firestore: admin.firestore(),
+});
+
 // Recordatorios de estudio: nudges a estudiantes/tutores cuando una asignacion esta por
 // vencer sin terminar, recien se publico, o el estudiante lleva mucho sin actividad (ver
 // functions/academico/recordatoriosEstudio.js). Reusa listarAsignacionesPublicadasFirestore
@@ -866,6 +988,22 @@ exports.recordatoriosPagoDiarios = functionsV1.pubsub
   .schedule("every day 08:00")
   .timeZone("America/Bogota")
   .onRun(async () => servicioRecordatoriosPago(new Date()));
+
+// Indicadores de Estudiante: cron diario de deteccion de patrones (riesgo de desercion /
+// candidato a fidelizacion), 100% determinista -- ver functions/academico/indicadoresEstudiante.js.
+// Corre a las 6am, antes que el resto de crons de las 8am, para que el Admin ya tenga los
+// hallazgos del dia listos cuando entra a revisar la academia en la mañana.
+exports.indicadoresEstudianteDiarios = functionsV1.pubsub
+  .schedule("every day 06:00")
+  .timeZone("America/Bogota")
+  .onRun(async () => servicioIndicadoresEstudiante(new Date()));
+
+// Callable: unico writer autorizado para marcar un hallazgo de indicadoresEstudiante como
+// resuelto (con nota opcional). Ver el WHY completo (por que NO es un updateDoc directo del
+// cliente acotado por firestore.rules) en indicadoresEstudiante.js, junto a la funcion.
+exports.resolverHallazgoIndicador = functionsV1.https.onCall(
+  crearHandlerCallable(servicioResolverHallazgoIndicador)
+);
 
 // Recordatorios de estudio diarios al buzón de estudiantes/tutores (ver
 // functions/academico/recordatoriosEstudio.js). Misma cadencia que recordatoriosPagoDiarios;
