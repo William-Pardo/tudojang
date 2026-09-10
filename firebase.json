@@ -24,6 +24,10 @@
         "function": "activarSuscripcionManual"
       },
       {
+        "source": "/manifest.json",
+        "function": "manifestPwa"
+      },
+      {
         "source": "/privacy",
         "destination": "/privacy.html"
       },
