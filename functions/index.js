@@ -5,6 +5,7 @@ const { Resend } = require("resend");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 const { manejarRequest } = require("./http");
+const { crearServicioManifestPwa } = require("./manifestPwa");
 const { enviarCorreo } = require("./email");
 const { verificarFirmaEventoWompi } = require("./wompi");
 const { crearServicioFirmaCheckoutWompi } = require("./wompiIntegrity");
@@ -458,6 +459,13 @@ const servicioResolverTenantPublico = crearServicioResolverTenantPublico({
   firestore: admin.firestore()
 });
 
+// Reusa TAL CUAL la resolucion slug->tenant de resolverTenantPublico (misma proyeccion de
+// campos publicos que ya consume BrandingProvider.tsx), en vez de repetir la query a `tenants`
+// con criterios propios.
+const servicioManifestPwa = crearServicioManifestPwa({
+  resolverTenantPublico: servicioResolverTenantPublico
+});
+
 const servicioVerificarDuplicadoAspirante = crearServicioVerificarDuplicadoAspirante({
   firestore: admin.firestore()
 });
@@ -906,6 +914,13 @@ exports.actualizarEstadoSolicitudCarnets = functionsV1.https.onCall(
 exports.resolverTenantPublico = functionsV1.https.onCall(
   crearHandlerCallable(servicioResolverTenantPublico)
 );
+
+// `/manifest.json` servido por el SERVIDOR segun el subdominio (rewrite en firebase.json), para
+// que el PWA instalado muestre el logo y el nombre de la academia. Publica y sin auth por
+// definicion: el navegador pide el manifest antes de que exista cualquier sesion. Ver
+// manifestPwa.js para el detalle de por que esto no puede hacerse mutando el manifest en el
+// cliente (ERR-0033: dejaba la app instalada colgada en Android).
+exports.manifestPwa = functionsV1.https.onRequest(servicioManifestPwa);
 
 // Callables PUBLICAS (SIN auth) del flujo de reporte de pago via link de WhatsApp -- ver
 // pagosPublicos.js para el detalle completo del bug real que resuelven (2026-09-02): tanto
