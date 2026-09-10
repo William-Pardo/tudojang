@@ -4,30 +4,30 @@ import { useEffect, useRef } from 'react';
 import type { ConfiguracionClub } from '../tipos';
 
 const TAMANO_CANVAS = 512;
-const TAMANOS_ICONO_MANIFEST = ['any', '192x192', '512x512'];
 
 interface DefaultsInstalacion {
     touchIconHref: string;
     appleTitle: string;
-    manifestHref: string;
 }
 
 /**
- * Sincroniza lo que iOS Safari ("Compartir > Agregar a inicio") y Chrome/Android/Desktop
- * ("Instalar app") usan como ícono y nombre con el branding del tenant activo.
+ * Sincroniza lo que iOS Safari ("Compartir > Agregar a inicio") usa como ícono y nombre con
+ * el branding del tenant activo, mutando en vivo `<link rel="apple-touch-icon">` y
+ * `<meta name="apple-mobile-web-app-title">` -- iOS los lee del DOM en el momento exacto de
+ * instalar, no depende de manifest.json.
  *
- * iOS lee `<link rel="apple-touch-icon">` y `<meta name="apple-mobile-web-app-title">` del
- * DOM EN VIVO en el momento exacto de instalar -- no depende de manifest.json. Chrome, en
- * cambio, instala en base al Web App Manifest, así que además reemplazamos el `href` de
- * `<link rel="manifest">` por una Blob URL con el JSON armado en el cliente (Chrome
- * re-evalúa el manifest cuando ese href cambia, siempre que ocurra antes de que el usuario
- * dispare la instalación).
+ * NO tocamos `<link rel="manifest">` a propósito (ver ERR-0033 en bitacora.json): Android
+ * identifica una PWA instalada (WebAPK) contra el manifest con el que se instaló, y revisa
+ * periódicamente que siga coincidiendo. Reemplazar su href por una Blob URL nueva en cada
+ * sesión le da al WebAPK una identidad distinta cada vez que se abre -- causó que la app
+ * instalada quedara sin responder en Android, había que forzar el cierre. Mientras no exista
+ * una URL de manifest ESTABLE por tenant, Android/Chrome se queda con el manifest.json
+ * genérico y solo iOS obtiene el ícono/nombre personalizado.
  *
  * Si `tenant` no trae logoUrl/nombreClub, o es null (logout, landing genérica sin tenant),
  * no se toca nada: quedan los defaults ya presentes en index.html.
  */
 export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void => {
-    const manifestUrlRef = useRef<string | null>(null);
     const defaultsRef = useRef<DefaultsInstalacion | null>(null);
 
     useEffect(() => {
@@ -35,7 +35,6 @@ export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void =>
 
         const touchIconEl = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
         const appleTitleEl = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
-        const manifestEl = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
 
         // Guardamos los defaults originales de index.html una sola vez (antes de la primera
         // mutación) para poder revertir exactamente a ellos después, sin hardcodear "TuDojang"
@@ -44,19 +43,13 @@ export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void =>
             defaultsRef.current = {
                 touchIconHref: touchIconEl?.getAttribute('href') ?? '',
                 appleTitle: appleTitleEl?.getAttribute('content') ?? '',
-                manifestHref: manifestEl?.getAttribute('href') ?? '',
             };
         }
         const defaults = defaultsRef.current;
 
         const revertirADefaults = () => {
-            if (manifestUrlRef.current) {
-                URL.revokeObjectURL(manifestUrlRef.current);
-                manifestUrlRef.current = null;
-            }
             if (defaults.touchIconHref) touchIconEl?.setAttribute('href', defaults.touchIconHref);
             if (defaults.appleTitle) appleTitleEl?.setAttribute('content', defaults.appleTitle);
-            if (defaults.manifestHref) manifestEl?.setAttribute('href', defaults.manifestHref);
         };
 
         if (!tenant || (!tenant.logoUrl && !tenant.nombreClub)) {
@@ -69,12 +62,10 @@ export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void =>
         const aplicarBrandingInstalacion = async () => {
             const nombre = tenant.nombreClub || defaults.appleTitle;
             let iconoInstalacion = tenant.logoUrl || defaults.touchIconHref;
-            let iconoEsPngOpaco = false;
 
             if (tenant.logoUrl) {
                 try {
                     iconoInstalacion = await aplanarLogoAPngOpaco(tenant.logoUrl);
-                    iconoEsPngOpaco = true;
                 } catch {
                     // Falla de carga/CORS (canvas "tainted") u otro error del aplanado --
                     // seguimos con el logo original del tenant sin aplanar. No rompe la app;
@@ -88,30 +79,6 @@ export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void =>
 
             if (nombre) appleTitleEl?.setAttribute('content', nombre);
             if (iconoInstalacion) touchIconEl?.setAttribute('href', iconoInstalacion);
-
-            if (manifestEl) {
-                const blobPrevia = manifestUrlRef.current;
-                const manifestJson = {
-                    short_name: nombre,
-                    name: nombre,
-                    description: 'Módulo integral para la gestión de escuelas de Taekwondo.',
-                    icons: TAMANOS_ICONO_MANIFEST.map((sizes) => ({
-                        src: iconoInstalacion,
-                        ...(iconoEsPngOpaco ? { type: 'image/png' } : {}),
-                        sizes,
-                    })),
-                    start_url: '.',
-                    display: 'standalone',
-                    theme_color: '#1f3e90',
-                    background_color: '#ffffff',
-                };
-                const blobUrl = URL.createObjectURL(
-                    new Blob([JSON.stringify(manifestJson)], { type: 'application/manifest+json' })
-                );
-                manifestUrlRef.current = blobUrl;
-                manifestEl.setAttribute('href', blobUrl);
-                if (blobPrevia) URL.revokeObjectURL(blobPrevia);
-            }
         };
 
         aplicarBrandingInstalacion();
@@ -121,17 +88,6 @@ export const usePwaInstallBranding = (tenant: ConfiguracionClub | null): void =>
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tenant?.logoUrl, tenant?.nombreClub]);
-
-    // Al desmontar definitivamente el provider (ej. cierre completo de la SPA), liberamos
-    // cualquier Blob URL viva para no dejar memory leaks.
-    useEffect(() => {
-        return () => {
-            if (manifestUrlRef.current) {
-                URL.revokeObjectURL(manifestUrlRef.current);
-                manifestUrlRef.current = null;
-            }
-        };
-    }, []);
 };
 
 /**
