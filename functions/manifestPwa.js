@@ -135,6 +135,22 @@ const colorValido = (valor, respaldo) =>
   typeof valor === 'string' && COLOR_HEX_VALIDO.test(valor.trim()) ? valor.trim() : respaldo;
 
 /**
+ * Texto que va DEBAJO del icono en la pantalla de inicio. Android e iOS lo cortan cerca de los
+ * 12 caracteres, asi que `nombreClub` completo ("Club deportivo de taekwondo gajog") se veria
+ * truncado a la parte generica y no al nombre que distingue al club. Se prefiere el campo
+ * explicito `nombreCortoApp`; sin el, el slug capitalizado ("gajog" -> "Gajog") es la mejor
+ * aproximacion disponible, porque es corto y ya identifica al club en su propio subdominio.
+ * No se trunca: cortar en silencio produce nombres cortados de formas peores que las del
+ * launcher, y la decision de que entra en esos 12 caracteres es del club, no nuestra.
+ */
+function construirNombreCorto(tenant, slug, nombreCompleto) {
+  const explicito = String(tenant?.nombreCortoApp || '').trim();
+  if (explicito) return explicito;
+  if (slug) return slug.charAt(0).toUpperCase() + slug.slice(1);
+  return nombreCompleto;
+}
+
+/**
  * Arma el manifest del tenant. Devuelve `null` si el tenant no tiene nombre: un manifest sin
  * `name` deja la PWA instalada sin etiqueta, peor que servir el generico.
  */
@@ -145,7 +161,7 @@ function construirManifestTenant(tenant, slugSolicitado) {
   const slug = String(tenant.slug || slugSolicitado || '').trim().toLowerCase();
 
   return {
-    short_name: nombre,
+    short_name: construirNombreCorto(tenant, slug, nombre),
     name: nombre,
     description: MANIFEST_GENERICO.description,
     icons: construirIconos(tenant.logoUrl),

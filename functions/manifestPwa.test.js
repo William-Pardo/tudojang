@@ -145,7 +145,7 @@ test('servicio: con subdominio valido sirve nombre y logo del tenant', async () 
 
   assert.deepEqual(resolver.llamadas, ['gajog']);
   assert.equal(manifest.name, 'Gajog Taekwondo');
-  assert.equal(manifest.short_name, 'Gajog Taekwondo');
+  assert.equal(manifest.short_name, 'Gajog');
   assert.ok(manifest.icons.length > 0);
   assert.ok(manifest.icons.every((icono) => icono.src === TENANT_GAJOG.logoUrl));
   assert.ok(manifest.icons.some((icono) => icono.sizes === '192x192'));
@@ -154,6 +154,35 @@ test('servicio: con subdominio valido sirve nombre y logo del tenant', async () 
   assert.equal(manifest.start_url, '/');
   assert.equal(manifest.scope, '/');
   assert.equal(manifest.display, 'standalone');
+});
+
+test('servicio: `nombreCortoApp` explicito gana sobre el slug capitalizado', async () => {
+  const tenant = { ...TENANT_GAJOG, nombreCortoApp: 'TKD Gajog' };
+  const servicio = crearServicioManifestPwa({ resolverTenantPublico: crearResolverFake({ gajog: tenant }) });
+
+  const manifest = leerManifest(await ejecutar(servicio, 'gajog.tudojang.com'));
+
+  assert.equal(manifest.short_name, 'TKD Gajog');
+  assert.equal(manifest.name, 'Gajog Taekwondo');
+});
+
+test('servicio: un nombreClub largo no se cuela en el texto bajo el icono', async () => {
+  const tenant = { ...TENANT_GAJOG, nombreClub: 'Club deportivo de taekwondo gajog' };
+  const servicio = crearServicioManifestPwa({ resolverTenantPublico: crearResolverFake({ gajog: tenant }) });
+
+  const manifest = leerManifest(await ejecutar(servicio, 'gajog.tudojang.com'));
+
+  assert.equal(manifest.short_name, 'Gajog');
+  assert.equal(manifest.name, 'Club deportivo de taekwondo gajog');
+});
+
+test('servicio: sin slug ni nombre corto, el short_name cae al nombre completo', async () => {
+  const tenant = { nombreClub: 'Academia Bushido', logoUrl: TENANT_GAJOG.logoUrl };
+  const servicio = crearServicioManifestPwa({ resolverTenantPublico: crearResolverFake({ bushido: tenant }) });
+
+  const manifest = leerManifest(await ejecutar(servicio, 'bushido.tudojang.com'));
+
+  assert.equal(manifest.short_name, 'Bushido');
 });
 
 test('servicio: el `id` es estable y propio del tenant', async () => {
