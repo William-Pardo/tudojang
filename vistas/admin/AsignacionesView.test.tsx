@@ -1240,6 +1240,56 @@ describe('Fix 1: Eliminar programa academico', () => {
       ['jornada-huerfana'],
     ));
   });
+
+  // Fix 2026-09-22 (bug real reportado: "Eliminar programa" decia exito pero el programa
+  // volvia al refrescar la pagina). Causa raiz: un guard `programaId !== programaInicial.id`
+  // asumia que un programa con el ID del placeholder demo NUNCA podia estar persistido en
+  // Firestore, asi que se saltaba el borrado real -- si el documento SI existia (el usuario
+  // llego a operarlo con ese ID), nunca se borraba y la siguiente hidratacion lo traia de
+  // vuelta. El fix borra siempre: `deleteDoc` sobre un documento inexistente no lanza error
+  // (ver FirestoreProgramaRepository.eliminarPrograma), asi que sigue siendo seguro incluso
+  // si el placeholder nunca se persistio.
+  it('eliminar el programa seleccionado por defecto (placeholder demo) SI llama a eliminarPrograma con su id', async () => {
+    const user = userEvent.setup();
+    const repositoryPrograma = crearRepoProgramaFake({
+      eliminarPrograma: jest.fn().mockResolvedValue(undefined),
+    });
+    renderVista({ repositoryPrograma });
+
+    await user.click(screen.getByRole('button', { name: /eliminar programa/i }));
+    await user.click(screen.getByRole('button', { name: /^eliminar$/i }));
+
+    await waitFor(() => expect(repositoryPrograma.eliminarPrograma).toHaveBeenCalledWith(
+      'tenant-real',
+      'programa-infantil-iniciacion-jul-sep-2026',
+    ));
+  });
+
+  // Fix 2026-09-22 (mismo bug, otro sintoma): el placeholder demo vive en el useState
+  // inicial (`[programaInicial]`), asi que cada remount (refresh de pagina) arrancaba
+  // mostrandolo de nuevo en la bandeja aunque el tenant YA tuviera programas reales en
+  // Firestore -- daba la sensacion de que "revivia" sin importar cuantas veces se borrara.
+  it('una vez que hay programas reales hidratados desde Firestore, el placeholder demo deja de mostrarse en la bandeja', async () => {
+    const programaReal = {
+      id: 'programa-real-1',
+      tenantId: 'tenant-real',
+      nombre: 'Programa real del tenant',
+      descripcion: 'Desc',
+      version: 1,
+      estado: 'publicado' as const,
+      unidades: [],
+      creadoEn: '2026-01-01T00:00:00.000Z',
+      actualizadoEn: '2026-01-01T00:00:00.000Z',
+      tags: ['x'],
+    };
+    const repositoryPrograma = crearRepoProgramaFake({
+      listarProgramasPorTenant: jest.fn().mockResolvedValue([programaReal]),
+    });
+    renderVista({ repositoryPrograma });
+
+    await screen.findByRole('option', { name: /programa real del tenant/i });
+    expect(screen.queryByRole('option', { name: /infantil iniciaci[oó]n/i })).not.toBeInTheDocument();
+  });
 });
 
 // Rediseño 2026-07-13 (pedido explicito del usuario): el boton+modal "Asistencia a
