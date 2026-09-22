@@ -249,6 +249,32 @@ describe('ModalEdicionJornada', () => {
     expect(screen.getByText(/fundamentos tecnicos/i)).toBeInTheDocument();
   });
 
+  // El material dejo de ser obligatorio en el Paso 1 del asistente (mismo cambio que
+  // AsignacionesView.tsx): confirmar sin elegir ningun material debe llamar a
+  // `asignarMaterial` con recurso/recursoId undefined, sin lanzar el error de material
+  // invalido ni bloquear el cierre del wizard.
+  it('recorrer el asistente sin elegir material llama a asignarMaterial con recurso/recursoId undefined, sin lanzar error', async () => {
+    const user = userEvent.setup();
+    const { asignarMaterial } = renderModal();
+
+    await user.click(await screen.findByRole('button', { name: /\+ agregar material/i }));
+    await screen.findByRole('button', { name: /fundamentos tecnicos/i });
+    // Paso 1: material opcional, se avanza sin elegir ninguno.
+    await user.click(screen.getByRole('button', { name: /^continuar$/i }));
+    await user.click(screen.getByRole('button', { name: /^continuar$/i }));
+    await user.click(screen.getByRole('button', { name: /^Blanco$/ }));
+    await user.click(screen.getByRole('button', { name: /^asignar$/i }));
+
+    await waitFor(() => expect(asignarMaterial).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: 'tenant-1', jornadaId: 'jornada-1', recurso: undefined, recursoId: undefined }),
+    ));
+
+    expect(screen.queryByText(/selecciona un material valido/i)).not.toBeInTheDocument();
+    // El wizard se cierra igual que en el camino con material (mismo fix del bug de
+    // "Asignar" sin efecto visible).
+    expect(await screen.findByRole('button', { name: /\+ agregar material/i })).toBeInTheDocument();
+  });
+
   it('guardar sin cambios de horario/sede/instructor no llama a existeConflictoHorario, guarda y registra auditoria con fuente agenda', async () => {
     const user = userEvent.setup();
     const repository = crearRepository();

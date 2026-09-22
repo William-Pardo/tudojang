@@ -1308,7 +1308,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
 
   const editarAsignacionPublicada = (asignacion: AsignacionPublicadaLocal) => {
     setAsignacionEditandoId(asignacion.id);
-    setRecursoId(asignacion.recursoId);
+    setRecursoId(asignacion.recursoId ?? '');
     setTituloPersonalizado(asignacion.titulo);
     setTipoDestinatario(asignacion.destinatario.tipo);
     setGrupo(
@@ -1414,7 +1414,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
   });
 
   const draftDesdeAsignacion = (asignacion: AsignacionPublicadaLocal): AsignacionDraft => ({
-    recursoId: asignacion.recursoId,
+    recursoId: asignacion.recursoId ?? '',
     // Fix 2: el wizard ya no deja elegir destinatario (siempre 'grupo'); el
     // propio componente lo fuerza igual al abrir (ver override en su
     // useState), pero se deja explicito aqui tambien para que la intencion
@@ -1475,8 +1475,15 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
   // (actualizarAsignacionFn, upsert con mismo id). Reutiliza publishAsignacion
   // para validar recurso aprobado y armar la asignacion, igual que publicar().
   const confirmarWizard = async (draft: AsignacionDraft) => {
-    const recursoDraft = recursosDisponibles.find((item) => item.id === draft.recursoId);
-    if (!recursoDraft) {
+    // El material dejo de ser obligatorio (Paso 1 del wizard ya no bloquea sin
+    // recursoId): producto usa el Paso 3 (grados) como su forma de fijar a que
+    // grados aplica la clase, aunque hoy no se publique material real. Si el
+    // usuario SI eligio un recursoId, ese id debe seguir siendo valido (mismo
+    // chequeo de antes); si no eligio ninguno, se sigue de largo sin recurso.
+    const recursoDraft = draft.recursoId
+      ? recursosDisponibles.find((item) => item.id === draft.recursoId)
+      : undefined;
+    if (draft.recursoId && !recursoDraft) {
       throw new Error('Selecciona un material valido para asignar.');
     }
     const jornadaIdPublicacion = embedded ? await asegurarJornadaPrograma() : jornadaEfectivaId;
@@ -1497,15 +1504,17 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
     const asignacionId = wizardModo === 'editar' && asignacionEditandoWizard
       ? asignacionEditandoWizard.id
       : `asignacion-${clavePublicacion.replace(/[^a-z0-9]+/gi, '-')}`;
-    const recursoConTenant = { ...recursoDraft, tenantId };
+    const recursoConTenant = recursoDraft ? { ...recursoDraft, tenantId } : undefined;
     const asignacion = publishAsignacion({
       asignacion: {
         id: asignacionId,
         tenantId,
-        recursoId: draft.recursoId,
-        titulo: recursoDraft.tituloVisible || recursoDraft.nombre,
-        descripcion: `Asignacion academica para ${recursoDraft.ficha?.disciplina ?? 'disciplina general'}`,
-        tags: recursoDraft.ficha?.tags ?? [],
+        recursoId: draft.recursoId || undefined,
+        titulo: recursoDraft ? (recursoDraft.tituloVisible || recursoDraft.nombre) : 'Clase sin material asignado',
+        descripcion: recursoDraft
+          ? `Asignacion academica para ${recursoDraft.ficha?.disciplina ?? 'disciplina general'}`
+          : undefined,
+        tags: recursoDraft?.ficha?.tags ?? [],
         destinatario,
         uso: mapearCriterioAUso(draft.criterio),
         momento: draft.momento,

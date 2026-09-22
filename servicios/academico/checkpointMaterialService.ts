@@ -24,7 +24,7 @@ export interface MaterialDeJornada {
 
 // Almacenamiento en memoria para modo local / tests.
 let _mockCheckpoints: CheckpointMaterialJornada[] = [];
-let _mockAsignaciones: Array<{ id: string; tenantId: string; jornadaId?: string; titulo: string }> = [];
+let _mockAsignaciones: Array<{ id: string; tenantId: string; jornadaId?: string; titulo: string; recursoId?: string }> = [];
 
 export const __resetMockCheckpoints = () => { _mockCheckpoints = []; };
 export const __setMockAsignaciones = (a: typeof _mockAsignaciones) => { _mockAsignaciones = a; };
@@ -51,18 +51,24 @@ export const crearCheckpointMaterialService = (deps: CheckpointMaterialServiceDe
     tenantId: string,
     jornadaId: string,
   ): Promise<MaterialDeJornada[]> => {
+    // El material dejo de ser obligatorio al fijar grados a una clase (Paso 1 de
+    // AsignarMaterialWizard ya no exige recursoId): una asignacion "solo-grado"
+    // (sin recurso real) no debe contar como material para el checkpoint/cobertura
+    // de cierre de clase, asi que se descarta aca antes de armar la lista.
     if (!firebaseActivo()) {
       return _mockAsignaciones
-        .filter((a) => a.tenantId === tenantId && a.jornadaId === jornadaId)
+        .filter((a) => a.tenantId === tenantId && a.jornadaId === jornadaId && !!a.recursoId)
         .map((a) => ({ asignacionId: a.id, titulo: a.titulo }));
     }
 
     const ref = collection(getDb(), 'tenants', tenantId, 'asignaciones');
     const snap = await getDocs(query(ref, where('jornadaId', '==', jornadaId)));
-    return snap.docs.map((d) => {
-      const data = d.data() as { titulo?: string };
-      return { asignacionId: d.id, titulo: data.titulo ?? '(Sin título)' };
-    });
+    return snap.docs
+      .filter((d) => !!(d.data() as { recursoId?: string }).recursoId)
+      .map((d) => {
+        const data = d.data() as { titulo?: string };
+        return { asignacionId: d.id, titulo: data.titulo ?? '(Sin título)' };
+      });
   };
 
   /** Marca (o re-marca) el estado de un material en esta jornada. Doc-id = asignacionId. */

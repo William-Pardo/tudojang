@@ -40,7 +40,13 @@ interface GetAsignacionesByEstudianteInput {
 
 interface ValidateAsignacionInput {
   asignacion: AsignacionAcademica;
-  recurso: RecursoAcademico;
+  /**
+   * Opcional: una asignacion "solo-grado" (sin material real, ver Paso 1 de
+   * AsignarMaterialWizard) no tiene recurso contra el cual validar. Cuando
+   * viene ausente, validateAsignacion/publishAsignacion se saltan todo el
+   * chequeo de recurso (no hay nada que aprobar/matchear).
+   */
+  recurso?: RecursoAcademico;
 }
 
 type ValidateAsignacionResult =
@@ -227,6 +233,12 @@ export function validateAsignacion({
   asignacion,
   recurso,
 }: ValidateAsignacionInput): ValidateAsignacionResult {
+  // Sin recurso (asignacion solo-grado): no hay nada que validar contra
+  // biblioteca, se deja pasar.
+  if (!recurso) {
+    return { valid: true };
+  }
+
   if (asignacion.tenantId !== recurso.tenantId) {
     return { valid: false, reason: 'tenant_no_coincide' };
   }
@@ -247,6 +259,18 @@ export function publishAsignacion({
   recurso,
   publicadoPorUid,
 }: PublishAsignacionInput): AsignacionAcademica {
+  // Sin recurso: asignacion "solo-grado" (Paso 1 de AsignarMaterialWizard ya no
+  // obliga a elegir material). No hay campos de recurso que copiar ni recurso
+  // que aprobar/matchear -- se publica tal cual llego el borrador.
+  if (!recurso) {
+    return {
+      ...asignacion,
+      estado: 'publicada',
+      creadoPorUid: publicadoPorUid,
+      actualizadoEn: new Date().toISOString(),
+    };
+  }
+
   const validacion = validateAsignacion({ asignacion, recurso });
 
   if (!validacion.valid) {
@@ -370,8 +394,13 @@ export async function eliminarAsignacion(
 export interface AsignarMaterialAJornadaInput {
   tenantId: string;
   jornadaId: string;
-  recurso: RecursoAcademico;
-  recursoId: string;
+  /**
+   * Opcionales: permiten fijar una asignacion "solo-grado" (destinatario +
+   * grados) sobre la jornada sin publicar material real (ver Paso 1 de
+   * AsignarMaterialWizard, ya no obliga a elegir recurso).
+   */
+  recurso?: RecursoAcademico;
+  recursoId?: string;
   tipoDestinatario: TipoDestinatarioAsignacion;
   grupoObjetivo: string;
   grados: string[];
@@ -414,7 +443,8 @@ function mapearCriterioAUsoAcademico(criterio: AsignarMaterialAJornadaInput['cri
 export async function asignarMaterialAJornada(
   input: AsignarMaterialAJornadaInput,
 ): Promise<PublicarAsignacionResponse> {
-  const id = input.asignacionIdExistente ?? `asignacion-agenda-${input.jornadaId}-${input.recursoId}`;
+  const id = input.asignacionIdExistente
+    ?? `asignacion-agenda-${input.jornadaId}-${input.recursoId || 'sin-material'}`;
   const destinatario = construirDestinatarioMaterial(input.tipoDestinatario, input.grupoObjetivo, input.grados);
   const ahora = new Date().toISOString();
 
@@ -422,10 +452,10 @@ export async function asignarMaterialAJornada(
     asignacion: {
       id,
       tenantId: input.tenantId,
-      recursoId: input.recursoId,
+      recursoId: input.recursoId || undefined,
       jornadaId: input.jornadaId,
-      titulo: input.recurso.tituloVisible || input.recurso.nombre,
-      tags: input.recurso.ficha?.tags ?? [],
+      titulo: input.recurso ? (input.recurso.tituloVisible || input.recurso.nombre) : 'Clase sin material asignado',
+      tags: input.recurso?.ficha?.tags ?? [],
       destinatario,
       uso: mapearCriterioAUsoAcademico(input.criterio),
       momento: input.momento,

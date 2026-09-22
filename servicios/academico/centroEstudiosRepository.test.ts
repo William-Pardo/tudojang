@@ -99,6 +99,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-1', // Válida: publicada, grupo infantil
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-1',
       destinatario: { tipo: 'grupo', grupo: 'Infantil' },
       titulo: 'Asignacion 1',
     },
@@ -106,6 +107,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-2', // Inválida: otro grupo (Adultos)
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-2',
       destinatario: { tipo: 'grupo', grupo: 'Adultos' },
       titulo: 'Asignacion 2',
     },
@@ -113,6 +115,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-3', // Inválida: borrador
       tenantId: 'tenant-1',
       estado: 'borrador',
+      recursoId: 'recurso-3',
       destinatario: { tipo: 'grupo', grupo: 'Infantil' },
       titulo: 'Asignacion 3',
     },
@@ -120,6 +123,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-4', // Inválida: estudiante específico no coincide
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-4',
       destinatario: { tipo: 'estudiante', estudianteIds: ['est-2'] },
       titulo: 'Asignacion 4',
     },
@@ -127,6 +131,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-5', // Válida: estudiante específico coincide
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-5',
       destinatario: { tipo: 'estudiante', estudianteIds: ['est-1'] },
       titulo: 'Asignacion 5',
     },
@@ -134,6 +139,7 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-6', // Válida: grado coincide
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-6',
       destinatario: { tipo: 'grado', grupo: 'Infantil', grados: ['Blanco'] },
       titulo: 'Asignacion 6',
     },
@@ -141,8 +147,16 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
       id: 'asig-7', // Inválida: grado no coincide
       tenantId: 'tenant-1',
       estado: 'publicada',
+      recursoId: 'recurso-7',
       destinatario: { tipo: 'grado', grupo: 'Infantil', grados: ['Amarillo'] },
       titulo: 'Asignacion 7',
+    },
+    {
+      id: 'asig-8', // Inválida: asignacion solo-grado sin material real (nunca debe llegar al estudiante)
+      tenantId: 'tenant-1',
+      estado: 'publicada',
+      destinatario: { tipo: 'grupo', grupo: 'Infantil' },
+      titulo: 'Clase sin material asignado',
     },
   ];
 
@@ -211,6 +225,9 @@ describe('FirestoreCentroEstudiosRepository (TDD - RED)', () => {
     expect(idsRetornados).not.toContain('asig-3');
     expect(idsRetornados).not.toContain('asig-4');
     expect(idsRetornados).not.toContain('asig-7');
+    // asig-8 coincide por grupo/estado, pero no tiene recursoId (asignacion solo-grado
+    // sin material real): nunca debe llegar al estudiante.
+    expect(idsRetornados).not.toContain('asig-8');
   });
 
   it('retorna lista vacía si el estudiante no existe en la base de datos', async () => {

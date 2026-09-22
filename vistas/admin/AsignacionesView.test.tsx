@@ -216,6 +216,73 @@ describe('AsignacionesView - punto de entrada unico del asistente unificado (Fas
   });
 });
 
+describe('material opcional: asignar una clase sin recurso real (confirmarWizard)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (listarRecursosAprobados as jest.Mock).mockResolvedValue([materialA, materialB]);
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([]);
+  });
+
+  it('crear sin elegir material: publica una asignacion "solo-grado" con titulo "Clase sin material asignado", sin recursoId ni tags, y sin lanzar el error de material invalido', async () => {
+    const user = userEvent.setup();
+    const { publicarAsignacionFn } = renderVista();
+
+    await user.click(screen.getByRole('button', { name: /\+ agregar material/i }));
+    await screen.findByRole('dialog');
+    // Paso 1: el material es opcional, se avanza sin elegir ninguno.
+    await user.click(screen.getByRole('button', { name: /^continuar$/i }));
+    await user.click(screen.getByRole('button', { name: /^continuar$/i }));
+    await user.click(screen.getByRole('button', { name: /^Blanco$/ }));
+    await user.click(screen.getByRole('button', { name: /^asignar$/i }));
+
+    await waitFor(() => expect(publicarAsignacionFn).toHaveBeenCalledTimes(1));
+    const llamada = publicarAsignacionFn.mock.calls[0][0];
+    expect(llamada.asignacion).toMatchObject({
+      titulo: 'Clase sin material asignado',
+      tags: [],
+    });
+    expect(llamada.asignacion.recursoId).toBeUndefined();
+    expect(screen.queryByText(/selecciona un material valido/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/clase sin material asignado/i)).toBeInTheDocument();
+  });
+
+  it('editar con un recursoId que ya no existe en recursosDisponibles sigue lanzando el error de material invalido', async () => {
+    const asignacionConRecursoEliminado: AsignacionAcademica = {
+      id: 'asignacion-recurso-eliminado',
+      tenantId: 'tenant-real',
+      recursoId: materialA.id,
+      jornadaId: JORNADA_SINTETICA_ID,
+      titulo: materialA.nombre,
+      destinatario: { tipo: 'grupo', grupo: 'Infantil', grados: ['Blanco'] },
+      uso: 'estudio',
+      momento: 'preparacion',
+      obligatoria: true,
+      fechaApertura: '2026-07-01T00:00:00.000Z',
+      fechaCierre: '2026-09-30T23:59:59.000Z',
+      estado: 'publicada',
+      creadoPorUid: 'maestro-real',
+      creadoEn: '2026-07-01T00:00:00.000Z',
+      actualizadoEn: '2026-07-01T00:00:00.000Z',
+    };
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([asignacionConRecursoEliminado]);
+    const user = userEvent.setup();
+    // materialA ya no esta entre los recursos disponibles (p.ej. se elimino/desaprobo de
+    // biblioteca despues de publicada la asignacion): recursosDisponibles solo trae materialB.
+    const { actualizarAsignacionFn } = renderVista({ recursos: [materialB] });
+
+    await screen.findByText(materialA.nombre);
+    await user.click(screen.getByRole('button', { name: new RegExp(`editar ${materialA.nombre}`, 'i') }));
+
+    const dialogo = await screen.findByRole('dialog');
+    await user.click(within(dialogo).getByRole('button', { name: /^continuar$/i }));
+    await user.click(within(dialogo).getByRole('button', { name: /^Amarillo$/ }));
+    await user.click(within(dialogo).getByRole('button', { name: /^asignar$/i }));
+
+    expect(await within(dialogo).findByText(/selecciona un material valido para asignar/i)).toBeInTheDocument();
+    expect(actualizarAsignacionFn).not.toHaveBeenCalled();
+  });
+});
+
 describe('exclusion de duplicados en el picker del asistente', () => {
   beforeEach(() => {
     jest.clearAllMocks();

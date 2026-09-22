@@ -121,6 +121,31 @@ describe('MisClasesView', () => {
     expect(await screen.findByText(/fundamentos tecnicos/i)).toBeInTheDocument();
   });
 
+  // El material dejo de ser obligatorio al asignar grados a una clase (Paso 1 de
+  // AsignarMaterialWizard ya no exige recursoId): una asignacion "solo-grado" no debe
+  // aparecer como si fuera material real -- la jornada debe seguir mostrando el fallback.
+  it('una jornada cuya unica asignacion es "solo-grado" (sin recursoId) muestra "Sin material asignado"', async () => {
+    const repository = {
+      listarJornadasPorTenant: jest.fn().mockResolvedValue([crearJornada({ id: 'jornada-1' })]),
+      guardarJornada: jest.fn().mockResolvedValue(undefined),
+      registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+      existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+    };
+    (listarAsignacionesPorTenant as jest.Mock).mockResolvedValue([
+      crearAsignacion({
+        id: 'asig-solo-grado',
+        jornadaId: 'jornada-1',
+        titulo: 'Clase sin material asignado',
+        recursoId: undefined,
+      }),
+    ]);
+
+    render(<MisClasesView tenantId="tenant-1" programaId="programa-1" usuarioId="maestro-1" repository={repository as any} />);
+
+    expect(await screen.findByText(/sin material asignado/i)).toBeInTheDocument();
+    expect(screen.queryByText('Clase sin material asignado')).not.toBeInTheDocument();
+  });
+
   // Rediseño 2026-07-12 (pedido explicito del usuario: "borrador como estado ya no
   // deberia existir", clases malleables por defecto): ya no existe un boton "Confirmar"
   // que transicione borrador->confirmada. Una jornada en borrador ahora ofrece las MISMAS

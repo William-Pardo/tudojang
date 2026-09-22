@@ -178,8 +178,13 @@ const ModalEdicionJornada: React.FC<ModalEdicionJornadaProps> = ({
     cargarAsignacionesTenant(tenantId)
       .then((asignaciones) => {
         if (!activo) return;
+        // El material dejo de ser obligatorio (Paso 1 del wizard ya no exige recursoId):
+        // una asignacion "solo-grado" no tiene recurso que excluir de la lista de picker,
+        // asi que se descarta antes de armar `recursoIdsAsignados`.
         setRecursoIdsAsignados(
-          asignaciones.filter((asignacion) => asignacion.jornadaId === jornada.id).map((asignacion) => asignacion.recursoId),
+          asignaciones
+            .filter((asignacion) => asignacion.jornadaId === jornada.id && !!asignacion.recursoId)
+            .map((asignacion) => asignacion.recursoId as string),
         );
       })
       .catch(() => { if (activo) setRecursoIdsAsignados([]); });
@@ -326,15 +331,21 @@ const ModalEdicionJornada: React.FC<ModalEdicionJornadaProps> = ({
   const materialesAsignadosResumen = recursosDisponibles.filter((recurso) => recursoIdsAsignados.includes(recurso.id));
 
   const confirmarMaterial = async (draftMaterial: AsignacionDraft) => {
-    const recurso = recursosDisponibles.find((item) => item.id === draftMaterial.recursoId);
-    if (!recurso) {
+    // El material dejo de ser obligatorio en el Paso 1 del wizard: si el
+    // usuario eligio un recursoId, debe seguir siendo uno valido (mismo
+    // chequeo de antes); si no eligio ninguno, se arma una asignacion
+    // "solo-grado" (destinatario + grados) sin recurso real.
+    const recurso = draftMaterial.recursoId
+      ? recursosDisponibles.find((item) => item.id === draftMaterial.recursoId)
+      : undefined;
+    if (draftMaterial.recursoId && !recurso) {
       throw new Error('Selecciona un material valido para asignar.');
     }
     await asignarMaterial({
       tenantId,
       jornadaId: jornada.id,
       recurso,
-      recursoId: draftMaterial.recursoId,
+      recursoId: draftMaterial.recursoId || undefined,
       tipoDestinatario: draftMaterial.destinatario,
       grupoObjetivo: draftMaterial.grupoObjetivo,
       grados: draftMaterial.grados,
@@ -344,7 +355,9 @@ const ModalEdicionJornada: React.FC<ModalEdicionJornadaProps> = ({
       fechaCierre: draftMaterial.fechaCierre || undefined,
       publicadoPorUid: usuarioId,
     });
-    setRecursoIdsAsignados((actuales) => [...actuales, draftMaterial.recursoId]);
+    if (draftMaterial.recursoId) {
+      setRecursoIdsAsignados((actuales) => [...actuales, draftMaterial.recursoId]);
+    }
     // Fix (bug reportado: clic en "Asignar" no parecía hacer nada -- ni error, ni cambio
     // visible): tras guardar con éxito, nada volvía a `pestana: 'programa'`, así que el
     // wizard quedaba montado indefinidamente en el mismo paso 3, dando la impresión de que
