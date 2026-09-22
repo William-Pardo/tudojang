@@ -629,11 +629,20 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
       });
 
       setProgramas((actuales) => {
+        // Fix 2026-09-22 (bug real: el programa placeholder demo "revivia" en cada
+        // refresh aunque el tenant ya tuviera programas reales, incluso despues de
+        // "eliminarlo"): el placeholder nunca esta en Firestore, asi que una vez que
+        // SI hay programas reales hidratados dejar de mostrarlo -- de lo contrario,
+        // como `programas` arranca siempre en `[programaInicial]` (useState inicial),
+        // cada remount lo volvia a mezclar en la bandeja para siempre.
+        const base = hidratados.length > 0
+          ? actuales.filter((programa) => programa.id !== programaInicial.id)
+          : actuales;
         // Solo se AGREGAN programas nuevos: una entrada ya presente en esta sesion
         // (posiblemente con ediciones locales del usuario en curso) nunca se pisa
         // con la copia hidratada.
-        const nuevos = hidratados.filter((real) => !actuales.some((programa) => programa.id === real.id));
-        return nuevos.length ? [...actuales, ...nuevos] : actuales;
+        const nuevos = hidratados.filter((real) => !base.some((programa) => programa.id === real.id));
+        return nuevos.length ? [...base, ...nuevos] : base;
       });
 
       // Fix 2 (duplicados al editar): tras un remount la seleccion volvia SIEMPRE al
@@ -1249,8 +1258,7 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
   // documento ProgramaAcademico, limpia las jornadas asociadas que aun no se operaron
   // (mismo criterio de trazabilidad de la subtarea 12.6: una jornada cerrada/operada
   // o con asistencia registrada NUNCA se borra fisicamente; se conserva como historial
-  // aunque su programa desaparezca). El placeholder demo local nunca se persistio, asi
-  // que para el solo se limpia el estado local.
+  // aunque su programa desaparezca).
   const eliminarProgramaSeleccionado = async () => {
     if (!programaSeleccionado || eliminandoPrograma) return;
     setEliminandoPrograma(true);
@@ -1279,9 +1287,17 @@ const AsignacionesView: React.FC<AsignacionesViewProps> = ({
         );
       }
 
-      if (programaId !== programaInicial.id) {
-        await repositoryPrograma.eliminarPrograma(tenantId, programaId);
-      }
+      // Fix 2026-09-22 (bug real reportado: "Eliminar programa" decia exito pero el
+      // programa volvia al refrescar la pagina). El guard `programaId !== programaInicial.id`
+      // asumia que un programa con el ID del placeholder demo nunca podia estar persistido
+      // en Firestore, asi que se saltaba el borrado real -- pero si el usuario llego a
+      // guardar/operar ese programa mientras aun tenia ese ID (o quedo huerfano de alguna
+      // forma), el documento SI existia y nunca se borraba: la UI lo quitaba solo en memoria
+      // y la siguiente hidratacion desde Firestore lo traia de vuelta. Borrar siempre es
+      // seguro: `deleteDoc` sobre un documento que no existe en Firestore no lanza error
+      // (ver FirestoreProgramaRepository.eliminarPrograma), asi que el caso realmente
+      // "nunca persistido" sigue siendo un no-op inofensivo.
+      await repositoryPrograma.eliminarPrograma(tenantId, programaId);
 
       setProgramas((actuales) => {
         const restantes = actuales.filter((programa) => programa.id !== programaId);
