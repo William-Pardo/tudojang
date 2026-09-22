@@ -6,7 +6,8 @@ import type { JornadaInstruccion } from '../../models/academico/jornada';
 import type { AsignacionAcademica } from '../../models/academico/asignacion';
 import type { RegistroAsistencia } from '../../models/academico/asistencia';
 import { ConflictoConcurrenciaError } from '../../servicios/academico/jornadaRepository';
-import { RolUsuario } from '../../tipos';
+import type { EjecucionPrograma } from '../../models/academico/programa';
+import { RolUsuario, type Estudiante, EstadoPago, GrupoEdad, GradoTKD } from '../../tipos';
 
 jest.mock('../../servicios/academico/asignacionService', () => ({
   listarAsignacionesPorTenant: jest.fn(),
@@ -54,6 +55,56 @@ function crearAsignacion(overrides: Partial<AsignacionAcademica> = {}): Asignaci
     creadoPorUid: 'maestro-1',
     creadoEn: ahora,
     actualizadoEn: ahora,
+    ...overrides,
+  };
+}
+
+// Pedido explicito del usuario (2026-09-22): helpers para el pill "Alumno asignado",
+// mismo criterio de matricula automatica que ya usa inscripcionService.ts
+// (perteneceAutomaticamente) -- grupo + sede coinciden y el pago no esta Vencido.
+function crearEjecucionMock(overrides: Partial<EjecucionPrograma> = {}): EjecucionPrograma {
+  const ahora = '2026-06-01T00:00:00.000Z';
+  return {
+    id: 'ejecucion-programa-1',
+    tenantId: 'tenant-1',
+    programaId: 'programa-1',
+    grupoId: 'infantil',
+    sedeId: 'sede-principal',
+    estado: 'activo',
+    fechaInicio: '2026-01-01',
+    unidadActualId: null,
+    objetivoActualId: null,
+    objetivosCompletados: [],
+    creadoEn: ahora,
+    actualizadoEn: ahora,
+    ...overrides,
+  };
+}
+
+function crearEstudianteMock(overrides: Partial<Estudiante> = {}): Estudiante {
+  return {
+    id: 'estudiante-1',
+    tenantId: 'tenant-1',
+    nombres: 'Ana',
+    apellidos: 'Gomez',
+    numeroIdentificacion: '123',
+    fechaNacimiento: '2015-01-01',
+    grado: GradoTKD.Blanco,
+    grupo: GrupoEdad.Infantil,
+    horasAcumuladasGrado: 0,
+    sedeId: 'sede-principal',
+    telefono: '3000000000',
+    correo: 'ana@test.com',
+    fechaIngreso: '2024-01-01',
+    estadoPago: EstadoPago.AlDia,
+    saldoDeudor: 0,
+    historialPagos: [],
+    consentimientoInformado: true,
+    contratoServiciosFirmado: true,
+    consentimientoImagenFirmado: true,
+    consentimientoFotosVideos: true,
+    carnetGenerado: false,
+    estadoMatricula: 'activo',
     ...overrides,
   };
 }
@@ -1076,6 +1127,139 @@ describe('MisClasesView', () => {
       await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
 
       expect(await screen.findByText(/^cerrada$/i)).toBeInTheDocument();
+    });
+  });
+
+  // Pedido explicito del usuario (2026-09-22): pill "Alumno asignado" en cada tarjeta,
+  // en el mismo lugar/espacio que "Material asignado" -- a diferencia del material (que
+  // SI varia por jornada individual), este estado es el MISMO en TODAS las tarjetas de un
+  // mismo Programa (se calcula por grupo/sede del Programa completo, no por jornada
+  // individual -- ver decision de producto documentada en PestanaProgramaJornada.tsx).
+  describe('pill "Alumno asignado" (grupo/sede del Programa, §pill-alumno-asignado)', () => {
+    it('muestra el pill cuando la ejecucion del Programa tiene al menos un estudiante real matriculado (grupo+sede coinciden, no vencido)', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', fecha: '2026-07-06' }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+        // Mismo id determinista que usa AsignacionesView para hidratar (`ejecucion-${programaId}`).
+        obtenerEjecucion: jest.fn().mockResolvedValue(
+          crearEjecucionMock({ grupoId: 'infantil', sedeId: 'sede-principal' }),
+        ),
+      };
+      const obtenerEstudiantesFn = jest.fn().mockResolvedValue([
+        crearEstudianteMock({
+          tenantId: 'tenant-1',
+          grupo: GrupoEdad.Infantil,
+          sedeId: 'sede-principal',
+          estadoPago: EstadoPago.AlDia,
+        }),
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          obtenerEstudiantesFn={obtenerEstudiantesFn}
+        />,
+      );
+
+      expect(await screen.findByText('2026-07-06')).toBeInTheDocument();
+      expect(repository.obtenerEjecucion).toHaveBeenCalledWith('tenant-1', 'ejecucion-programa-1');
+      expect(await screen.findByTitle('Alumno asignado')).toBeInTheDocument();
+    });
+
+    it('no muestra el pill cuando ningun estudiante coincide con el grupo/sede de la ejecucion, sin romper el resto de la vista', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', fecha: '2026-07-06' }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+        obtenerEjecucion: jest.fn().mockResolvedValue(
+          crearEjecucionMock({ grupoId: 'infantil', sedeId: 'sede-principal' }),
+        ),
+      };
+      // Ni el grupo, ni el pago Vencido: ninguno pertenece automaticamente.
+      const obtenerEstudiantesFn = jest.fn().mockResolvedValue([
+        crearEstudianteMock({ grupo: GrupoEdad.Adultos, sedeId: 'sede-principal' }),
+        crearEstudianteMock({ id: 'estudiante-2', grupo: GrupoEdad.Infantil, sedeId: 'sede-principal', estadoPago: EstadoPago.Vencido }),
+      ]);
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          obtenerEstudiantesFn={obtenerEstudiantesFn}
+        />,
+      );
+
+      expect(await screen.findByText('2026-07-06')).toBeInTheDocument();
+      await waitFor(() => expect(obtenerEstudiantesFn).toHaveBeenCalled());
+      expect(screen.queryByTitle('Alumno asignado')).not.toBeInTheDocument();
+      // El resto de la vista sigue funcionando normal (material, estado).
+      expect(screen.getByText(/sin material asignado/i)).toBeInTheDocument();
+    });
+
+    it('no muestra el pill ni rompe la vista cuando el repositorio no implementa obtenerEjecucion (mock/consumidor viejo)', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', fecha: '2026-07-06' }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+        // Sin obtenerEjecucion -- mismo caso que mocks/consumidores preexistentes.
+      };
+      const obtenerEstudiantesFn = jest.fn();
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          obtenerEstudiantesFn={obtenerEstudiantesFn}
+        />,
+      );
+
+      expect(await screen.findByText('2026-07-06')).toBeInTheDocument();
+      expect(screen.queryByTitle('Alumno asignado')).not.toBeInTheDocument();
+      expect(obtenerEstudiantesFn).not.toHaveBeenCalled();
+    });
+
+    it('no muestra el pill y degrada sin romper la vista si obtenerEstudiantesFn falla', async () => {
+      const repository = {
+        listarJornadasPorTenant: jest.fn().mockResolvedValue([
+          crearJornada({ id: 'jornada-1', fecha: '2026-07-06' }),
+        ]),
+        guardarJornada: jest.fn().mockResolvedValue(undefined),
+        registrarAuditoria: jest.fn().mockResolvedValue(undefined),
+        existeConflictoHorario: jest.fn().mockResolvedValue({ hayConflicto: false }),
+        obtenerEjecucion: jest.fn().mockResolvedValue(crearEjecucionMock()),
+      };
+      const obtenerEstudiantesFn = jest.fn().mockRejectedValue(new Error('permisos insuficientes'));
+
+      render(
+        <MisClasesView
+          tenantId="tenant-1"
+          programaId="programa-1"
+          usuarioId="maestro-1"
+          repository={repository as any}
+          obtenerEstudiantesFn={obtenerEstudiantesFn}
+        />,
+      );
+
+      expect(await screen.findByText('2026-07-06')).toBeInTheDocument();
+      await waitFor(() => expect(obtenerEstudiantesFn).toHaveBeenCalled());
+      expect(screen.queryByTitle('Alumno asignado')).not.toBeInTheDocument();
     });
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { JornadaInstruccion } from '../../models/academico/jornada';
-import { RolUsuario } from '../../tipos';
+import { RolUsuario, type Estudiante } from '../../tipos';
 import {
   jornadaRepository,
   mensajeConflictoHorario,
@@ -10,6 +10,8 @@ import {
   type JornadaRepository,
 } from '../../servicios/academico/jornadaRepository';
 import { listarAsignacionesPorTenant } from '../../servicios/academico/asignacionService';
+import { perteneceAutomaticamente } from '../../servicios/academico/inscripcionService';
+import { obtenerEstudiantes } from '../../servicios/estudiantesApi';
 import {
   confirmarJornada,
   cerrarJornada,
@@ -22,7 +24,7 @@ import {
   type AsistenciaRepository,
 } from '../../servicios/academico/asistenciaRepository';
 import { contarCheckIns } from '../../servicios/academico/asistenciaService';
-import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar } from '../../components/Iconos';
+import { IconoCalendario, IconoReloj, IconoAprobar, IconoEditar, IconoReprogramar, IconoEliminar, IconoEstudiantes } from '../../components/Iconos';
 import {
   checkpointMaterialService as checkpointMaterialServicePorDefecto,
   type CheckpointMaterialService,
@@ -99,6 +101,14 @@ interface MisClasesViewProps {
   // vista no conoce el wizard -- solo delega la jornada clickeada. Opcional: sin este
   // callback, el icono editar no se renderiza (mismo patron que el resto de props opcionales).
   onEditarMaterial?: (jornada: JornadaInstruccion) => void;
+  // Pedido explicito del usuario (2026-09-22): pill "Alumno asignado" en cada tarjeta,
+  // mismo patron inyectable que asistenciaRepository/checkpointMaterialService -- default
+  // real (obtenerEstudiantes de estudiantesApi.ts) que los tests pueden reemplazar sin
+  // tocar Firebase. Se usa junto con `repository.obtenerEjecucion?.(...)` (opcional, ver
+  // JornadaRepository) para responder "¿el grupo/sede del Programa tiene al menos un
+  // estudiante real matriculado?" -- MISMO criterio que ya usa ClaseEnVivoView.tsx
+  // (roster esperado, WS-6 §15.C) via `perteneceAutomaticamente` (inscripcionService.ts).
+  obtenerEstudiantesFn?: (tenantId?: string) => Promise<Estudiante[]>;
 }
 
 // Subtarea 12.2 — permiso "maestro asignado". Solo el maestro asignado
@@ -249,6 +259,7 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   checkpointMaterialService = checkpointMaterialServicePorDefecto,
   refreshTrigger = 0,
   onEditarMaterial,
+  obtenerEstudiantesFn = obtenerEstudiantes,
 }) => {
   const [jornadas, setJornadas] = React.useState<JornadaInstruccion[]>([]);
   const [materialPorJornadaId, setMaterialPorJornadaId] = React.useState<Record<string, string[]>>({});
@@ -281,6 +292,14 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   // que ya existe en JornadaRepository y ya es por jornada individual.
   const [temaEditandoJornadaId, setTemaEditandoJornadaId] = React.useState<string | null>(null);
   const [temaBorradorPorJornadaId, setTemaBorradorPorJornadaId] = React.useState<Record<string, string>>({});
+  // Pedido explicito del usuario (2026-09-22): "alumno asignado" se define por el GRUPO del
+  // Programa completo (no por jornada individual -- ver decision de producto documentada en
+  // PestanaProgramaJornada.tsx sobre no permitir reasignar el grupo de una jornada suelta),
+  // asi que se calcula UNA vez por Programa (no por jornada) y se renderiza igual en cada
+  // card. `false` por defecto: si `obtenerEjecucion` no esta implementado (mock/consumidor
+  // viejo) o algo falla, el pill simplemente no se muestra -- no rompe el resto de la vista
+  // (mismo criterio defensivo que ya usa el fetch de material, ver cargar() arriba).
+  const [hayAlumnoAsignado, setHayAlumnoAsignado] = React.useState(false);
 
   const cargar = React.useCallback(() => {
     // Las jornadas y las asignaciones (material) se cargan de forma independiente:
@@ -323,6 +342,42 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
   React.useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Pedido explicito del usuario (2026-09-22): "¿el grupo/sede de este Programa tiene al
+  // menos un estudiante real matriculado?" -- se calcula UNA vez por Programa (id
+  // determinista `ejecucion-${programaId}`, misma convencion que usa AsignacionesView para
+  // hidratar) y NO por jornada individual. Mismo patron de manejo de errores que el roster
+  // de ClaseEnVivoView.tsx (WS-6 §15.C): `obtenerEjecucion` es opcional en
+  // JornadaRepository, y cualquier fallo degrada a no mostrar el pill sin romper la vista.
+  React.useEffect(() => {
+    let activo = true;
+
+    async function calcularAlumnoAsignado() {
+      try {
+        const ejecucion = await repository.obtenerEjecucion?.(tenantId, `ejecucion-${programaId}`);
+        if (!activo) return;
+        if (!ejecucion) {
+          setHayAlumnoAsignado(false);
+          return;
+        }
+
+        const estudiantes = await obtenerEstudiantesFn(tenantId);
+        if (!activo) return;
+
+        const asignado = estudiantes.some(
+          (estudiante) => estudiante.tenantId === tenantId && perteneceAutomaticamente(estudiante, ejecucion),
+        );
+        setHayAlumnoAsignado(asignado);
+      } catch {
+        if (activo) setHayAlumnoAsignado(false);
+      }
+    }
+
+    calcularAlumnoAsignado();
+    return () => {
+      activo = false;
+    };
+  }, [tenantId, programaId, repository, obtenerEstudiantesFn]);
 
   // Gap #5: solo las jornadas 'en_curso' necesitan el conteo de check-ins (son las unicas
   // que se pueden cerrar, y cerrarJornada() exige asistenciaRegistrada) -- cargar check-ins
@@ -741,6 +796,24 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
                       {estilo.etiqueta}
                     </span>
                   </div>
+
+                  {/* Pedido explicito del usuario (2026-09-22): indicador positivo chiquito
+                      pero visible de que esta clase ya tiene alumno asignado -- a
+                      diferencia del material (varia por jornada), este estado es el MISMO
+                      en TODAS las tarjetas de un mismo Programa (se calcula por grupo/sede
+                      del Programa, no por jornada individual). Sin estado negativo: si no
+                      hay alumno asignado, el pill simplemente no se renderiza. */}
+                  {hayAlumnoAsignado && (
+                    <div>
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
+                        title="Alumno asignado"
+                      >
+                        <IconoEstudiantes aria-hidden="true" className="h-3 w-3" />
+                        <span className="sr-only">Alumno asignado</span>
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Material asignado</p>
