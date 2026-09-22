@@ -214,9 +214,14 @@ const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsProgram
         })}
       </div>
 
+      {!draft.recursoId && (
+        <p className="px-1 text-[11px] font-bold text-gray-400">
+          El material es opcional: podés continuar sin elegir uno y asignar solo los grados en el Paso 3.
+        </p>
+      )}
+
       <button
         type="button"
-        disabled={!draft.recursoId}
         onClick={onContinuar}
         className="w-full rounded-2xl bg-tkd-blue py-3 text-[11px] font-black uppercase tracking-widest text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       >

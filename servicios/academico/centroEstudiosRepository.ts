@@ -128,7 +128,11 @@ export class FirestoreCentroEstudiosRepository implements CentroEstudiosReposito
           urgencia: calcularUrgenciaAsignacion(data.fechaCierre),
         } as AsignacionCentroEstudios;
 
-        if (aplicaAlEstudiante(asignacion, estudiante)) {
+        // Una asignacion sin recursoId es "solo-grado" (fija el grado de una clase sin
+        // publicar material, ver AsignarMaterialWizard.tsx): no tiene contenido real que
+        // el estudiante pueda abrir, asi que nunca debe llegar a su Centro de Estudios
+        // (evita una tarjeta vacia que crashea MaterialPreviewModal al abrirla).
+        if (data.recursoId && aplicaAlEstudiante(asignacion, estudiante)) {
           asignacionesValidas.push(asignacion);
         }
       }

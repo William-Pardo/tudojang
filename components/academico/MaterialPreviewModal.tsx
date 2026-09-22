@@ -166,7 +166,10 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
     let activo = true;
     setCargandoPreguntasQuiz(true);
-    quizService.obtenerQuiz(asignacion.tenantId, asignacion.recursoId)
+    // `recursoId` es opcional en el modelo (asignaciones "solo-grado" sin material real, ver
+    // AsignarMaterialWizard), pero este modal solo se abre para materiales reales -- el
+    // Centro de Estudios ya filtra esas asignaciones antes de llegar aca.
+    quizService.obtenerQuiz(asignacion.tenantId, asignacion.recursoId ?? '')
       .then((preguntas) => {
         // Exito: `preguntas` puede ser null/[] (el quiz realmente no tiene preguntas) o una
         // lista. En ambos casos NO es un error -- se limpia el flag de error.
@@ -199,7 +202,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     let activo = true;
     let objectUrlCreada: string | null = null;
     const promesaUrl = modoVistaPrevia
-      ? driveService.obtenerUrlTemporalRecurso(asignacion.tenantId, asignacion.recursoId)
+      ? driveService.obtenerUrlTemporalRecurso(asignacion.tenantId, asignacion.recursoId ?? '')
       : driveService.obtenerUrlTemporal(asignacion.tenantId, asignacion.id, asignacion.externalFileId);
     promesaUrl
       .then((resultado) => {
@@ -272,7 +275,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
     await visualizacionRepository.registrarSync(
       asignacionActual.tenantId,
-      asignacionActual.recursoId,
+      asignacionActual.recursoId ?? '',
       estudianteId,
       payload,
     );

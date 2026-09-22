@@ -79,7 +79,7 @@ const QuizView: React.FC<QuizViewProps> = ({
     estudianteId: estudianteId ?? '',
     estudianteNombre,
     asignacionId: asignacion.id,
-    recursoId: recursoId ?? asignacion.recursoId,
+    recursoId: recursoId ?? asignacion.recursoId ?? '',
     tituloRecurso: asignacion.titulo,
   });
   const [respuestas, setRespuestas] = React.useState<Record<string, string>>({});

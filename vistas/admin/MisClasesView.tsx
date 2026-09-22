@@ -302,7 +302,12 @@ const MisClasesView: React.FC<MisClasesViewProps> = ({
           const material: Record<string, string[]> = {};
           for (const jornada of delPrograma) {
             material[jornada.id] = asignaciones
-              .filter((asignacion) => asignacion.jornadaId === jornada.id)
+              // El material dejo de ser obligatorio al asignar grados a una clase
+              // (AsignarMaterialWizard, Paso 1 ya no exige recursoId): una asignacion
+              // "solo-grado" no tiene material real y no debe aparecer aca -- si no,
+              // "Materiales asignados" mostraria una entrada vacia/generica en vez del
+              // fallback "Sin material asignado".
+              .filter((asignacion) => asignacion.jornadaId === jornada.id && !!asignacion.recursoId)
               .map((asignacion) => asignacion.titulo);
           }
           setMaterialPorJornadaId(material);

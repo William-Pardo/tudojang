@@ -44,6 +44,20 @@ describe('Integracion: listar los materiales asignados a la jornada', () => {
     expect(materiales.map((m) => m.asignacionId).sort()).toEqual(['asig-1', 'asig-2']);
     expect(materiales.find((m) => m.asignacionId === 'asig-1')?.titulo).toBe('Taeguk 1');
   });
+
+  // El material dejo de ser obligatorio al fijar grados a una clase (Paso 1 de
+  // AsignarMaterialWizard ya no exige recursoId): una asignacion "solo-grado" (sin
+  // recurso real) no debe contar como material para el checkpoint/cobertura de cierre.
+  it('excluye una asignacion "solo-grado" sin recursoId real, aunque tenga el mismo jornadaId', async () => {
+    sembrarMaterial('asig-1', 'Taeguk 1', JORNADA);
+    sembrarDoc(`tenants/${TENANT}/asignaciones/asig-solo-grado`, {
+      id: 'asig-solo-grado', tenantId: TENANT, titulo: 'Clase sin material asignado', jornadaId: JORNADA, estado: 'publicada',
+    });
+
+    const materiales = await servicio.listarMaterialesDeJornada(TENANT, JORNADA);
+
+    expect(materiales.map((m) => m.asignacionId)).toEqual(['asig-1']);
+  });
 });
 
 describe('Integracion: marcar y releer checkpoints', () => {
@@ -98,5 +112,21 @@ describe('Integracion: el resumen de cierre cruza materiales asignados con check
     expect(asig2?.estado).toBe('sin_marcar');
     // 1 practicado (peso 1) + 1 sin_marcar (0) sobre 2 aplicables = 50%.
     expect(resumen.coberturaPorcentaje).toBe(50);
+  });
+
+  it('una asignacion "solo-grado" (sin recursoId) no cuenta en la cobertura de cierre de clase', async () => {
+    sembrarMaterial('asig-1', 'Taeguk 1', JORNADA);
+    sembrarDoc(`tenants/${TENANT}/asignaciones/asig-solo-grado`, {
+      id: 'asig-solo-grado', tenantId: TENANT, titulo: 'Clase sin material asignado', jornadaId: JORNADA, estado: 'publicada',
+    });
+    await servicio.guardarCheckpoint(TENANT, JORNADA, { asignacionId: 'asig-1', estado: 'practicado' }, MAESTRO);
+
+    const materiales = await servicio.listarMaterialesDeJornada(TENANT, JORNADA);
+    const checkpoints = await servicio.listarCheckpoints(TENANT, JORNADA);
+    const resumen = resumirCoberturaClase(materiales, checkpoints);
+
+    expect(resumen.total).toBe(1);
+    expect(resumen.coberturaPorcentaje).toBe(100);
+    expect(resumen.detalle.find((d) => d.asignacionId === 'asig-solo-grado')).toBeUndefined();
   });
 });

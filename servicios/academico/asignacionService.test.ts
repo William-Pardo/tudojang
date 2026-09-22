@@ -115,6 +115,37 @@ describe('asignacionService', () => {
     });
   });
 
+  // El material dejo de ser obligatorio al asignar grados a una clase (ver Paso 1 de
+  // AsignarMaterialWizard): validateAsignacion/publishAsignacion deben aceptar una
+  // asignacion "solo-grado" (sin recurso) sin ejecutar ningun chequeo de biblioteca.
+  it('valida como valida una asignacion "solo-grado" sin recurso (material ya no es obligatorio)', () => {
+    const asignacion = crearAsignacion({ id: 'asignacion-solo-grado', recursoId: undefined });
+
+    expect(validateAsignacion({ asignacion })).toEqual({ valid: true });
+  });
+
+  it('publishAsignacion publica una asignacion "solo-grado" sin recurso, sin lanzar error y sin copiar campos de recurso', () => {
+    const asignacion = crearAsignacion({
+      id: 'asignacion-solo-grado',
+      estado: 'borrador',
+      recursoId: undefined,
+      titulo: 'Clase sin material asignado',
+      tags: [],
+    });
+
+    const publicada = publishAsignacion({ asignacion, publicadoPorUid: 'maestro-1' });
+
+    expect(publicada).toMatchObject({
+      id: 'asignacion-solo-grado',
+      estado: 'publicada',
+      creadoPorUid: 'maestro-1',
+      titulo: 'Clase sin material asignado',
+    });
+    expect(publicada.recursoId).toBeUndefined();
+    expect(publicada.externalFileId).toBeUndefined();
+    expect(publicada.youtubeVideoId).toBeUndefined();
+  });
+
   it('copia youtubeVideoId del recurso a la asignacion al publicar (reemplazo Drive->YouTube solo video)', () => {
     const asignacion = crearAsignacion({ id: 'asignacion-video-yt', estado: 'borrador' });
     const recurso = crearRecurso({

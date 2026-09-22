@@ -87,15 +87,20 @@ const irAPaso3 = async (user: ReturnType<typeof userEvent.setup>) => {
 
 describe('AsignarMaterialWizard', () => {
   describe('Paso 1: seleccion de material', () => {
-    it('deshabilita Continuar sin material seleccionado y lo habilita al elegir uno', async () => {
+    it('el material es opcional: Continuar esta habilitado sin elegir ninguno y sigue habilitado al elegir uno', async () => {
+      // Producto (2026-09-22): elegir material dejo de ser obligatorio -- el Paso 3
+      // (grados) es el unico lugar de la UI para fijar a que grados aplica la clase,
+      // y no debe bloquearse por falta de material.
       const user = userEvent.setup();
       renderWizard();
 
-      expect(screen.getByRole('button', { name: /^continuar$/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /^continuar$/i })).toBeEnabled();
+      expect(screen.getByText(/el material es opcional/i)).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /fundamentos tecnicos/i }));
 
       expect(screen.getByRole('button', { name: /^continuar$/i })).toBeEnabled();
+      expect(screen.queryByText(/el material es opcional/i)).not.toBeInTheDocument();
     });
 
     it('muestra la cantidad de tags coincidentes con el programa por material', () => {

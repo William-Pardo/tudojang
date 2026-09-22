@@ -75,7 +75,7 @@ describe('FirestoreCentroEstudiosRepository - RED', () => {
 
     // Mock assignments documents
     const docs = [
-      { id: 'asig1', data: () => ({ tenantId: 't1', estado: 'publicada', destinatario: 'dest1' }) },
+      { id: 'asig1', data: () => ({ tenantId: 't1', estado: 'publicada', recursoId: 'recurso-1', destinatario: 'dest1' }) },
       { id: 'asig2', data: () => ({ tenantId: 't1', estado: 'borrador', destinatario: 'dest2' }) },
     ];
     mockGetDocs.mockResolvedValue({ docs });

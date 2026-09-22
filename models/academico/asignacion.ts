@@ -40,8 +40,13 @@ export interface AsignacionAcademica {
 
   /**
    * Recurso académico aprobado en biblioteca.
+   * Opcional: producto permite fijar una asignacion (destinatario/grados) sobre
+   * una clase sin publicar material real todavia (ver AsignarMaterialWizard,
+   * Paso 1 ya no obliga a elegir recurso). Codigo que lee este campo para
+   * mostrar "material asignado" (MisClasesView, checkpointMaterialService)
+   * debe tratar `recursoId` ausente/vacio como "sin material real".
    */
-  recursoId: string;
+  recursoId?: string;
 
   /**
    * ID externo del archivo en Google Drive asociado al recurso.
