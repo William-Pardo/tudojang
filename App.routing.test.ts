@@ -125,9 +125,9 @@ describe('HIJOS_POR_ID_ENLACE (menú mobile acordeon)', () => {
     expect(HIJOS_POR_ID_ENLACE.centroEstudios({ usuario: { rol: RolUsuario.Estudiante } })).toEqual([]);
   });
 
-  it('Configuracion: expone las 7 pestañas reales cuando no es demo comercial', () => {
+  it('Configuracion: expone las 8 pestañas reales cuando no es demo comercial', () => {
     const hijos = HIJOS_POR_ID_ENLACE.configuracion({ usuario: { rol: RolUsuario.Admin }, configClub: { esDemoComercial: false } });
-    expect(hijos.map((h) => h.id)).toEqual(['branding', 'equipo', 'accesos', 'sedes', 'programas', 'alertas', 'licencia']);
+    expect(hijos.map((h) => h.id)).toEqual(['branding', 'equipo', 'accesos', 'sedes', 'programas', 'grupos', 'alertas', 'licencia']);
   });
 
   it('Configuracion: esDemoComercial oculta Programas Extra', () => {

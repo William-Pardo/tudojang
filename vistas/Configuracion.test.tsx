@@ -429,3 +429,53 @@ describe('Configuracion - modo demo comercial (esDemoComercial)', () => {
         expect(screen.getByText('Programas Extra')).toBeInTheDocument();
     });
 });
+
+describe('Configuracion - tab Grupos de Entrenamiento', () => {
+    const guardarConfiguraciones = jest.fn<(...args: any[]) => Promise<void>>();
+    const mostrarNotificacion = jest.fn();
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        guardarConfiguraciones.mockResolvedValue(undefined);
+        mockSearchParams = new URLSearchParams('tab=grupos');
+        useConfiguracionMock.mockReturnValue({
+            usuarios: [],
+            configNotificaciones: { tenantId: 'test-tenant' },
+            configClub: { ...configClubBase, gruposEntrenamiento: [{ id: 'grp-a', nombre: 'Avanzados' }] },
+            cargando: false,
+            error: null,
+            guardarConfiguraciones,
+            agregarUsuario: jest.fn(),
+            actualizarUsuario: jest.fn(),
+            eliminarUsuario: jest.fn(),
+            cargarConfiguracion: jest.fn(),
+        });
+        useProgramasMock.mockReturnValue({ programas: [], eliminarPrograma: jest.fn(), agregarPrograma: jest.fn(), actualizarPrograma: jest.fn() });
+        useEstudiantesMock.mockReturnValue({ estudiantes: [{ id: 'e1', grupoEntrenamientoId: 'grp-a' }] });
+        useSedesMock.mockReturnValue({ sedes: [], sedesVisibles: [], totalSedesActivas: 1, eliminarSede: jest.fn(), agregarSede: jest.fn(), actualizarSede: jest.fn() });
+        useAuthMock.mockReturnValue({ usuario: { id: 'admin-1', tenantId: 'test-tenant', rol: 'Admin', email: 'admin@test.com' } });
+        useNotificacionMock.mockReturnValue({ toasts: [], mostrarNotificacion, ocultarNotificacion: jest.fn() });
+    });
+
+    it('crear un grupo lo guarda por la misma ruta de la configuración del club (guardarConfiguraciones)', async () => {
+        const user = userEvent.setup();
+        render(<VistaConfiguracion />);
+
+        expect(screen.getByText('Avanzados')).toBeInTheDocument();
+        expect(screen.getByText('1 alumno')).toBeInTheDocument();
+
+        await user.type(screen.getByPlaceholderText(/Nombre del grupo/), 'Infantil');
+        await user.click(screen.getByRole('button', { name: /Crear grupo/ }));
+
+        await waitFor(() => expect(guardarConfiguraciones).toHaveBeenCalledTimes(1));
+        const [, configGuardada] = guardarConfiguraciones.mock.calls[0] as [unknown, ConfiguracionClub];
+        expect(configGuardada.tenantId).toBe('test-tenant');
+        expect(configGuardada.gruposEntrenamiento).toEqual([
+            { id: 'grp-a', nombre: 'Avanzados' },
+            { id: expect.stringMatching(/^grp-/), nombre: 'Infantil' },
+        ]);
+        // El resto del documento del club viaja igual (merge sobre tenants/{tenantId}).
+        expect(configGuardada.nombreClub).toBe('Test Club');
+        expect(await screen.findByText('Infantil')).toBeInTheDocument();
+    });
+});

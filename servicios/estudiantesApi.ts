@@ -225,6 +225,49 @@ export const reactivarEstudiante = async (idEstudiante: string): Promise<void> =
     await updateDoc(docRef, { estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() });
 };
 
+// Asignación masiva desde el Directorio (grupo de entrenamiento / grado). A diferencia de
+// actualizarEstudiante (que manda el documento completo al updateDoc), acá cada write toca
+// UN SOLO campo: si la copia local del estudiante estuviera desactualizada, un write completo
+// pisaría cambios hechos por otra persona (pagos, firmas, etc.). Un update por estudiante
+// (no writeBatch) para poder reportar exactamente cuáles fallaron y reintentar solo esos;
+// repetir el mismo valor es inofensivo, así que el reintento es idempotente.
+export type CambioMasivoEstudiante =
+    | { campo: 'grupoEntrenamientoId'; valor: string | null } // null = "Sin grupo"
+    | { campo: 'grado'; valor: GradoTKD };
+
+export interface ResultadoCambioMasivo {
+    exitosos: string[];
+    fallidos: { id: string; error: string }[];
+}
+
+export const aplicarCambioEstudiante = async (idEstudiante: string, cambio: CambioMasivoEstudiante): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    if (cambio.campo === 'grado') {
+        await updateDoc(docRef, { grado: cambio.valor });
+    } else {
+        await updateDoc(docRef, { grupoEntrenamientoId: cambio.valor ? cambio.valor : deleteField() });
+    }
+};
+
+export const aplicarCambioMasivoEstudiantes = async (
+    idsEstudiantes: string[],
+    cambio: CambioMasivoEstudiante
+): Promise<ResultadoCambioMasivo> => {
+    const ids = Array.from(new Set(idsEstudiantes));
+    const resultados = await Promise.allSettled(ids.map(id => aplicarCambioEstudiante(id, cambio)));
+    const resultado: ResultadoCambioMasivo = { exitosos: [], fallidos: [] };
+    resultados.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+            resultado.exitosos.push(ids[i]);
+        } else {
+            const motivo = r.reason instanceof Error ? r.reason.message : String(r.reason);
+            resultado.fallidos.push({ id: ids[i], error: motivo });
+        }
+    });
+    return resultado;
+};
+
 export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
     const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'consentimiento');

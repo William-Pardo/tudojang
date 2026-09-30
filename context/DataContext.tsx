@@ -55,6 +55,9 @@ interface EstudiantesContextType {
     // explícito, sin borrado físico (matricula-estado-estudiante).
     retirarEstudiante: (id: string) => Promise<void>;
     reactivarEstudiante: (id: string) => Promise<void>;
+    // Asignación masiva (grupo de entrenamiento / grado): write parcial de un campo por
+    // estudiante; el estado local se actualiza solo para los que sí se guardaron.
+    aplicarCambioMasivoEstudiantes: (ids: string[], cambio: api.CambioMasivoEstudiante) => Promise<api.ResultadoCambioMasivo>;
 }
 const EstudiantesContext = createContext<EstudiantesContextType | undefined>(undefined);
 
@@ -327,6 +330,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         reactivarEstudiante: async (id) => {
                             await api.reactivarEstudiante(id);
                             setEstudiantes(prev => prev.map(e => e.id === id ? { ...e, estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() } : e));
+                        },
+                        aplicarCambioMasivoEstudiantes: async (ids, cambio) => {
+                            const resultado = await api.aplicarCambioMasivoEstudiantes(ids, cambio);
+                            const actualizados = new Set(resultado.exitosos);
+                            if (actualizados.size > 0) {
+                                setEstudiantes(prev => prev.map(e => {
+                                    if (!actualizados.has(e.id)) return e;
+                                    if (cambio.campo === 'grado') return { ...e, grado: cambio.valor };
+                                    const { grupoEntrenamientoId: _anterior, ...resto } = e;
+                                    return cambio.valor ? { ...resto, grupoEntrenamientoId: cambio.valor } : resto;
+                                }));
+                            }
+                            return resultado;
                         }
                     }}>
                         <EventosContext.Provider value={{

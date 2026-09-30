@@ -14,6 +14,7 @@ const mockExportarCSV = jest.fn();
 const mockGenerar = jest.fn();
 const mockRetirarEstudiante = jest.fn();
 const mockReactivarEstudiante = jest.fn();
+const mockAplicarCambioMasivo = jest.fn();
 
 jest.mock('../context/AuthContext', () => ({ useAuth: () => ({ usuario: mockUsuario }) }));
 jest.mock('../context/DataContext', () => ({ useConfiguracion: () => ({ configClub: mockConfigClub }) }));
@@ -97,6 +98,10 @@ jest.mock('../hooks/useGestionEstudiantes', () => ({
       configClub: mockEscenario.configClub ?? { tenantId: 'tenant-1' },
       retirarEstudiante: mockRetirarEstudiante,
       reactivarEstudiante: mockReactivarEstudiante,
+      gruposEntrenamiento: [],
+      filtroGrupoEntrenamiento: 'todos',
+      setFiltroGrupoEntrenamiento: jest.fn(),
+      aplicarCambioMasivoEstudiantes: mockAplicarCambioMasivo,
     };
   },
 }));
@@ -123,6 +128,9 @@ jest.mock('../components/TablaEstudiantes', () => (props: any) => (
   <div data-testid="tabla">
     {props.estudiantes.map((e: Estudiante) => (
       <div key={e.id} data-testid={`est-${e.id}`}>
+        {props.onToggleSeleccion && (
+          <input type="checkbox" aria-label={`sel-${e.id}`} checked={!!props.seleccionados?.has(e.id)} onChange={() => props.onToggleSeleccion(e.id)} />
+        )}
         {e.nombres} ({e.estadoMatricula})
         {e.estadoMatricula === 'retirado' ? (
           <button onClick={() => props.onReactivar(e)}>Reactivar {e.nombres}</button>
@@ -201,6 +209,47 @@ describe('VistaEstudiantes', () => {
     expect(screen.getAllByTestId(/est-/)).toHaveLength(2);
     fireEvent.change(screen.getByLabelText('estado'), { target: { value: EstadoPago.Pendiente } });
     expect(screen.getAllByTestId(/est-/)).toHaveLength(1);
+  });
+
+  describe('asignación masiva', () => {
+    it('"seleccionar filtrados" selecciona solo los visibles y la acción aplica solo sobre ellos', async () => {
+      const user = userEvent.setup();
+      mockAplicarCambioMasivo.mockResolvedValue({ exitosos: ['3', '5'], fallidos: [] });
+      render(<VistaEstudiantes />);
+
+      expect(screen.queryByRole('region', { name: 'Acciones masivas' })).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('grupo'), { target: { value: GrupoEdad.Cadetes } });
+      await user.click(screen.getByLabelText('Seleccionar todos los filtrados'));
+
+      expect(screen.getByText('2 alumnos seleccionados')).toBeInTheDocument();
+      expect(screen.getByLabelText('sel-3')).toBeChecked();
+      expect(screen.getByLabelText('sel-5')).toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: 'Asignar grado' }));
+      await user.selectOptions(screen.getByLabelText('Nuevo grado'), GradoTKD.Azul);
+      await user.click(screen.getByRole('button', { name: 'Continuar' }));
+      expect(screen.getByText(`Vas a cambiar el grado de 2 alumnos a ${GradoTKD.Azul}`)).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+      await waitFor(() => expect(mockAplicarCambioMasivo).toHaveBeenCalledWith(['3', '5'], { campo: 'grado', valor: GradoTKD.Azul }));
+      // Éxito total: se limpia la selección y desaparece la barra.
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Acciones masivas' })).not.toBeInTheDocument());
+      expect(screen.getByLabelText('sel-3')).not.toBeChecked();
+      expect(mockMostrarNotificacion).toHaveBeenCalledWith('2 alumnos actualizados.', 'success');
+    });
+
+    it('un seleccionado que queda oculto por un filtro no entra en la acción', async () => {
+      const user = userEvent.setup();
+      render(<VistaEstudiantes />);
+
+      await user.click(screen.getByLabelText('sel-1')); // Ana, Infantil
+      await user.click(screen.getByLabelText('sel-3')); // Carla, Cadetes
+      expect(screen.getByText('2 alumnos seleccionados')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('grupo'), { target: { value: GrupoEdad.Cadetes } });
+      expect(screen.getByText('1 alumno seleccionado')).toBeInTheDocument();
+    });
   });
 
   it('abre los flujos de formulario, registrar pago y ver firma', async () => {

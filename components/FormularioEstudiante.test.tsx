@@ -486,5 +486,79 @@ describe('FormularioEstudiante', () => {
       expect(screen.queryByText('Cobro Justo (Día 10+)')).not.toBeInTheDocument();
     });
   });
+
+  // Grupo de entrenamiento (catálogo por club): campo independiente del Grupo Técnico por
+  // edad, que se sigue calculando solo desde la fecha de nacimiento.
+  describe('Grupo de entrenamiento', () => {
+    const grupos = [{ id: 'grp-a', nombre: 'Avanzados' }, { id: 'grp-b', nombre: 'Junior y Mayores' }];
+
+    const estudianteAdulto = (overrides: Partial<Estudiante> = {}): Estudiante => ({
+      id: 'est-9', tenantId: 'test-tenant', nombres: 'Laura', apellidos: 'Mora', numeroIdentificacion: '555',
+      // Adulto (sin tutor obligatorio) pero < EDAD_INUSUAL_MINIMA (33), para que el submit no
+      // se frene en el modal de "Revisa antes de guardar".
+      fechaNacimiento: `${new Date().getFullYear() - 25}-01-01`, grado: GradoTKD.Verde, grupo: GrupoEdad.Adultos, horasAcumuladasGrado: 12,
+      sedeId: '1', estadoPago: EstadoPago.AlDia, fechaIngreso: '2023-01-01', saldoDeudor: 0, historialPagos: [],
+      consentimientoInformado: true, contratoServiciosFirmado: true, consentimientoImagenFirmado: true,
+      consentimientoFotosVideos: true, telefono: '3001234567', correo: 'laura@test.com', carnetGenerado: false,
+      estadoMatricula: 'activo',
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      mockState.configClub = { ...mockState.configClub, gruposEntrenamiento: grupos };
+    });
+
+    it('se muestra separado del Grupo Técnico, con el catálogo + "Sin grupo"', () => {
+      renderComponent();
+      const select = screen.getByLabelText('Grupo de entrenamiento') as HTMLSelectElement;
+      expect(Array.from(select.options).map(o => o.textContent)).toEqual(['Sin grupo', 'Avanzados', 'Junior y Mayores']);
+      expect(select).toHaveValue('');
+      expect(screen.getByLabelText(/Grupo T/i)).not.toBe(select);
+    });
+
+    it('alta: guarda grupoEntrenamientoId y el grupo por edad se sigue calculando solo', async () => {
+      const { container } = renderComponent();
+      await llenarCamposRequeridos(); // nacimiento 2000-01-01 => Adultos (verificado adentro)
+
+      fireEvent.change(screen.getByLabelText('Grupo de entrenamiento'), { target: { value: 'grp-b' } });
+      fireEvent.submit(container.querySelector('form')!);
+
+      await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+      const guardado = onGuardarMock.mock.calls[0][0];
+      expect(guardado.grupoEntrenamientoId).toBe('grp-b');
+      expect(guardado.grupo).toBe(GrupoEdad.Adultos);
+    });
+
+    it('edición: precarga el grupo actual y lo conserva al guardar sin tocarlo', async () => {
+      const { container } = renderComponent({ estudianteActual: estudianteAdulto({ grupoEntrenamientoId: 'grp-a' }) });
+
+      expect(screen.getByLabelText('Grupo de entrenamiento')).toHaveValue('grp-a');
+      fireEvent.submit(container.querySelector('form')!);
+
+      await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+      const guardado = onGuardarMock.mock.calls[0][0];
+      expect(guardado).toEqual(expect.objectContaining({ id: 'est-9', grupoEntrenamientoId: 'grp-a', grado: GradoTKD.Verde, grupo: GrupoEdad.Adultos }));
+    });
+
+    it('edición: cambiar a "Sin grupo" manda \'\' explícito para limpiar el campo', async () => {
+      const { container } = renderComponent({ estudianteActual: estudianteAdulto({ grupoEntrenamientoId: 'grp-a' }) });
+
+      fireEvent.change(screen.getByLabelText('Grupo de entrenamiento'), { target: { value: '' } });
+      fireEvent.submit(container.querySelector('form')!);
+
+      await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+      expect(onGuardarMock.mock.calls[0][0]).toHaveProperty('grupoEntrenamientoId', '');
+    });
+
+    it('edición con id huérfano (grupo eliminado): se muestra y se guarda como "Sin grupo"', async () => {
+      const { container } = renderComponent({ estudianteActual: estudianteAdulto({ grupoEntrenamientoId: 'grp-eliminado' }) });
+
+      expect(screen.getByLabelText('Grupo de entrenamiento')).toHaveValue('');
+      fireEvent.submit(container.querySelector('form')!);
+
+      await waitFor(() => expect(onGuardarMock).toHaveBeenCalledTimes(1));
+      expect(onGuardarMock.mock.calls[0][0]).toHaveProperty('grupoEntrenamientoId', '');
+    });
+  });
 });
 

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FiltrosEstudiantes from './FiltrosEstudiantes';
 import { EstadoPago, GradoTKD, GrupoEdad } from '../tipos';
+import { FILTRO_SIN_GRUPO_ENTRENAMIENTO } from '../utils/gruposEntrenamiento';
 
 describe('FiltrosEstudiantes', () => {
   const props = {
@@ -77,5 +78,31 @@ describe('FiltrosEstudiantes', () => {
     render(<FiltrosEstudiantes {...props} />);
     await user.selectOptions(screen.getByLabelText('Sede'), 'sur');
     expect(props.setFiltroSede).toHaveBeenCalledWith('sur');
+  });
+
+  describe('grupo de entrenamiento', () => {
+    const grupos = [{ id: 'grp-a', nombre: 'Avanzados' }, { id: 'grp-b', nombre: 'Junior y Mayores' }];
+
+    it('no muestra el filtro si el club no tiene grupos de entrenamiento', () => {
+      render(<FiltrosEstudiantes {...props} setFiltroGrupoEntrenamiento={jest.fn()} gruposEntrenamiento={[]} />);
+      expect(screen.queryByLabelText('Grupo de entrenamiento')).not.toBeInTheDocument();
+    });
+
+    it('lista el catálogo + "Sin grupo" e informa el id elegido', async () => {
+      const user = userEvent.setup();
+      const setFiltroGrupoEntrenamiento = jest.fn();
+      render(<FiltrosEstudiantes {...props} gruposEntrenamiento={grupos} filtroGrupoEntrenamiento="todos" setFiltroGrupoEntrenamiento={setFiltroGrupoEntrenamiento} />);
+
+      const select = screen.getByLabelText('Grupo de entrenamiento');
+      expect(Array.from((select as HTMLSelectElement).options).map(o => o.textContent)).toEqual([
+        'Todos los grupos de entrenamiento', 'Avanzados', 'Junior y Mayores', 'Sin grupo',
+      ]);
+
+      await user.selectOptions(select, 'grp-b');
+      expect(setFiltroGrupoEntrenamiento).toHaveBeenCalledWith('grp-b');
+
+      await user.selectOptions(select, 'Sin grupo');
+      expect(setFiltroGrupoEntrenamiento).toHaveBeenLastCalledWith(FILTRO_SIN_GRUPO_ENTRENAMIENTO);
+    });
   });
 });

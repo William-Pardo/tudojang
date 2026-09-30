@@ -109,6 +109,41 @@ describe('FilaEstudiante', () => {
     if (!isCard) expect(container.querySelector('tr')).toBeInTheDocument();
   });
 
+  describe('grupo de entrenamiento', () => {
+    const grupos = [{ id: 'grp-a', nombre: 'Avanzados' }];
+
+    it.each([true, false])('muestra el nombre del grupo asignado (isCard=%s)', (isCard) => {
+      renderFila({ estudiante: crearEstudiante({ grupoEntrenamientoId: 'grp-a' }), gruposEntrenamiento: grupos, isCard });
+      expect(screen.getByTitle('Grupo de entrenamiento')).toHaveTextContent('Avanzados');
+    });
+
+    it.each([true, false])('un id huérfano (grupo eliminado) se muestra como "Sin grupo" (isCard=%s)', (isCard) => {
+      renderFila({ estudiante: crearEstudiante({ grupoEntrenamientoId: 'grp-eliminado' }), gruposEntrenamiento: grupos, isCard });
+      expect(screen.getByTitle('Grupo de entrenamiento')).toHaveTextContent('Sin grupo');
+    });
+
+    it('sin catálogo en el club no muestra la etiqueta', () => {
+      renderFila({ estudiante: crearEstudiante({ grupoEntrenamientoId: 'grp-a' }) });
+      expect(screen.queryByTitle('Grupo de entrenamiento')).not.toBeInTheDocument();
+    });
+
+    it('con onToggleSeleccion pinta un checkbox que informa el id del estudiante', async () => {
+      const user = userEvent.setup();
+      const onToggleSeleccion = jest.fn();
+      renderFila({ onToggleSeleccion, seleccionado: false, isCard: false });
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Seleccionar Ana García' });
+      expect(checkbox).not.toBeChecked();
+      await user.click(checkbox);
+      expect(onToggleSeleccion).toHaveBeenCalledWith('est-1');
+    });
+
+    it('sin onToggleSeleccion no hay checkbox', () => {
+      renderFila();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+  });
+
   it.each([
     [EstadoPago.AlDia, 'bg-green-100'],
     [EstadoPago.Pendiente, 'bg-yellow-100'],
