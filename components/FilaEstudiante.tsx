@@ -2,8 +2,9 @@
 // components/FilaEstudiante.tsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { Estudiante } from '../tipos';
+import type { Estudiante, GrupoEntrenamiento } from '../tipos';
 import { RolUsuario } from '../tipos';
+import { nombreGrupoEntrenamiento } from '../utils/gruposEntrenamiento';
 import { useAuth } from '../context/AuthContext';
 import { normalizarEstadoMatricula } from '../utils/facturacion';
 import type { AlertaContactoDuplicado } from '../utils/contactoDuplicado';
@@ -38,6 +39,12 @@ interface Props {
     // lógica acá).
     onRetirar: (estudiante: Estudiante) => void;
     onReactivar: (estudiante: Estudiante) => void;
+    // Catálogo de grupos de entrenamiento del club, para mostrar el nombre (id huérfano o
+    // ausente => "Sin grupo"). Selección para asignación masiva: sin onToggleSeleccion no se
+    // pinta el checkbox.
+    gruposEntrenamiento?: GrupoEntrenamiento[];
+    seleccionado?: boolean;
+    onToggleSeleccion?: (idEstudiante: string) => void;
     isCard: boolean;
 }
 
@@ -50,9 +57,32 @@ export const FilaEstudiante: React.FC<Props> = ({
     onCompartirLink,
     onRetirar,
     onReactivar,
+    gruposEntrenamiento,
+    seleccionado = false,
+    onToggleSeleccion,
     isCard,
 }) => {
     const { usuario } = useAuth();
+    const nombreEntrenamiento = nombreGrupoEntrenamiento(estudiante, gruposEntrenamiento);
+    const checkboxSeleccion = onToggleSeleccion ? (
+        <input
+            type="checkbox"
+            checked={seleccionado}
+            onChange={() => onToggleSeleccion(estudiante.id)}
+            aria-label={`Seleccionar ${estudiante.nombres} ${estudiante.apellidos}`}
+            className="w-4 h-4 accent-tkd-blue cursor-pointer"
+        />
+    ) : null;
+    // Solo se muestra si el club ya definió grupos de entrenamiento -- en un club que no usa
+    // la función, un "Sin grupo" en cada fila sería ruido.
+    const badgeEntrenamiento = (gruposEntrenamiento?.length ?? 0) === 0 ? null : (
+        <span
+            title="Grupo de entrenamiento"
+            className="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+        >
+            {nombreEntrenamiento}
+        </span>
+    );
     const alertaTelefono = alertasContacto.find(a => a.campo === 'telefono');
     const alertaCorreo = alertasContacto.find(a => a.campo === 'correo');
     const [modalQrAbierto, setModalQrAbierto] = useState(false);
@@ -204,6 +234,8 @@ export const FilaEstudiante: React.FC<Props> = ({
                     className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 space-y-4"
                 >
                     <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-3">
+                            {checkboxSeleccion && <div className="pt-1">{checkboxSeleccion}</div>}
                         <div>
                             <p className="text-lg font-black text-tkd-dark dark:text-white uppercase leading-tight">
                                 {estudiante.nombres} {estudiante.apellidos}
@@ -211,6 +243,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                             </p>
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">{estudiante.numeroIdentificacion}</p>
                             {contenidoContacto}
+                        </div>
                         </div>
                         {contenidoAcciones}
                     </div>
@@ -230,6 +263,12 @@ export const FilaEstudiante: React.FC<Props> = ({
                                     {estudiante.grado}
                                 </span>
                             </div>
+                            {badgeEntrenamiento && (
+                                <div>
+                                    <p className="text-[10px] text-gray-400 uppercase font-black mb-0.5 tracking-widest">Entrenamiento</p>
+                                    {badgeEntrenamiento}
+                                </div>
+                            )}
                         </div>
                         <div className="w-full sm:w-auto">
                             <p className="text-[10px] text-gray-400 uppercase font-black mb-1.5 tracking-widest sm:text-right">Estado Documental</p>
@@ -243,8 +282,9 @@ export const FilaEstudiante: React.FC<Props> = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    className={`${seleccionado ? 'bg-blue-50/60 dark:bg-blue-900/20' : ''} hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors`}
                 >
+                    {checkboxSeleccion && <td className="pl-6 py-4 w-8">{checkboxSeleccion}</td>}
                     <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-black text-tkd-dark dark:text-white uppercase">
                             {estudiante.nombres} {estudiante.apellidos}
@@ -258,6 +298,7 @@ export const FilaEstudiante: React.FC<Props> = ({
                         <span className="mt-1 px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                             {estudiante.grado}
                         </span>
+                        {badgeEntrenamiento && <div className="mt-1">{badgeEntrenamiento}</div>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                         <EstadoPagoBadge estado={estudiante.estadoPago} />

@@ -15,6 +15,7 @@ import { formatearPrecio } from '../utils/formatters';
 import { calcularTarifaBaseEstudiante, calcularSumaProgramasRecurrentes, calcularMontoCobroJusto } from '../utils/calculations';
 import { buscarEstudianteDuplicado } from '../servicios/estudiantesApi';
 import { generarAlertasAsistenciales } from '../utils/validacionAsistencial';
+import { ETIQUETA_SIN_GRUPO, resolverGrupoEntrenamiento } from '../utils/gruposEntrenamiento';
 
 interface Props {
     abierto: boolean;
@@ -54,6 +55,7 @@ export const schemaEstudiante = yup.object({
     fechaNacimiento: yup.string().required('La fecha de nacimiento es obligatoria.'),
     grado: yup.string().oneOf(Object.values(GradoTKD)).required('El grado es obligatorio.'),
     grupo: yup.string().oneOf(Object.values(GrupoEdad)).required(),
+    grupoEntrenamientoId: yup.string().optional(),
     horasAcumuladasGrado: yup.number().typeError('Debe ser un número.').min(0).required(),
     sedeId: yup.string().required('Debe seleccionar una sede.'),
     telefono: yup.string().trim().optional(),
@@ -122,14 +124,22 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
         ...(borrador || {})
     });
 
+    const gruposEntrenamiento = configClub.gruposEntrenamiento || [];
+
+    // Edición: un grupoEntrenamientoId que ya no existe en el catálogo (grupo eliminado) se
+    // muestra y se guarda como "Sin grupo" ('') -- si no, el select mostraría "Sin grupo" pero
+    // react-hook-form seguiría enviando el id huérfano.
+    const crearValoresEdicion = (estudiante: Estudiante) => ({
+        ...estudiante,
+        grupoEntrenamientoId: resolverGrupoEntrenamiento(estudiante, gruposEntrenamiento)?.id ?? '',
+        enviarInvitacionLoginEstudiante: false,
+        enviarInvitacionLoginTutor: false
+    });
+
     const { register, handleSubmit, formState: { errors, isValid }, watch, setValue, reset } = useForm<any>({
         resolver: yupResolver(schemaEstudiante),
         mode: 'onChange',
-        defaultValues: estudianteActual ? {
-            ...estudianteActual,
-            enviarInvitacionLoginEstudiante: false,
-            enviarInvitacionLoginTutor: false
-        } : crearDefaultsEstudiante()
+        defaultValues: estudianteActual ? crearValoresEdicion(estudianteActual) : crearDefaultsEstudiante()
     });
 
     // Fix 2026-07-21 (`npm run typecheck`): react-hook-form tipa un grupo ANIDADO como
@@ -272,11 +282,7 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
     };
 
     useEffect(() => {
-        if (abierto) reset(estudianteActual ? {
-            ...estudianteActual,
-            enviarInvitacionLoginEstudiante: false,
-            enviarInvitacionLoginTutor: false
-        } : crearDefaultsEstudiante());
+        if (abierto) reset(estudianteActual ? crearValoresEdicion(estudianteActual) : crearDefaultsEstudiante());
     }, [abierto, estudianteActual, borrador, reset, configClub.configuracionCuentasExternas?.invitarEstudianteAlCrear, configClub.configuracionCuentasExternas?.invitarTutorAlCrear]);
 
     const onSubmit = async (data: any) => {
@@ -348,12 +354,27 @@ const FormularioEstudiante: React.FC<Props> = ({ abierto, onCerrar, onGuardar, e
                                 <FormInputError mensaje={errors.grado?.message as string} />
                             </div>
                             <div className="space-y-1">
-                                <label htmlFor="grupo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Grupo Técnico</label>
+                                <label htmlFor="grupo" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Grupo Técnico (por edad)</label>
                                 <select id="grupo" {...register('grupo')} className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
                                     {Object.values(GrupoEdad).map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
                                 <FormInputError mensaje={errors.grupo?.message as string} />
                             </div>
+                        </div>
+
+                        {/* Grupo de entrenamiento (nivel/clase definido por el club). Independiente
+                            del Grupo Técnico de arriba, que se calcula solo por fecha de nacimiento. */}
+                        <div className="p-6 bg-purple-50 dark:bg-purple-900/10 rounded-3xl border border-purple-100 dark:border-purple-900/30 space-y-2">
+                            <label htmlFor="grupoEntrenamientoId" className="text-[10px] font-black uppercase text-purple-700 dark:text-purple-300 block tracking-widest">Grupo de entrenamiento</label>
+                            <select id="grupoEntrenamientoId" {...register('grupoEntrenamientoId')} className="w-full bg-white dark:bg-gray-800 border-none rounded-xl p-4 text-sm font-black dark:text-white">
+                                <option value="">{ETIQUETA_SIN_GRUPO}</option>
+                                {gruposEntrenamiento.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                            </select>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                                {gruposEntrenamiento.length > 0
+                                    ? 'Nivel o clase en la que entrena. No cambia el grupo por edad.'
+                                    : 'Tu club aún no tiene grupos. Créalos en Configuración > Grupos de Entrenamiento.'}
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4">

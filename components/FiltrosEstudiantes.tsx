@@ -1,7 +1,8 @@
 // components/FiltrosEstudiantes.tsx
 import React from 'react';
-import type { Sede } from '../tipos';
+import type { Sede, GrupoEntrenamiento } from '../tipos';
 import { GrupoEdad, EstadoPago, GradoTKD } from '../tipos';
+import { ETIQUETA_SIN_GRUPO, FILTRO_SIN_GRUPO_ENTRENAMIENTO } from '../utils/gruposEntrenamiento';
 
 interface Props {
   filtroNombre: string;
@@ -17,6 +18,11 @@ interface Props {
   sedes: Sede[];
   onLimpiar: () => void;
   filtrosActivos: boolean;
+  // Grupo de entrenamiento (catálogo por club). Opcional: si el club no tiene grupos
+  // definidos, el filtro no se muestra.
+  gruposEntrenamiento?: GrupoEntrenamiento[];
+  filtroGrupoEntrenamiento?: string;
+  setFiltroGrupoEntrenamiento?: (value: string) => void;
 }
 
 const FiltrosEstudiantes: React.FC<Props> = ({
@@ -33,11 +39,15 @@ const FiltrosEstudiantes: React.FC<Props> = ({
   sedes,
   onLimpiar,
   filtrosActivos,
+  gruposEntrenamiento = [],
+  filtroGrupoEntrenamiento = 'todos',
+  setFiltroGrupoEntrenamiento,
 }) => {
   const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm";
+  const mostrarFiltroEntrenamiento = gruposEntrenamiento.length > 0 && !!setFiltroGrupoEntrenamiento;
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 gap-4 ${mostrarFiltroEntrenamiento ? 'md:grid-cols-3 xl:grid-cols-6' : 'md:grid-cols-5'}`}>
         <input
           type="text"
           placeholder="Buscar por nombre..."
@@ -61,6 +71,13 @@ const FiltrosEstudiantes: React.FC<Props> = ({
           <option value="todos">Todas las sedes</option>
           {sedes.map(sede => <option key={sede.id} value={sede.id}>{sede.nombre}</option>)}
         </select>
+        {mostrarFiltroEntrenamiento && (
+          <select aria-label="Grupo de entrenamiento" value={filtroGrupoEntrenamiento} onChange={e => setFiltroGrupoEntrenamiento!(e.target.value)} className={selectClass}>
+            <option value="todos">Todos los grupos de entrenamiento</option>
+            {gruposEntrenamiento.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+            <option value={FILTRO_SIN_GRUPO_ENTRENAMIENTO}>{ETIQUETA_SIN_GRUPO}</option>
+          </select>
+        )}
       </div>
       {filtrosActivos && (
         <div className="mt-3 flex justify-end">

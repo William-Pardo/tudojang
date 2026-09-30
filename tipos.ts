@@ -121,6 +121,15 @@ export interface Programa {
     activo: boolean;
 }
 
+// Grupo de entrenamiento definido por cada club (p. ej. "Infantil", "Avanzados",
+// "Junior y Mayores"). Es independiente del GrupoEdad (calculado por fecha de nacimiento):
+// agrupa por NIVEL/clase real. El estudiante guarda solo el `id`, así que renombrar un grupo
+// no deja alumnos huérfanos.
+export interface GrupoEntrenamiento {
+    id: string;
+    nombre: string;
+}
+
 export interface ConfiguracionClub {
     tenantId: string;
     slug: string;
@@ -175,6 +184,9 @@ export interface ConfiguracionClub {
     // nada) a un prorrateo diario desde el día 10. Opt-in por tenant -- si no está activo, el
     // formulario de alta mantiene exactamente el comportamiento anterior.
     cobroJustoActivo?: boolean;
+    // Catálogo de grupos de entrenamiento del club (ver GrupoEntrenamiento). Ausente = sin
+    // grupos definidos todavía.
+    gruposEntrenamiento?: GrupoEntrenamiento[];
     // Campos de pricing por cupo real (SDD pricing-cupo-real, Bloque 2 -- capacidad-tenant /
     // facturacion-metered). Corte final (Bloque 4, tasks.md 4.13): `plan`/`limiteEstudiantes`/
     // `limiteUsuarios`/`limiteSedes` fueron RETIRADOS de esta interfaz -- cualquier lector que
@@ -208,6 +220,9 @@ export interface Estudiante {
     fechaNacimiento: string;
     grado: GradoTKD;
     grupo: GrupoEdad;
+    // Id de un GrupoEntrenamiento del catálogo del club (ConfiguracionClub.gruposEntrenamiento).
+    // Ausente, '' o un id que ya no existe en el catálogo (grupo eliminado) = "Sin grupo".
+    grupoEntrenamientoId?: string;
     horasAcumuladasGrado: number;
     sedeId: string;
     telefono: string;

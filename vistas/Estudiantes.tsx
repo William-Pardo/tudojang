@@ -1,6 +1,6 @@
 
 // vistas/Estudiantes.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGestionEstudiantes } from '../hooks/useGestionEstudiantes';
@@ -21,6 +21,7 @@ import { TablaEstudiantesSkeleton } from '../components/skeletons/TablaEstudiant
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import ModalImportacionMasiva from '../components/ModalImportacionMasiva';
+import AccionesMasivasEstudiantes from '../components/AccionesMasivasEstudiantes';
 import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
 // Sub-vistas integradas
@@ -57,6 +58,10 @@ export const VistaEstudiantes: React.FC = () => {
         setFiltroGrado,
         filtroSede,
         setFiltroSede,
+        filtroGrupoEntrenamiento,
+        setFiltroGrupoEntrenamiento,
+        gruposEntrenamiento,
+        aplicarCambioMasivoEstudiantes,
         sedesVisibles,
         modalFormularioAbierto,
         estudianteEnEdicion,
@@ -91,6 +96,31 @@ export const VistaEstudiantes: React.FC = () => {
     const [misionActiva, setMisionActiva] = useState<MisionKicho | null>(null);
     const [countdown, setCountdown] = useState('');
     const [generandoData, setGenerandoData] = useState(false);
+
+    // Selección para asignación masiva. Las acciones operan SOLO sobre los seleccionados que
+    // siguen visibles con los filtros actuales -- si el usuario cambia un filtro, un alumno
+    // que quedó oculto no se modifica "a ciegas".
+    const [seleccion, setSeleccion] = useState<Set<string>>(() => new Set());
+    const seleccionadosVisibles = useMemo(
+        () => estudiantesFiltrados.filter(e => seleccion.has(e.id)),
+        [estudiantesFiltrados, seleccion]
+    );
+    const idsSeleccionadosVisibles = useMemo(() => new Set(seleccionadosVisibles.map(e => e.id)), [seleccionadosVisibles]);
+    const todosFiltradosSeleccionados = estudiantesFiltrados.length > 0 && seleccionadosVisibles.length === estudiantesFiltrados.length;
+
+    const toggleSeleccion = (idEstudiante: string) => {
+        setSeleccion(prev => {
+            const nueva = new Set(prev);
+            if (nueva.has(idEstudiante)) nueva.delete(idEstudiante); else nueva.add(idEstudiante);
+            return nueva;
+        });
+    };
+
+    const toggleSeleccionarFiltrados = () => {
+        setSeleccion(todosFiltradosSeleccionados ? new Set() : new Set(estudiantesFiltrados.map(e => e.id)));
+    };
+
+    const limpiarSeleccion = () => setSeleccion(new Set());
 
     const esTutor = usuario?.rol === RolUsuario.Tutor;
     // Preserva el fallback actual por rol (esTutor ? 'asistencia' : 'directorio') cuando el
@@ -156,6 +186,17 @@ export const VistaEstudiantes: React.FC = () => {
                         sedes={sedesVisibles}
                         onLimpiar={limpiarFiltros}
                         filtrosActivos={filtrosActivos}
+                        gruposEntrenamiento={gruposEntrenamiento}
+                        filtroGrupoEntrenamiento={filtroGrupoEntrenamiento}
+                        setFiltroGrupoEntrenamiento={setFiltroGrupoEntrenamiento}
+                    />
+
+                    <AccionesMasivasEstudiantes
+                        seleccionados={seleccionadosVisibles}
+                        gruposEntrenamiento={gruposEntrenamiento}
+                        onAplicar={aplicarCambioMasivoEstudiantes}
+                        onLimpiarSeleccion={limpiarSeleccion}
+                        onNotificar={mostrarNotificacion}
                     />
 
                     {filtrosSinResultados ? (
@@ -169,12 +210,22 @@ export const VistaEstudiantes: React.FC = () => {
                         </EmptyState>
                     ) : (
                         <>
-                            <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1">
+                            <div className="mb-4 text-[10px] font-black text-tkd-blue flex justify-between items-center uppercase tracking-widest px-1 gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={todosFiltradosSeleccionados}
+                                        onChange={toggleSeleccionarFiltrados}
+                                        aria-label="Seleccionar todos los filtrados"
+                                        className="w-4 h-4 accent-tkd-blue"
+                                    />
+                                    <span>Seleccionar los {estudiantesFiltrados.length} filtrados</span>
+                                </label>
                                 <div>
                                     <>Mostrando <span className="text-tkd-blue">{startIndex + 1}-{Math.min(endIndex, estudiantesFiltrados.length)}</span> de <span className="text-tkd-blue">{estudiantesFiltrados.length}</span></>
                                 </div>
                             </div>
-                            <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} onRetirar={retirarEstudiante} onReactivar={reactivarEstudiante} />
+                            <TablaEstudiantes estudiantes={estudiantesPaginados} onEditar={abrirFormulario} onEliminar={abrirConfirmacionEliminar} onVerFirma={abrirModalFirma} onCompartirLink={handleShareLink} onRetirar={retirarEstudiante} onReactivar={reactivarEstudiante} gruposEntrenamiento={gruposEntrenamiento} seleccionados={idsSeleccionadosVisibles} onToggleSeleccion={toggleSeleccion} />
                             {renderPaginacion()}
                         </>
                     )}

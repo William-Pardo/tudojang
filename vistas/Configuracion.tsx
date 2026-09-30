@@ -2,7 +2,7 @@
 // vistas/Configuracion.tsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede, ConfiguracionClub } from '../tipos';
+import { Usuario, TipoVinculacionColaborador, RolUsuario, Programa, TipoCobroPrograma, Sede, ConfiguracionClub, GrupoEntrenamiento } from '../tipos';
 import { generarUrlAbsoluta, formatearPrecio } from '../utils/formatters';
 import {
     IconoCerrar, IconoContrato, IconoWhatsApp, IconoCopiar, IconoAprobar,
@@ -28,6 +28,7 @@ import GestionNotificacionesPush from '../components/GestionNotificacionesPush';
 import InvitacionesView from './admin/InvitacionesView';
 import { optimizarImagenBase64 } from '../utils/imageProcessor';
 import Loader from '../components/Loader';
+import GestionGruposEntrenamiento from '../components/configuracion/GestionGruposEntrenamiento';
 import { calcularCapacidad } from '../utils/facturacion';
 import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
 
@@ -317,8 +318,8 @@ const VistaConfiguracion: React.FC = () => {
     // extra: cada seccion del wizard de onboarding se gatea por `currentStep` (ver mas abajo),
     // no por `activeTab` solo, asi que un `?tab=` invalido/ausente durante el wizard es
     // seguro -- cae al fallback 'branding' de siempre y el wizard sigue su propio flujo.
-    const CONFIG_TAB_IDS = ['branding', 'equipo', 'sedes', 'programas', 'alertas', 'accesos', 'licencia'] as const;
-    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'alertas' | 'accesos' | 'licencia'>(() =>
+    const CONFIG_TAB_IDS = ['branding', 'equipo', 'sedes', 'programas', 'grupos', 'alertas', 'accesos', 'licencia'] as const;
+    const [activeTab, setActiveTab] = useState<'branding' | 'equipo' | 'sedes' | 'programas' | 'grupos' | 'alertas' | 'accesos' | 'licencia'>(() =>
         resolverTabInicial(CONFIG_TAB_IDS, searchParams.get('tab'), 'branding')
     );
     // Bug reportado en vivo: el useState de arriba solo lee `?tab=` al MONTAR -- si esta vista
@@ -409,6 +410,17 @@ const VistaConfiguracion: React.FC = () => {
         } finally {
             setComprandoExtra(null);
         }
+    };
+
+    // Catálogo de grupos de entrenamiento: misma ruta de guardado que el resto de la
+    // configuración del club (guardarConfiguraciones -> tenants/{tenantId} con merge), igual
+    // que restaurarColores/remover logo más abajo. Se lanza el error para que el componente
+    // muestre el aviso y no limpie el formulario.
+    const guardarGruposEntrenamiento = async (gruposEntrenamiento: GrupoEntrenamiento[]) => {
+        if (!localConfigClub) throw new Error('Configuración del club no disponible');
+        const nuevaConfig: ConfiguracionClub = { ...localConfigClub, gruposEntrenamiento };
+        await guardarConfiguraciones(localConfigNotificaciones, nuevaConfig);
+        setLocalConfigClub(nuevaConfig);
     };
 
     // --- LÓGICA DE ONBOARDING ---
@@ -598,6 +610,7 @@ const VistaConfiguracion: React.FC = () => {
                             { id: 'accesos', label: 'Cuentas Externas', icon: IconoEmail },
                             { id: 'sedes', label: 'Sedes Adicionales', icon: IconoCasa },
                             { id: 'programas', label: 'Programas Extra', icon: IconoProgramasExtra, iconScale: 'scale-[1.46]' },
+                            { id: 'grupos', label: 'Grupos de Entrenamiento', icon: IconoEstudiantes },
                             // Renombrado a pedido del usuario: se confundía con el leaf top-level
                             // "Alertas" del menú (donde llegan las notificaciones) -- esto es la
                             // configuración del motor que las genera. Coincide con el título real
@@ -1038,6 +1051,15 @@ const VistaConfiguracion: React.FC = () => {
                             ))}
                         </div>
                     </div>
+                )}
+
+                {!isWizardMode && activeTab === 'grupos' && (
+                    <GestionGruposEntrenamiento
+                        grupos={localConfigClub.gruposEntrenamiento || []}
+                        estudiantes={estudiantes}
+                        onGuardar={guardarGruposEntrenamiento}
+                        onNotificar={mostrarNotificacion}
+                    />
                 )}
 
                 {!isWizardMode && activeTab === 'alertas' && (

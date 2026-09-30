@@ -11,6 +11,7 @@ import { RolAcademico } from '../models/academico';
 import { useNotificacion } from '../context/NotificacionContext';
 import { useEstudiantes, useConfiguracion, useSedes } from '../context/DataContext';
 import { generarUrlAbsoluta } from '../utils/formatters';
+import { pasaFiltroGrupoEntrenamiento } from '../utils/gruposEntrenamiento';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -23,9 +24,10 @@ export const useGestionEstudiantes = () => {
     const {
         estudiantes, cargando, error, agregarEstudiante, actualizarEstudiante, eliminarEstudiante,
         retirarEstudiante: retirarEstudianteApi, reactivarEstudiante: reactivarEstudianteApi,
-        cargarEstudiantes,
+        cargarEstudiantes, aplicarCambioMasivoEstudiantes,
     } = useEstudiantes();
     const { configClub } = useConfiguracion();
+    const gruposEntrenamiento = useMemo(() => configClub.gruposEntrenamiento || [], [configClub.gruposEntrenamiento]);
     const { sedesVisibles } = useSedes();
     const { mostrarNotificacion } = useNotificacion();
     const location = ReactRouterDOM.useLocation();
@@ -36,6 +38,8 @@ export const useGestionEstudiantes = () => {
     const [filtroEstado, setFiltroEstado] = useState<EstadoPago | 'todos'>('todos');
     const [filtroGrado, setFiltroGrado] = useState<GradoTKD | 'todos'>('todos');
     const [filtroSede, setFiltroSede] = useState('todos');
+    // 'todos' | FILTRO_SIN_GRUPO_ENTRENAMIENTO | id de un grupo del catálogo
+    const [filtroGrupoEntrenamiento, setFiltroGrupoEntrenamiento] = useState('todos');
     const [modalFormularioAbierto, setModalFormularioAbierto] = useState(false);
     const [estudianteEnEdicion, setEstudianteEnEdicion] = useState<Estudiante | null>(null);
     const [modalConfirmacionAbierto, setModalConfirmacionAbierto] = useState(false);
@@ -62,13 +66,14 @@ export const useGestionEstudiantes = () => {
             const pasaFiltroEstado = filtroEstado === 'todos' || e.estadoPago === filtroEstado;
             const pasaFiltroGrado = filtroGrado === 'todos' || e.grado === filtroGrado;
             const pasaFiltroSede = filtroSede === 'todos' || e.sedeId === filtroSede;
-            return pasaFiltroNombre && pasaFiltroGrupo && pasaFiltroEstado && pasaFiltroGrado && pasaFiltroSede;
+            const pasaFiltroEntrenamiento = pasaFiltroGrupoEntrenamiento(e, filtroGrupoEntrenamiento, gruposEntrenamiento);
+            return pasaFiltroNombre && pasaFiltroGrupo && pasaFiltroEstado && pasaFiltroGrado && pasaFiltroSede && pasaFiltroEntrenamiento;
         });
-    }, [estudiantes, filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede, error]);
+    }, [estudiantes, filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede, filtroGrupoEntrenamiento, gruposEntrenamiento, error]);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede]);
+    }, [filtroNombre, filtroGrupo, filtroEstado, filtroGrado, filtroSede, filtroGrupoEntrenamiento]);
 
     const totalPages = Math.ceil(estudiantesFiltrados.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -121,6 +126,14 @@ export const useGestionEstudiantes = () => {
                     ...datosPersistibles.tutor,
                     correo: datosPersistibles.tutor.correo.toLowerCase().trim(),
                 };
+            }
+
+            // Grupo de entrenamiento: el select del formulario manda '' para "Sin grupo". En
+            // una EDICIÓN se conserva '' a propósito (actualizarEstudiante hace updateDoc con
+            // el documento, así que omitir la clave dejaría el grupo anterior intacto). En un
+            // alta no hay nada que limpiar: se omite para no guardar un campo vacío.
+            if (!datosPersistibles.id && !datosPersistibles.grupoEntrenamientoId) {
+                delete datosPersistibles.grupoEntrenamientoId;
             }
 
             const enviarInvitacionAcademica = async (estudiante: Estudiante, rol: RolAcademico) => {
@@ -400,13 +413,15 @@ export const useGestionEstudiantes = () => {
         setFiltroEstado('todos');
         setFiltroGrado('todos');
         setFiltroSede('todos');
+        setFiltroGrupoEntrenamiento('todos');
     };
 
     const filtrosActivos = filtroNombre !== '' ||
         filtroGrupo !== 'todos' ||
         filtroEstado !== 'todos' ||
         filtroGrado !== 'todos' ||
-        filtroSede !== 'todos';
+        filtroSede !== 'todos' ||
+        filtroGrupoEntrenamiento !== 'todos';
 
     return {
         estudiantes,
@@ -423,6 +438,10 @@ export const useGestionEstudiantes = () => {
         setFiltroGrado,
         filtroSede,
         setFiltroSede,
+        filtroGrupoEntrenamiento,
+        setFiltroGrupoEntrenamiento,
+        gruposEntrenamiento,
+        aplicarCambioMasivoEstudiantes,
         sedesVisibles,
         estudiantesFiltrados,
         estudiantesPaginados,

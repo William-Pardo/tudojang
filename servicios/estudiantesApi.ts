@@ -225,6 +225,72 @@ export const reactivarEstudiante = async (idEstudiante: string): Promise<void> =
     await updateDoc(docRef, { estadoMatricula: 'activo', fechaReactivacion: new Date().toISOString() });
 };
 
+// Asignación masiva desde el Directorio (grupo de entrenamiento / grado). A diferencia de
+// actualizarEstudiante (que manda el documento completo al updateDoc), acá cada write toca
+// UN SOLO campo: si la copia local del estudiante estuviera desactualizada, un write completo
+// pisaría cambios hechos por otra persona (pagos, firmas, etc.). Un update por estudiante
+// (no writeBatch) para poder reportar exactamente cuáles fallaron y reintentar solo esos;
+// repetir el mismo valor es inofensivo, así que el reintento es idempotente.
+export type CambioMasivoEstudiante =
+    | { campo: 'grupoEntrenamientoId'; valor: string | null } // null = "Sin grupo"
+    | { campo: 'grado'; valor: GradoTKD };
+
+export interface ResultadoCambioMasivo {
+    exitosos: string[];
+    fallidos: { id: string; error: string }[];
+}
+
+export const aplicarCambioEstudiante = async (idEstudiante: string, cambio: CambioMasivoEstudiante): Promise<void> => {
+    if (!isFirebaseConfigured) return;
+    const docRef = doc(db, 'estudiantes', idEstudiante);
+    if (cambio.campo === 'grado') {
+        await updateDoc(docRef, { grado: cambio.valor });
+    } else {
+        await updateDoc(docRef, { grupoEntrenamientoId: cambio.valor ? cambio.valor : deleteField() });
+    }
+};
+
+// Sin conexión, el SDK de Firestore no rechaza el updateDoc: lo encola y la promesa queda
+// pendiente hasta que el servidor confirma. Sin este límite, la asignación masiva se quedaba
+// en "Aplicando cambios..." indefinidamente. Al vencer se reporta como fallido; el write
+// encolado puede igual confirmarse después, y como reintentar es idempotente no hay daño.
+export const TIEMPO_LIMITE_CAMBIO_MS = 20000;
+// Escrituras simultáneas por tanda, para no disparar cientos de requests a la vez.
+export const TAMANO_TANDA_CAMBIO_MASIVO = 25;
+
+const conTiempoLimite = <T,>(promesa: Promise<T>, ms: number): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Sin respuesta del servidor (revisa tu conexión).')), ms);
+        promesa.then(
+            v => { clearTimeout(timer); resolve(v); },
+            e => { clearTimeout(timer); reject(e); }
+        );
+    });
+
+export const aplicarCambioMasivoEstudiantes = async (
+    idsEstudiantes: string[],
+    cambio: CambioMasivoEstudiante
+): Promise<ResultadoCambioMasivo> => {
+    const ids = Array.from(new Set(idsEstudiantes));
+    const resultados: PromiseSettledResult<void>[] = [];
+    for (let i = 0; i < ids.length; i += TAMANO_TANDA_CAMBIO_MASIVO) {
+        const tanda = ids.slice(i, i + TAMANO_TANDA_CAMBIO_MASIVO);
+        resultados.push(...await Promise.allSettled(
+            tanda.map(id => conTiempoLimite(aplicarCambioEstudiante(id, cambio), TIEMPO_LIMITE_CAMBIO_MS))
+        ));
+    }
+    const resultado: ResultadoCambioMasivo = { exitosos: [], fallidos: [] };
+    resultados.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+            resultado.exitosos.push(ids[i]);
+        } else {
+            const motivo = r.reason instanceof Error ? r.reason.message : String(r.reason);
+            resultado.fallidos.push({ id: ids[i], error: motivo });
+        }
+    });
+    return resultado;
+};
+
 export const guardarFirmaConsentimiento = async (idEstudiante: string, tenantId: string, firmaDigital: string): Promise<void> => {
     if (!isFirebaseConfigured) return;
     const urlFirma = await uploadFirma(tenantId, idEstudiante, firmaDigital, 'consentimiento');
