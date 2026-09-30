@@ -6,8 +6,8 @@ import type {
     SensibilidadSoporte,
 } from './tipos';
 
-const VERSION = '1.0.9';
-const VERIFIED_AT = '2026-09-09';
+const VERSION = '1.0.10';
+const VERIFIED_AT = '2026-09-30';
 const OWNER = 'Producto y Soporte Tudojang';
 const DEFAULT_ESCALATION = 'Escalar si la pantalla, los permisos o los datos no coinciden con estos pasos.';
 const AUTH_UI_ONLY = 'Visibilidad de UI inventariada; autorización backend/reglas no verificada.';
@@ -209,6 +209,35 @@ export const CATALOGO_SOPORTE_V1 = {
             ['Abre Estudiantes.', 'Pulsa Agregar Estudiante o selecciona una fila existente.', 'Completa o revisa los datos y pulsa Guardar Estudiante; las acciones destructivas requieren privilegio vigente.'],
             ['vistas/Estudiantes.tsx', 'components/FilaEstudiante.tsx'],
             { sensitivity: 'sensitive', negativeTerms: ['registrar pago', 'marcar asistencia'] }),
+        // Agregado 2026-09-30 (PR #104): asignación masiva de grado y grupo de entrenamiento.
+        entry('students.bulk-assign', 'estudiantes', 'Asignación masiva de grado y grupo de entrenamiento', AEA, '/estudiantes',
+            [
+                'asignacion masiva',
+                'asignar grupo a varios',
+                'asignar grupo de entrenamiento',
+                'cambiar grado a varios',
+                'cambiar grado masivo',
+                'asignar grado en bloque',
+                'actualizar grados',
+                'seleccionar varios estudiantes',
+                'filtrar por grupo de entrenamiento',
+                'reintentar fallidos',
+            ],
+            ['seleccionar', 'asignar', 'filtrar', 'confirmar', 'reintentar'],
+            [
+                'Abre Estudiantes. Si quieres, filtra por Grupo de entrenamiento (incluye la opción "Sin grupo") para ver solo a quienes faltan.',
+                'Marca las casillas de los alumnos o usa "Seleccionar los N filtrados". La selección se mantiene al cambiar de página o de búsqueda.',
+                'Antes de aplicar, borra la búsqueda por nombre: la acción solo se aplica a los seleccionados que siguen visibles con los filtros actuales.',
+                'En la barra de acciones elige Asignar grupo de entrenamiento o Asignar grado, escoge el valor y revisa la confirmación con la lista de nombres.',
+                'Al terminar verás cuántos se actualizaron y cuáles fallaron; usa Reintentar fallidos. Sin conexión, cada cambio se da por fallido a los 20 segundos. Solo se modifica el campo elegido, el resto de la ficha no se toca.',
+                'Para un solo alumno también puedes cambiar el grado y el Grupo de entrenamiento desde su ficha con Editar. El filtro de Grado muestra el grado actual, no el que vas a asignar.',
+            ],
+            ['vistas/Estudiantes.tsx', 'components/AccionesMasivasEstudiantes.tsx', 'components/FiltrosEstudiantes.tsx', 'servicios/estudiantesApi.ts'],
+            {
+                sensitivity: 'sensitive',
+                negativeTerms: ['registrar pago', 'importar estudiantes'],
+                authorizationRef: 'firestore.rules#estudiantes update: instructor del mismo tenant',
+            }),
         entry('students.kicho', 'estudiantes', 'Censo y aspirantes de Misión KICHO', AE, '/estudiantes',
             ['mision kicho', 'censo kicho', 'aspirantes kicho', 'activar censo'],
             ['activar', 'compartir', 'consultar', 'aprobar', 'rechazar'],
@@ -373,7 +402,32 @@ export const CATALOGO_SOPORTE_V1 = {
             ['crear programa', 'editar programa', 'eliminar programa', 'cobro adicional'],
             ['crear', 'editar', 'eliminar', 'configurar'],
             ['Abre Configuración > Programas.', 'Crea o selecciona el programa.', 'Configura su tarifa y guarda.'],
-            ['vistas/Configuracion.tsx'], { sensitivity: 'privileged' }),
+            ['vistas/Configuracion.tsx'], { sensitivity: 'privileged', negativeTerms: ['grupo de entrenamiento', 'grupos de entrenamiento'] }),
+        // Agregado 2026-09-30 (PR #104): catálogo de grupos por nivel/clase de cada club.
+        entry('config.training-groups', 'configuracion', 'Grupos de entrenamiento del club', A, '/configuracion',
+            [
+                'grupos de entrenamiento',
+                'crear grupo de entrenamiento',
+                'renombrar grupo',
+                'eliminar grupo de entrenamiento',
+                'grupos por nivel',
+                'clases por nivel',
+                'categorias del club',
+                'grupo avanzados',
+            ],
+            ['crear', 'renombrar', 'eliminar', 'consultar'],
+            [
+                'Abre Configuración > Grupos de Entrenamiento.',
+                'Escribe el nombre del grupo tal como lo llama tu club (por ejemplo Avanzados o Junior y Mayores) y agrégalo. No se permiten nombres vacíos ni repetidos.',
+                'Para renombrar, edita el nombre: los alumnos siguen en el grupo porque quedan ligados por un identificador interno, no por el nombre.',
+                'Al eliminar, el sistema avisa cuántos alumnos tiene el grupo; esos alumnos quedan como "Sin grupo" y puedes reasignarlos desde Estudiantes.',
+                'Estos grupos son distintos del Grupo Técnico (por edad), que se sigue calculando solo con la fecha de nacimiento. Si el club no crea grupos, nada cambia en la app.',
+            ],
+            ['vistas/Configuracion.tsx', 'components/configuracion/GestionGruposEntrenamiento.tsx', 'utils/gruposEntrenamiento.ts'],
+            {
+                sensitivity: 'privileged',
+                authorizationRef: 'firestore.rules#tenants/{tenantId} update: solo Admin del tenant',
+            }),
         entry('config.alerts', 'configuracion', 'Preferencias de alertas y push', A, '/configuracion',
             ['configurar alertas', 'notificaciones push', 'preferencias de notificacion'],
             ['activar', 'desactivar', 'configurar', 'guardar'],

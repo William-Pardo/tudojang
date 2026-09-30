@@ -30,6 +30,7 @@ const INVENTARIO_MANUAL_ESPERADO = [
   'finance.payment-validation-history',
   'students.directory',
   'students.manage',
+  'students.bulk-assign',
   'students.kicho',
   'students.kicho-legalize',
   'students.live-class',
@@ -56,6 +57,7 @@ const INVENTARIO_MANUAL_ESPERADO = [
   'config.branches',
   'config.staff',
   'config.programs',
+  'config.training-groups',
   'config.alerts',
   'config.license',
   'profile.self',
@@ -97,10 +99,10 @@ async function construirCatalogoFusionadoReal() {
   return fusionarCatalogo(nucleo, marcadores);
 }
 
-test('catalogo fusionado real: expone exactamente las 64 entradas esperadas (59 manuales + 4 migradas + jornadas.manage)', async () => {
+test('catalogo fusionado real: expone exactamente las 66 entradas esperadas (61 manuales + 4 migradas + jornadas.manage)', async () => {
   const catalogo = await construirCatalogoFusionadoReal();
 
-  assert.equal(catalogo.entries.length, 64);
+  assert.equal(catalogo.entries.length, 66);
   assert.deepEqual(
     catalogo.entries.map((entrada) => entrada.inventoryId).sort(),
     [...INVENTARIO_FUSIONADO_ESPERADO].sort(),
