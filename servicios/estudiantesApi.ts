@@ -250,12 +250,35 @@ export const aplicarCambioEstudiante = async (idEstudiante: string, cambio: Camb
     }
 };
 
+// Sin conexión, el SDK de Firestore no rechaza el updateDoc: lo encola y la promesa queda
+// pendiente hasta que el servidor confirma. Sin este límite, la asignación masiva se quedaba
+// en "Aplicando cambios..." indefinidamente. Al vencer se reporta como fallido; el write
+// encolado puede igual confirmarse después, y como reintentar es idempotente no hay daño.
+export const TIEMPO_LIMITE_CAMBIO_MS = 20000;
+// Escrituras simultáneas por tanda, para no disparar cientos de requests a la vez.
+export const TAMANO_TANDA_CAMBIO_MASIVO = 25;
+
+const conTiempoLimite = <T,>(promesa: Promise<T>, ms: number): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Sin respuesta del servidor (revisa tu conexión).')), ms);
+        promesa.then(
+            v => { clearTimeout(timer); resolve(v); },
+            e => { clearTimeout(timer); reject(e); }
+        );
+    });
+
 export const aplicarCambioMasivoEstudiantes = async (
     idsEstudiantes: string[],
     cambio: CambioMasivoEstudiante
 ): Promise<ResultadoCambioMasivo> => {
     const ids = Array.from(new Set(idsEstudiantes));
-    const resultados = await Promise.allSettled(ids.map(id => aplicarCambioEstudiante(id, cambio)));
+    const resultados: PromiseSettledResult<void>[] = [];
+    for (let i = 0; i < ids.length; i += TAMANO_TANDA_CAMBIO_MASIVO) {
+        const tanda = ids.slice(i, i + TAMANO_TANDA_CAMBIO_MASIVO);
+        resultados.push(...await Promise.allSettled(
+            tanda.map(id => conTiempoLimite(aplicarCambioEstudiante(id, cambio), TIEMPO_LIMITE_CAMBIO_MS))
+        ));
+    }
     const resultado: ResultadoCambioMasivo = { exitosos: [], fallidos: [] };
     resultados.forEach((r, i) => {
         if (r.status === 'fulfilled') {

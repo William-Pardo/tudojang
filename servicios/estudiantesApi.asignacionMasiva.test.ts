@@ -4,7 +4,12 @@
  * (nunca setDoc ni el documento completo), los fallos se reportan por estudiante y el
  * reintento sobre los fallidos es idempotente.
  */
-import { aplicarCambioEstudiante, aplicarCambioMasivoEstudiantes } from './estudiantesApi';
+import {
+    aplicarCambioEstudiante,
+    aplicarCambioMasivoEstudiantes,
+    TAMANO_TANDA_CAMBIO_MASIVO,
+    TIEMPO_LIMITE_CAMBIO_MS,
+} from './estudiantesApi';
 import { db } from '../firebase/config';
 import { doc, updateDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { GradoTKD } from '../tipos';
@@ -118,6 +123,43 @@ describe('asignación masiva de estudiantes', () => {
             const resultado = await aplicarCambioMasivoEstudiantes(['a', 'a', 'b'], { campo: 'grado', valor: GradoTKD.Blanco });
             expect(resultado.exitosos).toEqual(['a', 'b']);
             expect(updateDocMock).toHaveBeenCalledTimes(2);
+        });
+
+        it('un write que nunca responde (sin conexión) se reporta como fallido al vencer el tiempo límite', async () => {
+            jest.useFakeTimers();
+            try {
+                updateDocMock.mockImplementation((ref: { id: string }) =>
+                    ref.id === 'colgado' ? new Promise(() => undefined) : Promise.resolve());
+
+                const pendiente = aplicarCambioMasivoEstudiantes(['ok', 'colgado'], { campo: 'grado', valor: GradoTKD.Verde });
+                await jest.advanceTimersByTimeAsync(TIEMPO_LIMITE_CAMBIO_MS);
+                const resultado = await pendiente;
+
+                expect(resultado.exitosos).toEqual(['ok']);
+                expect(resultado.fallidos).toHaveLength(1);
+                expect(resultado.fallidos[0].id).toBe('colgado');
+                expect(resultado.fallidos[0].error).toMatch(/conexión/);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
+        it('limita las escrituras simultáneas a una tanda a la vez', async () => {
+            let enVuelo = 0;
+            let maximo = 0;
+            updateDocMock.mockImplementation(async () => {
+                enVuelo++;
+                maximo = Math.max(maximo, enVuelo);
+                await Promise.resolve();
+                enVuelo--;
+            });
+            const ids = Array.from({ length: TAMANO_TANDA_CAMBIO_MASIVO * 2 + 3 }, (_, i) => `e${i}`);
+
+            const resultado = await aplicarCambioMasivoEstudiantes(ids, { campo: 'grado', valor: GradoTKD.Azul });
+
+            expect(resultado.exitosos).toEqual(ids);
+            expect(updateDocMock).toHaveBeenCalledTimes(ids.length);
+            expect(maximo).toBeLessThanOrEqual(TAMANO_TANDA_CAMBIO_MASIVO);
         });
     });
 });
