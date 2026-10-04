@@ -1,9 +1,7 @@
 import {
-  createUserWithEmailAndPassword,
   getAuth,
   signInWithEmailAndPassword,
   signOut,
-  updateCurrentUser,
 } from 'firebase/auth';
 import {
   arrayUnion,
@@ -166,6 +164,15 @@ export const autenticarUsuario = async (email: string, contrasena: string): Prom
   throw new Error('Tu perfil no existe o no se ha sincronizado correctamente.');
 };
 
+const MENSAJE_EMAIL_YA_REGISTRADO =
+  'Este correo ya está registrado en TuDojang. Usa un correo diferente para el nuevo miembro del equipo';
+
+// Bug real (2026-10-03): el alta creaba la cuenta Auth desde el navegador
+// (createUserWithEmailAndPassword) y luego escribia `usuarios/{uid}` directo -- write
+// SIEMPRE rechazado por firestore.rules ("allow create, delete: if false"), dejando una
+// cuenta Auth huerfana y `auth/email-already-in-use` en cada reintento. Ahora todo el alta
+// (cuenta Auth + claims + perfil, con rollback) ocurre en el callable `crearUsuarioStaff`.
+// Tampoco hay ya intercambio de sesion: el Admin nunca queda deslogueado.
 export const agregarUsuario = async (datos: any): Promise<Usuario> => {
   if (!isFirebaseConfigured) {
     const nuevo = { id: `user-${Date.now()}`, ...buildUserData(datos), contrasena: datos.contrasena };
@@ -174,14 +181,27 @@ export const agregarUsuario = async (datos: any): Promise<Usuario> => {
     return usuario as Usuario;
   }
 
-  const auth = getAuth();
-  const currentUser = auth.currentUser;
-  const credential = await createUserWithEmailAndPassword(auth, datos.email, datos.contrasena);
-  const usuario = { id: credential.user.uid, ...buildUserData(datos) } as Usuario;
-  await createUser(usuario);
-  await signOut(auth);
-  if (currentUser) await updateCurrentUser(auth, currentUser);
-  return usuario;
+  // El tenant activo lo fija DataContext (`datos.tenantId`); si no viene, se usa el claim
+  // del token. El callable vuelve a validar rol+tenant server-side de todas formas.
+  const tokenResult = await getAuth().currentUser?.getIdTokenResult();
+  const tenantId = (datos?.tenantId || tokenResult?.claims?.tenantId) as string | undefined;
+  if (!tenantId) {
+    throw new Error('No se pudo determinar el tenant del usuario actual.');
+  }
+
+  const callable = httpsCallable<{ tenantId: string; datos: any }, Usuario>(
+    getFunctions(),
+    'crearUsuarioStaff',
+  );
+  try {
+    const response = await callable({ tenantId, datos });
+    return response.data;
+  } catch (error: any) {
+    if (error?.code === 'functions/already-exists') {
+      throw new Error(MENSAJE_EMAIL_YA_REGISTRADO);
+    }
+    throw error;
+  }
 };
 
 export const cerrarSesion = async (): Promise<void> => {

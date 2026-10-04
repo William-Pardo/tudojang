@@ -124,32 +124,59 @@ describe('usuariosApi', () => {
   });
 
   describe('agregarUsuario', () => {
-    it('deberÃ­a crear un nuevo usuario y guardar sus datos en Firestore', async () => {
-      const mockUserCredential = { user: { uid: 'new-user-uid' } };
-      (createUserWithEmailAndPassword as jest.Mock).mockResolvedValueOnce(mockUserCredential);
-      (setDoc as jest.Mock).mockResolvedValueOnce(undefined);
-      (signOut as jest.Mock).mockResolvedValueOnce(undefined);
+    const datosUsuario = {
+      email: 'new@user.com',
+      contrasena: 'pass123',
+      nombreUsuario: 'New User',
+      rol: RolUsuario.Asistente,
+      tenantId: 'tenant123',
+    };
 
-      const datosUsuario = {
-        email: 'new@user.com',
-        contrasena: 'pass123',
-        nombreUsuario: 'New User',
-        rol: RolUsuario.Asistente,
-        tenantId: 'tenant123',
-      };
+    it('crea el usuario via el callable crearUsuarioStaff (sin escribir Firestore ni tocar la sesion del Admin)', async () => {
+      mockCallable.mockResolvedValueOnce({
+        data: { id: 'new-user-uid', email: 'new@user.com', rol: RolUsuario.Asistente, tenantId: 'tenant123' },
+      });
 
       const newUser = await agregarUsuario(datosUsuario);
 
-      expect(createUserWithEmailAndPassword).toHaveBeenCalledWith(expect.any(Object), datosUsuario.email, datosUsuario.contrasena);
-      expect(setDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          email: datosUsuario.email,
-          rol: datosUsuario.rol,
-        })
-      );
-      expect(signOut).toHaveBeenCalledWith(expect.any(Object));
-      expect(newUser).toEqual(expect.objectContaining({ id: 'new-user-uid', email: datosUsuario.email }));
+      expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'crearUsuarioStaff');
+      expect(mockCallable).toHaveBeenCalledWith({ tenantId: 'tenant123', datos: datosUsuario });
+      expect(createUserWithEmailAndPassword).not.toHaveBeenCalled();
+      expect(setDoc).not.toHaveBeenCalled();
+      expect(signOut).not.toHaveBeenCalled();
+      expect(newUser).toEqual(expect.objectContaining({ id: 'new-user-uid', email: 'new@user.com' }));
+    });
+
+    it('usa el tenantId del claim si los datos no traen tenantId', async () => {
+      mockCallable.mockResolvedValueOnce({ data: { id: 'uid-2' } });
+      const { tenantId: _, ...sinTenant } = datosUsuario;
+
+      await agregarUsuario(sinTenant);
+
+      expect(mockCallable).toHaveBeenCalledWith({ tenantId: 'tenant-1', datos: sinTenant });
+    });
+
+    it('falla si no hay tenant ni en los datos ni en el token', async () => {
+      (getAuth as jest.Mock).mockReturnValue({
+        currentUser: { uid: 'test-uid', getIdTokenResult: jest.fn().mockResolvedValue({ claims: {} }) },
+      });
+      const { tenantId: _, ...sinTenant } = datosUsuario;
+
+      await expect(agregarUsuario(sinTenant)).rejects.toThrow(/tenant del usuario actual/i);
+      expect(mockCallable).not.toHaveBeenCalled();
+    });
+
+    it('traduce already-exists a un mensaje claro en espanol', async () => {
+      mockCallable.mockRejectedValueOnce(Object.assign(new Error('already-exists'), { code: 'functions/already-exists' }));
+
+      await expect(agregarUsuario(datosUsuario)).rejects.toThrow(/ya est. registrado en TuDojang.*correo diferente/i);
+    });
+
+    it('propaga otros errores del callable sin modificarlos', async () => {
+      const error = Object.assign(new Error('Tenant no autorizado'), { code: 'functions/permission-denied' });
+      mockCallable.mockRejectedValueOnce(error);
+
+      await expect(agregarUsuario(datosUsuario)).rejects.toBe(error);
     });
 
     it('deberÃ­a usar el modo mock si isFirebaseConfigured es falso', async () => {

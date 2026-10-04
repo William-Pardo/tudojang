@@ -92,6 +92,7 @@ const {
 } = require("./academico/progreso");
 const {
   crearServicioActualizarUsuarioStaff,
+  crearServicioCrearUsuarioStaff,
 } = require("./academico/usuarios");
 const {
   crearServicioCreateSede,
@@ -425,6 +426,11 @@ const servicioRegistrarAsistencia = crearServicioRegistrarAsistencia({
 
 const servicioActualizarUsuarioStaff = crearServicioActualizarUsuarioStaff({
   firestore: admin.firestore()
+});
+
+const servicioCrearUsuarioStaff = crearServicioCrearUsuarioStaff({
+  firestore: admin.firestore(),
+  auth: admin.auth()
 });
 
 const servicioCreateSede = crearServicioCreateSede({
@@ -855,6 +861,13 @@ exports.debugValidacionAsistencia = functionsV1.https.onCall(
 
 exports.actualizarUsuarioStaff = functionsV1.https.onCall(
   crearHandlerCallable(servicioActualizarUsuarioStaff)
+);
+
+// Alta segura de miembros del equipo -- reemplaza el alta desde el cliente
+// (createUserWithEmailAndPassword + write directo a `usuarios/{uid}`, bloqueado por
+// firestore.rules), que dejaba cuentas Auth huerfanas. Ver academico/usuarios.js.
+exports.crearUsuarioStaff = functionsV1.https.onCall(
+  crearHandlerCallable(servicioCrearUsuarioStaff)
 );
 
 // Alta/edicion/baja de sedes -- movido a Cloud Function (bug real 2026-07-16: el limite
