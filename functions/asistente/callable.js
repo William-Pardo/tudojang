@@ -162,6 +162,7 @@ const crearHandlerCallable = (service) => async (data, context) => {
       "resource-exhausted",
       "unavailable",
       "not-found",
+      "already-exists",
     ]);
     const code = allowedCodes.has(error?.code) ? error.code : "internal";
     if (code === "internal") {
