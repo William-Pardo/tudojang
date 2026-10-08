@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { crearServicioActualizarUsuarioStaff } = require('./usuarios');
+const { crearServicioActualizarUsuarioStaff, crearServicioRepararOCrearUsuarioStaff } = require('./usuarios');
 
 function crearContextoAdmin(overrides = {}) {
   return {
@@ -215,4 +215,86 @@ test('SuperAdmin puede gestionar usuarios de cualquier tenant', async () => {
   );
 
   assert.equal(resultado.rol, 'Maestro');
+});
+
+// --- repararOCrearUsuarioStaff ---
+
+function crearAuthAdminFake({ uid = 'uid-huerfano', lanzarError = false } = {}) {
+  return {
+    getUserByEmail: async (email) => {
+      if (lanzarError) throw Object.assign(new Error('no existe'), { code: 'auth/user-not-found' });
+      return { uid, email };
+    },
+  };
+}
+
+test('repararOCrearUsuarioStaff: rechaza si no esta autenticado', async () => {
+  const servicio = crearServicioRepararOCrearUsuarioStaff({
+    firestore: crearFirestoreFake(),
+    authAdmin: crearAuthAdminFake(),
+  });
+  await assert.rejects(
+    () => servicio({ tenantId: 'tenant-1', email: 'x@x.com', datosUsuario: { rol: 'Asistente' } }, {}),
+    /no autenticado/i,
+  );
+});
+
+test('repararOCrearUsuarioStaff: rechaza si el caller no es Admin', async () => {
+  const servicio = crearServicioRepararOCrearUsuarioStaff({
+    firestore: crearFirestoreFake(),
+    authAdmin: crearAuthAdminFake(),
+  });
+  await assert.rejects(
+    () => servicio(
+      { tenantId: 'tenant-1', email: 'x@x.com', datosUsuario: { rol: 'Asistente' } },
+      { auth: { uid: 'editor-1', token: { tenantId: 'tenant-1', rol: 'Editor' } } },
+    ),
+    /administrador/i,
+  );
+});
+
+test('repararOCrearUsuarioStaff: crea el documento cuando el uid existe en Auth pero no en Firestore', async () => {
+  const writes = [];
+  const servicio = crearServicioRepararOCrearUsuarioStaff({
+    firestore: crearFirestoreFake({ writes }),
+    authAdmin: crearAuthAdminFake({ uid: 'uid-huerfano' }),
+  });
+  const resultado = await servicio(
+    { tenantId: 'tenant-1', email: 'orphan@user.com', datosUsuario: { nombreUsuario: 'Orphan', rol: 'Asistente' } },
+    crearContextoAdmin(),
+  );
+  assert.equal(resultado.id, 'uid-huerfano');
+  assert.equal(resultado.email, 'orphan@user.com');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, 'usuarios/uid-huerfano');
+  assert.equal(writes[0].data.rol, 'Asistente');
+  assert.equal(writes[0].data.tenantId, 'tenant-1');
+});
+
+test('repararOCrearUsuarioStaff: lanza already-exists cuando el doc en Firestore ya existe', async () => {
+  const servicio = crearServicioRepararOCrearUsuarioStaff({
+    firestore: crearFirestoreFake({ usuarioExistente: { tenantId: 'tenant-1', rol: 'Asistente' } }),
+    authAdmin: crearAuthAdminFake({ uid: 'uid-existente' }),
+  });
+  await assert.rejects(
+    () => servicio(
+      { tenantId: 'tenant-1', email: 'dup@user.com', datosUsuario: { rol: 'Asistente' } },
+      crearContextoAdmin(),
+    ),
+    /already-exists|ya tiene un usuario registrado/i,
+  );
+});
+
+test('repararOCrearUsuarioStaff: lanza not-found cuando el email no existe en Auth', async () => {
+  const servicio = crearServicioRepararOCrearUsuarioStaff({
+    firestore: crearFirestoreFake(),
+    authAdmin: crearAuthAdminFake({ lanzarError: true }),
+  });
+  await assert.rejects(
+    () => servicio(
+      { tenantId: 'tenant-1', email: 'noexiste@user.com', datosUsuario: { rol: 'Asistente' } },
+      crearContextoAdmin(),
+    ),
+    /not-found|no existe en Authentication/i,
+  );
 });

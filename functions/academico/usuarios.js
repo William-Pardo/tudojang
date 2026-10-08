@@ -4,6 +4,12 @@
 // a `usuarios/{uid}` (bloqueado sin excepcion por firestore.rules: "allow create,
 // update, delete: if false" -- DT-0020), que dejaba rota cualquier edicion (incluido
 // el cambio de rol Editor->Maestro) para todos los roles, incluido Admin.
+//
+// Callable `repararOCrearUsuarioStaff`: recupera el estado huerfano Auth-sin-Firestore.
+// Cuando agregarUsuario (cliente) recibe auth/email-already-in-use y verifica que el
+// email NO tiene documento en Firestore, invoca este callable para que el Admin SDK
+// obtenga el UID existente y cree el documento faltante. Si el documento ya existe,
+// retorna 'already-exists' para que el cliente distinga el huerfano real del duplicado.
 
 'use strict';
 
@@ -108,6 +114,70 @@ function crearServicioActualizarUsuarioStaff({ firestore }) {
   };
 }
 
+// Fix ERR-ORPHAN-AUTH (2026-10-08): estado huerfano Auth-sin-Firestore.
+// agregarUsuario (cliente) no puede obtener el UID de un usuario existente;
+// este callable usa Admin SDK (authAdmin.getUserByEmail) para hacerlo de forma segura.
+function crearServicioRepararOCrearUsuarioStaff({ firestore, authAdmin }) {
+  return async function repararOCrearUsuarioStaff(data, context) {
+    const auth = requireAuth(context);
+    assertEsAdmin(auth);
+
+    const tenantId = String(data?.tenantId || '').trim();
+    const email = String(data?.email || '').trim().toLowerCase();
+    const datosUsuario = data?.datosUsuario;
+
+    assertTenantAutorizado(tenantId, auth);
+
+    if (!email) throw crearError('invalid-argument', 'El email es obligatorio');
+    if (!datosUsuario) throw crearError('invalid-argument', 'datosUsuario es obligatorio');
+
+    // Obtener el UID existente en Auth via Admin SDK.
+    let userRecord;
+    try {
+      userRecord = await authAdmin.getUserByEmail(email);
+    } catch (e) {
+      // Si no existe en Auth tampoco, el cliente deberia haber podido crear el usuario.
+      // Esto es un estado inesperado; lanzar para que el cliente reintente el flujo normal.
+      throw crearError('not-found', 'El correo no existe en Authentication. Reintenta el registro.');
+    }
+
+    const uid = userRecord.uid;
+    const ref = firestore.collection('usuarios').doc(uid);
+    const snap = await ref.get();
+
+    // Si ya existe el documento, NO es un huerfano -- es un duplicado real.
+    if (snap.exists) {
+      const existente = snap.data();
+      // Solo bloqueamos si pertenece al mismo tenant; cross-tenant lo puede ver SuperAdmin.
+      if (existente.tenantId === tenantId || auth.token?.rol !== 'SuperAdmin') {
+        throw crearError('already-exists', 'Este correo ya tiene un usuario registrado activo.');
+      }
+    }
+
+    // Crear el documento faltante con el UID existente.
+    const camposPermitidos = [
+      'nombreUsuario', 'email', 'rol', 'whatsapp', 'numeroIdentificacion', 'sedeId',
+    ];
+    const payload = { tenantId };
+    for (const campo of camposPermitidos) {
+      if (datosUsuario[campo] !== undefined) payload[campo] = datosUsuario[campo];
+    }
+
+    if (payload.rol !== undefined && !ROLES_VALIDOS.has(payload.rol)) {
+      throw crearError('invalid-argument', `Rol invalido: ${payload.rol}`);
+    }
+    if (payload.rol === 'SuperAdmin' && auth.token?.rol !== 'SuperAdmin') {
+      throw crearError('permission-denied', 'Solo un SuperAdmin puede asignar el rol SuperAdmin');
+    }
+
+    payload.email = email;
+    await ref.set(payload);
+
+    return { id: uid, ...payload };
+  };
+}
+
 module.exports = {
   crearServicioActualizarUsuarioStaff,
+  crearServicioRepararOCrearUsuarioStaff,
 };

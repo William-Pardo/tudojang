@@ -97,7 +97,7 @@ test('si resolverNombreReal explota, no revienta el envío -- cae al fallback', 
   assert.equal(enviados.length, 1); // igual se envía
 });
 
-test('no revela si el email no existe (retorna ok sin enviar, sin error)', async () => {
+test('no revela si el email no existe (retorna ok sin enviar con razon user-not-found)', async () => {
   const { enviados, dep } = deps({
     auth: {
       getUserByEmail: async () => { const e = new Error('no user'); e.code = 'auth/user-not-found'; throw e; },
@@ -110,6 +110,7 @@ test('no revela si el email no existe (retorna ok sin enviar, sin error)', async
 
   assert.equal(res.ok, true);
   assert.equal(res.enviado, false);
+  assert.equal(res.razon, 'user-not-found');
   assert.equal(enviados.length, 0);
 });
 
@@ -120,7 +121,7 @@ test('rechaza email invalido', async () => {
   await assert.rejects(() => servicio({ email: 'no-es-email' }), /Email invalido/);
 });
 
-test('si el correo (Resend) falla, igual retorna ok con enviado=false (no revienta)', async () => {
+test('si el correo (Resend) falla, igual retorna ok con enviado=false y razon email-failed', async () => {
   const { dep } = deps({
     enviarCorreo: async () => { throw new Error('Resend rechazo'); },
   });
@@ -130,6 +131,7 @@ test('si el correo (Resend) falla, igual retorna ok con enviado=false (no revien
 
   assert.equal(res.ok, true);
   assert.equal(res.enviado, false);
+  assert.equal(res.razon, 'email-failed');
 });
 
 test('si el dominio no está en Authorized domains, da un mensaje operable (no el generico interno)', async () => {

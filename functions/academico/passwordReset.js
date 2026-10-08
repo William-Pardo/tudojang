@@ -120,7 +120,7 @@ function crearServicioSendPasswordReset({ auth, enviarCorreo, resend, appUrl, re
       if (user.displayName) nombreUsuario = user.displayName;
     } catch (err) {
       if (err && err.code === 'auth/user-not-found') {
-        return { ok: true, enviado: false };
+        return { ok: true, enviado: false, razon: 'user-not-found' };
       }
       throw err;
     }
@@ -163,6 +163,7 @@ function crearServicioSendPasswordReset({ auth, enviarCorreo, resend, appUrl, re
     const html = construirHtml({ nombreUsuario, enlaceRecuperacion });
 
     let enviado = false;
+    let razon;
     try {
       const resendClient = typeof resend === 'function' ? resend() : resend;
       await enviarCorreo(resendClient, {
@@ -174,9 +175,10 @@ function crearServicioSendPasswordReset({ auth, enviarCorreo, resend, appUrl, re
       enviado = true;
     } catch (err) {
       console.error('[sendPasswordReset] el correo no pudo enviarse:', { email, message: err && err.message });
+      razon = 'email-failed';
     }
 
-    return { ok: true, enviado };
+    return { ok: true, enviado, ...(razon ? { razon } : {}) };
   };
 }
 

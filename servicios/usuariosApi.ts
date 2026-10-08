@@ -176,12 +176,48 @@ export const agregarUsuario = async (datos: any): Promise<Usuario> => {
 
   const auth = getAuth();
   const currentUser = auth.currentUser;
-  const credential = await createUserWithEmailAndPassword(auth, datos.email, datos.contrasena);
-  const usuario = { id: credential.user.uid, ...buildUserData(datos) } as Usuario;
-  await createUser(usuario);
-  await signOut(auth);
-  if (currentUser) await updateCurrentUser(auth, currentUser);
-  return usuario;
+
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, datos.email, datos.contrasena);
+    const usuario = { id: credential.user.uid, ...buildUserData(datos) } as Usuario;
+    await createUser(usuario);
+    await signOut(auth);
+    if (currentUser) await updateCurrentUser(auth, currentUser);
+    return usuario;
+  } catch (error: any) {
+    // Fix ERR-ORPHAN-AUTH (2026-10-08): el correo ya existe en Firebase Auth pero
+    // puede que NO tenga documento en Firestore (estado huerfano). Se distinguen
+    // dos casos: duplicado real (doc existe) vs. huerfano (doc faltante).
+    if (error?.code !== 'auth/email-already-in-use') throw error;
+
+    const docExistente = await firestoreRepository.getByEmail(
+      String(datos.email || '').toLowerCase().trim()
+    );
+
+    if (docExistente) {
+      // Duplicado real: el usuario ya esta registrado y activo.
+      throw new Error('Este correo ya tiene un usuario registrado. Si necesitas editar sus datos, usa la opción de editar perfil.');
+    }
+
+    // Estado huerfano: existe en Auth pero no en Firestore.
+    // El callable usa Admin SDK para obtener el UID existente y crear el documento.
+    const tokenResult = await auth.currentUser?.getIdTokenResult();
+    const tenantId = tokenResult?.claims?.tenantId as string | undefined;
+    if (!tenantId) throw new Error('No se pudo determinar el tenant del usuario actual.');
+
+    const callable = httpsCallable<
+      { tenantId: string; email: string; datosUsuario: any },
+      Usuario
+    >(getFunctions(), 'repararOCrearUsuarioStaff');
+
+    const response = await callable({
+      tenantId,
+      email: String(datos.email || '').toLowerCase().trim(),
+      datosUsuario: buildUserData(datos),
+    });
+
+    return response.data;
+  }
 };
 
 export const cerrarSesion = async (): Promise<void> => {
@@ -240,11 +276,17 @@ export const eliminarUsuario = async (id: string): Promise<void> => {
 // vía Resend, y apunta a /restablecer-clave en el dominio real de la app.
 export const enviarCorreoRecuperacion = async (email: string): Promise<void> => {
   if (!isFirebaseConfigured) return;
-  const sendPasswordResetCF = httpsCallable<{ email: string }, { ok: boolean; enviado: boolean }>(
+  const sendPasswordResetCF = httpsCallable<{ email: string }, { ok: boolean; enviado: boolean; razon?: string }>(
     getFunctions(),
     'sendPasswordReset'
   );
-  await sendPasswordResetCF({ email });
+  const response = await sendPasswordResetCF({ email });
+  if (!response.data?.enviado) {
+    if (response.data?.razon === 'user-not-found') {
+      throw new Error('El correo ingresado no corresponde a una cuenta activa. Si eres un tutor o miembro nuevo, activa tu cuenta desde el enlace de invitación enviado a tu correo.');
+    }
+    throw new Error('No fue posible entregar el correo de recuperación. Por favor intenta nuevamente o contacta al soporte de la academia.');
+  }
 };
 
 export const guardarTokenNotificacionUsuario = async (idUsuario: string, token: string): Promise<void> => {

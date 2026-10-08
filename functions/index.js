@@ -92,6 +92,7 @@ const {
 } = require("./academico/progreso");
 const {
   crearServicioActualizarUsuarioStaff,
+  crearServicioRepararOCrearUsuarioStaff,
 } = require("./academico/usuarios");
 const {
   crearServicioCreateSede,
@@ -425,6 +426,11 @@ const servicioRegistrarAsistencia = crearServicioRegistrarAsistencia({
 
 const servicioActualizarUsuarioStaff = crearServicioActualizarUsuarioStaff({
   firestore: admin.firestore()
+});
+
+const servicioRepararOCrearUsuarioStaff = crearServicioRepararOCrearUsuarioStaff({
+  firestore: admin.firestore(),
+  authAdmin: admin.auth(),
 });
 
 const servicioCreateSede = crearServicioCreateSede({
@@ -855,6 +861,11 @@ exports.debugValidacionAsistencia = functionsV1.https.onCall(
 
 exports.actualizarUsuarioStaff = functionsV1.https.onCall(
   crearHandlerCallable(servicioActualizarUsuarioStaff)
+);
+
+// Fix ERR-ORPHAN-AUTH (2026-10-08): recupera el estado huerfano Auth-sin-Firestore.
+exports.repararOCrearUsuarioStaff = functionsV1.https.onCall(
+  crearHandlerCallable(servicioRepararOCrearUsuarioStaff)
 );
 
 // Alta/edicion/baja de sedes -- movido a Cloud Function (bug real 2026-07-16: el limite

@@ -152,7 +152,7 @@ describe('usuariosApi', () => {
       expect(newUser).toEqual(expect.objectContaining({ id: 'new-user-uid', email: datosUsuario.email }));
     });
 
-    it('deberÃ­a usar el modo mock si isFirebaseConfigured es falso', async () => {
+    it('debería usar el modo mock si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as any).isFirebaseConfigured = false;
       const newUser = await agregarUsuario({
         email: 'mock@user.com',
@@ -162,6 +162,40 @@ describe('usuariosApi', () => {
         tenantId: 'mocktenant',
       });
       expect(newUser).toEqual(expect.objectContaining({ email: 'mock@user.com' }));
+    });
+
+    it('debería relanzar errores que no sean auth/email-already-in-use', async () => {
+      const networkError = Object.assign(new Error('Network error'), { code: 'auth/network-request-failed' });
+      (createUserWithEmailAndPassword as jest.Mock).mockRejectedValueOnce(networkError);
+      await expect(agregarUsuario({ email: 'x@x.com', contrasena: 'pass', rol: RolUsuario.Asistente, tenantId: 't1' })).rejects.toThrow('Network error');
+      expect(httpsCallable).not.toHaveBeenCalled();
+    });
+
+    it('debería lanzar error claro cuando el correo ya tiene documento en Firestore (duplicado real)', async () => {
+      const duplicateError = Object.assign(new Error('email in use'), { code: 'auth/email-already-in-use' });
+      (createUserWithEmailAndPassword as jest.Mock).mockRejectedValueOnce(duplicateError);
+      // getByEmail: getDocs retorna snapshot con un doc existente
+      (getDocs as jest.Mock).mockResolvedValueOnce({
+        empty: false,
+        docs: [{ id: 'uid-existente', data: () => ({ email: 'dup@user.com', rol: RolUsuario.Asistente, tenantId: 't1' }) }],
+      });
+      await expect(agregarUsuario({ email: 'dup@user.com', contrasena: 'pass', rol: RolUsuario.Asistente, tenantId: 't1' })).rejects.toThrow(/correo ya tiene un usuario registrado/);
+      expect(httpsCallable).not.toHaveBeenCalled();
+    });
+
+    it('debería invocar repararOCrearUsuarioStaff cuando el correo existe en Auth pero NO en Firestore (estado huerfano)', async () => {
+      const orphanError = Object.assign(new Error('email in use'), { code: 'auth/email-already-in-use' });
+      (createUserWithEmailAndPassword as jest.Mock).mockRejectedValueOnce(orphanError);
+      // getByEmail: getDocs retorna snapshot vacío (sin doc en Firestore)
+      (getDocs as jest.Mock).mockResolvedValueOnce({ empty: true, docs: [] });
+      const usuarioReparado = { id: 'uid-huerfano', email: 'orphan@user.com', rol: RolUsuario.Asistente, tenantId: 't1' };
+      mockCallable.mockResolvedValueOnce({ data: usuarioReparado });
+
+      const result = await agregarUsuario({ email: 'orphan@user.com', contrasena: 'pass', nombreUsuario: 'Orphan', rol: RolUsuario.Asistente, tenantId: 't1' });
+
+      expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'repararOCrearUsuarioStaff');
+      expect(mockCallable).toHaveBeenCalledWith(expect.objectContaining({ email: 'orphan@user.com', tenantId: 'tenant-1' }));
+      expect(result).toEqual(usuarioReparado);
     });
   });
 
@@ -309,14 +343,28 @@ describe('usuariosApi', () => {
     // Fix UX de restablecimiento de clave (2026-07-15): ya no usa sendPasswordResetEmail()
     // del SDK cliente (correo/paginas genericas de Firebase) -- invoca la Cloud Function
     // `sendPasswordReset`, que entrega el link con la plantilla propia del proyecto.
-    it('deberÃ­a invocar la Cloud Function sendPasswordReset con el email', async () => {
+    it('debería invocar la Cloud Function sendPasswordReset con el email', async () => {
       mockCallable.mockResolvedValue({ data: { ok: true, enviado: true } });
       await enviarCorreoRecuperacion('test@test.com');
       expect(httpsCallable).toHaveBeenCalledWith('functions-mock', 'sendPasswordReset');
       expect(mockCallable).toHaveBeenCalledWith({ email: 'test@test.com' });
     });
 
-    it('no deberÃ­a hacer nada si isFirebaseConfigured es falso', async () => {
+    it('lanza un error explicativo si la función responde con enviado=false y razon user-not-found', async () => {
+      mockCallable.mockResolvedValue({ data: { ok: true, enviado: false, razon: 'user-not-found' } });
+      await expect(enviarCorreoRecuperacion('invalido@test.com')).rejects.toThrow(
+        'El correo ingresado no corresponde a una cuenta activa. Si eres un tutor o miembro nuevo, activa tu cuenta desde el enlace de invitación enviado a tu correo.'
+      );
+    });
+
+    it('lanza un error genérico si enviado=false sin razon específica o por fallo de envio', async () => {
+      mockCallable.mockResolvedValue({ data: { ok: true, enviado: false, razon: 'email-failed' } });
+      await expect(enviarCorreoRecuperacion('test@test.com')).rejects.toThrow(
+        'No fue posible entregar el correo de recuperación. Por favor intenta nuevamente o contacta al soporte de la academia.'
+      );
+    });
+
+    it('no debería hacer nada si isFirebaseConfigured es falso', async () => {
       (require('../firebase/config') as any).isFirebaseConfigured = false;
       await enviarCorreoRecuperacion('test@test.com');
       expect(mockCallable).not.toHaveBeenCalled();
