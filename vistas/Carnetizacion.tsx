@@ -49,6 +49,31 @@ const VistaCarnetizacion: React.FC = () => {
         }
     };
 
+    // Genera el PDF con TODOS los estudiantes del tenant, ignorando el flag
+    // carnetGenerado. Útil cuando el PDF nunca llegó a descargarse aunque el
+    // flag ya quedó en true (ej.: se solicitó fabricación antes de imprimir).
+    // No desmarca ningún flag en Firestore — solo descarga el archivo.
+    const handleRegenerarTodos = async () => {
+        if (estudiantes.length === 0) return;
+        if (!window.confirm(`¿Descargar el PDF con los ${estudiantes.length} carnets de todos los estudiantes activos?`)) return;
+        setProcesando(true);
+        try {
+            await generarLoteCarnetsPdf(
+                estudiantes,
+                sedesVisibles,
+                configClub,
+                `Todos_Carnets_${new Date().toISOString().split('T')[0]}`,
+                formato
+            );
+            mostrarNotificacion(`PDF generado con ${estudiantes.length} carnets. Descarga iniciada.`, "success");
+        } catch (error) {
+            console.error(error);
+            mostrarNotificacion("Error al regenerar los carnets", "error");
+        } finally {
+            setProcesando(false);
+        }
+    };
+
     if (cargando) return <div className="p-8 flex justify-center"><Loader texto="Analizando registros..." /></div>;
 
     return (
@@ -107,6 +132,17 @@ const VistaCarnetizacion: React.FC = () => {
                                         {procesando ? 'Procesando Lote...' : 'Procesar Impresión'}
                                     </button>
                                 )}
+
+                                {/* Escape hatch: regenera el PDF para todos los estudiantes
+                                    aunque el flag carnetGenerado ya esté en true. */}
+                                <button
+                                    onClick={handleRegenerarTodos}
+                                    disabled={estudiantes.length === 0 || procesando}
+                                    className="w-full bg-white/10 border border-white/20 text-white/80 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/20 transition-all flex items-center justify-center gap-2 disabled:opacity-30"
+                                >
+                                    <IconoExportar className="w-4 h-4" />
+                                    {procesando ? 'Generando...' : `Regenerar todos (${estudiantes.length})`}
+                                </button>
 
                                 <button
                                     onClick={async () => {
