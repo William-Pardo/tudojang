@@ -15,6 +15,11 @@ import EmptyState from '../components/EmptyState';
 // Reactivado (2026-10-20): flujo de descarga local habilitado nuevamente.
 const MOSTRAR_BOTON_PROCESAR_IMPRESION = true;
 
+// Herramienta oculta de emergencia (2026-10-20): genera el PDF con todos los
+// estudiantes ignorando el flag carnetGenerado. Visible solo cuando se necesita
+// corregir un lote que fue marcado como generado sin descargar el PDF.
+const MOSTRAR_REGENERACION_CARNETS = false;
+
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
     const { sedesVisibles } = useSedes();
@@ -133,16 +138,19 @@ const VistaCarnetizacion: React.FC = () => {
                                     </button>
                                 )}
 
-                                {/* Escape hatch: regenera el PDF para todos los estudiantes
-                                    aunque el flag carnetGenerado ya esté en true. */}
-                                <button
-                                    onClick={handleRegenerarTodos}
-                                    disabled={estudiantes.length === 0 || procesando}
-                                    className="w-full bg-white/10 border border-white/20 text-white/80 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/20 transition-all flex items-center justify-center gap-2 disabled:opacity-30"
-                                >
-                                    <IconoExportar className="w-4 h-4" />
-                                    {procesando ? 'Generando...' : `Regenerar todos (${estudiantes.length})`}
-                                </button>
+                                {/* Herramienta oculta: Regeneración de Carnets.
+                                    Activa con MOSTRAR_REGENERACION_CARNETS = true cuando
+                                    el PDF no se descargó pero el flag ya quedó en true. */}
+                                {MOSTRAR_REGENERACION_CARNETS && (
+                                    <button
+                                        onClick={handleRegenerarTodos}
+                                        disabled={estudiantes.length === 0 || procesando}
+                                        className="w-full bg-white/10 border border-white/20 text-white/80 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/20 transition-all flex items-center justify-center gap-2 disabled:opacity-30"
+                                    >
+                                        <IconoExportar className="w-4 h-4" />
+                                        {procesando ? 'Generando...' : `Regeneración de Carnets (${estudiantes.length})`}
+                                    </button>
+                                )}
 
                                 <button
                                     onClick={async () => {
