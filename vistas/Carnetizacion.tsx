@@ -12,8 +12,8 @@ import { formatearFecha } from '../utils/formatters';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
 
-// Oculto a pedido explícito (2026-07-30): ver nota junto al botón "Procesar Impresión" más abajo.
-const MOSTRAR_BOTON_PROCESAR_IMPRESION = false;
+// Reactivado (2026-10-20): flujo de descarga local habilitado nuevamente.
+const MOSTRAR_BOTON_PROCESAR_IMPRESION = true;
 
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
