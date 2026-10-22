@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import type { Estudiante, Sede, ConfiguracionClub } from '../tipos';
 import { getBeltStyle } from './beltStyles';
-import { getSafeBackground, getIdealTextColor } from './ColorUtils';
+import { getSafeBackground } from './ColorUtils';
 
 export enum FormatoPapel {
     Individual = 'Individual (CR80)',
@@ -72,13 +72,12 @@ export const generarLoteCarnetsPdf = async (
     container.style.pointerEvents = 'none';
     document.body.appendChild(container);
 
-    // Determinar colores seguros
+    // safeBg/textColor retained for QR color continuity with club branding
     const safeBg = getSafeBackground({
         primary: configClub.colorPrimario,
         secondary: configClub.colorSecundario,
         accent: configClub.colorAcento
     });
-    const textColor = getIdealTextColor(safeBg);
 
     try {
         for (let i = 0; i < estudiantes.length; i++) {
@@ -86,45 +85,234 @@ export const generarLoteCarnetsPdf = async (
             const sede = sedes.find(s => s.id === est.sedeId);
             const visual = getBeltStyle(est.grado);
 
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(est.id)}&color=${safeBg.replace('#', '')}&bgcolor=ffffff&margin=1`;
+            // QR: módulos negros sobre fondo blanco (caja blanca del SVG de referencia)
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(est.id)}&color=000000&bgcolor=ffffff&margin=1`;
             const logoUrl = configClub.logoUrl || DEFAULT_LOGO_BASE64;
 
-            // Template mejorado con reglas de legibilidad
+            // ─── TEMPLATE CARNET-02 ───────────────────────────────────────────────────
+            // Dimensiones físicas del carnet: 85.6×54mm → renderizado a 324×204px (scale×3.78)
+            // Todas las medidas provienen de TEMPLATE CARNET-02.svg (viewBox 242.6×153.1)
+            // Ratio de conversión: 242.6 / 85.6 = 2.834 → 1 px-SVG ≈ 0.353mm
+            //
+            // Regla A  — nombre largo: reduce letter-spacing → font-size → line-height
+            // Regla B  — sin desplazamientos, solapamientos ni texto cortado
+            // Regla C  — márgenes idénticos al SVG: H=5.5mm / V=5.15mm → ~21px / ~19px
+            // Regla D  — borde derecho del nombre ≤ x del borde derecho del QR-box (≈ x 265px)
+            // Regla E  — colores, radios y posiciones idénticos al SVG de referencia
+
+            // ── Cálculo adaptativo del nombre (Regla A) ──────────────────────────────
+            // El nombre completo se divide en nombres y apellidos (dos renglones máx.).
+            // Si alguno de los dos supera el ancho de la caja de texto (~175px a 18px),
+            // se reduce letter-spacing primero, luego font-size hasta mínimo 13px.
+            const NAME_BOX_PX  = 175;   // ancho max de la caja de texto del nombre (Regla D)
+            const NAME_SIZE_MAX = 18;    // px base (equivale a aprox. 4.75pt en SVG)
+            const NAME_SIZE_MIN = 13;    // px mínimo legible
+            const NAME_LS_MAX   = -0.3; // letter-spacing base (px)
+            const NAME_LS_MIN   = -1.2; // letter-spacing mínimo
+
+            // Estimación de ancho de texto (aprox. 0.6× el font-size por carácter bold-condensed)
+            const estimarAncho = (texto: string, size: number, ls: number): number =>
+                texto.length * (size * 0.62 + ls);
+
+            let nameFontSize   = NAME_SIZE_MAX;
+            let nameLetterSpacing = NAME_LS_MAX;
+            let nameLineHeight = 1.05;
+
+            const maxLen = Math.max(est.nombres.length, est.apellidos.length);
+            // Paso 1: reducir letter-spacing
+            if (estimarAncho(est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+                nameLetterSpacing = NAME_LS_MIN;
+            }
+            // Paso 2: reducir font-size si sigue sin caber
+            if (estimarAncho(est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+                nameFontSize = Math.max(NAME_SIZE_MIN, Math.round(NAME_BOX_PX / (maxLen * 0.62)));
+            }
+            // Paso 3: ajustar line-height si el nombre tiene más de ~14 chars
+            if (maxLen > 14) nameLineHeight = 0.97;
+
             const cardHtml = `
-                <div id="card-${i}" style="width: 324px; height: 204px; background-color: ${safeBg}; font-family: 'Inter', system-ui, sans-serif; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; overflow: hidden; position: relative; color: ${textColor}; border-radius: 12px;">
-                    <!-- Decoración de Fondo (Branding) -->
-                    <div style="position: absolute; right: -40px; top: -40px; width: 150px; height: 150px; background: ${configClub.colorSecundario}; opacity: 0.15; border-radius: 50%; filter: blur(40px);"></div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; position: relative; z-index: 10;">
-                        <div style="text-align: left;">
-                            <div style="font-size: 14px; font-weight: 900; text-transform: uppercase; line-height: 1.1; letter-spacing: -0.5px;">${configClub.nombreClub}</div>
-                            <div style="font-size: 8px; font-weight: 700; opacity: 0.8; margin-top: 2px;">SEDE: ${sede?.nombre.toUpperCase() || 'PRINCIPAL'}</div>
+                <div id="card-${i}" style="
+                    width: 324px;
+                    height: 204px;
+                    background-color: #211915;
+                    font-family: 'Inter', system-ui, sans-serif;
+                    display: flex;
+                    flex-direction: column;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                    position: relative;
+                    border-radius: 10px;
+                ">
+                    <!-- Fila superior: nombre del club + logo -->
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                        padding: 22px 22px 0 22px;
+                        position: relative;
+                        z-index: 10;
+                    ">
+                        <!-- Nombre del club + sede -->
+                        <div style="flex: 1; padding-right: 8px; max-width: 240px;">
+                            <div style="
+                                font-size: 13px;
+                                font-weight: 900;
+                                text-transform: uppercase;
+                                line-height: 1.05;
+                                letter-spacing: -0.4px;
+                                color: #FFFFFF;
+                            ">${configClub.nombreClub}</div>
+                            <div style="
+                                font-size: 6.5px;
+                                font-weight: 700;
+                                color: #FFFFFF;
+                                opacity: 0.85;
+                                margin-top: 3px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.3px;
+                            ">SEDE: ${sede?.nombre.toUpperCase() || 'PRINCIPAL'}</div>
                         </div>
-                        <div style="background: white; padding: 4px; border-radius: 8px; width: 36px; height: 36px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+
+                        <!-- Logo (SVG: x≈201→227, y≈14.7→42.1 → ~34px ancho, 36px alto) -->
+                        <div style="
+                            background: #FFFFFF;
+                            border-radius: 8px;
+                            width: 34px;
+                            height: 34px;
+                            flex-shrink: 0;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            overflow: hidden;
+                        ">
                             <img src="${logoUrl}" crossorigin="anonymous" style="width: 100%; height: 100%; object-fit: contain;" />
                         </div>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: 18px; flex-grow: 1; position: relative; z-index: 10;">
-                        <div style="background: white; padding: 6px; border-radius: 12px; width: 70px; height: 70px; box-shadow: 0 8px 15px rgba(0,0,0,0.1);">
+                    <!-- Fila central: QR + datos del estudiante -->
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 14px;
+                        padding: 10px 22px 0 22px;
+                        flex-grow: 1;
+                        position: relative;
+                        z-index: 10;
+                    ">
+                        <!-- QR (SVG: x=16.6→68.8 = 19.6mm, y=57.3→109.6 = 18.4mm → 74×70px) -->
+                        <div style="
+                            background: #FFFFFF;
+                            border-radius: 10px;
+                            width: 74px;
+                            height: 70px;
+                            flex-shrink: 0;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            overflow: hidden;
+                            padding: 4px;
+                            box-sizing: border-box;
+                        ">
                             <img src="${qrUrl}" crossorigin="anonymous" style="width: 100%; height: 100%;" />
                         </div>
-                        <div style="flex: 1;">
-                            <div style="font-size: 7px; font-weight: 900; opacity: 0.6; letter-spacing: 1.5px; margin-bottom: 4px;">ESTUDIANTE ACTIVO</div>
-                            <div style="font-size: 18px; font-weight: 950; text-transform: uppercase; line-height: 1; margin-bottom: 2px;">${est.nombres}</div>
-                            <div style="font-size: 18px; font-weight: 950; text-transform: uppercase; line-height: 1; margin-bottom: 8px;">${est.apellidos}</div>
-                            <div style="height: 3px; width: 40px; background: ${configClub.colorAcento}; border-radius: 2px; margin-bottom: 8px;"></div>
-                            <div style="font-size: 10px; font-weight: 800; font-family: monospace;">ID: ${est.numeroIdentificacion}</div>
+
+                        <!-- Caja de texto del estudiante (Regla D: borde derecho ≤ x=265px) -->
+                        <div style="
+                            flex: 1;
+                            max-width: 175px;
+                            overflow: hidden;
+                        ">
+                            <!-- Nombre (Regla A aplicada) -->
+                            <div style="
+                                font-size: ${nameFontSize}px;
+                                font-weight: 900;
+                                text-transform: uppercase;
+                                line-height: ${nameLineHeight};
+                                letter-spacing: ${nameLetterSpacing}px;
+                                color: #FFFFFF;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: clip;
+                            ">${est.nombres}</div>
+                            <div style="
+                                font-size: ${nameFontSize}px;
+                                font-weight: 900;
+                                text-transform: uppercase;
+                                line-height: ${nameLineHeight};
+                                letter-spacing: ${nameLetterSpacing}px;
+                                color: #FFFFFF;
+                                margin-bottom: 5px;
+                                white-space: nowrap;
+                                overflow: hidden;
+                                text-overflow: clip;
+                            ">${est.apellidos}</div>
+
+                            <!-- Línea decorativa rosa/acento (SVG: y=84.6, x=82.3→110.9 → 38px ancho) -->
+                            <div style="
+                                height: 2.5px;
+                                width: 38px;
+                                background: #C34772;
+                                border-radius: 2px;
+                                margin-bottom: 6px;
+                            "></div>
+
+                            <!-- ID (SVG: texto monoespaciado debajo de la línea) -->
+                            <div style="
+                                font-size: 8.5px;
+                                font-weight: 800;
+                                color: #FFFFFF;
+                                font-family: monospace;
+                                letter-spacing: 0.2px;
+                            ">ID: ${est.numeroIdentificacion}</div>
                         </div>
                     </div>
 
-                    <div style="margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10; border-top: 1px solid rgba(255,255,255,0.1);">
-                        <div style="background: ${visual.background}; color: ${visual.color}; font-size: 10px; font-weight: 900; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.2); box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-transform: uppercase;">
-                            ${est.grado}
-                        </div>
-                        <div style="text-align: right; font-size: 9px; font-weight: 700; opacity: 0.7;">
-                            DESDE: ${new Date(est.fechaIngreso).getFullYear()}
-                        </div>
+                    <!-- Línea divisoria horizontal flotante (SVG: y=113.3 → bottom ~50px, centrada entre QR y cinturón) -->
+                    <div style="
+                        position: absolute;
+                        bottom: 50px;
+                        left: 22px;
+                        right: 17px;
+                        height: 0.5px;
+                        background: rgba(255, 255, 255, 0.15);
+                        z-index: 5;
+                    "></div>
+
+                    <!-- Fila inferior: cinturón (izq) + año (der) -->
+                    <div style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 0 22px 11px 22px;
+                        margin-top: auto;
+                        position: relative;
+                        z-index: 10;
+                    ">
+                        <!-- Pill del cinturón (SVG: #FED700, x=16.5→73, y=116.8→135.9) -->
+                        <div style="
+                            background: ${visual.background};
+                            color: ${visual.color};
+                            font-size: 9px;
+                            font-weight: 900;
+                            padding: 3px 9px;
+                            border-radius: 5px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.3px;
+                            border: 1px solid rgba(0,0,0,0.15);
+                            white-space: nowrap;
+                            max-width: 175px;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                        ">${est.grado}</div>
+
+                        <!-- Año de ingreso (SVG: "Desde 2026", alineado a la derecha) -->
+                        <div style="
+                            font-size: 9px;
+                            font-weight: 700;
+                            color: #FFFFFF;
+                            opacity: 0.75;
+                            letter-spacing: 0.2px;
+                        ">Desde: ${new Date(est.fechaIngreso).getFullYear()}</div>
                     </div>
                 </div>
             `;
