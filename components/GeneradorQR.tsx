@@ -96,14 +96,14 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
                 />
             </div>
 
-            <div className="flex-1 max-w-[175px] overflow-hidden text-left">
+            <div className="flex-1 max-w-[175px] text-left">
                 <div 
                     style={{
                         fontSize: `${nameFontSize}px`,
                         lineHeight: nameLineHeight,
                         letterSpacing: `${nameLetterSpacing}px`
                     }}
-                    className="font-black uppercase text-white whitespace-nowrap py-[1px]"
+                    className="font-black uppercase text-white whitespace-nowrap pt-[2px] pb-[1px]"
                 >
                     {estudiante.nombres}
                 </div>
@@ -113,12 +113,12 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
                         lineHeight: nameLineHeight,
                         letterSpacing: `${nameLetterSpacing}px`
                     }}
-                    className="font-black uppercase text-white whitespace-nowrap py-[1px] mb-[4px]"
+                    className="font-black uppercase text-white whitespace-nowrap pt-[2px] pb-[1px] mb-[3px]"
                 >
                     {estudiante.apellidos}
                 </div>
-                <div className="h-[2.5px] w-[38px] bg-[#C34772] rounded-[2px] mb-[4px]"></div>
-                <p className="text-[8.5px] font-extrabold text-white font-mono tracking-[0.2px] leading-[1.2]">
+                <div className="h-[2.5px] w-[38px] bg-[#C34772] rounded-[2px] mb-[3px]"></div>
+                <p className="text-[8.5px] font-extrabold text-white font-mono tracking-[0.2px] leading-[1.1]">
                     ID: {estudiante.numeroIdentificacion}
                 </p>
             </div>
@@ -131,7 +131,7 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
         <div className="flex justify-between items-center px-[22px] pb-[11px] mt-auto relative z-10">
             <div
                 style={{ background: visualGrado.background, color: visualGrado.color }}
-                className="h-[18px] inline-flex items-center justify-center px-[9px] rounded-[5px] text-[9px] font-black uppercase tracking-[0.3px] border border-black/15 whitespace-nowrap max-w-[175px] overflow-hidden text-ellipsis box-border leading-none"
+                className="h-[18px] leading-[18px] inline-block text-center align-middle px-[9px] rounded-[5px] text-[9px] font-black uppercase tracking-[0.3px] border border-black/15 whitespace-nowrap max-w-[175px] overflow-hidden text-ellipsis box-border"
             >
                 {estudiante.grado}
             </div>

@@ -219,7 +219,6 @@ export const generarLoteCarnetsPdf = async (
                         <div style="
                             flex: 1;
                             max-width: 175px;
-                            overflow: hidden;
                         ">
                             <!-- Nombre (Regla A aplicada con padding seguro para no cortar acentos ni ascendentes) -->
                             <div style="
@@ -239,7 +238,7 @@ export const generarLoteCarnetsPdf = async (
                                 line-height: ${nameLineHeight};
                                 letter-spacing: ${nameLetterSpacing}px;
                                 color: #FFFFFF;
-                                margin-bottom: 4px;
+                                margin-bottom: 3px;
                                 white-space: nowrap;
                                 padding: 2px 0 1px 0;
                             ">${est.apellidos}</div>
@@ -250,7 +249,7 @@ export const generarLoteCarnetsPdf = async (
                                 width: 38px;
                                 background: #C34772;
                                 border-radius: 2px;
-                                margin-bottom: 4px;
+                                margin-bottom: 3px;
                             "></div>
 
                             <!-- ID (SVG: texto monoespaciado debajo de la línea) -->
@@ -260,7 +259,7 @@ export const generarLoteCarnetsPdf = async (
                                 color: #FFFFFF;
                                 font-family: monospace;
                                 letter-spacing: 0.2px;
-                                line-height: 1.2;
+                                line-height: 1.1;
                             ">ID: ${est.numeroIdentificacion}</div>
                         </div>
                     </div>
@@ -286,17 +285,17 @@ export const generarLoteCarnetsPdf = async (
                         position: relative;
                         z-index: 10;
                     ">
-                        <!-- Pill del cinturón (SVG: #FED700, x=16.5→73, y=116.8→135.9) -->
+                        <!-- Pill del cinturón (inline-block con line-height==height para centrado vertical perfecto en html2canvas) -->
                         <div style="
                             background: ${visual.background};
                             color: ${visual.color};
                             font-size: 9px;
                             font-weight: 900;
                             height: 18px;
-                            display: inline-flex;
-                            align-items: center;
-                            justify-content: center;
-                            line-height: 1;
+                            line-height: 18px;
+                            display: inline-block;
+                            text-align: center;
+                            vertical-align: middle;
                             padding: 0 9px;
                             border-radius: 5px;
                             text-transform: uppercase;
