@@ -1,4 +1,3 @@
-
 // components/GeneradorQR.tsx
 import React, { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -24,6 +23,31 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
   const sedeEstudiante = sedesVisibles.find(s => s.id === estudiante.sedeId);
   const visualGrado = getBeltStyle(estudiante.grado);
 
+  // Cálculo adaptativo del nombre (Regla A)
+  const NAME_BOX_PX  = 175;
+  const NAME_SIZE_MAX = 18;
+  const NAME_SIZE_MIN = 13;
+  const NAME_LS_MAX   = -0.3;
+  const NAME_LS_MIN   = -1.2;
+
+  const estimarAncho = (texto: string, size: number, ls: number): number =>
+      texto.length * (size * 0.62 + ls);
+
+  let nameFontSize   = NAME_SIZE_MAX;
+  let nameLetterSpacing = NAME_LS_MAX;
+  let nameLineHeight = 1.18;
+
+  const maxLen = Math.max(estudiante.nombres.length, estudiante.apellidos.length);
+  if (estimarAncho(estudiante.nombres.length > estudiante.apellidos.length ? estudiante.nombres : estudiante.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+      nameLetterSpacing = NAME_LS_MIN;
+  }
+  if (estimarAncho(estudiante.nombres.length > estudiante.apellidos.length ? estudiante.nombres : estudiante.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+      nameFontSize = Math.max(NAME_SIZE_MIN, Math.round(NAME_BOX_PX / (maxLen * 0.62)));
+  }
+  if (maxLen > 14) nameLineHeight = 1.12;
+
+  const anioIngreso = estudiante.fechaIngreso ? new Date(estudiante.fechaIngreso).getFullYear() : new Date().getFullYear();
+
   const downloadCard = async () => {
     /* istanbul ignore next -- el botón solo existe mientras la tarjeta referenciada está montada */
     if (!cardRef.current) return;
@@ -42,66 +66,79 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
     <div className="flex flex-col items-center space-y-6">
       <div 
         ref={cardRef}
-        style={{ backgroundColor: configClub.colorPrimario }}
-        className="w-[340px] h-[215px] rounded-xl shadow-2xl overflow-hidden flex flex-col relative pt-[19px] px-[19px] pb-[20px] border border-white/20"
+        style={{ backgroundColor: '#211915' }}
+        className="w-[324px] h-[204px] rounded-[10px] shadow-2xl overflow-hidden flex flex-col relative font-['Inter',system-ui,sans-serif]"
       >
-        <div className="flex justify-between items-start z-10 mb-3">
-            <div className="text-left max-w-[190px]">
-                <h1 className="text-[14px] font-black uppercase tracking-tight text-white leading-[1.2] drop-shadow-md">
+        {/* Fila superior: club + logo */}
+        <div className="flex justify-between items-start pt-[20px] px-[22px] z-10">
+            <div className="text-left max-w-[240px] flex-1 pr-2">
+                <h1 className="text-[13px] font-black uppercase text-white leading-[1.05] tracking-[-0.4px]">
                     {configClub.nombreClub}
                 </h1>
-                <p className="text-[9px] font-bold text-white/60 uppercase mt-0.5 leading-none">
-                    {sedeEstudiante?.nombre || 'Sede Principal'}
+                <p className="text-[6.5px] font-bold text-white/85 uppercase mt-[3px] tracking-[0.3px] leading-none">
+                    SEDE: <span>{sedeEstudiante?.nombre || 'Sede Principal'}</span>
                 </p>
             </div>
-            <div className="bg-white p-1 rounded-lg shadow-md flex-shrink-0">
-                <LogoDinamico className="w-8 h-8" />
+            <div className="bg-white rounded-[8px] w-[34px] h-[34px] flex-shrink-0 flex items-center justify-center overflow-hidden">
+                <LogoDinamico className="w-7 h-7 object-contain" />
             </div>
         </div>
 
-        <div className="flex gap-4 items-center flex-grow z-10">
-            <div className="bg-white p-1.5 rounded-xl shadow-lg flex-shrink-0">
+        {/* Fila central: QR + datos */}
+        <div className="flex gap-[14px] items-center pt-[6px] px-[22px] z-10">
+            <div className="bg-white rounded-[10px] w-[74px] h-[70px] flex-shrink-0 flex items-center justify-center p-1 box-border overflow-hidden">
                 <QRCodeSVG
                     value={estudiante.id}
-                    size={64}
+                    size={62}
                     level="H"
-                    fgColor={configClub.colorPrimario}
+                    fgColor={configClub.colorPrimario || '#000000'}
                     bgColor="#FFFFFF"
                 />
             </div>
 
-            <div className="flex flex-col justify-center text-white">
-                <span className="text-[7px] font-black uppercase tracking-[0.2em] text-white/40 mb-1.5 leading-none">Identificación Alumno</span>
-                <h2 className="text-[17px] font-black uppercase leading-[1.2]">
+            <div className="flex-1 max-w-[175px] overflow-hidden text-left">
+                <div 
+                    style={{
+                        fontSize: `${nameFontSize}px`,
+                        lineHeight: nameLineHeight,
+                        letterSpacing: `${nameLetterSpacing}px`
+                    }}
+                    className="font-black uppercase text-white whitespace-nowrap py-[1px]"
+                >
                     {estudiante.nombres}
-                </h2>
-                <h2 className="text-[17px] font-black uppercase leading-[1.2] mb-2">
+                </div>
+                <div 
+                    style={{
+                        fontSize: `${nameFontSize}px`,
+                        lineHeight: nameLineHeight,
+                        letterSpacing: `${nameLetterSpacing}px`
+                    }}
+                    className="font-black uppercase text-white whitespace-nowrap py-[1px] mb-[4px]"
+                >
                     {estudiante.apellidos}
-                </h2>
-                <div className="h-[2px] w-10 mb-2" style={{ backgroundColor: configClub.colorSecundario }}></div>
-                <p className="text-[10px] font-bold text-white/90 leading-none">ID: {estudiante.numeroIdentificacion}</p>
+                </div>
+                <div className="h-[2.5px] w-[38px] bg-[#C34772] rounded-[2px] mb-[4px]"></div>
+                <p className="text-[8.5px] font-extrabold text-white font-mono tracking-[0.2px] leading-[1.2]">
+                    ID: {estudiante.numeroIdentificacion}
+                </p>
             </div>
         </div>
 
-        <div className="mt-2 pt-2 border-t border-white/10 z-10">
-            <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                    <span className="text-[8px] font-black text-white/50 uppercase leading-none relative -top-1">Grado:</span>
-                    <div
-                        style={{ background: visualGrado.background, color: visualGrado.color }}
-                        className="px-3 py-0.5 rounded-md text-[10px] font-black uppercase shadow-sm border border-black/10 transition-colors leading-none"
-                    >
-                        <span className="relative -top-1">{estudiante.grado}</span>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <span className="text-[7px] font-black text-white/40 uppercase block leading-none">Ingreso</span>
-                    <p className="text-[9px] font-bold text-white/90 leading-none">{estudiante.fechaIngreso}</p>
-                </div>
+        {/* Línea divisoria flotante */}
+        <div className="absolute bottom-[36px] left-[22px] right-[17px] h-[0.5px] bg-white/15 z-5 pointer-events-none"></div>
+
+        {/* Fila inferior: cinturón + año */}
+        <div className="flex justify-between items-center px-[22px] pb-[11px] mt-auto relative z-10">
+            <div
+                style={{ background: visualGrado.background, color: visualGrado.color }}
+                className="h-[18px] inline-flex items-center justify-center px-[9px] rounded-[5px] text-[9px] font-black uppercase tracking-[0.3px] border border-black/15 whitespace-nowrap max-w-[175px] overflow-hidden text-ellipsis box-border leading-none"
+            >
+                {estudiante.grado}
+            </div>
+            <div className="text-[9px] font-bold text-white/75 tracking-[0.2px]">
+                Desde: {anioIngreso}
             </div>
         </div>
-
-        <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
       </div>
 
       <button 
@@ -110,7 +147,9 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
         className="flex items-center space-x-3 bg-tkd-red text-white px-8 py-4 rounded-xl hover:bg-red-700 transition-all shadow-xl disabled:bg-gray-400 group"
       >
         <IconoExportar className="w-5 h-5" />
-        <span className="font-black uppercase text-xs tracking-widest">Descargar Carnet Oficial</span>
+        <span className="font-black uppercase text-xs tracking-widest">
+            {procesando ? 'Generando Carnet...' : 'Descargar Carnet Oficial'}
+        </span>
       </button>
     </div>
   );
