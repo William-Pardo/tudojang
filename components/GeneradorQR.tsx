@@ -24,25 +24,28 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
   const visualGrado = getBeltStyle(estudiante.grado);
 
   // Cálculo adaptativo del nombre (Regla A)
-  const NAME_BOX_PX  = 175;
-  const NAME_SIZE_MAX = 18;
-  const NAME_SIZE_MIN = 13;
-  const NAME_LS_MAX   = -0.3;
-  const NAME_LS_MIN   = -1.2;
+  const NAME_BOX_PX   = 194;  // Ancho útil disponible en la fila central (324px - 22px - 74px - 14px - 18px)
+  const NAME_SIZE_MAX = 18;   // px base
+  const NAME_SIZE_MIN = 12;   // px mínimo legible para nombres muy largos
+  const NAME_LS_MAX   = -0.3; // letter-spacing base (px)
+  const NAME_LS_MIN   = -0.8; // letter-spacing condensado para aprovechar espacio
 
+  // En Inter Black (900) en mayúsculas, el ratio ancho/alto promedio por glifo es ~0.70
   const estimarAncho = (texto: string, size: number, ls: number): number =>
-      texto.length * (size * 0.62 + ls);
+      texto.length * (size * 0.70 + ls);
 
   let nameFontSize   = NAME_SIZE_MAX;
   let nameLetterSpacing = NAME_LS_MAX;
   let nameLineHeight = 1.18;
 
-  const maxLen = Math.max(estudiante.nombres.length, estudiante.apellidos.length);
-  if (estimarAncho(estudiante.nombres.length > estudiante.apellidos.length ? estudiante.nombres : estudiante.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+  const textoMasLargo = estudiante.nombres.length > estudiante.apellidos.length ? estudiante.nombres : estudiante.apellidos;
+  const maxLen = textoMasLargo.length;
+
+  if (estimarAncho(textoMasLargo, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
       nameLetterSpacing = NAME_LS_MIN;
   }
-  if (estimarAncho(estudiante.nombres.length > estudiante.apellidos.length ? estudiante.nombres : estudiante.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
-      nameFontSize = Math.max(NAME_SIZE_MIN, Math.round(NAME_BOX_PX / (maxLen * 0.62)));
+  if (estimarAncho(textoMasLargo, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+      nameFontSize = Math.max(NAME_SIZE_MIN, Math.floor(NAME_BOX_PX / (maxLen * 0.70)));
   }
   if (maxLen > 14) nameLineHeight = 1.12;
 
@@ -96,7 +99,7 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
                 />
             </div>
 
-            <div className="flex-1 max-w-[175px] text-left">
+            <div className="flex-1 max-w-[196px] text-left">
                 <div 
                     style={{
                         fontSize: `${nameFontSize}px`,

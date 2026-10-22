@@ -102,30 +102,32 @@ export const generarLoteCarnetsPdf = async (
 
             // ── Cálculo adaptativo del nombre (Regla A) ──────────────────────────────
             // El nombre completo se divide en nombres y apellidos (dos renglones máx.).
-            // Si alguno de los dos supera el ancho de la caja de texto (~175px a 18px),
-            // se reduce letter-spacing primero, luego font-size hasta mínimo 13px.
-            const NAME_BOX_PX  = 175;   // ancho max de la caja de texto del nombre (Regla D)
-            const NAME_SIZE_MAX = 18;    // px base (equivale a aprox. 4.75pt en SVG)
-            const NAME_SIZE_MIN = 13;    // px mínimo legible
+            // Si alguno de los dos supera el ancho útil de la caja (~194px),
+            // se reduce letter-spacing primero, luego font-size proporcionalmente hasta mín 12px.
+            const NAME_BOX_PX   = 194;  // ancho útil disponible en la fila central (324 - 22 izq - 74 qr - 14 gap - 18 der)
+            const NAME_SIZE_MAX = 18;   // px base (equivale a aprox. 4.75pt en SVG)
+            const NAME_SIZE_MIN = 12;   // px mínimo legible para nombres muy largos
             const NAME_LS_MAX   = -0.3; // letter-spacing base (px)
-            const NAME_LS_MIN   = -1.2; // letter-spacing mínimo
+            const NAME_LS_MIN   = -0.8; // letter-spacing condensado
 
-            // Estimación de ancho de texto (aprox. 0.6× el font-size por carácter bold-condensed)
+            // En Inter Black (900) mayúsculas, el ratio ancho/alto promedio por carácter es ~0.70
             const estimarAncho = (texto: string, size: number, ls: number): number =>
-                texto.length * (size * 0.62 + ls);
+                texto.length * (size * 0.70 + ls);
 
             let nameFontSize   = NAME_SIZE_MAX;
             let nameLetterSpacing = NAME_LS_MAX;
             let nameLineHeight = 1.18;
 
-            const maxLen = Math.max(est.nombres.length, est.apellidos.length);
-            // Paso 1: reducir letter-spacing
-            if (estimarAncho(est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+            const textoMasLargo = est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos;
+            const maxLen = textoMasLargo.length;
+
+            // Paso 1: reducir letter-spacing si excede el ancho útil
+            if (estimarAncho(textoMasLargo, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
                 nameLetterSpacing = NAME_LS_MIN;
             }
             // Paso 2: reducir font-size si sigue sin caber
-            if (estimarAncho(est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
-                nameFontSize = Math.max(NAME_SIZE_MIN, Math.round(NAME_BOX_PX / (maxLen * 0.62)));
+            if (estimarAncho(textoMasLargo, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
+                nameFontSize = Math.max(NAME_SIZE_MIN, Math.floor(NAME_BOX_PX / (maxLen * 0.70)));
             }
             // Paso 3: ajustar line-height de forma segura sin recortar ascendentes en canvas
             if (maxLen > 14) nameLineHeight = 1.12;
@@ -215,10 +217,10 @@ export const generarLoteCarnetsPdf = async (
                             <img src="${qrUrl}" crossorigin="anonymous" style="width: 100%; height: 100%;" />
                         </div>
 
-                        <!-- Caja de texto del estudiante (Regla D: borde derecho ≤ x=265px) -->
+                        <!-- Caja de texto del estudiante (324 - 22 izq - 74 qr - 14 gap = 214px total, max 196px para margen der) -->
                         <div style="
                             flex: 1;
-                            max-width: 175px;
+                            max-width: 196px;
                         ">
                             <!-- Nombre (Regla A aplicada con padding seguro para no cortar acentos ni ascendentes) -->
                             <div style="
