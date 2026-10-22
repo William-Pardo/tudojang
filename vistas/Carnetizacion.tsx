@@ -1,6 +1,6 @@
 
 // vistas/Carnetizacion.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useEstudiantes, useSedes, useConfiguracion } from '../context/DataContext';
 import { useNotificacion } from '../context/NotificacionContext';
 import { generarLoteCarnetsPdf, FormatoPapel } from '../utils/pdfBatchGenerator';
@@ -15,11 +15,6 @@ import EmptyState from '../components/EmptyState';
 // Reactivado (2026-10-20): flujo de descarga local habilitado nuevamente.
 const MOSTRAR_BOTON_PROCESAR_IMPRESION = true;
 
-// Herramienta oculta de emergencia (2026-10-20): genera el PDF con todos los
-// estudiantes ignorando el flag carnetGenerado. Visible solo cuando se necesita
-// corregir un lote que fue marcado como generado sin descargar el PDF.
-const MOSTRAR_REGENERACION_CARNETS = true;
-
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
     const { sedesVisibles } = useSedes();
@@ -27,6 +22,30 @@ const VistaCarnetizacion: React.FC = () => {
     const { mostrarNotificacion } = useNotificacion();
     const [procesando, setProcesando] = useState(false);
     const [formato, setFormato] = useState<FormatoPapel>(FormatoPapel.Carta);
+    const [mostrarRegeneracion, setMostrarRegeneracion] = useState(false);
+
+    // Atajo de teclado (Ctrl+Shift+R o Alt+R): alterna la visibilidad de la herramienta de emergencia
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const esCtrlShiftR = (e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'R' || e.key === 'r');
+            const esAltR = e.altKey && (e.key === 'R' || e.key === 'r');
+
+            if (esCtrlShiftR || esAltR) {
+                e.preventDefault();
+                setMostrarRegeneracion(prev => {
+                    const nuevoEstado = !prev;
+                    mostrarNotificacion(
+                        nuevoEstado ? "Modo de emergencia: herramienta de regeneración visible" : "Herramienta de regeneración oculta",
+                        nuevoEstado ? "success" : "info"
+                    );
+                    return nuevoEstado;
+                });
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [mostrarNotificacion]);
 
     const pendientes = useMemo(() =>
         estudiantes.filter(e => !e.carnetGenerado),
@@ -138,10 +157,9 @@ const VistaCarnetizacion: React.FC = () => {
                                     </button>
                                 )}
 
-                                {/* Herramienta oculta: Regeneración de Carnets.
-                                    Activa con MOSTRAR_REGENERACION_CARNETS = true cuando
-                                    el PDF no se descargó pero el flag ya quedó en true. */}
-                                {MOSTRAR_REGENERACION_CARNETS && (
+                                {/* Herramienta de emergencia: Regeneración de Carnets.
+                                    Oculta por defecto. Se activa/desactiva con el atajo de teclado Ctrl+Shift+R o Alt+R. */}
+                                {mostrarRegeneracion && (
                                     <button
                                         onClick={handleRegenerarTodos}
                                         disabled={estudiantes.length === 0 || procesando}
