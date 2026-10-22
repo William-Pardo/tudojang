@@ -18,7 +18,7 @@ const MOSTRAR_BOTON_PROCESAR_IMPRESION = true;
 // Herramienta oculta de emergencia (2026-10-20): genera el PDF con todos los
 // estudiantes ignorando el flag carnetGenerado. Visible solo cuando se necesita
 // corregir un lote que fue marcado como generado sin descargar el PDF.
-const MOSTRAR_REGENERACION_CARNETS = false;
+const MOSTRAR_REGENERACION_CARNETS = true;
 
 const VistaCarnetizacion: React.FC = () => {
     const { estudiantes, cargando, cargarEstudiantes } = useEstudiantes();
