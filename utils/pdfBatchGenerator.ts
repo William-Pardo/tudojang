@@ -116,7 +116,7 @@ export const generarLoteCarnetsPdf = async (
 
             let nameFontSize   = NAME_SIZE_MAX;
             let nameLetterSpacing = NAME_LS_MAX;
-            let nameLineHeight = 1.05;
+            let nameLineHeight = 1.18;
 
             const maxLen = Math.max(est.nombres.length, est.apellidos.length);
             // Paso 1: reducir letter-spacing
@@ -127,8 +127,8 @@ export const generarLoteCarnetsPdf = async (
             if (estimarAncho(est.nombres.length > est.apellidos.length ? est.nombres : est.apellidos, nameFontSize, nameLetterSpacing) > NAME_BOX_PX) {
                 nameFontSize = Math.max(NAME_SIZE_MIN, Math.round(NAME_BOX_PX / (maxLen * 0.62)));
             }
-            // Paso 3: ajustar line-height si el nombre tiene más de ~14 chars
-            if (maxLen > 14) nameLineHeight = 0.97;
+            // Paso 3: ajustar line-height de forma segura sin recortar ascendentes en canvas
+            if (maxLen > 14) nameLineHeight = 1.12;
 
             const cardHtml = `
                 <div id="card-${i}" style="
@@ -194,8 +194,7 @@ export const generarLoteCarnetsPdf = async (
                         display: flex;
                         align-items: center;
                         gap: 14px;
-                        padding: 10px 22px 0 22px;
-                        flex-grow: 1;
+                        padding: 6px 22px 0 22px;
                         position: relative;
                         z-index: 10;
                     ">
@@ -222,7 +221,7 @@ export const generarLoteCarnetsPdf = async (
                             max-width: 175px;
                             overflow: hidden;
                         ">
-                            <!-- Nombre (Regla A aplicada) -->
+                            <!-- Nombre (Regla A aplicada con padding seguro para no cortar acentos ni ascendentes) -->
                             <div style="
                                 font-size: ${nameFontSize}px;
                                 font-weight: 900;
@@ -231,8 +230,7 @@ export const generarLoteCarnetsPdf = async (
                                 letter-spacing: ${nameLetterSpacing}px;
                                 color: #FFFFFF;
                                 white-space: nowrap;
-                                overflow: hidden;
-                                text-overflow: clip;
+                                padding: 2px 0 1px 0;
                             ">${est.nombres}</div>
                             <div style="
                                 font-size: ${nameFontSize}px;
@@ -241,10 +239,9 @@ export const generarLoteCarnetsPdf = async (
                                 line-height: ${nameLineHeight};
                                 letter-spacing: ${nameLetterSpacing}px;
                                 color: #FFFFFF;
-                                margin-bottom: 5px;
+                                margin-bottom: 4px;
                                 white-space: nowrap;
-                                overflow: hidden;
-                                text-overflow: clip;
+                                padding: 2px 0 1px 0;
                             ">${est.apellidos}</div>
 
                             <!-- Línea decorativa rosa/acento (SVG: y=84.6, x=82.3→110.9 → 38px ancho) -->
@@ -253,7 +250,7 @@ export const generarLoteCarnetsPdf = async (
                                 width: 38px;
                                 background: #C34772;
                                 border-radius: 2px;
-                                margin-bottom: 6px;
+                                margin-bottom: 4px;
                             "></div>
 
                             <!-- ID (SVG: texto monoespaciado debajo de la línea) -->
@@ -263,14 +260,15 @@ export const generarLoteCarnetsPdf = async (
                                 color: #FFFFFF;
                                 font-family: monospace;
                                 letter-spacing: 0.2px;
+                                line-height: 1.2;
                             ">ID: ${est.numeroIdentificacion}</div>
                         </div>
                     </div>
 
-                    <!-- Línea divisoria horizontal flotante (SVG: y=113.3 → bottom ~50px, centrada entre QR y cinturón) -->
+                    <!-- Línea divisoria horizontal flotante (centrada entre el final del contenido y el cinturón) -->
                     <div style="
                         position: absolute;
-                        bottom: 50px;
+                        bottom: 36px;
                         left: 22px;
                         right: 17px;
                         height: 0.5px;
@@ -294,7 +292,12 @@ export const generarLoteCarnetsPdf = async (
                             color: ${visual.color};
                             font-size: 9px;
                             font-weight: 900;
-                            padding: 3px 9px;
+                            height: 18px;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            line-height: 1;
+                            padding: 0 9px;
                             border-radius: 5px;
                             text-transform: uppercase;
                             letter-spacing: 0.3px;
@@ -303,6 +306,7 @@ export const generarLoteCarnetsPdf = async (
                             max-width: 175px;
                             overflow: hidden;
                             text-overflow: ellipsis;
+                            box-sizing: border-box;
                         ">${est.grado}</div>
 
                         <!-- Año de ingreso (SVG: "Desde 2026", alineado a la derecha) -->
