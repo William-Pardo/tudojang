@@ -289,7 +289,7 @@ export const generarLoteCarnetsPdf = async (
                         align-items: center;
                         z-index: 10;
                     ">
-                        <!-- Pill del cinturón (centrado flex nativo + span con line-height 1 para mayúsculas) -->
+                        <!-- Pill del cinturón (centrado flex nativo + compensación óptica de mayúsculas con padding inferior) -->
                         <div style="
                             background: ${visual.background};
                             color: ${visual.color};
@@ -297,7 +297,7 @@ export const generarLoteCarnetsPdf = async (
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            padding: 0 9px;
+                            padding: 0 9px 3px 9px;
                             border-radius: 5px;
                             border: 1px solid rgba(0,0,0,0.15);
                             box-sizing: border-box;

@@ -134,7 +134,7 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
         <div className="absolute bottom-[10px] left-[22px] right-[22px] h-[18px] flex justify-between items-center z-10">
             <div
                 style={{ background: visualGrado.background, color: visualGrado.color }}
-                className="h-[18px] flex items-center justify-center px-[9px] rounded-[5px] border border-black/15 whitespace-nowrap max-w-[175px] box-border"
+                className="h-[18px] flex items-center justify-center px-[9px] pb-[3px] rounded-[5px] border border-black/15 whitespace-nowrap max-w-[175px] box-border"
             >
                 <span className="text-[8.5px] font-black uppercase tracking-[0.3px] leading-none text-center block">
                     {estudiante.grado}
