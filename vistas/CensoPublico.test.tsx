@@ -46,7 +46,7 @@ describe('CensoPublico', () => {
       },
       estaCargado: true,
     });
-    verificarDuplicadoAspiranteMock.mockResolvedValue({ correoExiste: false, telefonoExiste: false });
+    verificarDuplicadoAspiranteMock.mockResolvedValue({ correoExiste: false, telefonoExiste: false, identificacionExiste: false });
     registrarAspirantePublicoMock.mockResolvedValue(undefined);
     obtenerMisionPorIdMock.mockResolvedValue(null);
   });
@@ -77,7 +77,7 @@ describe('CensoPublico', () => {
   };
 
   it('muestra una advertencia inline sin identidad al perder foco en correo cuando verificarDuplicadoAspirante marca correoExiste', async () => {
-    verificarDuplicadoAspiranteMock.mockResolvedValueOnce({ correoExiste: true, telefonoExiste: false });
+    verificarDuplicadoAspiranteMock.mockResolvedValueOnce({ correoExiste: true, telefonoExiste: false, identificacionExiste: false });
     renderCenso();
 
     const emailInput = await screen.findByPlaceholderText('EMAIL@EJEMPLO.COM');
@@ -85,13 +85,13 @@ describe('CensoPublico', () => {
     fireEvent.blur(emailInput);
 
     await waitFor(() => {
-      expect(screen.getByText('Ya existe un registro con este dato en nuestro sistema.')).toBeInTheDocument();
+      expect(screen.getByText('Ya existe un registro con este correo en nuestro sistema.')).toBeInTheDocument();
     });
     expect(verificarDuplicadoAspiranteMock).toHaveBeenCalledWith('test-tenant', { correo: 'dup@test.com' });
   });
 
   it('con un duplicado detectado, el submit muestra el ModalConfirmacion antes de enviar; confirmando, se llama a registrarAspirantePublico', async () => {
-    verificarDuplicadoAspiranteMock.mockResolvedValueOnce({ correoExiste: true, telefonoExiste: false });
+    verificarDuplicadoAspiranteMock.mockResolvedValueOnce({ correoExiste: true, telefonoExiste: false, identificacionExiste: false });
     const { container } = renderCenso();
 
     const emailInput = await screen.findByPlaceholderText('EMAIL@EJEMPLO.COM');

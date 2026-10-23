@@ -104,13 +104,21 @@ const ModalEditarRegistroCenso: React.FC<Props> = ({ registro, onGuardar, onCerr
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
+                            <label className={labelClass}>Identificación del Aspirante <span className="text-tkd-red">*</span></label>
+                            <input name="numeroIdentificacion" type="text" required className={claseInput('numeroIdentificacion')} value={datos.numeroIdentificacion || ''} onChange={handleChange} />
+                            <CampoError campo="numeroIdentificacion" />
+                        </div>
+                        <div>
                             <label className={labelClass}>Email Contacto</label>
                             <input name="email" type="email" required className={claseInput('email')} value={datos.email} onChange={handleChange} />
                             <CampoError campo="email" />
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
-                            <label className={labelClass}>WhatsApp</label>
-                            <input name="telefono" type="tel" required className={claseInput('telefono')} value={datos.telefono} onChange={handleChange} />
+                            <label className={labelClass}>WhatsApp del Aspirante</label>
+                            <input name="telefono" type="tel" className={claseInput('telefono')} value={datos.telefono || ''} onChange={handleChange} />
                             <CampoError campo="telefono" />
                         </div>
                     </div>

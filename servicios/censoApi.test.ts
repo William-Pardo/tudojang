@@ -318,14 +318,14 @@ describe('censoApi', () => {
       const resultado = await verificarDuplicadoAspirante('tenant123', { correo: 'a@b.com' });
 
       expect(mockCallable).not.toHaveBeenCalled();
-      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false });
+      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false, identificacionExiste: false });
     });
 
     it('no llama a la función si no viene ni correo ni teléfono', async () => {
       const resultado = await verificarDuplicadoAspirante('tenant123', {});
 
       expect(mockCallable).not.toHaveBeenCalled();
-      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false });
+      expect(resultado).toEqual({ correoExiste: false, telefonoExiste: false, identificacionExiste: false });
     });
   });
 });

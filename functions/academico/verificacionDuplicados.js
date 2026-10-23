@@ -30,9 +30,10 @@ function crearServicioVerificarDuplicadoAspirante({ firestore }) {
 
     const correo = data?.correo ? String(data.correo).toLowerCase().trim() : '';
     const telefono = data?.telefono ? soloDigitos(data.telefono) : '';
+    const identificacion = data?.identificacion ? String(data.identificacion).trim() : '';
 
-    if (!correo && !telefono) {
-      throw crearError('invalid-argument', 'Falta correo o telefono para verificar');
+    if (!correo && !telefono && !identificacion) {
+      throw crearError('invalid-argument', 'Falta correo, telefono o identificacion para verificar');
     }
 
     // Solo necesitamos saber SI existe -- limit(1) evita traer el documento completo (ni
@@ -64,6 +65,7 @@ function crearServicioVerificarDuplicadoAspirante({ firestore }) {
 
     let correoExiste = false;
     let telefonoExiste = false;
+    let identificacionExiste = false;
 
     if (correo) {
       correoExiste = (await existeEnColeccion('estudiantes', 'correo', correo))
@@ -75,7 +77,12 @@ function crearServicioVerificarDuplicadoAspirante({ firestore }) {
         || (await existeEnRegistrosPendientes('datos.telefono', telefono));
     }
 
-    return { correoExiste, telefonoExiste };
+    if (identificacion) {
+      identificacionExiste = (await existeEnColeccion('estudiantes', 'numeroIdentificacion', identificacion))
+        || (await existeEnRegistrosPendientes('datos.numeroIdentificacion', identificacion));
+    }
+
+    return { correoExiste, telefonoExiste, identificacionExiste };
   };
 }
 

@@ -446,8 +446,9 @@ export interface RegistroTemporal {
     datos: {
         nombres: string;
         apellidos: string;
+        numeroIdentificacion?: string;
         email: string;
-        telefono: string;
+        telefono?: string;
         fechaNacimiento: string;
         eps?: string;
         rh?: string;

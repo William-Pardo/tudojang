@@ -34,11 +34,14 @@ const mapearRegistroABorrador = (reg: RegistroTemporal): Partial<Estudiante> => 
     return {
         nombres: d.nombres,
         apellidos: d.apellidos,
-        // El censo público no pide cédula propia del aspirante; se precarga con el teléfono
-        // (mismo criterio que la inyección masiva de Kicho) y el tenant la corrige al revisar.
-        numeroIdentificacion: d.telefono,
+        // El censo ahora pide el documento directamente; si viene en numeroIdentificacion se
+        // usa de inmediato. Registros antiguos que no lo traen quedan con el teléfono como
+        // fallback (misma conducta anterior) para que el tenant corrija al revisar.
+        numeroIdentificacion: d.numeroIdentificacion || d.telefono || '',
         fechaNacimiento: d.fechaNacimiento,
-        telefono: d.telefono,
+        telefono: d.tutorNombre
+            ? (d.tutorTelefono || '') // menor: el teléfono del lead es el del tutor
+            : (d.telefono || ''),     // adulto: su propio WhatsApp
         correo: d.email,
         eps: d.eps || '',
         rh: d.rh || '',

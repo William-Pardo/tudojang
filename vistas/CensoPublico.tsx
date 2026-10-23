@@ -51,7 +51,7 @@ const CensoPublico: React.FC = () => {
     }, [misionId]);
 
     const [formData, setFormData] = useState({
-        nombres: '', apellidos: '', email: '', telefono: '',
+        nombres: '', apellidos: '', numeroIdentificacion: '', email: '', telefono: '',
         fechaNacimiento: '', eps: '', rh: '', direccion: '', barrio: '',
         tutorNombre: '', tutorApellidos: '', tutorCedula: '',
         tutorEmail: '', tutorTelefono: '', parentesco: 'Padre'
@@ -70,7 +70,9 @@ const CensoPublico: React.FC = () => {
     // Chequeo de duplicados en vivo (on-blur, sin debounce) contra la Cloud Function pública
     // verificarDuplicadoAspirante -- nunca bloquea el formulario, solo alimenta la advertencia
     // inline y las alertas de confirmación previas al envío (ver alertasParaConfirmar).
-    const [duplicados, setDuplicados] = useState<{ correoExiste: boolean; telefonoExiste: boolean }>({ correoExiste: false, telefonoExiste: false });
+    const [duplicados, setDuplicados] = useState<{ correoExiste: boolean; telefonoExiste: boolean; identificacionExiste: boolean }>(
+        { correoExiste: false, telefonoExiste: false, identificacionExiste: false }
+    );
 
     // Alertas pendientes de confirmar (patrón "preguntar y confirmar", nunca rechazo
     // silencioso): si hay alguna, el envío real se frena hasta que el aspirante confirme
@@ -108,6 +110,17 @@ const CensoPublico: React.FC = () => {
         }
     };
 
+    const handleBlurIdentificacion = async (e: React.FocusEvent<HTMLInputElement>) => {
+        const identificacion = e.target.value;
+        if (!identificacion || !tenant?.tenantId) return;
+        try {
+            const resultado = await verificarDuplicadoAspirante(tenant.tenantId, { identificacion });
+            setDuplicados(prev => ({ ...prev, identificacionExiste: resultado.identificacionExiste }));
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     // Combina los flags de duplicado (ya verificados en blur) con las heurísticas de
     // asistenciales (edad implausible, nombre del alumno calcado del tutor) recalculadas al
     // momento del envío -- array vacío si no hay nada raro que confirmar.
@@ -120,7 +133,8 @@ const CensoPublico: React.FC = () => {
             tutorApellidos: formData.tutorApellidos,
         });
         if (duplicados.correoExiste) alertas.push('Ya existe un registro con este correo en nuestro sistema.');
-        if (duplicados.telefonoExiste) alertas.push('Ya existe un registro con este teléfono en nuestro sistema.');
+        if (duplicados.telefonoExiste) alertas.push('Ya existe un registro con este WhatsApp en nuestro sistema.');
+        if (duplicados.identificacionExiste) alertas.push('Ya existe un alumno con este número de identificación.');
         return alertas;
     };
 
@@ -242,19 +256,27 @@ const CensoPublico: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
-                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Email Contacto</label>
-                            <input name="email" type="email" required className={inputClass} placeholder="EMAIL@EJEMPLO.COM" onChange={handleInputChange} onBlur={handleBlurCorreo} />
-                            {duplicados.correoExiste && (
-                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este dato en nuestro sistema.</p>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Identificación del Aspirante <span className="text-tkd-red">*</span></label>
+                            <input name="numeroIdentificacion" type="text" required className={inputClass} placeholder="T.I. / C.C. / R.C." onChange={handleInputChange} onBlur={handleBlurIdentificacion} />
+                            {duplicados.identificacionExiste && (
+                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un alumno con este documento en nuestro sistema.</p>
                             )}
                         </div>
                         <div>
-                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp</label>
-                            <input name="telefono" type="tel" required className={inputClass} placeholder="3001234567" onChange={handleInputChange} onBlur={handleBlurTelefono} />
-                            {duplicados.telefonoExiste && (
-                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este dato en nuestro sistema.</p>
+                            <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">Email Contacto <span className="text-tkd-red">*</span></label>
+                            <input name="email" type="email" required className={inputClass} placeholder="EMAIL@EJEMPLO.COM" onChange={handleInputChange} onBlur={handleBlurCorreo} />
+                            {duplicados.correoExiste && (
+                                <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este correo en nuestro sistema.</p>
                             )}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block tracking-widest">WhatsApp del Aspirante{edad !== null && edad < 18 ? <span className="ml-1 font-medium normal-case text-gray-400">(opcional si es menor)</span> : <span className="text-tkd-red"> *</span>}</label>
+                        <input name="telefono" type="tel" required={edad === null || edad >= 18} className={inputClass} placeholder="3001234567" onChange={handleInputChange} onBlur={handleBlurTelefono} />
+                        {duplicados.telefonoExiste && (
+                            <p className="mt-2 text-[9px] font-black uppercase text-amber-600 tracking-widest">Ya existe un registro con este WhatsApp en nuestro sistema.</p>
+                        )}
                     </div>
 
                     <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">

@@ -189,13 +189,13 @@ export const inyectarEstudiantesKicho = async (
             tenantId: reg.tenantId,
             nombres: datos.nombres.toUpperCase().trim(),
             apellidos: datos.apellidos.toUpperCase().trim(),
-            numeroIdentificacion: datos.telefono, // O el campo que definas como ID único
+            numeroIdentificacion: (datos.numeroIdentificacion || datos.telefono || '').toUpperCase().trim(),
             fechaNacimiento: datos.fechaNacimiento,
             grado: GradoTKD.Blanco,
             grupo: GrupoEdad.NoAsignado,
             horasAcumuladasGrado: 0,
             sedeId: datos.sedeSugeridaId || sedeDefault,
-            telefono: datos.telefono,
+            telefono: datos.telefono || '',
             correo: datos.email.toLowerCase().trim(),
             fechaIngreso: hoy,
             estadoPago: EstadoPago.AlDia,
@@ -301,18 +301,18 @@ export const eliminarRegistroTemporal = async (id: string): Promise<void> => {
  * `verificarDuplicadoAspirante` (Admin SDK, App Check) porque el visitante no tiene sesión --
  * mismo patrón que buscarTenantPorSlug (servicios/configuracionApi.ts) sobre
  * resolverTenantPublico. Ver functions/academico/verificacionDuplicados.js: el resultado
- * NUNCA incluye nombre/id del match, solo los 2 booleanos.
+ * NUNCA incluye nombre/id/documento del match, solo los 3 booleanos.
  */
 export const verificarDuplicadoAspirante = async (
     tenantId: string,
-    datos: { correo?: string; telefono?: string }
-): Promise<{ correoExiste: boolean; telefonoExiste: boolean }> => {
-    if (!isFirebaseConfigured || (!datos.correo && !datos.telefono)) {
-        return { correoExiste: false, telefonoExiste: false };
+    datos: { correo?: string; telefono?: string; identificacion?: string }
+): Promise<{ correoExiste: boolean; telefonoExiste: boolean; identificacionExiste: boolean }> => {
+    if (!isFirebaseConfigured || (!datos.correo && !datos.telefono && !datos.identificacion)) {
+        return { correoExiste: false, telefonoExiste: false, identificacionExiste: false };
     }
     const callable = httpsCallable<
-        { tenantId: string; correo?: string; telefono?: string },
-        { correoExiste: boolean; telefonoExiste: boolean }
+        { tenantId: string; correo?: string; telefono?: string; identificacion?: string },
+        { correoExiste: boolean; telefonoExiste: boolean; identificacionExiste: boolean }
     >(getFunctions(), 'verificarDuplicadoAspirante');
     const { data } = await callable({ tenantId, ...datos });
     return data;

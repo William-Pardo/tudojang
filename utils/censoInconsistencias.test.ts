@@ -65,14 +65,14 @@ describe('detectarInconsistencias', () => {
     it('marca, apuntando al campo telefono, un teléfono con menos de 10 dígitos', () => {
       const r = registro({ telefono: '12345' });
       expect(detectarInconsistencias(r, [], [])).toContainEqual({
-        campo: 'telefono', mensaje: 'Teléfono del aspirante no tiene 10 dígitos',
+        campo: 'telefono', mensaje: 'WhatsApp del aspirante no tiene 10 dígitos',
       });
     });
 
     it('marca un teléfono con más de 10 dígitos', () => {
       const r = registro({ telefono: '300123456789' });
       expect(detectarInconsistencias(r, [], [])).toContainEqual({
-        campo: 'telefono', mensaje: 'Teléfono del aspirante no tiene 10 dígitos',
+        campo: 'telefono', mensaje: 'WhatsApp del aspirante no tiene 10 dígitos',
       });
     });
 
@@ -138,10 +138,12 @@ describe('detectarInconsistencias', () => {
       });
     });
 
-    it('no marca un menor que sí tiene tutor cargado', () => {
+    it('no marca un menor que sí tiene tutor cargado (con teléfono)', () => {
       const haceDiezAnios = new Date();
       haceDiezAnios.setFullYear(haceDiezAnios.getFullYear() - 10);
-      const r = registro({ fechaNacimiento: haceDiezAnios.toISOString().slice(0, 10), tutorNombre: 'Maria' });
+      // El tutor debe incluir tutorTelefono; de lo contrario la nueva validación
+      // "menor con tutor sin WhatsApp" emite su propia alerta (campo distinto).
+      const r = registro({ fechaNacimiento: haceDiezAnios.toISOString().slice(0, 10), tutorNombre: 'Maria', tutorTelefono: '3009876543' });
       expect(detectarInconsistencias(r, [], [])).toEqual([]);
     });
 
@@ -155,7 +157,7 @@ describe('detectarInconsistencias', () => {
     it('marca, apuntando al campo tutorTelefono, uno con menos de 10 dígitos', () => {
       const r = registro({ tutorNombre: 'Maria', tutorTelefono: '123' });
       expect(detectarInconsistencias(r, [], [])).toContainEqual({
-        campo: 'tutorTelefono', mensaje: 'Teléfono del tutor no tiene 10 dígitos',
+        campo: 'tutorTelefono', mensaje: 'WhatsApp del tutor no tiene 10 dígitos',
       });
     });
 

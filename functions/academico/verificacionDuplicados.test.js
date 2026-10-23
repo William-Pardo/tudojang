@@ -50,7 +50,7 @@ test('verificarDuplicadoAspirante: rechaza si falta el tenantId', async () => {
   );
 });
 
-test('verificarDuplicadoAspirante: rechaza si faltan correo y telefono', async () => {
+test('verificarDuplicadoAspirante: rechaza si faltan correo, telefono e identificacion', async () => {
   const servicio = crearServicioVerificarDuplicadoAspirante({ firestore: crearFirestoreFake() });
 
   await assert.rejects(
@@ -62,14 +62,14 @@ test('verificarDuplicadoAspirante: rechaza si faltan correo y telefono', async (
   );
 });
 
-test('verificarDuplicadoAspirante: devuelve ambos en false si no hay coincidencias', async () => {
+test('verificarDuplicadoAspirante: devuelve todos en false si no hay coincidencias', async () => {
   const servicio = crearServicioVerificarDuplicadoAspirante({
     firestore: crearFirestoreFake({ estudiantes: [], registros_temporales: [] }),
   });
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'nadie@correo.com', telefono: '3001234567' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false, identificacionExiste: false });
 });
 
 test('verificarDuplicadoAspirante: detecta correo ya usado por un estudiante real', async () => {
@@ -83,10 +83,10 @@ test('verificarDuplicadoAspirante: detecta correo ya usado por un estudiante rea
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'JUAN@correo.com  ' });
 
-  assert.deepEqual(resultado, { correoExiste: true, telefonoExiste: false });
+  assert.deepEqual(resultado, { correoExiste: true, telefonoExiste: false, identificacionExiste: false });
 });
 
-test('verificarDuplicadoAspirante: NUNCA devuelve nombre, id u otro dato del match -- solo los 2 booleanos', async () => {
+test('verificarDuplicadoAspirante: NUNCA devuelve nombre, id u otro dato del match -- solo los booleanos', async () => {
   const servicio = crearServicioVerificarDuplicadoAspirante({
     firestore: crearFirestoreFake({
       estudiantes: [
@@ -97,7 +97,7 @@ test('verificarDuplicadoAspirante: NUNCA devuelve nombre, id u otro dato del mat
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'juan@correo.com' });
 
-  assert.deepEqual(Object.keys(resultado).sort(), ['correoExiste', 'telefonoExiste']);
+  assert.deepEqual(Object.keys(resultado).sort(), ['correoExiste', 'identificacionExiste', 'telefonoExiste']);
 });
 
 test('verificarDuplicadoAspirante: detecta telefono ya usado, normalizando digitos', async () => {
@@ -109,7 +109,7 @@ test('verificarDuplicadoAspirante: detecta telefono ya usado, normalizando digit
 
   const resultado = await servicio({ tenantId: 'tenant-1', telefono: '300-123-4567' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true, identificacionExiste: false });
 });
 
 test('verificarDuplicadoAspirante: detecta correo de otra solicitud PENDIENTE en registros_temporales', async () => {
@@ -123,7 +123,7 @@ test('verificarDuplicadoAspirante: detecta correo de otra solicitud PENDIENTE en
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'pendiente@correo.com' });
 
-  assert.deepEqual(resultado, { correoExiste: true, telefonoExiste: false });
+  assert.deepEqual(resultado, { correoExiste: true, telefonoExiste: false, identificacionExiste: false });
 });
 
 test('verificarDuplicadoAspirante: detecta telefono de otra solicitud PENDIENTE en registros_temporales', async () => {
@@ -137,7 +137,33 @@ test('verificarDuplicadoAspirante: detecta telefono de otra solicitud PENDIENTE 
 
   const resultado = await servicio({ tenantId: 'tenant-1', telefono: '3009998888' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true, identificacionExiste: false });
+});
+
+test('verificarDuplicadoAspirante: detecta identificacion ya usada por un estudiante real', async () => {
+  const servicio = crearServicioVerificarDuplicadoAspirante({
+    firestore: crearFirestoreFake({
+      estudiantes: [{ id: 'e1', tenantId: 'tenant-1', numeroIdentificacion: '1020304050' }],
+    }),
+  });
+
+  const resultado = await servicio({ tenantId: 'tenant-1', identificacion: '1020304050' });
+
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false, identificacionExiste: true });
+});
+
+test('verificarDuplicadoAspirante: detecta identificacion de otra solicitud PENDIENTE en registros_temporales', async () => {
+  const servicio = crearServicioVerificarDuplicadoAspirante({
+    firestore: crearFirestoreFake({
+      registros_temporales: [
+        { id: 'r1', tenantId: 'tenant-1', estado: 'pendiente', datos: { numeroIdentificacion: '1020304050' } },
+      ],
+    }),
+  });
+
+  const resultado = await servicio({ tenantId: 'tenant-1', identificacion: '1020304050' });
+
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false, identificacionExiste: true });
 });
 
 test('verificarDuplicadoAspirante: una solicitud RECHAZADA/PROCESADA no cuenta como duplicado activo', async () => {
@@ -152,7 +178,7 @@ test('verificarDuplicadoAspirante: una solicitud RECHAZADA/PROCESADA no cuenta c
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'viejo@correo.com', telefono: '3005554444' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false, identificacionExiste: false });
 });
 
 test('verificarDuplicadoAspirante: aisla por tenant -- un match de otro tenant no cuenta', async () => {
@@ -164,7 +190,7 @@ test('verificarDuplicadoAspirante: aisla por tenant -- un match de otro tenant n
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'compartido@correo.com' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: false, identificacionExiste: false });
 });
 
 test('verificarDuplicadoAspirante: evalua correo y telefono de forma independiente', async () => {
@@ -176,5 +202,5 @@ test('verificarDuplicadoAspirante: evalua correo y telefono de forma independien
 
   const resultado = await servicio({ tenantId: 'tenant-1', correo: 'no-coincide@correo.com', telefono: '3001112222' });
 
-  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true });
+  assert.deepEqual(resultado, { correoExiste: false, telefonoExiste: true, identificacionExiste: false });
 });

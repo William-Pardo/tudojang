@@ -48,13 +48,6 @@ export const detectarInconsistencias = (
     const { datos } = registro;
     const alertas: AlertaCenso[] = [];
 
-    if (soloDigitos(datos.telefono).length !== 10) {
-        alertas.push({ campo: 'telefono', mensaje: 'Teléfono del aspirante no tiene 10 dígitos' });
-    }
-    if (datos.email && !EMAIL_REGEX.test(datos.email)) {
-        alertas.push({ campo: 'email', mensaje: 'Email con formato inválido' });
-    }
-
     const edad = calcularEdad(datos.fechaNacimiento);
     if (edad === null || edad < 0 || edad > 100) {
         alertas.push({ campo: 'fechaNacimiento', mensaje: 'Fecha de nacimiento inválida' });
@@ -62,21 +55,39 @@ export const detectarInconsistencias = (
         alertas.push({ campo: 'tutorNombre', mensaje: 'Menor de edad sin datos de tutor' });
     }
 
-    if (datos.tutorTelefono && soloDigitos(datos.tutorTelefono).length !== 10) {
-        alertas.push({ campo: 'tutorTelefono', mensaje: 'Teléfono del tutor no tiene 10 dígitos' });
+    // Para adultos: su propio WhatsApp es obligatorio y debe tener 10 dígitos.
+    // Para menores: el WhatsApp que importa es el del tutor (decisor de pago); el del
+    // aspirante es opcional -- no se valida su longitud.
+    const esAdulto = edad !== null && edad >= 18;
+    if (esAdulto && datos.telefono && soloDigitos(datos.telefono).length !== 10) {
+        alertas.push({ campo: 'telefono', mensaje: 'WhatsApp del aspirante no tiene 10 dígitos' });
     }
 
-    const telefonoDigitos = soloDigitos(datos.telefono);
+    if (datos.email && !EMAIL_REGEX.test(datos.email)) {
+        alertas.push({ campo: 'email', mensaje: 'Email con formato inválido' });
+    }
+
+    if (datos.tutorTelefono && soloDigitos(datos.tutorTelefono).length !== 10) {
+        alertas.push({ campo: 'tutorTelefono', mensaje: 'WhatsApp del tutor no tiene 10 dígitos' });
+    }
+
+    // Para menores, el WhatsApp del tutor es el canal principal del lead: se exige si
+    // hay datos de tutor pero no tiene teléfono registrado.
+    if (!esAdulto && datos.tutorNombre?.trim() && !datos.tutorTelefono?.trim()) {
+        alertas.push({ campo: 'tutorTelefono', mensaje: 'Menor de edad: falta el WhatsApp del acudiente' });
+    }
+
+    const telefonoDigitos = soloDigitos(datos.telefono || '');
     const emailNormalizado = datos.email?.trim().toLowerCase();
     const otrosDelLote = todosLosRegistros.filter(r => r.id !== registro.id);
 
-    if (hayTelefonoDuplicado(telefonoDigitos, otrosDelLote.map(r => r.datos.telefono))) {
+    if (telefonoDigitos && hayTelefonoDuplicado(telefonoDigitos, otrosDelLote.map(r => r.datos.telefono))) {
         alertas.push({ campo: 'telefono', mensaje: 'Posible duplicado: otro registro pendiente tiene el mismo teléfono' });
     }
     if (hayEmailDuplicado(emailNormalizado, otrosDelLote.map(r => r.datos.email))) {
         alertas.push({ campo: 'email', mensaje: 'Posible duplicado: otro registro pendiente tiene el mismo email' });
     }
-    if (hayTelefonoDuplicado(telefonoDigitos, estudiantesExistentes.map(e => e.telefono))) {
+    if (telefonoDigitos && hayTelefonoDuplicado(telefonoDigitos, estudiantesExistentes.map(e => e.telefono))) {
         alertas.push({ campo: 'telefono', mensaje: 'Posible duplicado: ya existe un estudiante con este teléfono' });
     }
     if (hayEmailDuplicado(emailNormalizado, estudiantesExistentes.map(e => e.correo))) {
