@@ -277,38 +277,43 @@ export const generarLoteCarnetsPdf = async (
                         z-index: 5;
                     "></div>
 
-                    <!-- Fila inferior: cinturón (izq) + año (der) -->
+                    <!-- Fila inferior: cinturón (izq) + año (der) anclada a 10px del fondo -->
                     <div style="
+                        position: absolute;
+                        bottom: 10px;
+                        left: 22px;
+                        right: 22px;
+                        height: 18px;
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
-                        padding: 0 22px 11px 22px;
-                        margin-top: auto;
-                        position: relative;
                         z-index: 10;
                     ">
-                        <!-- Pill del cinturón (inline-block con line-height==height para centrado vertical perfecto en html2canvas) -->
+                        <!-- Pill del cinturón (centrado flex nativo + span con line-height 1 para mayúsculas) -->
                         <div style="
                             background: ${visual.background};
                             color: ${visual.color};
-                            font-size: 9px;
-                            font-weight: 900;
                             height: 18px;
-                            line-height: 18px;
-                            display: inline-block;
-                            text-align: center;
-                            vertical-align: middle;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
                             padding: 0 9px;
                             border-radius: 5px;
-                            text-transform: uppercase;
-                            letter-spacing: 0.3px;
                             border: 1px solid rgba(0,0,0,0.15);
+                            box-sizing: border-box;
                             white-space: nowrap;
                             max-width: 175px;
-                            overflow: hidden;
-                            text-overflow: ellipsis;
-                            box-sizing: border-box;
-                        ">${est.grado}</div>
+                        ">
+                            <span style="
+                                font-size: 8.5px;
+                                font-weight: 900;
+                                text-transform: uppercase;
+                                letter-spacing: 0.3px;
+                                line-height: 1;
+                                text-align: center;
+                                display: block;
+                            ">${est.grado}</span>
+                        </div>
 
                         <!-- Año de ingreso (SVG: "Desde 2026", alineado a la derecha) -->
                         <div style="
@@ -317,6 +322,7 @@ export const generarLoteCarnetsPdf = async (
                             color: #FFFFFF;
                             opacity: 0.75;
                             letter-spacing: 0.2px;
+                            line-height: 1;
                         ">Desde: ${new Date(est.fechaIngreso).getFullYear()}</div>
                     </div>
                 </div>

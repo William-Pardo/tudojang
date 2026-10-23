@@ -130,15 +130,17 @@ const GeneradorQR: React.FC<Props> = ({ estudiante }) => {
         {/* Línea divisoria flotante */}
         <div className="absolute bottom-[36px] left-[22px] right-[17px] h-[0.5px] bg-white/15 z-5 pointer-events-none"></div>
 
-        {/* Fila inferior: cinturón + año */}
-        <div className="flex justify-between items-center px-[22px] pb-[11px] mt-auto relative z-10">
+        {/* Fila inferior: cinturón + año (anclada con posición absoluta a 10px del fondo) */}
+        <div className="absolute bottom-[10px] left-[22px] right-[22px] h-[18px] flex justify-between items-center z-10">
             <div
                 style={{ background: visualGrado.background, color: visualGrado.color }}
-                className="h-[18px] leading-[18px] inline-block text-center align-middle px-[9px] rounded-[5px] text-[9px] font-black uppercase tracking-[0.3px] border border-black/15 whitespace-nowrap max-w-[175px] overflow-hidden text-ellipsis box-border"
+                className="h-[18px] flex items-center justify-center px-[9px] rounded-[5px] border border-black/15 whitespace-nowrap max-w-[175px] box-border"
             >
-                {estudiante.grado}
+                <span className="text-[8.5px] font-black uppercase tracking-[0.3px] leading-none text-center block">
+                    {estudiante.grado}
+                </span>
             </div>
-            <div className="text-[9px] font-bold text-white/75 tracking-[0.2px]">
+            <div className="text-[9px] font-bold text-white/75 tracking-[0.2px] leading-none">
                 Desde: {anioIngreso}
             </div>
         </div>
