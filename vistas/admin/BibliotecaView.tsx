@@ -19,7 +19,9 @@ import {
   IconoQuiz,
   IconoOjoAbierto,
   IconoAnalisis,
+  IconoVideoMas,
 } from '../../components/Iconos';
+import ModalClasificarVideo, { type DatosVideoDirecto } from '../../components/academico/ModalClasificarVideo';
 
 // Vista previa administrativa (pedido explícito del usuario, 2026-07-16): permite a
 // Admin/Editor/Asistente/Maestro reproducir/ver el contenido real de un recurso desde la
@@ -124,7 +126,16 @@ interface BibliotecaViewProps {
     | 'obtenerConexionDrive'
     | 'guardarCarpetaActiva'
   >;
-  bibliotecaService?: Pick<typeof defaultBibliotecaService, 'importFromDrive' | 'findRecursoIndexado' | 'updateFicha' | 'approveRecurso' | 'archiveRecurso' | 'listarRecursosAprobados'>;
+  bibliotecaService?: Pick<
+    typeof defaultBibliotecaService,
+    | 'importFromDrive'
+    | 'findRecursoIndexado'
+    | 'updateFicha'
+    | 'approveRecurso'
+    | 'archiveRecurso'
+    | 'listarRecursosAprobados'
+    | 'crearRecursoVideoDirecto'
+  >;
   navegarOAuth?: (url: string) => void;
   tenantId?: string;
   usuarioId?: string;
@@ -283,6 +294,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   // Paso 7: reporte de visualización de video para staff -- solo aplica a recursos de
   // video con youtubeVideoId (los que usan el proxy de Drive no tienen tracking real).
   const [recursoReporteVisualizacion, setRecursoReporteVisualizacion] = React.useState<RecursoAcademico | null>(null);
+  const [modalVideoDirectoAbierto, setModalVideoDirectoAbierto] = React.useState(false);
   const carpetaListadaRef = React.useRef('');
   const selectorAutoAbiertoRef = React.useRef('');
 
@@ -298,6 +310,10 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   );
   const recursosAprobadosCount = recursosAprobadosLista.length;
   const archivosDriveIds = React.useMemo(() => new Set(archivosDrive.map((archivo) => archivo.id)), [archivosDrive]);
+  const recursosDirectos = React.useMemo(
+    () => recursos.filter((r) => r.estado === 'aprobado' && !archivosDriveIds.has(r.externalFileId)),
+    [recursos, archivosDriveIds]
+  );
   const redirectUri = React.useMemo(
     () => `${window.location.origin}${window.location.pathname}`,
     [],
@@ -799,6 +815,25 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
     }
   };
 
+  const guardarVideoDirecto = async (datos: DatosVideoDirecto) => {
+    if (!bibliotecaService?.crearRecursoVideoDirecto) return;
+    try {
+      const nuevoRecurso = await bibliotecaService.crearRecursoVideoDirecto(tenantId, {
+        titulo: datos.titulo,
+        videoUrl: datos.videoUrl,
+        disciplina: datos.disciplina,
+        tags: datos.tags,
+        creadoPorUid: usuarioId,
+      });
+      fusionarRecursosLocales([nuevoRecurso]);
+      mostrarNotificacion('¡Video agregado y aprobado en la biblioteca!', 'success');
+      if (onRecursoAprobado) onRecursoAprobado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar el video.');
+      throw err;
+    }
+  };
+
   const aprobar = async (recursoObjetivo: RecursoAcademico) => {
     setError('');
 
@@ -1048,11 +1083,31 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                 La cuenta Drive esta conectada. La carpeta institucional se elige o cambia desde el bloque 1.
               </p>
             )}
-            {folderId && (
-              <p className="text-xs font-black uppercase tracking-widest text-tkd-blue break-all">
-                Carpeta activa: {folderName || folderId}
-              </p>
-            )}
+            <div className="flex items-center justify-between gap-3">
+              {folderId ? (
+                <p className="text-xs font-black uppercase tracking-widest text-tkd-blue break-all">
+                  Carpeta activa: {folderName || folderId}
+                </p>
+              ) : (
+                <p className="text-xs font-bold text-gray-400">
+                  {driveConectado ? 'Sin carpeta seleccionada' : 'Drive no conectado'}
+                </p>
+              )}
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => setModalVideoDirectoAbierto(true)}
+                  aria-label="Agregar video"
+                  title="Agregar video"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-tkd-blue text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <IconoVideoMas className="h-5 w-5" />
+                </button>
+                <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover:block z-20 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1 text-[10px] font-bold text-white shadow-lg dark:bg-gray-700">
+                  Agregar video
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-white divide-y-2 divide-black/20 dark:border-white/10 dark:bg-gray-950/30">
@@ -1061,7 +1116,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                 Cuenta Drive conectada. Falta seleccionar la carpeta institucional para poder listar e importar archivos.
               </div>
             )}
-            {driveConectado && folderId && archivosDrive.length === 0 && !validandoCarpeta && (
+            {driveConectado && folderId && archivosDrive.length === 0 && recursosDirectos.length === 0 && !validandoCarpeta && (
               <div className="p-6 text-sm font-bold text-gray-400">
                 La carpeta activa no tiene archivos visibles para Tudojang o la cuenta conectada no tiene permisos de lectura.
               </div>
@@ -1191,6 +1246,60 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                 </div>
               );
             })}
+            {recursosDirectos.map((recurso) => (
+              <div
+                key={recurso.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 bg-green-50/50 dark:bg-green-400/5"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={claseIconoDocumentoCentroEstudios}>
+                    <IconoRecursoBiblioteca mimeType={recurso.mimeType} className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-tkd-dark dark:text-white">
+                      {recurso.tituloVisible || recurso.nombre}
+                    </p>
+                    <p className="truncate text-[11px] font-normal text-gray-400">
+                      Video · Enlace directo · ✓ aprobado
+                    </p>
+                    {recurso.ficha?.tags && recurso.ficha.tags.length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {recurso.ficha.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-block rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-tkd-blue dark:border-blue-400/20 dark:bg-blue-400/10"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRecursoEnVistaPrevia(recurso)}
+                    aria-label={`Vista previa de ${recurso.nombre}`}
+                    title="Vista previa del contenido real"
+                    className={claseBotonIconoDocumentoCentroEstudios}
+                  >
+                    <IconoOjoAbierto className="h-4 w-4" />
+                  </button>
+                  {recurso.youtubeVideoId && (
+                    <button
+                      type="button"
+                      onClick={() => setRecursoReporteVisualizacion(recurso)}
+                      aria-label={`Ver reporte de visualización de ${recurso.nombre}`}
+                      title="Ver reporte de visualización"
+                      className={claseBotonIconoDocumentoCentroEstudios}
+                    >
+                      <IconoAnalisis className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </article>
 
@@ -1378,6 +1487,12 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
           onCerrar={() => setRecursoReporteVisualizacion(null)}
         />
       )}
+
+      <ModalClasificarVideo
+        abierto={modalVideoDirectoAbierto}
+        onCerrar={() => setModalVideoDirectoAbierto(false)}
+        onGuardar={guardarVideoDirecto}
+      />
     </section>
   );
 };

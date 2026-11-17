@@ -3,7 +3,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BibliotecaView from './BibliotecaView';
-import { clearMockRecursos, getMockRecursos } from '../../servicios/academico/bibliotecaService';
+import { clearMockRecursos, getMockRecursos, bibliotecaService as defaultBibliotecaService } from '../../servicios/academico/bibliotecaService';
 
 import '@testing-library/jest-dom';
 jest.setTimeout(15000);
@@ -860,6 +860,60 @@ describe('BibliotecaView', () => {
       const dialogoReporte = await screen.findByRole('dialog');
       expect(dialogoReporte).toHaveTextContent(/reporte de visualizaci.n/i);
       expect(dialogoReporte).toHaveTextContent(/clase 1 patadas.mp4/i);
+    });
+  });
+
+  describe('creación directa de video por URL (sin depender de Google Drive)', () => {
+    it('renderiza el botón de agregar video, abre el modal y guarda el video en la lista', async () => {
+      const user = userEvent.setup();
+      const mockCrearVideoDirecto = jest.fn().mockResolvedValue({
+        id: 'rec-video-directo-1',
+        tenantId: 'tenant-demo',
+        nombre: 'Técnica Naeryo Chagi Directa',
+        tituloVisible: 'Técnica Naeryo Chagi Directa',
+        mimeType: 'video/mp4',
+        estado: 'aprobado',
+        youtubeVideoId: 'dQw4w9WgXcQ',
+        ficha: {
+          disciplina: 'Taekwondo',
+          tipo: 'video',
+          usos: ['estudio'],
+          tags: ['patadas'],
+        },
+      });
+
+      render(
+        <BibliotecaView
+          bibliotecaService={{
+            ...defaultBibliotecaService,
+            crearRecursoVideoDirecto: mockCrearVideoDirecto,
+          }}
+        />
+      );
+
+      const botonAgregarVideo = screen.getByRole('button', { name: /^agregar video$/i });
+      expect(botonAgregarVideo).toBeInTheDocument();
+
+      await user.click(botonAgregarVideo);
+      expect(screen.getByRole('heading', { name: /clasificar recurso/i })).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText(/título visible/i), 'Técnica Naeryo Chagi Directa');
+      await user.type(screen.getByLabelText(/url del video/i), 'https://youtu.be/dQw4w9WgXcQ');
+
+      await user.click(screen.getByRole('button', { name: /guardar y aprobar/i }));
+
+      await waitFor(() => {
+        expect(mockCrearVideoDirecto).toHaveBeenCalledWith(
+          'tenant-demo',
+          expect.objectContaining({
+            titulo: 'Técnica Naeryo Chagi Directa',
+            videoUrl: 'https://youtu.be/dQw4w9WgXcQ',
+          })
+        );
+      });
+
+      expect(await screen.findByText('Técnica Naeryo Chagi Directa')).toBeInTheDocument();
+      expect(screen.getByText(/video · enlace directo · ✓ aprobado/i)).toBeInTheDocument();
     });
   });
 });

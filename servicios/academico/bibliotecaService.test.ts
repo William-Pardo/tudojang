@@ -1,4 +1,4 @@
-﻿import { crearBibliotecaService, clearMockRecursos, RecursoNoPublicadoError } from './bibliotecaService';
+import { crearBibliotecaService, clearMockRecursos, RecursoNoPublicadoError } from './bibliotecaService';
 
 const bibliotecaService = crearBibliotecaService({ isFirebaseConfigured: false });
 
@@ -180,3 +180,52 @@ describe('bibliotecaService.updateFicha -- youtubeVideoId', () => {
     expect(guardado?.youtubeVideoId).toBeNull();
   });
 });
+
+describe('bibliotecaService.crearRecursoVideoDirecto', () => {
+  it('crea un recurso de video directo aprobado con youtubeVideoId y ficha completa', async () => {
+    const recurso = await bibliotecaService.crearRecursoVideoDirecto(TENANT_ID, {
+      titulo: 'Patada en Hacha (Naeryo Chagi)',
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      disciplina: 'Taekwondo',
+      tags: ['patadas', 'avanzado'],
+      creadoPorUid: ADMIN_UID,
+    });
+
+    expect(recurso.id).toBeDefined();
+    expect(recurso.tenantId).toBe(TENANT_ID);
+    expect(recurso.nombre).toBe('Patada en Hacha (Naeryo Chagi)');
+    expect(recurso.tituloVisible).toBe('Patada en Hacha (Naeryo Chagi)');
+    expect(recurso.youtubeVideoId).toBe('dQw4w9WgXcQ');
+    expect(recurso.estado).toBe('aprobado');
+    expect(recurso.mimeType).toBe('video/mp4');
+    expect(recurso.ficha?.tipo).toBe('video');
+    expect(recurso.ficha?.disciplina).toBe('Taekwondo');
+    expect(recurso.ficha?.tags).toEqual(['patadas', 'avanzado']);
+
+    const aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    const encontrado = aprobados.find((r) => r.id === recurso.id);
+    expect(encontrado).toBeDefined();
+    expect(encontrado?.youtubeVideoId).toBe('dQw4w9WgXcQ');
+  });
+
+  it('falla si la URL del video no es válida', async () => {
+    await expect(
+      bibliotecaService.crearRecursoVideoDirecto(TENANT_ID, {
+        titulo: 'Video Invalido',
+        videoUrl: 'https://sitio-invalido.com/post/123',
+        creadoPorUid: ADMIN_UID,
+      })
+    ).rejects.toThrow(/URL|enlace/i);
+  });
+
+  it('falla si el título está vacío', async () => {
+    await expect(
+      bibliotecaService.crearRecursoVideoDirecto(TENANT_ID, {
+        titulo: '   ',
+        videoUrl: 'https://youtu.be/dQw4w9WgXcQ',
+        creadoPorUid: ADMIN_UID,
+      })
+    ).rejects.toThrow(/título|nombre/i);
+  });
+});
+

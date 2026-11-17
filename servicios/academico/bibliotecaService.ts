@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../../firebase/config';
 import { RecursoAcademico, FichaAcademica } from '../../models/academico/recurso';
+import { parsearYoutubeVideoId } from '../../utils/academico/youtubeUrl';
 
 export interface BibliotecaServiceDeps {
   db?: Firestore;
@@ -341,13 +342,75 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     } as RecursoAcademico));
   };
 
+  /**
+   * Crea un recurso de video directo por URL (sin depender de archivo en Drive)
+   * y lo guarda directamente como aprobado para su uso inmediato.
+   */
+  const crearRecursoVideoDirecto = async (
+    tenantId: string,
+    input: {
+      titulo: string;
+      videoUrl: string;
+      disciplina?: string;
+      tags?: string[];
+      creadoPorUid: string;
+    }
+  ): Promise<RecursoAcademico> => {
+    const tituloLimpio = (input.titulo || '').trim();
+    if (!tituloLimpio) {
+      throw new Error('El título o nombre del video es obligatorio.');
+    }
+
+    const videoId = parsearYoutubeVideoId(input.videoUrl);
+    if (!videoId) {
+      throw new Error('La URL o enlace del video no tiene un formato válido.');
+    }
+
+    const id = `rec-video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const ahora = new Date().toISOString();
+    const tags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
+
+    const recurso: RecursoAcademico = {
+      id,
+      tenantId,
+      proveedor: 'google_drive',
+      externalFileId: `video-${videoId}`,
+      youtubeVideoId: videoId,
+      nombre: tituloLimpio,
+      tituloVisible: tituloLimpio,
+      nombreNormalizado: normalizarNombreRecurso_(tituloLimpio),
+      mimeType: 'video/mp4',
+      fuenteDriveEstado: 'verificada',
+      creadoPorUid: input.creadoPorUid,
+      creadoEn: ahora,
+      actualizadoEn: ahora,
+      estado: 'aprobado',
+      ficha: {
+        disciplina: input.disciplina?.trim() || 'Taekwondo',
+        tipo: 'video',
+        usos: ['estudio'],
+        tags,
+      },
+    };
+
+    if (!checkConfigured()) {
+      mockRecursos.push(recurso);
+      return recurso;
+    }
+
+    const docRef = doc(getDatabase(), 'tenants', tenantId, 'recursos', id);
+    await setDoc(docRef, recurso);
+    return recurso;
+  };
+
   return {
     importFromDrive,
     findRecursoIndexado,
     updateFicha,
     approveRecurso,
     archiveRecurso,
-    listarRecursosAprobados
+    listarRecursosAprobados,
+    crearRecursoVideoDirecto,
   };
 };
 
@@ -360,7 +423,8 @@ export const {
   updateFicha,
   approveRecurso,
   archiveRecurso,
-  listarRecursosAprobados
+  listarRecursosAprobados,
+  crearRecursoVideoDirecto,
 } = bibliotecaService;
 
 function buscarRecursoIndexadoEnMock_(tenantId: string, fileId: string, nombre?: string): RecursoAcademico | null {

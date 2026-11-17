@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AsignarMaterialWizard, { type AsignacionDraft } from './AsignarMaterialWizard';
 import type { RecursoAcademico } from '../../models/academico/recurso';
@@ -322,6 +322,60 @@ describe('AsignarMaterialWizard', () => {
       });
 
       expect(screen.getByText(/material asignado/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Agregar video directo desde Paso 1', () => {
+    it('renderiza el botón de agregar video y abre el modal de clasificación', async () => {
+      const user = userEvent.setup();
+      renderWizard({ modo: 'crear' });
+
+      const botonAgregarVideo = screen.getByRole('button', { name: /agregar video/i });
+      expect(botonAgregarVideo).toBeInTheDocument();
+
+      await user.click(botonAgregarVideo);
+      expect(screen.getByRole('heading', { name: /clasificar recurso/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/url del video/i)).toBeInTheDocument();
+    });
+
+    it('al guardar el video en el modal, lo inyecta en la lista y lo selecciona automáticamente', async () => {
+      const user = userEvent.setup();
+      const onCrearVideoDirecto = jest.fn().mockResolvedValue({
+        id: 'rec-video-nuevo',
+        tenantId: 'tenant-test',
+        nombre: 'Patada en Hacha Nueva',
+        tituloVisible: 'Patada en Hacha Nueva',
+        mimeType: 'video/mp4',
+        estado: 'aprobado',
+        youtubeVideoId: 'dQw4w9WgXcQ',
+        ficha: {
+          disciplina: 'Taekwondo',
+          tipo: 'video',
+          usos: ['estudio'],
+          tags: ['combate'],
+        },
+      });
+
+      renderWizard({ modo: 'crear', onCrearVideoDirecto });
+
+      await user.click(screen.getByRole('button', { name: /agregar video/i }));
+
+      await user.type(screen.getByLabelText(/título visible/i), 'Patada en Hacha Nueva');
+      await user.type(screen.getByLabelText(/url del video/i), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+      await user.click(screen.getByRole('button', { name: /guardar y aprobar/i }));
+
+      await waitFor(() => {
+        expect(onCrearVideoDirecto).toHaveBeenCalledWith(expect.objectContaining({
+          titulo: 'Patada en Hacha Nueva',
+          videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        }));
+      });
+
+      // El nuevo material aparece en la lista y está seleccionado (botón Continuar habilitado)
+      expect(await screen.findByText('Patada en Hacha Nueva')).toBeInTheDocument();
+      const botonNuevo = screen.getByRole('button', { name: /patada en hacha nueva/i });
+      expect(botonNuevo).toHaveAttribute('aria-pressed', 'true');
     });
   });
 });

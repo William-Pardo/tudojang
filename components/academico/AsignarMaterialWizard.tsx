@@ -2,7 +2,9 @@ import React from 'react';
 import { GradoTKD } from '../../tipos';
 import type { MomentoAsignacion } from '../../models/academico';
 import type { RecursoAcademico } from '../../models/academico/recurso';
-import { IconoAprobar, IconoCerrar, IconoContrato, IconoFirma, IconoImagen } from '../Iconos';
+import { IconoAprobar, IconoCerrar, IconoContrato, IconoFirma, IconoImagen, IconoVideoMas } from '../Iconos';
+import ModalClasificarVideo, { type DatosVideoDirecto } from './ModalClasificarVideo';
+import { bibliotecaService as defaultBibliotecaService } from '../../servicios/academico/bibliotecaService';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -31,6 +33,10 @@ interface AsignarMaterialWizardProps {
   draftInicial: AsignacionDraft | null;
   onCancelar: () => void;
   onConfirmar: (draft: AsignacionDraft) => Promise<void>;
+  /** Función opcional para crear un video directo desde el modal de clasificación */
+  onCrearVideoDirecto?: (datos: DatosVideoDirecto) => Promise<RecursoAcademico>;
+  tenantId?: string;
+  usuarioId?: string;
 }
 
 type PasoAsistente = 1 | 2 | 3;
@@ -139,9 +145,10 @@ interface Step1Props {
   tagsPrograma: string[];
   onActualizar: (cambios: Partial<AsignacionDraft>) => void;
   onContinuar: () => void;
+  onAbrirModalVideo?: () => void;
 }
 
-const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsPrograma, onActualizar, onContinuar }) => {
+const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsPrograma, onActualizar, onContinuar, onAbrirModalVideo }) => {
   const [busqueda, setBusqueda] = React.useState('');
   const [mostrarTodos, setMostrarTodos] = React.useState(false);
 
@@ -156,7 +163,12 @@ const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsProgram
   const sinMatch = filtrados.filter((recurso) => contarTagsCoincidentes(recurso, tagsPrograma) === 0);
   // Si nada matchea (p.ej. el programa no tiene tags), mostrar todo en vez de
   // dejar la lista vacia esperando un click en "ver sin match".
-  const visibles = conMatch.length > 0 && !mostrarTodos ? conMatch : filtrados;
+  // Además, si el recurso seleccionado no tiene match (ej. recién creado por video directo),
+  // se incluye siempre en visibles para que nunca quede oculto al usuario.
+  const recursoSeleccionadoSinMatch = sinMatch.filter((recurso) => recurso.id === draft.recursoId);
+  const visibles = conMatch.length > 0 && !mostrarTodos
+    ? [...conMatch, ...recursoSeleccionadoSinMatch]
+    : filtrados;
 
   return (
     <div className="space-y-3">
@@ -169,18 +181,32 @@ const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsProgram
         className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-tkd-dark focus:outline-none focus:ring-2 focus:ring-tkd-blue/30"
       />
 
-      <p className="px-1 text-xs font-bold text-gray-400">
-        <span className="text-tkd-blue">{conMatch.length}</span> materiales coinciden con los tags del programa
-        {sinMatch.length > 0 && !mostrarTodos && (
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="text-xs font-bold text-gray-400">
+          <span className="text-tkd-blue">{conMatch.length}</span> materiales coinciden con los tags del programa
+          {sinMatch.length > 0 && !mostrarTodos && (
+            <button
+              type="button"
+              onClick={() => setMostrarTodos(true)}
+              className="ml-2 font-black text-tkd-blue hover:underline"
+            >
+              + ver {sinMatch.length} sin match
+            </button>
+          )}
+        </p>
+        {onAbrirModalVideo && (
           <button
             type="button"
-            onClick={() => setMostrarTodos(true)}
-            className="ml-2 font-black text-tkd-blue hover:underline"
+            onClick={onAbrirModalVideo}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-tkd-dark shadow-sm transition hover:border-tkd-blue hover:text-tkd-blue dark:border-white/10 dark:bg-gray-800 dark:text-white"
+            aria-label="Agregar video"
+            title="Agregar video"
           >
-            + ver {sinMatch.length} sin match
+            <IconoVideoMas className="h-4 w-4 text-tkd-red" />
+            <span>Agregar video</span>
           </button>
         )}
-      </p>
+      </div>
 
       <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
         {visibles.length === 0 && (
@@ -502,7 +528,17 @@ const AsignarMaterialWizard: React.FC<AsignarMaterialWizardProps> = ({
   draftInicial,
   onCancelar,
   onConfirmar,
+  onCrearVideoDirecto,
+  tenantId = 'tenant-demo',
+  usuarioId = 'admin-demo',
 }) => {
+  const [materialesLocales, setMaterialesLocales] = React.useState<RecursoAcademico[]>(materialesDisponibles);
+  const [modalVideoAbierto, setModalVideoAbierto] = React.useState(false);
+
+  React.useEffect(() => {
+    setMaterialesLocales(materialesDisponibles);
+  }, [materialesDisponibles]);
+
   // "Editar" abre el asistente directamente en Configurar: el Paso 1 (elegir
   // material) queda inaccesible porque recursoId es la mitad del id
   // deterministico del documento en Firestore (mirror de
@@ -527,13 +563,32 @@ const AsignarMaterialWizard: React.FC<AsignarMaterialWizardProps> = ({
     setDraft((actual) => ({ ...actual, ...cambios }));
   };
 
+  const handleCrearVideo = async (datos: DatosVideoDirecto) => {
+    if (onCrearVideoDirecto) {
+      const nuevo = await onCrearVideoDirecto(datos);
+      setMaterialesLocales((prev) => [nuevo, ...prev]);
+      actualizarDraft({ recursoId: nuevo.id });
+      return;
+    }
+
+    const nuevo = await defaultBibliotecaService.crearRecursoVideoDirecto(tenantId, {
+      titulo: datos.titulo,
+      videoUrl: datos.videoUrl,
+      disciplina: datos.disciplina,
+      tags: datos.tags,
+      creadoPorUid: usuarioId,
+    });
+    setMaterialesLocales((prev) => [nuevo, ...prev]);
+    actualizarDraft({ recursoId: nuevo.id });
+  };
+
   const hayCambiosSinGuardar = modo === 'editar' && serializarDraftParaCambios(draft) !== snapshotInicial;
   // Paso 3 sin grados siempre bloquea "Asignar" (crear y editar). En editar,
   // ademas exige que algo difiera del snapshot inicial; "Atras"/"Continuar"
   // nunca dependen de este chequeo (ver Step2/Step3 mas abajo).
   const puedeConfirmar = draft.grados.length > 0 && (modo === 'crear' || hayCambiosSinGuardar);
 
-  const recursoSeleccionado = materialesDisponibles.find((recurso) => recurso.id === draft.recursoId);
+  const recursoSeleccionado = materialesLocales.find((recurso) => recurso.id === draft.recursoId);
   const materialChip: MaterialChip | null = recursoSeleccionado
     ? { titulo: tituloRecurso(recursoSeleccionado), mimeType: recursoSeleccionado.mimeType }
     // En modo 'editar' el material puede no estar en materialesDisponibles:
@@ -583,10 +638,11 @@ const AsignarMaterialWizard: React.FC<AsignarMaterialWizardProps> = ({
           {paso === 1 && (
             <Step1
               draft={draft}
-              materialesDisponibles={materialesDisponibles}
+              materialesDisponibles={materialesLocales}
               tagsPrograma={tagsPrograma}
               onActualizar={actualizarDraft}
               onContinuar={() => setPaso(2)}
+              onAbrirModalVideo={() => setModalVideoAbierto(true)}
             />
           )}
 
@@ -615,6 +671,13 @@ const AsignarMaterialWizard: React.FC<AsignarMaterialWizardProps> = ({
           )}
         </div>
       </div>
+
+      <ModalClasificarVideo
+        abierto={modalVideoAbierto}
+        onCerrar={() => setModalVideoAbierto(false)}
+        onGuardar={handleCrearVideo}
+        tagsSugeridosIniciales={tagsPrograma}
+      />
     </div>
   );
 };
