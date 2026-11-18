@@ -915,5 +915,51 @@ describe('BibliotecaView', () => {
       expect(await screen.findByText('Técnica Naeryo Chagi Directa')).toBeInTheDocument();
       expect(screen.getByText(/video · enlace directo · ✓ aprobado/i)).toBeInTheDocument();
     });
+
+    it('permite eliminar un video directo de la biblioteca con confirmación', async () => {
+      const user = userEvent.setup();
+      const mockEliminarRecurso = jest.fn().mockResolvedValue(undefined);
+      window.confirm = jest.fn().mockReturnValue(true);
+
+      const recursoDirectoInicial = {
+        id: 'rec-dir-1',
+        tenantId: 'tenant-demo',
+        nombre: 'Video a Borrar',
+        tituloVisible: 'Video a Borrar',
+        mimeType: 'video/mp4',
+        proveedor: 'google_drive' as const,
+        fuenteDriveEstado: 'verificada' as const,
+        creadoPorUid: 'admin-1',
+        creadoEn: '2026-07-23T00:00:00.000Z',
+        actualizadoEn: '2026-07-23T00:00:00.000Z',
+        estado: 'aprobado' as const,
+        youtubeVideoId: 'dQw4w9WgXcQ',
+        externalFileId: 'video-dQw4w9WgXcQ',
+      };
+
+      render(
+        <BibliotecaView
+          bibliotecaService={{
+            ...defaultBibliotecaService,
+            listarRecursosAprobados: jest.fn().mockResolvedValue([recursoDirectoInicial]),
+            eliminarRecurso: mockEliminarRecurso,
+          }}
+        />
+      );
+
+      expect(await screen.findByText('Video a Borrar')).toBeInTheDocument();
+
+      const botonEliminar = screen.getByRole('button', { name: /retirar video a borrar|eliminar video a borrar/i });
+      expect(botonEliminar).toBeInTheDocument();
+
+      await user.click(botonEliminar);
+
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/seguro.*eliminar.*video a borrar/i));
+      await waitFor(() => {
+        expect(mockEliminarRecurso).toHaveBeenCalledWith('tenant-demo', 'rec-dir-1');
+      });
+
+      expect(screen.queryByText('Video a Borrar')).not.toBeInTheDocument();
+    });
   });
 });

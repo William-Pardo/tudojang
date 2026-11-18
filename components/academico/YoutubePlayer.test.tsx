@@ -228,4 +228,41 @@ describe('YoutubePlayer', () => {
       screen.getByText(/no permite su reproducción insertada en sitios externos/i)
     ).toBeInTheDocument();
   });
+
+  it('invoca onListo cuando el player completa su inicialización', async () => {
+    const onListo = jest.fn();
+    render(
+      <YoutubePlayer
+        videoId="dQw4w9WgXcQ"
+        titulo="Clase lista"
+        registrarSync={jest.fn()}
+        onListo={onListo}
+      />
+    );
+    await flushMicrotasks();
+    expect(onListo).toHaveBeenCalled();
+  });
+
+  it('invoca onErrorDetectado con mensaje y código cuando el reproductor emite un error', async () => {
+    const onErrorDetectado = jest.fn();
+    render(
+      <YoutubePlayer
+        videoId="dQw4w9WgXcQ"
+        titulo="Clase con error"
+        registrarSync={jest.fn()}
+        onErrorDetectado={onErrorDetectado}
+      />
+    );
+    await flushMicrotasks();
+
+    const player = FakeYoutubePlayer.instancias[0];
+    act(() => {
+      player.events?.onError?.({ data: 150 });
+    });
+
+    expect(onErrorDetectado).toHaveBeenCalledWith(
+      expect.stringMatching(/no permite su reproducción insertada en sitios externos/i),
+      150
+    );
+  });
 });

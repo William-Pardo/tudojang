@@ -1,6 +1,7 @@
 import React from 'react';
 import { IconoCerrar } from '../Iconos';
 import { parsearYoutubeVideoId } from '../../utils/academico/youtubeUrl';
+import YoutubePlayer from './YoutubePlayer';
 import {
   TAGS_ACADEMICOS_ESTANDAR,
   alternarTagEnTexto,
@@ -39,7 +40,16 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
   const [errorUrl, setErrorUrl] = React.useState('');
   const [errorTitulo, setErrorTitulo] = React.useState('');
   const [guardando, setGuardando] = React.useState(false);
+  const [errorReproduccion, setErrorReproduccion] = React.useState<string | null>(null);
+  const [videoListo, setVideoListo] = React.useState(false);
   const prevAbiertoRef = React.useRef(false);
+
+  const videoId = React.useMemo(() => parsearYoutubeVideoId(videoUrl), [videoUrl]);
+
+  React.useEffect(() => {
+    setErrorReproduccion(null);
+    setVideoListo(false);
+  }, [videoId]);
 
   React.useEffect(() => {
     if (abierto && !prevAbiertoRef.current) {
@@ -49,6 +59,8 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
       setTagsTexto(tagsSugeridosIniciales.join(', '));
       setErrorUrl('');
       setErrorTitulo('');
+      setErrorReproduccion(null);
+      setVideoListo(false);
       setGuardando(false);
     }
     prevAbiertoRef.current = abierto;
@@ -64,9 +76,13 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
       return;
     }
 
-    const videoId = parsearYoutubeVideoId(videoUrl);
     if (!videoId) {
       setErrorUrl('El enlace ingresado no tiene un formato de video reproducible.');
+      return;
+    }
+
+    if (errorReproduccion) {
+      setErrorUrl(errorReproduccion);
       return;
     }
 
@@ -188,6 +204,31 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
                 {errorUrl}
               </p>
             )}
+
+            {videoId && (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 p-3 text-white">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                  <span className="text-gray-300">Vista previa del video</span>
+                  {errorReproduccion ? (
+                    <span className="text-red-400 font-bold">Bloqueado por YouTube</span>
+                  ) : videoListo ? (
+                    <span className="text-emerald-400 font-bold">✓ Reproducción confirmada</span>
+                  ) : (
+                    <span className="text-yellow-400 font-bold">Verificando...</span>
+                  )}
+                </div>
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
+                  <YoutubePlayer
+                    videoId={videoId}
+                    titulo={titulo.trim() || 'Vista previa del video'}
+                    onListo={() => setVideoListo(true)}
+                    onErrorDetectado={(mensaje) => {
+                      setErrorReproduccion(mensaje);
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -245,7 +286,7 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
             </button>
             <button
               type="submit"
-              disabled={guardando}
+              disabled={guardando || Boolean(errorReproduccion)}
               className="rounded-2xl bg-tkd-blue px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700 transition disabled:opacity-50 shadow-sm"
             >
               {guardando ? 'Guardando...' : 'Guardar y aprobar'}

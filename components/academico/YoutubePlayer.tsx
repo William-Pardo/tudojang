@@ -64,7 +64,11 @@ export interface YoutubePlayerProps {
   intervaloSondeoMs?: number;
   /** Cada cuanto se persiste el avance (mismo default 30s que useProgressSync). */
   intervaloFlushMs?: number;
-  registrarSync: (input: YoutubePlayerRegistrarSyncInput) => void | Promise<void>;
+  registrarSync?: (input: YoutubePlayerRegistrarSyncInput) => void | Promise<void>;
+  /** Callback cuando el reproductor completa su inicialización */
+  onListo?: () => void;
+  /** Callback cuando el reproductor detecta un error de reproducción/bloqueo */
+  onErrorDetectado?: (mensaje: string, codigo?: number) => void;
 }
 
 let contadorInstanciasYoutubePlayer = 0;
@@ -77,6 +81,8 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
   intervaloSondeoMs = 5000,
   intervaloFlushMs = 30000,
   registrarSync,
+  onListo,
+  onErrorDetectado,
 }) => {
   const [elementId] = React.useState(() => {
     contadorInstanciasYoutubePlayer += 1;
@@ -88,7 +94,7 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
 
   const sincronizar = React.useCallback(
     (input: { posicionSegundos: number; duracionSegundos: number; nuevoInicio: boolean }) => {
-      if (!estudianteId) return;
+      if (!estudianteId || !registrarSync) return;
       return registrarSync({ ...input, estudianteNombre });
     },
     [estudianteId, estudianteNombre, registrarSync]
@@ -117,7 +123,10 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
         videoId,
         events: {
           onReady: () => {
-            if (activo) setListo(true);
+            if (activo) {
+              setListo(true);
+              onListo?.();
+            }
           },
           onStateChange: (event: any) => {
             if (!activo) return;
@@ -156,6 +165,7 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
               mensaje = 'El enlace contiene un identificador de video de YouTube no válido.';
             }
             setErrorReproduccion(mensaje);
+            onErrorDetectado?.(mensaje, codigo);
           },
         },
       });

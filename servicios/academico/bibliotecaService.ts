@@ -5,6 +5,7 @@
 import {
   collection,
   doc,
+  deleteDoc,
   getDoc,
   getDocs,
   query,
@@ -403,6 +404,22 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     return recurso;
   };
 
+  const eliminarRecurso = async (
+    tenantId: string,
+    recursoId: string
+  ): Promise<void> => {
+    if (!checkConfigured()) {
+      const idx = mockRecursos.findIndex((r) => r.id === recursoId && r.tenantId === tenantId);
+      if (idx !== -1) {
+        mockRecursos.splice(idx, 1);
+      }
+      return;
+    }
+
+    const docRef = doc(getDatabase(), 'tenants', tenantId, 'recursos', recursoId);
+    await deleteDoc(docRef);
+  };
+
   return {
     importFromDrive,
     findRecursoIndexado,
@@ -411,6 +428,7 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
     archiveRecurso,
     listarRecursosAprobados,
     crearRecursoVideoDirecto,
+    eliminarRecurso,
   };
 };
 
@@ -425,6 +443,7 @@ export const {
   archiveRecurso,
   listarRecursosAprobados,
   crearRecursoVideoDirecto,
+  eliminarRecurso,
 } = bibliotecaService;
 
 function buscarRecursoIndexadoEnMock_(tenantId: string, fileId: string, nombre?: string): RecursoAcademico | null {

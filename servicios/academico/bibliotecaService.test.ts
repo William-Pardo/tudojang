@@ -229,3 +229,25 @@ describe('bibliotecaService.crearRecursoVideoDirecto', () => {
   });
 });
 
+describe('bibliotecaService.eliminarRecurso', () => {
+  beforeEach(() => {
+    clearMockRecursos();
+  });
+
+  it('elimina un recurso de la biblioteca por su id', async () => {
+    const recurso = await bibliotecaService.crearRecursoVideoDirecto(TENANT_ID, {
+      titulo: 'Video a Eliminar',
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      creadoPorUid: ADMIN_UID,
+    });
+
+    let aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    expect(aprobados.some((r) => r.id === recurso.id)).toBe(true);
+
+    await bibliotecaService.eliminarRecurso(TENANT_ID, recurso.id);
+
+    aprobados = await bibliotecaService.listarRecursosAprobados(TENANT_ID);
+    expect(aprobados.some((r) => r.id === recurso.id)).toBe(false);
+  });
+});
+

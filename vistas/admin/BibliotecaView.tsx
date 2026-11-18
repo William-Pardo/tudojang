@@ -138,6 +138,7 @@ interface BibliotecaViewProps {
     | 'archiveRecurso'
     | 'listarRecursosAprobados'
     | 'crearRecursoVideoDirecto'
+    | 'eliminarRecurso'
   >;
   navegarOAuth?: (url: string) => void;
   tenantId?: string;
@@ -607,6 +608,27 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       if (onRecursoAprobado) onRecursoAprobado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo retirar el recurso aprobado.');
+    }
+  };
+
+  const eliminarRecursoDirecto = async (recurso: RecursoAcademico) => {
+    const nombre = recurso.tituloVisible || recurso.nombre;
+    const confirmado = window.confirm(
+      `¿Estás seguro de que deseas eliminar "${nombre}" de la biblioteca? Esta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+
+    setError('');
+    try {
+      if (bibliotecaService?.eliminarRecurso) {
+        await bibliotecaService.eliminarRecurso(tenantId, recurso.id);
+      }
+      setRecursos((actuales) => actuales.filter((item) => item.id !== recurso.id));
+      if (recursoSeleccionadoId === recurso.id) setRecursoSeleccionadoId('');
+      mostrarNotificacion('Video eliminado de la biblioteca.', 'success');
+      if (onRecursoAprobado) onRecursoAprobado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo eliminar el recurso.');
     }
   };
 
@@ -1301,6 +1323,15 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
                       <IconoAnalisis className="h-4 w-4" />
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void eliminarRecursoDirecto(recurso)}
+                    aria-label={`Eliminar ${recurso.nombre}`}
+                    title="Eliminar de la biblioteca"
+                    className={claseBotonIconoDocumentoCentroEstudios}
+                  >
+                    <IconoEliminar className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}
