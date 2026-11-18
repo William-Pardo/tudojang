@@ -652,7 +652,7 @@ service cloud.firestore {
     match /tenants/{tenantId}/recursos/{recursoId} {
       allow read: if authenticated()
         && (currentTenantId() == tenantId || isSuperAdmin());
-      allow create, update: if (isInstructor() && (currentTenantId() == tenantId || request.resource.data.tenantId == tenantId))
+      allow create, update: if (isInstructor() && currentTenantId() == tenantId)
         || isSuperAdmin();
       allow delete: if (isAdmin() && currentTenantId() == tenantId)
         || isSuperAdmin();
@@ -677,7 +677,7 @@ service cloud.firestore {
       allow read: if authenticated()
         && (currentTenantId() == tenantId || isSuperAdmin());
       // Solo instructores pueden crear/modificar/eliminar asignaciones
-      allow create, update: if (isInstructor() && (currentTenantId() == tenantId || request.resource.data.tenantId == tenantId))
+      allow create, update: if (isInstructor() && currentTenantId() == tenantId)
         || isSuperAdmin();
       allow delete: if (isInstructor() && currentTenantId() == tenantId)
         || isSuperAdmin();
