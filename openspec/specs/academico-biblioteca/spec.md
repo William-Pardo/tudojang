@@ -78,6 +78,23 @@ El sistema MUST NOT ofrecer el tab "Reutilizar" en aprobados ni el toggle "Aprob
 
 ### Requirement: Pipeline de Centro de Estudios en 3 pasos
 
+### Requirement: Validación interactiva y eliminación de video directo
+
+El modal de clasificación de video directo MUST pre-validar en tiempo real la disponibilidad de incrustación de YouTube antes de permitir el guardado. La vista de biblioteca MUST permitir al instructor eliminar videos directos.
+
+#### Scenario: Pre-validación bloquea guardado de video con restricciones de embed
+- GIVEN un instructor abriendo `ModalClasificarVideo`
+- WHEN ingresa una URL de YouTube cuyo autor bloquea la reproducción embebida en sitios externos (error 150/101, 100, 2)
+- THEN se muestra el error detectado en un banner de alerta
+- AND el botón "Guardar" MUST deshabilitarse
+
+#### Scenario: Eliminación de recursos directos en biblioteca
+- GIVEN un instructor navegando la sección de videos directos en `BibliotecaView`
+- WHEN pulsa el botón de eliminar (`IconoEliminar`) y confirma la acción
+- THEN se invoca `bibliotecaService.eliminarRecurso` eliminando el documento de Firestore
+- AND el recurso se retira de la lista activa en pantalla
+
+
 `CentroEstudios.tsx` MUST mostrar exactamente 3 pasos — "Conectar Drive", "Centro de recursos" (clasificación+aprobación) y "Programa y publicación" (combinado, sin dividirse).
 
 #### Scenario: El stepper muestra 3 pasos
