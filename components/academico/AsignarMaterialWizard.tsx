@@ -2,10 +2,11 @@ import React from 'react';
 import { GradoTKD } from '../../tipos';
 import type { MomentoAsignacion } from '../../models/academico';
 import type { RecursoAcademico } from '../../models/academico/recurso';
-import { IconoAprobar, IconoCerrar, IconoContrato, IconoFirma, IconoImagen, IconoVideoMas } from '../Iconos';
+import { IconoAprobar, IconoCerrar, IconoContrato, IconoFirma, IconoImagen, IconoVideo, IconoVideoMas } from '../Iconos';
 import ModalClasificarVideo, { type DatosVideoDirecto } from './ModalClasificarVideo';
 import { bibliotecaService as defaultBibliotecaService } from '../../servicios/academico/bibliotecaService';
 import { mapearErrorAcademico } from '../../utils/academico/erroresAcademicos';
+import { resolverTipoMaterial } from '../../utils/academico/resolverTipoMaterial';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -97,9 +98,27 @@ function tituloRecurso(recurso: RecursoAcademico): string {
   return recurso.tituloVisible || recurso.nombre;
 }
 
-const IconoTipoRecurso: React.FC<{ mimeType?: string; className?: string }> = ({ mimeType = '', className = 'h-4 w-4' }) => {
-  if (mimeType.startsWith('image/')) return <IconoImagen className={className} />;
-  if (mimeType.startsWith('video/') || mimeType.includes('presentation')) return <IconoFirma className={className} />;
+interface IconoTipoRecursoProps {
+  recurso?: RecursoAcademico | null;
+  mimeType?: string;
+  className?: string;
+}
+
+const IconoTipoRecurso: React.FC<IconoTipoRecursoProps> = ({ recurso, mimeType = '', className = 'h-4 w-4' }) => {
+  const tipo = resolverTipoMaterial(
+    recurso
+      ? {
+          mimeType: recurso.mimeType,
+          youtubeVideoId: recurso.youtubeVideoId,
+          tipoRecurso: recurso.ficha?.tipo,
+          titulo: recurso.tituloVisible || recurso.nombre,
+        }
+      : { mimeType }
+  );
+
+  if (tipo === 'imagen') return <IconoImagen className={className} />;
+  if (tipo === 'video') return <IconoVideo className={className} />;
+  if (tipo === 'presentacion') return <IconoFirma className={className} />;
   return <IconoContrato className={className} />;
 };
 
@@ -228,7 +247,7 @@ const Step1: React.FC<Step1Props> = ({ draft, materialesDisponibles, tagsProgram
                   : 'border-gray-200 bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-white/5'
               }`}
             >
-              <IconoTipoRecurso mimeType={recurso.mimeType} />
+              <IconoTipoRecurso recurso={recurso} mimeType={recurso.mimeType} />
               <span className="flex-1 truncate text-sm font-medium text-tkd-dark dark:text-white">{tituloRecurso(recurso)}</span>
               {coincidencias > 0 && (
                 <span className="shrink-0 rounded-full bg-tkd-blue/10 px-2 py-0.5 text-[10px] font-black text-tkd-blue">

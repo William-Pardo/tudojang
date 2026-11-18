@@ -102,9 +102,19 @@ describe('asignacionService', () => {
     expect(() => publishAsignacion({ asignacion, recurso, publicadoPorUid: 'maestro-1' })).toThrow(/recurso aprobado/i);
   });
 
-  it('publica asignacion valida usando recurso aprobado', () => {
+  it('publica asignacion valida usando recurso aprobado y propaga mimeType y tipoRecurso', () => {
     const asignacion = crearAsignacion({ id: 'asignacion-valida', estado: 'borrador' });
-    const recurso = crearRecurso({ estado: 'aprobado' });
+    const recurso = crearRecurso({
+      estado: 'aprobado',
+      mimeType: 'video/mp4',
+      youtubeVideoId: 'dQw4w9WgXcQ',
+      ficha: {
+        tipo: 'video',
+        disciplina: 'Taekwondo',
+        usos: ['estudio'],
+        tags: ['patada'],
+      },
+    });
 
     expect(publishAsignacion({ asignacion, recurso, publicadoPorUid: 'maestro-1' })).toMatchObject({
       id: 'asignacion-valida',
@@ -112,6 +122,9 @@ describe('asignacionService', () => {
       creadoPorUid: 'maestro-1',
       recursoId: recurso.id,
       externalFileId: recurso.externalFileId,
+      youtubeVideoId: 'dQw4w9WgXcQ',
+      mimeType: 'video/mp4',
+      tipoRecurso: 'video',
     });
   });
 

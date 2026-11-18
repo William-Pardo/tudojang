@@ -39,6 +39,8 @@ function construirAsignacionPreview(recurso: RecursoAcademico): AsignacionCentro
     recursoId: recurso.id,
     externalFileId: recurso.externalFileId,
     youtubeVideoId: recurso.youtubeVideoId ?? null,
+    mimeType: recurso.mimeType,
+    tipoRecurso: (recurso.ficha?.tipo as any) ?? (recurso.youtubeVideoId ? 'video' : undefined),
     titulo: recurso.tituloVisible || recurso.nombre,
     destinatario: { tipo: 'grupo', grupo: 'Todos' },
     uso: recurso.ficha?.tipo === 'quiz' ? 'evaluacion' : 'estudio',

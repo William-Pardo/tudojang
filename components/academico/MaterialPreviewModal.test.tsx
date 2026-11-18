@@ -369,6 +369,31 @@ describe('MaterialPreviewModal', () => {
       expect(screen.queryByLabelText(/^video clase/i)).not.toBeInTheDocument();
     });
 
+    it('resuelve y reproduce video de YouTube aunque el título NO tenga extensión .mp4 (ej. "VIDEO TUTOR")', async () => {
+      const driveService = {
+        obtenerUrlTemporal: jest.fn(),
+        obtenerBlobProtegido: jest.fn(),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'VIDEO TUTOR',
+            youtubeVideoId: 'c5fIxtJH2Q',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      // Debe montar YoutubePlayer y NO el Visor PDF
+      expect(await screen.findByLabelText(/reproductor de youtube/i)).toBeInTheDocument();
+      expect(screen.queryByText(/visor pdf/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/video de estudio/i)).toBeInTheDocument();
+    });
+
     it('registra la visualizacion en visualizacionRepository (tenant, recurso, alumno) al pausar', async () => {
       const registrarSync = jest.fn().mockResolvedValue(undefined);
       const visualizacionRepository = { registrarSync } as any;

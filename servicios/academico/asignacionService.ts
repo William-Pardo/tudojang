@@ -286,6 +286,8 @@ export function publishAsignacion({
     recursoId: recurso.id,
     externalFileId: recurso.externalFileId,
     youtubeVideoId: recurso.youtubeVideoId ?? null,
+    mimeType: recurso.mimeType,
+    tipoRecurso: recurso.ficha?.tipo ?? (recurso.youtubeVideoId ? 'video' : undefined),
     estado: 'publicada',
     creadoPorUid: publicadoPorUid,
     actualizadoEn: new Date().toISOString(),

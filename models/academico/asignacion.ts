@@ -6,6 +6,7 @@
 import type {
   EstadoProgreso,
   MomentoAsignacion,
+  TipoRecurso,
   UsoAcademico,
 } from './index';
 
@@ -87,6 +88,8 @@ export interface AsignacionAcademica {
   /** Metadatos del recurso copiados a la asignación */
   totalPaginas?: number;
   duracionSegundos?: number;
+  mimeType?: string;
+  tipoRecurso?: TipoRecurso;
 
   creadoPorUid: string;
   creadoEn: string;

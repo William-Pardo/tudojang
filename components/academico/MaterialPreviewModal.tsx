@@ -38,36 +38,11 @@ interface MaterialPreviewModalProps {
   modoVistaPrevia?: boolean;
 }
 
-function obtenerTipoMaterial(asignacion: AsignacionCentroEstudios): string {
-  if (asignacion.uso === 'evaluacion') return 'Quiz / Evaluación';
-  if (asignacion.uso === 'refuerzo') return 'Refuerzo guiado';
-  return 'Material de estudio';
-}
-
-type TipoMaterialDetectado = 'video' | 'pdf' | 'quiz' | 'generico';
-
-function detectarTipoMaterial(asignacion: AsignacionCentroEstudios): TipoMaterialDetectado {
-  if (asignacion.uso === 'evaluacion') return 'quiz';
-  const titulo = (asignacion.titulo || '').toLowerCase();
-  if (
-    titulo.endsWith('.mp4') ||
-    titulo.endsWith('.mov') ||
-    titulo.endsWith('.avi') ||
-    titulo.endsWith('.mkv') ||
-    asignacion.duracionSegundos !== undefined
-  ) {
-    return 'video';
-  }
-
-  // Extensiones genéricas explícitas
-  const ext = titulo.split('.').pop() || '';
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'md', 'ppt', 'pptx', 'key'].includes(ext)) {
-    return 'generico';
-  }
-
-  // Fallback por defecto a pdf para compatibilidad
-  return 'pdf';
-}
+import {
+  resolverTipoMaterial,
+  obtenerEtiquetaTipoMaterial,
+  type TipoMaterialResuelto,
+} from '../../utils/academico/resolverTipoMaterial';
 
 const obtenerMensajeAccesoDrive = (err: unknown): string => {
   const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
@@ -120,8 +95,8 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   const [errorPreguntasQuiz, setErrorPreguntasQuiz] = React.useState(false);
   const [reintentosQuiz, setReintentosQuiz] = React.useState(0);
 
-  const tipoMaterial = React.useMemo(
-    () => (asignacion ? detectarTipoMaterial(asignacion) : 'generico'),
+  const tipoMaterial = React.useMemo<TipoMaterialResuelto>(
+    () => resolverTipoMaterial(asignacion),
     [asignacion]
   );
 
@@ -135,22 +110,19 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     tituloRecurso: asignacion?.titulo ?? '',
   });
 
-  // Auto-registrar aperturas de archivos genéricos (imágenes, textos, etc.)
+  // Auto-registrar aperturas de archivos no evaluativos ni video (imágenes, textos, etc.)
   React.useEffect(() => {
-    if (!asignacion || !estudianteId || tipoMaterial !== 'generico') return;
+    if (!asignacion || !estudianteId) return;
 
-    const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
-    let tipoAct: 'imagen' | 'texto' | 'presentacion' | 'apertura' = 'apertura';
-
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-      tipoAct = 'imagen';
-    } else if (['txt', 'md'].includes(ext)) {
-      tipoAct = 'texto';
-    } else if (['ppt', 'pptx', 'key'].includes(ext)) {
-      tipoAct = 'presentacion';
+    if (tipoMaterial === 'imagen') {
+      registrarApertura('imagen');
+    } else if (tipoMaterial === 'presentacion') {
+      registrarApertura('presentacion');
+    } else if (tipoMaterial === 'generico') {
+      const ext = asignacion.titulo.split('.').pop()?.toLowerCase() || '';
+      const tipoAct = ['txt', 'md'].includes(ext) ? 'texto' : 'apertura';
+      registrarApertura(tipoAct);
     }
-
-    registrarApertura(tipoAct);
   }, [asignacion?.id, tipoMaterial, estudianteId, registrarApertura, asignacion?.titulo]);
 
   React.useEffect(() => {
@@ -287,7 +259,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
         <header className="p-6 border-b border-gray-100 dark:border-white/10 flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Vista previa del recurso</p>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">{obtenerTipoMaterial(asignacion)}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">{obtenerEtiquetaTipoMaterial(tipoMaterial, asignacion.uso)}</p>
             <h2 className="mt-2 text-2xl font-black uppercase text-tkd-dark dark:text-white leading-tight">{asignacion.titulo}</h2>
           </div>
           <button
@@ -408,25 +380,61 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               estudianteNombre={estudianteNombre}
               recursoId={asignacion.recursoId}
             />
-          ) : (
-            /* Tipo material: Generico (Imagen, texto, presentación) */
+          ) : tipoMaterial === 'imagen' ? (
+            /* Tipo material: Imagen */
             <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
               <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
-                {asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') ? '🖼' : '📝'}
+                🖼
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Imagen / Gráfico de estudio</p>
+              </div>
+
+              {blobUrl ? (
+                <img
+                  src={blobUrl}
+                  alt={asignacion.titulo}
+                  className="max-h-[50vh] max-w-full object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3"
+                />
+              ) : !errorAcceso ? (
+                <div className="text-sm text-gray-500 font-bold mt-2">
+                  Cargando imagen desde Google Drive...
+                </div>
+              ) : null}
+            </div>
+          ) : tipoMaterial === 'presentacion' ? (
+            /* Tipo material: Presentación / Diapositivas */
+            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
+                📊
+              </div>
+              <div>
+                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Diapositivas / Presentación académica</p>
+              </div>
+              {blobUrl ? (
+                <iframe
+                  src={blobUrl}
+                  title={asignacion.titulo}
+                  className="w-full h-[50vh] rounded-2xl border border-gray-100 dark:border-white/10"
+                />
+              ) : !errorAcceso ? (
+                <div className="text-sm text-gray-500 font-bold mt-2">
+                  Cargando presentación desde Google Drive...
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            /* Tipo material: Generico (Texto, archivos descargables) */
+            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
+                📝
               </div>
               <div>
                 <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Apertura registrada y validada para métricas</p>
               </div>
-
-              {/* Render de imágenes */}
-              {blobUrl && (asignacion.titulo.endsWith('.png') || asignacion.titulo.endsWith('.jpg') || asignacion.titulo.endsWith('.jpeg') || asignacion.titulo.endsWith('.gif')) && (
-                <img
-                  src={blobUrl}
-                  alt={asignacion.titulo}
-                  className="max-h-[40vh] object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3"
-                />
-              )}
 
               {/* Render de texto */}
               {textoContenido !== null && (
