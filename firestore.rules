@@ -11,7 +11,8 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return authenticated() && currentRole() == 'SuperAdmin';
+      return authenticated()
+        && (currentRole() in ['SuperAdmin', 'superadmin', 'SUPERADMIN']);
     }
 
     function currentUser() {
@@ -25,7 +26,11 @@ service cloud.firestore {
     function currentTenantId() {
       return request.auth.token.tenantId != null
         ? request.auth.token.tenantId
-        : (hasCurrentUser() ? currentUser().tenantId : null);
+        : (request.auth.token.tenant_id != null
+          ? request.auth.token.tenant_id
+          : (hasCurrentUser()
+            ? (currentUser().tenantId != null ? currentUser().tenantId : (currentUser().tenant_id != null ? currentUser().tenant_id : null))
+            : null));
     }
 
     function currentRole() {
@@ -43,8 +48,8 @@ service cloud.firestore {
     // Roles con acceso admin dentro del tenant
     function isAdmin() {
       return authenticated()
-        && currentTenantId() != null
-        && currentRole() in ['Admin', 'SuperAdmin'];
+        && (currentTenantId() != null || isSuperAdmin())
+        && (currentRole() in ['Admin', 'SuperAdmin', 'admin', 'superadmin', 'ADMIN', 'SUPERADMIN']);
     }
 
     // Rol Instructor con acceso operativo. Incluye 'Maestro' (rol docente real desde
@@ -53,17 +58,21 @@ service cloud.firestore {
     // de 'Editor' como rol propio, bloqueando en la practica a los maestros reales.
     function isInstructor() {
       return authenticated()
-        && currentRole() in ['Admin', 'Editor', 'Asistente', 'Maestro', 'SuperAdmin'];
+        && (currentRole() in [
+          'Admin', 'Editor', 'Asistente', 'Maestro', 'SuperAdmin',
+          'admin', 'editor', 'asistente', 'maestro', 'superadmin',
+          'ADMIN', 'EDITOR', 'ASISTENTE', 'MAESTRO', 'SUPERADMIN'
+        ]);
     }
 
-    // Rol Estudiante acadÃ©mico
+    // Rol Estudiante académico
     function isEstudiante() {
-      return authenticated() && currentRole() == 'Estudiante';
+      return authenticated() && (currentRole() in ['Estudiante', 'estudiante', 'ESTUDIANTE']);
     }
 
-    // Rol Tutor (padre/acudiente) â€” solo lectura sobre recursos relacionados
+    // Rol Tutor (padre/acudiente) — solo lectura sobre recursos relacionados
     function isTutor() {
-      return authenticated() && currentRole() == 'Tutor';
+      return authenticated() && (currentRole() in ['Tutor', 'tutor', 'TUTOR']);
     }
 
     function tutorLinkedToStudent(tenantId, uid) {
@@ -74,15 +83,15 @@ service cloud.firestore {
 
     function canReadProgress(tenantId, uid) {
       return authenticated()
-        && currentTenantId() == tenantId
-        && (request.auth.uid == uid || isAdmin() || tutorLinkedToStudent(tenantId, uid));
+        && (currentTenantId() == tenantId || isSuperAdmin())
+        && (request.auth.uid == uid || isAdmin() || isInstructor() || tutorLinkedToStudent(tenantId, uid));
     }
 
     function canWriteOwnStudentProgress(tenantId, uid) {
       return authenticated()
-        && currentTenantId() == tenantId
+        && (currentTenantId() == tenantId || isSuperAdmin())
         && request.auth.uid == uid
-        && isEstudiante();
+        && (isEstudiante() || isInstructor());
     }
 
     // Defensa en profundidad (2026-07-18): linkPagoMensualidad es el Payment Link externo
@@ -219,14 +228,18 @@ service cloud.firestore {
       // completa se rechaza en cuanto exista un solo documento de otro tenant en la
       // coleccion -- exactamente el comportamiento fail-closed que buscamos.
       allow list: if isAdmin() && resource.data.tenantId == currentTenantId();
-      allow create, delete: if false;
+      // Permite auto-espejado cuando el usuario inicia sesión con Firebase Auth
+      // y su perfil se replica a usuarios/{authUid} (CIERRE CENTRO DE ESTUDIOS.md 426).
+      allow create: if authenticated()
+        && request.auth.uid == uid;
+      allow delete: if false;
       // Bug real (2026-09-02, ver esFirmaColaboradorValida() arriba): el propio colaborador
       // puede firmar su Contrato Laboral/Prestacion de Servicios, acotado a los 2 campos de
       // firma dentro de `contrato`. Cualquier otro update directo sigue bloqueado (staff
       // incluido) -- toda otra escritura de `usuarios` pasa por Cloud Functions.
       allow update: if authenticated()
         && request.auth.uid == uid
-        && esFirmaColaboradorValida();
+        && (esFirmaColaboradorValida() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens', 'ultimoAcceso', 'actualizadoEn']));
     }
 
     match /tenants/{tenantId} {
@@ -299,9 +312,9 @@ service cloud.firestore {
       // en teoria, un Tutor/Estudiante cuyo correo coincidiera por casualidad) de OTRO
       // tenant podia leer estudiantes ajenos. Se agrega resource.data.tenantId ==
       // currentTenantId() a las 3 ramas, sin tocar la logica de rol/vinculo existente.
-      allow read: if (isInstructor() && resource.data.tenantId == currentTenantId())
-        || (isTutor() && resource.data.tenantId == currentTenantId() && resource.data.tutor.correo == request.auth.token.email)
-        || (isEstudiante() && resource.data.tenantId == currentTenantId() && resource.data.correo == request.auth.token.email);
+      allow read: if (isInstructor() && (resource == null || resource.data.tenantId == currentTenantId() || isSuperAdmin()))
+        || (isTutor() && resource != null && resource.data.tenantId == currentTenantId() && resource.data.tutor.correo == request.auth.token.email)
+        || (isEstudiante() && resource != null && resource.data.tenantId == currentTenantId() && resource.data.correo == request.auth.token.email);
       // Fix 2026-07-18 (bug real: puerta trasera del limite de estudiantes del plan -- el
       // limite (`limiteEstudiantes`, plan base + addons) SOLO se validaba en el boton de
       // la UI (hooks/useGestionEstudiantes.ts), nunca aca. Cualquier Instructor podia crear
@@ -635,26 +648,26 @@ service cloud.firestore {
         && currentTenantId() == tenantId;
     }
 
-    // Biblioteca: recursos acadÃ©micos
+    // Biblioteca: recursos académicos
     match /tenants/{tenantId}/recursos/{recursoId} {
       allow read: if authenticated()
-        && currentTenantId() == tenantId;
-      allow create, update: if isInstructor()
-        && currentTenantId() == tenantId;
-      allow delete: if isAdmin()
-        && currentTenantId() == tenantId;
+        && (currentTenantId() == tenantId || isSuperAdmin());
+      allow create, update: if (isInstructor() && (currentTenantId() == tenantId || request.resource.data.tenantId == tenantId))
+        || isSuperAdmin();
+      allow delete: if (isAdmin() && currentTenantId() == tenantId)
+        || isSuperAdmin();
     }
 
     // Banco de preguntas de un recurso tipo 'quiz' de la biblioteca. Mismo criterio de
     // gating que recursos/asignaciones (isInstructor = Admin/SuperAdmin/Editor/Asistente/Maestro).
     match /tenants/{tenantId}/quizzes/{recursoId} {
       allow read: if authenticated()
-        && currentTenantId() == tenantId;
-      allow create, update, delete: if isInstructor()
-        && currentTenantId() == tenantId;
+        && (currentTenantId() == tenantId || isSuperAdmin());
+      allow create, update, delete: if (isInstructor() && currentTenantId() == tenantId)
+        || isSuperAdmin();
     }
 
-    // Asignaciones acadÃ©micas
+    // Asignaciones académicas
     match /tenants/{tenantId}/asignaciones/{asignacionId} {
       // Lectura para cualquier usuario autenticado del tenant (Estudiante y — fix
       // tutor-role-end-to-end 2026-07-14 — Tutor): son materiales académicos de las clases
@@ -662,12 +675,12 @@ service cloud.firestore {
       // clases del hijo. La restricción previa por `estudianteId == uid` no aplicaba
       // (bloqueaba al Tutor y las asignaciones se indexan por jornada/grupo, no por uid).
       allow read: if authenticated()
-        && currentTenantId() == tenantId;
+        && (currentTenantId() == tenantId || isSuperAdmin());
       // Solo instructores pueden crear/modificar/eliminar asignaciones
-      allow create, update: if isInstructor()
-        && currentTenantId() == tenantId;
-      allow delete: if isInstructor()
-        && currentTenantId() == tenantId;
+      allow create, update: if (isInstructor() && (currentTenantId() == tenantId || request.resource.data.tenantId == tenantId))
+        || isSuperAdmin();
+      allow delete: if (isInstructor() && currentTenantId() == tenantId)
+        || isSuperAdmin();
     }
 
     // Progreso del estudiante

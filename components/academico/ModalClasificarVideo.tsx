@@ -6,6 +6,7 @@ import {
   alternarTagEnTexto,
   parsearTagsTexto,
 } from '../../utils/academico/tagsAcademicos';
+import { mapearErrorAcademico } from '../../utils/academico/erroresAcademicos';
 
 export interface DatosVideoDirecto {
   titulo: string;
@@ -81,7 +82,7 @@ export const ModalClasificarVideo: React.FC<ModalClasificarVideoProps> = ({
       });
       onCerrar();
     } catch (err) {
-      setErrorUrl(err instanceof Error ? err.message : 'No se pudo guardar el video.');
+      setErrorUrl(mapearErrorAcademico(err));
     } finally {
       setGuardando(false);
     }

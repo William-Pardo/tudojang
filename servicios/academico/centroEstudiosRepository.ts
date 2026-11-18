@@ -65,35 +65,45 @@ export class FirestoreCentroEstudiosRepository implements CentroEstudiosReposito
       let estudianteDocId: string = estudianteId;
 
       // 1. Intentar búsqueda directa por UID
-      const estudianteRef = this.deps.doc(this.deps.db, 'estudiantes', estudianteId);
-      const estudianteSnap = await this.deps.getDoc(estudianteRef);
+      try {
+        const estudianteRef = this.deps.doc(this.deps.db, 'estudiantes', estudianteId);
+        const estudianteSnap = await this.deps.getDoc(estudianteRef);
 
-      if (estudianteSnap.exists()) {
-        estudianteData = estudianteSnap.data();
-      } else {
+        if (estudianteSnap.exists()) {
+          estudianteData = estudianteSnap.data();
+        }
+      } catch {
+        // Fallback si no existe o no tiene permisos de lectura como estudiante
+      }
+
+      if (!estudianteData) {
         // 2. Fallback: Obtener el correo del usuario logueado
-        const usuarioRef = this.deps.doc(this.deps.db, 'usuarios', estudianteId);
-        const usuarioSnap = await this.deps.getDoc(usuarioRef);
+        try {
+          const usuarioRef = this.deps.doc(this.deps.db, 'usuarios', estudianteId);
+          const usuarioSnap = await this.deps.getDoc(usuarioRef);
 
-        if (usuarioSnap.exists()) {
-          const usuarioData = usuarioSnap.data();
-          const email = usuarioData.email?.toLowerCase().trim();
+          if (usuarioSnap.exists()) {
+            const usuarioData = usuarioSnap.data();
+            const email = usuarioData.email?.toLowerCase().trim();
 
-          if (email) {
-            // 3. Buscar en /estudiantes por correo electrónico
-            const estudiantesRef = this.deps.collection(this.deps.db, 'estudiantes');
-            const q = this.deps.query(
-              estudiantesRef,
-              this.deps.where('tenantId', '==', tenantId),
-              this.deps.where('correo', '==', email)
-            );
-            const querySnap = await this.deps.getDocs(q);
+            if (email) {
+              // 3. Buscar en /estudiantes por correo electrónico
+              const estudiantesRef = this.deps.collection(this.deps.db, 'estudiantes');
+              const q = this.deps.query(
+                estudiantesRef,
+                this.deps.where('tenantId', '==', tenantId),
+                this.deps.where('correo', '==', email)
+              );
+              const querySnap = await this.deps.getDocs(q);
 
-            if (!querySnap.empty) {
-              estudianteData = querySnap.docs[0].data();
-              estudianteDocId = querySnap.docs[0].id;
+              if (!querySnap.empty) {
+                estudianteData = querySnap.docs[0].data();
+                estudianteDocId = querySnap.docs[0].id;
+              }
             }
           }
+        } catch {
+          // No se encontró perfil de estudiante por correo
         }
       }
 

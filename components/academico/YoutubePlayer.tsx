@@ -83,6 +83,7 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
     return `youtube-player-${videoId}-${contadorInstanciasYoutubePlayer}`;
   });
   const [listo, setListo] = React.useState(false);
+  const [errorReproduccion, setErrorReproduccion] = React.useState<string | null>(null);
   const playerRef = React.useRef<any>(null);
 
   const sincronizar = React.useCallback(
@@ -143,6 +144,19 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
               flush();
             }
           },
+          onError: (event: any) => {
+            if (!activo) return;
+            const codigo = event?.data;
+            let mensaje = 'No se pudo reproducir este video de YouTube.';
+            if (codigo === 101 || codigo === 150) {
+              mensaje = 'El propietario de este video no permite su reproducción insertada en sitios externos.';
+            } else if (codigo === 100) {
+              mensaje = 'El video no fue encontrado o está marcado como privado.';
+            } else if (codigo === 2) {
+              mensaje = 'El enlace contiene un identificador de video de YouTube no válido.';
+            }
+            setErrorReproduccion(mensaje);
+          },
         },
       });
     });
@@ -165,7 +179,16 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
         <div id={elementId} data-testid="youtube-player-target" aria-label={`Reproductor de YouTube: ${titulo}`} />
       </div>
 
-      {!listo && (
+      {errorReproduccion && (
+        <div
+          role="alert"
+          className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-tkd-red dark:border-red-800 dark:bg-red-950/30"
+        >
+          {errorReproduccion}
+        </div>
+      )}
+
+      {!listo && !errorReproduccion && (
         <p className="mt-3 text-xs font-bold text-gray-400">Cargando reproductor de YouTube...</p>
       )}
     </section>

@@ -85,4 +85,18 @@ describe('ModalClasificarVideo', () => {
       expect(onCerrar).toHaveBeenCalled();
     });
   });
+
+  it('traduce el error Missing or insufficient permissions de Firebase al español', async () => {
+    const onGuardar = jest.fn().mockRejectedValue(new Error('Missing or insufficient permissions.'));
+    render(<ModalClasificarVideo abierto={true} onCerrar={jest.fn()} onGuardar={onGuardar} />);
+
+    await userEvent.type(screen.getByLabelText(/título visible/i), 'Patada en Hacha');
+    await userEvent.type(screen.getByLabelText(/url del video/i), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar y aprobar/i }));
+
+    expect(
+      await screen.findByText(/permisos insuficientes para realizar esta acción/i)
+    ).toBeInTheDocument();
+  });
 });

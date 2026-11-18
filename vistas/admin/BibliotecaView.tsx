@@ -22,6 +22,7 @@ import {
   IconoVideoMas,
 } from '../../components/Iconos';
 import ModalClasificarVideo, { type DatosVideoDirecto } from '../../components/academico/ModalClasificarVideo';
+import { mapearErrorAcademico } from '../../utils/academico/erroresAcademicos';
 
 // Vista previa administrativa (pedido explícito del usuario, 2026-07-16): permite a
 // Admin/Editor/Asistente/Maestro reproducir/ver el contenido real de un recurso desde la
@@ -829,8 +830,9 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       mostrarNotificacion('¡Video agregado y aprobado en la biblioteca!', 'success');
       if (onRecursoAprobado) onRecursoAprobado();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el video.');
-      throw err;
+      const mensaje = mapearErrorAcademico(err);
+      setError(mensaje);
+      throw new Error(mensaje);
     }
   };
 

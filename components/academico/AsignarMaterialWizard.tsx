@@ -5,6 +5,7 @@ import type { RecursoAcademico } from '../../models/academico/recurso';
 import { IconoAprobar, IconoCerrar, IconoContrato, IconoFirma, IconoImagen, IconoVideoMas } from '../Iconos';
 import ModalClasificarVideo, { type DatosVideoDirecto } from './ModalClasificarVideo';
 import { bibliotecaService as defaultBibliotecaService } from '../../servicios/academico/bibliotecaService';
+import { mapearErrorAcademico } from '../../utils/academico/erroresAcademicos';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -564,22 +565,28 @@ const AsignarMaterialWizard: React.FC<AsignarMaterialWizardProps> = ({
   };
 
   const handleCrearVideo = async (datos: DatosVideoDirecto) => {
-    if (onCrearVideoDirecto) {
-      const nuevo = await onCrearVideoDirecto(datos);
+    try {
+      if (onCrearVideoDirecto) {
+        const nuevo = await onCrearVideoDirecto(datos);
+        setMaterialesLocales((prev) => [nuevo, ...prev]);
+        actualizarDraft({ recursoId: nuevo.id });
+        return;
+      }
+
+      const nuevo = await defaultBibliotecaService.crearRecursoVideoDirecto(tenantId, {
+        titulo: datos.titulo,
+        videoUrl: datos.videoUrl,
+        disciplina: datos.disciplina,
+        tags: datos.tags,
+        creadoPorUid: usuarioId,
+      });
       setMaterialesLocales((prev) => [nuevo, ...prev]);
       actualizarDraft({ recursoId: nuevo.id });
-      return;
+    } catch (err) {
+      const mensaje = mapearErrorAcademico(err);
+      setError(mensaje);
+      throw new Error(mensaje);
     }
-
-    const nuevo = await defaultBibliotecaService.crearRecursoVideoDirecto(tenantId, {
-      titulo: datos.titulo,
-      videoUrl: datos.videoUrl,
-      disciplina: datos.disciplina,
-      tags: datos.tags,
-      creadoPorUid: usuarioId,
-    });
-    setMaterialesLocales((prev) => [nuevo, ...prev]);
-    actualizarDraft({ recursoId: nuevo.id });
   };
 
   const hayCambiosSinGuardar = modo === 'editar' && serializarDraftParaCambios(draft) !== snapshotInicial;

@@ -208,4 +208,24 @@ describe('YoutubePlayer', () => {
 
     expect(registrarSync).not.toHaveBeenCalled();
   });
+
+  it('muestra mensaje en español si el reproductor de YouTube emite un error', async () => {
+    render(
+      <YoutubePlayer
+        videoId="dQw4w9WgXcQ"
+        titulo="Clase con error"
+        registrarSync={jest.fn()}
+      />
+    );
+    await flushMicrotasks();
+
+    const player = FakeYoutubePlayer.instancias[0];
+    act(() => {
+      player.events?.onError?.({ data: 150 });
+    });
+
+    expect(
+      screen.getByText(/no permite su reproducción insertada en sitios externos/i)
+    ).toBeInTheDocument();
+  });
 });
