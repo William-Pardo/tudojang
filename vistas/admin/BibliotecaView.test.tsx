@@ -622,13 +622,15 @@ describe('BibliotecaView', () => {
     expect(await screen.findByRole('button', { name: /retirar material pendiente.pdf/i })).toBeInTheDocument();
   });
 
-  it('permite abrir una subcarpeta real desde el explorador Drive', async () => {
+  it('permite abrir una subcarpeta real desde el explorador Drive y retroceder usando las migas de pan', async () => {
     const user = userEvent.setup();
     window.localStorage.setItem('tudojang:driveConnection:tenant-real', 'conn-global-123');
     window.localStorage.setItem('tudojang:driveFolder:tenant-real', 'folder-root');
+    window.localStorage.setItem('tudojang:driveFolderName:tenant-real', 'Carpeta Principal');
     const driveService = {
       iniciarConexionOAuth: jest.fn(),
       procesarCallbackOAuth: jest.fn(),
+      guardarCarpetaActiva: jest.fn().mockResolvedValue({ ok: true }),
       listarCarpetaDrive: jest.fn()
         .mockResolvedValueOnce([
           {
@@ -643,16 +645,33 @@ describe('BibliotecaView', () => {
             name: 'Reglamento basico.pdf',
             mimeType: 'application/pdf',
           },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'folder-teoria',
+            name: 'Teoria',
+            mimeType: 'application/vnd.google-apps.folder',
+          },
         ]),
     };
 
     render(<BibliotecaView driveService={driveService as any} tenantId="tenant-real" />);
 
+    // Abrir subcarpeta "Teoria"
     await user.click(await screen.findByRole('button', { name: /abrir carpeta teoria/i }));
 
     expect(driveService.listarCarpetaDrive).toHaveBeenNthCalledWith(1, 'tenant-real', 'folder-root');
     expect(driveService.listarCarpetaDrive).toHaveBeenNthCalledWith(2, 'tenant-real', 'folder-teoria');
     expect((await screen.findAllByText(/reglamento basico.pdf/i)).length).toBeGreaterThan(0);
+
+    // Debe mostrar la miga de pan para "Carpeta Principal" y permitir retroceder
+    const botonMigaPrincipal = await screen.findByRole('button', { name: /ir a carpeta principal/i });
+    expect(botonMigaPrincipal).toBeInTheDocument();
+
+    await user.click(botonMigaPrincipal);
+
+    expect(driveService.listarCarpetaDrive).toHaveBeenNthCalledWith(3, 'tenant-real', 'folder-root');
+    expect((await screen.findAllByText(/teoria/i)).length).toBeGreaterThan(0);
   });
 
   it('muestra error operativo claro cuando el token de Drive fue revocado', async () => {

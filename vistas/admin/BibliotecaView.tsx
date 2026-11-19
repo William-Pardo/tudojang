@@ -277,6 +277,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   const [connectionId, setConnectionId] = React.useState('');
   const [folderId, setFolderId] = React.useState('');
   const [folderName, setFolderName] = React.useState('');
+  const [rutaCarpetasDrive, setRutaCarpetasDrive] = React.useState<Array<{ id: string; nombre: string }>>([]);
   const [googleAccountEmail, setGoogleAccountEmail] = React.useState('');
   const [archivosDrive, setArchivosDrive] = React.useState<ArchivoExploradorDrive[]>([]);
   const [validandoCarpeta, setValidandoCarpeta] = React.useState(false);
@@ -398,6 +399,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       setEstadoDrive('conectado');
       if (storedFolderId) {
         setFolderId(storedFolderId);
+        setRutaCarpetasDrive([{ id: storedFolderId, nombre: storedFolderName || 'Carpeta activa' }]);
       }
       if (storedFolderName) {
         setFolderName(storedFolderName);
@@ -408,6 +410,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
 
     setFolderId('');
     setFolderName('');
+    setRutaCarpetasDrive([]);
     setArchivosDrive([]);
     if (storedError) {
       setEstadoDrive('error');
@@ -440,6 +443,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
         if (conexion.activeFolderId) {
           setFolderId(conexion.activeFolderId);
           window.localStorage.setItem(`tudojang:driveFolder:${tenantId}`, conexion.activeFolderId);
+          setRutaCarpetasDrive([{ id: conexion.activeFolderId, nombre: conexion.activeFolderName || 'Carpeta activa' }]);
         }
         if (conexion.activeFolderName) {
           setFolderName(conexion.activeFolderName);
@@ -696,6 +700,36 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       await persistirCarpetaActiva(id, name);
       carpetaListadaRef.current = id;
       setFolderId(id);
+      if (name) setFolderName(name);
+      setRutaCarpetasDrive((prev) => {
+        const existe = prev.some((p) => p.id === id);
+        if (existe) return prev;
+        return [...prev, { id, nombre: name || 'Subcarpeta' }];
+      });
+      setArchivosDrive(archivosMapeados);
+      sincronizarEstadosFuenteConArchivos(archivosMapeados);
+    } catch (err) {
+      setError(obtenerMensajeErrorDrive(err));
+    } finally {
+      setValidandoCarpeta(false);
+    }
+  };
+
+  const navegarARutaDrive = async (indice: number) => {
+    if (indice < 0 || indice >= rutaCarpetasDrive.length) return;
+    const destino = rutaCarpetasDrive[indice];
+    if (!destino) return;
+
+    setError('');
+    setValidandoCarpeta(true);
+    try {
+      const archivos = await driveService.listarCarpetaDrive(tenantId, destino.id);
+      const archivosMapeados = archivos.map(mapearArchivoDrive);
+      await persistirCarpetaActiva(destino.id, destino.nombre);
+      carpetaListadaRef.current = destino.id;
+      setFolderId(destino.id);
+      setFolderName(destino.nombre);
+      setRutaCarpetasDrive((prev) => prev.slice(0, indice + 1));
       setArchivosDrive(archivosMapeados);
       sincronizarEstadosFuenteConArchivos(archivosMapeados);
     } catch (err) {
@@ -723,6 +757,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       carpetaListadaRef.current = id;
       setFolderId(id);
       if (name) setFolderName(name);
+      setRutaCarpetasDrive([{ id, nombre: name || 'Carpeta activa' }]);
       setArchivosDrive(archivosMapeados);
       sincronizarEstadosFuenteConArchivos(archivosMapeados);
     } catch (err) {
@@ -753,6 +788,7 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       setGoogleAccountEmail('');
       setFolderId('');
       setFolderName('');
+      setRutaCarpetasDrive([]);
       setSelectorCarpetasAbierto(false);
       setSelectorCarpetas([]);
       setArchivosDrive([]);
@@ -1111,9 +1147,38 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
             )}
             <div className="flex items-center justify-between gap-3">
               {folderId ? (
-                <p className="text-xs font-black uppercase tracking-widest text-tkd-blue break-all">
-                  Carpeta activa: {folderName || folderId}
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs font-black uppercase tracking-widest text-tkd-blue">
+                  {rutaCarpetasDrive.length > 1 ? (
+                    <>
+                      <span>Carpeta activa:</span>
+                      {rutaCarpetasDrive.map((paso, idx) => {
+                        const esUltimo = idx === rutaCarpetasDrive.length - 1;
+                        return (
+                          <React.Fragment key={paso.id}>
+                            {idx > 0 && <span className="text-gray-400">/</span>}
+                            {esUltimo ? (
+                              <span className="text-tkd-dark dark:text-white break-all">{paso.nombre}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void navegarARutaDrive(idx)}
+                                aria-label={`Ir a ${paso.nombre}`}
+                                title={`Ir a ${paso.nombre}`}
+                                className="hover:underline text-tkd-blue break-all focus:outline-none"
+                              >
+                                {paso.nombre}
+                              </button>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <p className="break-all">
+                      Carpeta activa: {folderName || folderId}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <p className="text-xs font-bold text-gray-400">
                   {driveConectado ? 'Sin carpeta seleccionada' : 'Drive no conectado'}
