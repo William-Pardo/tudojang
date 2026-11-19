@@ -319,6 +319,28 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     return result.data;
   };
 
+  /**
+   * Precarga en segundo plano la URL temporal y el blob protegido de un material
+   * para acelerar la reproducción inmediata cuando el usuario abre el visor.
+   */
+  const precargarMaterial = async (
+    tenantId: string,
+    asignacionId: string,
+    fileId: string,
+    tipoMaterial?: string
+  ): Promise<void> => {
+    try {
+      const res = await obtenerUrlTemporal(tenantId, asignacionId, fileId);
+      if (tipoMaterial !== 'presentacion' && res?.url) {
+        obtenerBlobProtegido(res.url).catch(() => {
+          // Ignora fallos silenciosamente durante la precarga
+        });
+      }
+    } catch {
+      // Ignora fallos silenciosamente durante la precarga
+    }
+  };
+
   return {
     iniciarConexionOAuth,
     procesarCallbackOAuth,
@@ -326,6 +348,7 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     obtenerUrlTemporal,
     obtenerUrlTemporalRecurso,
     obtenerBlobProtegido,
+    precargarMaterial,
     desconectarDrive,
     obtenerConexionDrive,
     guardarCarpetaActiva,

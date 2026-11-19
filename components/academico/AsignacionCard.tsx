@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 import { IconoAgenda, IconoCertificado } from '../Iconos';
+import { driveService } from '../../services/storage/driveService';
 
 export type EstadoVisualAsignacion = 'disponible' | 'iniciado' | 'completado';
 
@@ -83,6 +84,16 @@ const AsignacionCard: React.FC<AsignacionCardProps> = ({ asignacion, estado, onA
       <button
         type="button"
         onClick={() => onAbrirMaterial?.(asignacion)}
+        onMouseEnter={() => {
+          if (asignacion.externalFileId && asignacion.uso !== 'evaluacion' && !asignacion.youtubeVideoId) {
+            driveService.precargarMaterial(asignacion.tenantId, asignacion.id, asignacion.externalFileId, asignacion.tipoRecurso).catch(() => {});
+          }
+        }}
+        onTouchStart={() => {
+          if (asignacion.externalFileId && asignacion.uso !== 'evaluacion' && !asignacion.youtubeVideoId) {
+            driveService.precargarMaterial(asignacion.tenantId, asignacion.id, asignacion.externalFileId, asignacion.tipoRecurso).catch(() => {});
+          }
+        }}
         className="mt-6 w-full rounded-2xl bg-tkd-dark dark:bg-white text-white dark:text-tkd-dark py-4 text-[11px] font-black uppercase tracking-[0.22em] hover:bg-tkd-blue transition-all"
       >
         Abrir material

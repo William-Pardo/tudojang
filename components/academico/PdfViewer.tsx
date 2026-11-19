@@ -46,6 +46,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   const [errorCarga, setErrorCarga] = React.useState(false);
   const [paginaActual, setPaginaActual] = React.useState(1);
   const [contenedorAncho, setContenedorAncho] = React.useState<number>(640);
+  const [contenedorAlto, setContenedorAlto] = React.useState<number>(480);
+  const [pageRatio, setPageRatio] = React.useState<number | null>(null);
   const contenedorRef = React.useRef<HTMLDivElement | null>(null);
   const temporizadorPermanenciaRef = React.useRef<number | null>(null);
   const progresoRef = React.useRef(progreso);
@@ -58,8 +60,10 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 
     const actualizarDimensiones = () => {
       if (elemento) {
-        const anchoDisponible = Math.max(260, elemento.clientWidth - 16);
+        const anchoDisponible = Math.max(200, elemento.clientWidth - 16);
+        const altoDisponible = Math.max(160, elemento.clientHeight - 16);
         setContenedorAncho(anchoDisponible);
+        setContenedorAlto(altoDisponible);
       }
     };
 
@@ -72,6 +76,20 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
       return () => observer.disconnect();
     }
   }, []);
+
+  // Escalar proporcionalmente para que la página quepa al 100% en pantalla (contain) sin requerir scroll
+  const escalaAncho = React.useMemo(() => {
+    if (!pageRatio || !contenedorAlto || !contenedorAncho) {
+      return contenedorAncho;
+    }
+    const ratioContenedor = contenedorAncho / contenedorAlto;
+    if (ratioContenedor > pageRatio) {
+      // El alto es la restricción: ajusta ancho según el alto disponible
+      return Math.floor(contenedorAlto * pageRatio);
+    }
+    // El ancho es la restricción
+    return contenedorAncho;
+  }, [contenedorAncho, contenedorAlto, pageRatio]);
 
   // El PDF real manda sobre la estimación guardada en la asignación en cuanto carga.
   const totalPaginasEfectivo = numPaginasReal ?? totalPaginas;
@@ -148,13 +166,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 
       {!hayPaginas ? (
         <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-sm font-bold text-gray-400">
-          Sin páginas disponibles
+          Sin paginas disponibles
         </div>
       ) : (
         <div className="flex flex-col flex-1 min-h-0 space-y-3 overflow-hidden">
           <div
             ref={contenedorRef}
-            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center flex-1 min-h-[220px] max-h-[52vh] sm:max-h-[58vh] overflow-hidden p-2"
+            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center flex-1 min-h-0 overflow-hidden p-2 select-none"
           >
             {url && !errorCarga ? (
               <Document
@@ -163,12 +181,20 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                 onLoadError={() => setErrorCarga(true)}
                 loading={<p className="text-sm font-bold text-gray-400 py-10">Cargando documento...</p>}
                 error={<p className="text-sm font-bold text-red-500 py-10">No se pudo cargar el PDF.</p>}
+                className="flex items-center justify-center max-w-full max-h-full [&_.react-pdf__Page]:!bg-transparent [&_.react-pdf__Page]:flex [&_.react-pdf__Page]:items-center [&_.react-pdf__Page]:justify-center [&_.react-pdf__Page__canvas]:max-h-full [&_.react-pdf__Page__canvas]:max-w-full [&_.react-pdf__Page__canvas]:object-contain [&_.react-pdf__Page__canvas]:!h-auto [&_.react-pdf__Page__canvas]:rounded-xl shadow-sm"
               >
                 <Page
                   pageNumber={Math.min(paginaActual, totalPaginasEfectivo)}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
-                  width={contenedorAncho}
+                  width={escalaAncho}
+                  onLoadSuccess={(page: any) => {
+                    const origW = page.originalWidth || page.width || (page.view && page.view[2]) || 1;
+                    const origH = page.originalHeight || page.height || (page.view && page.view[3]) || 1;
+                    if (origW && origH) {
+                      setPageRatio(origW / origH);
+                    }
+                  }}
                 />
               </Document>
             ) : (

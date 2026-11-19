@@ -261,7 +261,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[120] bg-tkd-dark/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-4xl max-h-[96vh] sm:max-h-[92vh] flex flex-col bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10">
+      <div className={`w-full max-w-4xl flex flex-col bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10 ${tipoMaterial === 'pdf' ? 'h-[96vh] sm:h-[92vh]' : 'max-h-[96vh] sm:max-h-[92vh]'}`}>
         <header className="p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex items-start justify-between gap-4 shrink-0">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Vista previa del recurso</p>
@@ -278,7 +278,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
           </button>
         </header>
 
-        <main className={`p-4 sm:p-6 space-y-4 flex-1 ${tipoMaterial === 'pdf' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
+        <main className={`flex-1 min-h-0 ${tipoMaterial === 'pdf' ? 'overflow-hidden flex flex-col p-4 sm:p-6' : 'overflow-y-auto p-4 sm:p-6 space-y-4'}`}>
           {accesoTemporal && (
             <div className="rounded-2xl bg-green-50 text-green-800 p-4 text-sm font-bold">
               Acceso seguro listo. URL temporal vence en {new Date(accesoTemporal.expiresAt).toLocaleTimeString()}.
@@ -469,20 +469,22 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-black uppercase tracking-widest">
-            <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
-              <span className="block text-gray-400">Progreso</span>
-              <span className="block mt-1 text-tkd-blue">{progresoVisible}%</span>
+          {tipoMaterial !== 'pdf' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-black uppercase tracking-widest shrink-0">
+              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+                <span className="block text-gray-400">Progreso</span>
+                <span className="block mt-1 text-tkd-blue">{progresoVisible}%</span>
+              </div>
+              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+                <span className="block text-gray-400">Estado</span>
+                <span className="block mt-1 text-tkd-dark dark:text-white">{estadoVisible.replace('_', ' ')}</span>
+              </div>
+              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+                <span className="block text-gray-400">Urgencia</span>
+                <span className="block mt-1 text-tkd-dark dark:text-white">{asignacion.urgencia.replace('_', ' ')}</span>
+              </div>
             </div>
-            <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
-              <span className="block text-gray-400">Estado</span>
-              <span className="block mt-1 text-tkd-dark dark:text-white">{estadoVisible.replace('_', ' ')}</span>
-            </div>
-            <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
-              <span className="block text-gray-400">Urgencia</span>
-              <span className="block mt-1 text-tkd-dark dark:text-white">{asignacion.urgencia.replace('_', ' ')}</span>
-            </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

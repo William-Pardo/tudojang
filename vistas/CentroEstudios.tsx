@@ -18,6 +18,7 @@ import PanelMetricasEstudiantes from '../components/academico/PanelMetricasEstud
 import { db, isFirebaseConfigured } from '../firebase/config';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { resolverTabInicial } from '../utils/navegacion/resolverTabInicial';
+import { driveService } from '../services/storage/driveService';
 
 type TabGestion = 'flujo' | 'metricas';
 
@@ -152,6 +153,17 @@ const CentroEstudios: React.FC = () => {
       activo = false;
     };
   }, [usuario?.id, usuario?.tenantId, usuario?.rol]);
+
+  // Precarga inteligente en segundo plano para abrir los materiales al instante
+  React.useEffect(() => {
+    if (!asignaciones.length) return;
+    const candidatas = asignaciones.slice(0, 4);
+    candidatas.forEach((asig) => {
+      if (asig.externalFileId && asig.uso !== 'evaluacion' && !asig.youtubeVideoId) {
+        driveService.precargarMaterial(asig.tenantId, asig.id, asig.externalFileId, asig.tipoRecurso).catch(() => {});
+      }
+    });
+  }, [asignaciones]);
 
   const cerrarMaterial = () => {
     setAsignacionAbierta(null);
