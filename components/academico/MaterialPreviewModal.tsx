@@ -260,13 +260,13 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-tkd-dark/70 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-3xl bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10">
-        <header className="p-6 border-b border-gray-100 dark:border-white/10 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-[120] bg-tkd-dark/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-4xl max-h-[96vh] sm:max-h-[92vh] flex flex-col bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10">
+        <header className="p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex items-start justify-between gap-4 shrink-0">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Vista previa del recurso</p>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">{obtenerEtiquetaTipoMaterial(tipoMaterial, asignacion.uso)}</p>
-            <h2 className="mt-2 text-2xl font-black uppercase text-tkd-dark dark:text-white leading-tight">{asignacion.titulo}</h2>
+            <h2 className="mt-2 text-xl sm:text-2xl font-black uppercase text-tkd-dark dark:text-white leading-tight">{asignacion.titulo}</h2>
           </div>
           <button
             type="button"
@@ -278,7 +278,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
           </button>
         </header>
 
-        <main className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <main className={`p-4 sm:p-6 space-y-4 flex-1 ${tipoMaterial === 'pdf' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
           {accesoTemporal && (
             <div className="rounded-2xl bg-green-50 text-green-800 p-4 text-sm font-bold">
               Acceso seguro listo. URL temporal vence en {new Date(accesoTemporal.expiresAt).toLocaleTimeString()}.

@@ -51,22 +51,22 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   const progresoRef = React.useRef(progreso);
   progresoRef.current = progreso;
 
-  // Ajuste responsivo automático: mide el ancho real del contenedor para escalar la página del PDF
+  // Ajuste responsivo automático: mide ancho y alto del contenedor para escalar la página del PDF sin desbordar
   React.useEffect(() => {
     if (!contenedorRef.current) return;
     const elemento = contenedorRef.current;
 
-    const actualizarAncho = () => {
+    const actualizarDimensiones = () => {
       if (elemento) {
-        const anchoDisponible = Math.max(280, elemento.clientWidth - 32);
+        const anchoDisponible = Math.max(260, elemento.clientWidth - 16);
         setContenedorAncho(anchoDisponible);
       }
     };
 
-    actualizarAncho();
+    actualizarDimensiones();
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(() => {
-        actualizarAncho();
+        actualizarDimensiones();
       });
       observer.observe(elemento);
       return () => observer.disconnect();
@@ -128,19 +128,19 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   }, [paginaActual, hayPaginas, permanenciaMinimaMs, registrarPaginaConMetrica]);
 
   return (
-    <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+    <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-3 sm:p-5 flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 shrink-0">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">Visor PDF</p>
-          <h3 className="mt-2 text-xl font-black uppercase text-tkd-dark dark:text-white">{titulo}</h3>
-          <p className="mt-2 text-sm text-gray-500">
+          <h3 className="mt-1 text-lg sm:text-xl font-black uppercase text-tkd-dark dark:text-white leading-tight truncate">{titulo}</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
             Paginas registradas: {progreso.paginasVistas.length}/{totalPaginasEfectivo}
           </p>
         </div>
         <button
           type="button"
           onClick={flush}
-          className="rounded-2xl bg-tkd-dark text-white px-5 py-3 text-[10px] font-black uppercase tracking-widest"
+          className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest self-start sm:self-auto shrink-0"
         >
           Sincronizar avance
         </button>
@@ -148,13 +148,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
 
       {!hayPaginas ? (
         <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-sm font-bold text-gray-400">
-          Sin paginas disponibles
+          Sin páginas disponibles
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col flex-1 min-h-0 space-y-3 overflow-hidden">
           <div
             ref={contenedorRef}
-            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center min-h-[280px] max-h-[60vh] overflow-auto p-4"
+            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center flex-1 min-h-[220px] max-h-[52vh] sm:max-h-[58vh] overflow-hidden p-2"
           >
             {url && !errorCarga ? (
               <Document
@@ -178,17 +178,17 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 shrink-0 pt-1">
             <button
               type="button"
               onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
               disabled={paginaActual <= 1}
-              className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+              className="rounded-xl bg-tkd-dark text-white px-3 sm:px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
             >
               ‹ Anterior
             </button>
 
-            <p className="text-sm font-black text-tkd-dark dark:text-white">
+            <p className="text-xs sm:text-sm font-black text-tkd-dark dark:text-white">
               Pagina {paginaActual} de {totalPaginasEfectivo}
               {progreso.paginasVistas.includes(paginaActual) && (
                 <span className="ml-2 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
@@ -199,7 +199,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
               type="button"
               onClick={() => setPaginaActual((p) => Math.min(totalPaginasEfectivo, p + 1))}
               disabled={paginaActual >= totalPaginasEfectivo}
-              className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+              className="rounded-xl bg-tkd-dark text-white px-3 sm:px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
             >
               Siguiente ›
             </button>
@@ -208,7 +208,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
           <button
             type="button"
             onClick={() => registrarPaginaConMetrica(paginaActual)}
-            className="w-full rounded-xl bg-tkd-blue text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest"
+            className="w-full rounded-xl bg-tkd-blue text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest shrink-0"
           >
             Marcar pagina actual como vista
           </button>

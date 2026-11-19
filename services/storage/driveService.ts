@@ -110,25 +110,37 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
    * módulo se instancia al importar, y en algunos entornos (tests bajo Jest/jsdom) `fetch`
    * global todavía no existe en ese momento.
    */
+  // Cache en memoria para URLs temporales y blobs pre-cargados (acelera la apertura)
+  const cacheUrlsTemporales = new Map<string, { result: TemporaryFileUrlResult; exp: number }>();
+  const cacheBlobsProtegidos = new Map<string, Promise<Blob>>();
+
   const obtenerBlobProtegido = async (url: string): Promise<Blob> => {
-    const fetchFn = deps.fetchFn ?? fetch;
-    const idToken = await obtenerIdToken();
-    const response = await fetchFn(url, {
-      headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
-    });
-    if (!response.ok) {
-      const error = new Error(`No se pudo cargar el recurso protegido (status ${response.status})`);
-      // El proxy re-valida rol/tenant/asignación-o-recurso y también re-verifica el archivo en
-      // Drive -- distintos status reflejan causas bien distintas, no todas son "sin permiso".
-      const codigoPorStatus: Record<number, string> = {
-        401: 'unauthenticated',
-        403: 'permission-denied',
-        404: 'not-found',
-      };
-      (error as Error & { code?: string }).code = codigoPorStatus[response.status] ?? 'server-error';
-      throw error;
+    if (cacheBlobsProtegidos.has(url)) {
+      return cacheBlobsProtegidos.get(url)!;
     }
-    return response.blob();
+
+    const promesaBlob = (async () => {
+      const fetchFn = deps.fetchFn ?? fetch;
+      const idToken = await obtenerIdToken();
+      const response = await fetchFn(url, {
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+      });
+      if (!response.ok) {
+        cacheBlobsProtegidos.delete(url);
+        const error = new Error(`No se pudo cargar el recurso protegido (status ${response.status})`);
+        const codigoPorStatus: Record<number, string> = {
+          401: 'unauthenticated',
+          403: 'permission-denied',
+          404: 'not-found',
+        };
+        (error as Error & { code?: string }).code = codigoPorStatus[response.status] ?? 'server-error';
+        throw error;
+      }
+      return response.blob();
+    })();
+
+    cacheBlobsProtegidos.set(url, promesaBlob);
+    return promesaBlob;
   };
 
   /**
@@ -263,12 +275,20 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     asignacionId: string,
     fileId: string
   ): Promise<TemporaryFileUrlResult> => {
+    const cacheKey = `${tenantId}:${asignacionId}:${fileId}`;
+    const cached = cacheUrlsTemporales.get(cacheKey);
+    if (cached && cached.exp > Date.now() + 60000) {
+      return cached.result;
+    }
+
     const callGetUrl = call<
       { tenantId: string; asignacionId: string; fileId: string },
       TemporaryFileUrlResult
     >('getTemporaryFileUrl');
 
     const result = await callGetUrl({ tenantId, asignacionId, fileId });
+    const expiresTimestamp = Date.parse(result.data.expiresAt) || (Date.now() + 10 * 60 * 1000);
+    cacheUrlsTemporales.set(cacheKey, { result: result.data, exp: expiresTimestamp });
     return result.data;
   };
 
@@ -282,12 +302,20 @@ export const crearDriveService = (deps: DriveServiceDeps = {}) => {
     tenantId: string,
     recursoId: string
   ): Promise<TemporaryFileUrlResult> => {
+    const cacheKey = `recurso:${tenantId}:${recursoId}`;
+    const cached = cacheUrlsTemporales.get(cacheKey);
+    if (cached && cached.exp > Date.now() + 60000) {
+      return cached.result;
+    }
+
     const callGetUrlRecurso = call<
       { tenantId: string; recursoId: string },
       TemporaryFileUrlResult
     >('getTemporaryFileUrlRecurso');
 
     const result = await callGetUrlRecurso({ tenantId, recursoId });
+    const expiresTimestamp = Date.parse(result.data.expiresAt) || (Date.now() + 10 * 60 * 1000);
+    cacheUrlsTemporales.set(cacheKey, { result: result.data, exp: expiresTimestamp });
     return result.data;
   };
 
