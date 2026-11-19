@@ -97,6 +97,20 @@ El modal de clasificación de video directo MUST pre-validar en tiempo real la d
 ### Requirement: Navegación jerárquica de carpetas con migas de pan
 `BibliotecaView` MUST ofrecer una barra de migas de pan (breadcrumb) cuando el usuario navegue en subcarpetas de Google Drive, permitiendo retroceder a niveles previos sin desvincular los recursos indexados y aprobados de la biblioteca de materiales.
 
+### Requirement: Selección fluida de carpetas Drive y discriminación estricta de recursos directos
+`BibliotecaView` MUST permitir cambiar de carpeta en Google Drive inmediatamente sin mostrar confirmaciones bloqueantes (`window.confirm`). La sección de recursos directos MUST incluir únicamente recursos con `externalFileId` que comience con `video-`, impidiendo que archivos de Drive indexados de otras carpetas aparezcan erróneamente clasificados como directos.
+
+#### Scenario: Cambio de carpeta sin confirmación bloqueante
+- GIVEN un usuario con Google Drive conectado y recursos indexados en la biblioteca
+- WHEN el usuario selecciona una nueva carpeta desde el modal selector y confirma "Usar esta carpeta"
+- THEN no se ejecuta ningún `window.confirm`
+- AND se actualiza la carpeta activa y se listan sus archivos inmediatamente.
+
+#### Scenario: Aislamiento estricto de recursos directos
+- GIVEN un recurso importado desde Google Drive que fue aprobado en otra carpeta
+- WHEN el usuario visualiza la lista de recursos detectados de una carpeta distinta o vacía
+- THEN el recurso de Drive NO aparece en la lista de recursos directos de video.
+
 
 
 `CentroEstudios.tsx` MUST mostrar exactamente 3 pasos — "Conectar Drive", "Centro de recursos" (clasificación+aprobación) y "Programa y publicación" (combinado, sin dividirse).
