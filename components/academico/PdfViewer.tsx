@@ -45,9 +45,33 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   const [numPaginasReal, setNumPaginasReal] = React.useState<number | null>(null);
   const [errorCarga, setErrorCarga] = React.useState(false);
   const [paginaActual, setPaginaActual] = React.useState(1);
+  const [contenedorAncho, setContenedorAncho] = React.useState<number>(640);
+  const contenedorRef = React.useRef<HTMLDivElement | null>(null);
   const temporizadorPermanenciaRef = React.useRef<number | null>(null);
   const progresoRef = React.useRef(progreso);
   progresoRef.current = progreso;
+
+  // Ajuste responsivo automático: mide el ancho real del contenedor para escalar la página del PDF
+  React.useEffect(() => {
+    if (!contenedorRef.current) return;
+    const elemento = contenedorRef.current;
+
+    const actualizarAncho = () => {
+      if (elemento) {
+        const anchoDisponible = Math.max(280, elemento.clientWidth - 32);
+        setContenedorAncho(anchoDisponible);
+      }
+    };
+
+    actualizarAncho();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        actualizarAncho();
+      });
+      observer.observe(elemento);
+      return () => observer.disconnect();
+    }
+  }, []);
 
   // El PDF real manda sobre la estimación guardada en la asignación en cuanto carga.
   const totalPaginasEfectivo = numPaginasReal ?? totalPaginas;
@@ -128,7 +152,10 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center min-h-[280px] overflow-auto p-4">
+          <div
+            ref={contenedorRef}
+            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center min-h-[280px] max-h-[60vh] overflow-auto p-4"
+          >
             {url && !errorCarga ? (
               <Document
                 file={url}
@@ -141,7 +168,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                   pageNumber={Math.min(paginaActual, totalPaginasEfectivo)}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
-                  width={640}
+                  width={contenedorAncho}
                 />
               </Document>
             ) : (

@@ -181,6 +181,12 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
         if (!activo) return undefined;
         setAccesoTemporal(resultado);
 
+        // Si es presentación, usamos el visor interactivo de Drive / Docs Viewer
+        // y NO bajamos el blob binario porque el navegador fuerza la descarga automática de .pptx
+        if (tipoMaterial === 'presentacion') {
+          return undefined;
+        }
+
         // El proxy exige un ID token de Firebase en el header Authorization -- <video>/<img>/
         // react-pdf no pueden mandar headers, así que bajamos los bytes reales acá (autenticado)
         // y armamos un blob: URL local para pasarles a esos componentes sin tocarlos.
@@ -395,11 +401,15 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
                 <img
                   src={blobUrl}
                   alt={asignacion.titulo}
-                  className="max-h-[50vh] max-w-full object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3"
+                  loading="eager"
+                  className="max-h-[55vh] max-w-full object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3 transition-opacity duration-300"
                 />
               ) : !errorAcceso ? (
-                <div className="text-sm text-gray-500 font-bold mt-2">
-                  Cargando imagen desde Google Drive...
+                <div className="flex flex-col items-center justify-center p-6 space-y-3">
+                  <div className="w-8 h-8 border-3 border-tkd-blue border-t-transparent rounded-full animate-spin" />
+                  <div className="text-xs text-gray-400 font-bold tracking-wider uppercase">
+                    Cargando imagen de estudio...
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -413,15 +423,22 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
                 <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Diapositivas / Presentación académica</p>
               </div>
-              {blobUrl ? (
+              {asignacion.externalFileId ? (
                 <iframe
-                  src={blobUrl}
+                  src={`https://drive.google.com/file/d/${asignacion.externalFileId}/preview`}
                   title={asignacion.titulo}
-                  className="w-full h-[50vh] rounded-2xl border border-gray-100 dark:border-white/10"
+                  className="w-full h-[55vh] rounded-2xl border border-gray-100 dark:border-white/10"
+                  allow="autoplay"
+                />
+              ) : accesoTemporal?.url ? (
+                <iframe
+                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(accesoTemporal.url)}&embedded=true`}
+                  title={asignacion.titulo}
+                  className="w-full h-[55vh] rounded-2xl border border-gray-100 dark:border-white/10"
                 />
               ) : !errorAcceso ? (
                 <div className="text-sm text-gray-500 font-bold mt-2">
-                  Cargando presentación desde Google Drive...
+                  Cargando presentación interactiva...
                 </div>
               ) : null}
             </div>

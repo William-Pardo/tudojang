@@ -416,8 +416,24 @@ export const crearBibliotecaService = (deps: BibliotecaServiceDeps = {}) => {
       return;
     }
 
-    const docRef = doc(getDatabase(), 'tenants', tenantId, 'recursos', recursoId);
+    const database = getDatabase();
+    const docRef = doc(database, 'tenants', tenantId, 'recursos', recursoId);
     await deleteDoc(docRef);
+
+    // Eliminación en cascada de asignaciones vinculadas en el panel del estudiante
+    try {
+      const asignacionesRef = collection(database, 'tenants', tenantId, 'asignaciones');
+      const snap = await getDocs(query(asignacionesRef, where('recursoId', '==', recursoId)));
+      if (!snap.empty) {
+        const batch = writeBatch(database);
+        for (const docSnap of snap.docs) {
+          batch.delete(docSnap.ref);
+        }
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error(`[bibliotecaService] No se pudieron eliminar las asignaciones en cascada para ${recursoId}:`, err);
+    }
   };
 
   return {

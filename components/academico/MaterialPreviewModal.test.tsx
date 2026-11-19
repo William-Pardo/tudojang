@@ -471,6 +471,39 @@ describe('MaterialPreviewModal', () => {
       expect(driveService.obtenerUrlTemporal).toHaveBeenCalled();
       expect(screen.queryByLabelText(/reproductor de youtube/i)).not.toBeInTheDocument();
     });
+
+    it('renderiza visor embebido interactivo para presentaciones sin usar blobUrl descargable', async () => {
+      const driveService = {
+        obtenerUrlTemporal: jest.fn().mockResolvedValue({
+          url: 'https://proxy.example/file.pptx',
+          fileName: 'Presentacion.pptx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          expiresAt: '2026-06-28T12:15:00.000Z',
+        }),
+        obtenerBlobProtegido: jest.fn(),
+      };
+
+      render(
+        <MaterialPreviewModal
+          asignacion={{
+            ...asignacion,
+            uso: 'estudio',
+            titulo: 'Presentacion.pptx',
+            externalFileId: 'drive-slides-123',
+          }}
+          onCerrar={jest.fn()}
+          driveService={driveService as any}
+        />
+      );
+
+      // Debe renderizar el iframe con la URL embebida de Google Drive / Docs viewer, NO con blob:
+      const iframe = await screen.findByTitle('Presentacion.pptx');
+      expect(iframe).toBeInTheDocument();
+      expect(iframe.getAttribute('src')).toMatch(/drive\.google\.com\/file\/d\/drive-slides-123\/preview|docs\.google\.com\/viewer/);
+      expect(iframe.getAttribute('src')).not.toContain('blob:');
+      // No debió llamar a obtenerBlobProtegido que forzaba la descarga binaria
+      expect(driveService.obtenerBlobProtegido).not.toHaveBeenCalled();
+    });
   });
 
   it('muestra error controlado si el archivo Drive fue eliminado', async () => {
