@@ -102,6 +102,16 @@ export const IconoConfiguracion: React.FC<IconoProps> = (props) => (
   </svg>
 );
 export const IconoCerrar: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></BaseIcon>);
+export const IconoPantallaCompleta: React.FC<IconoProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+  </BaseIcon>
+);
+export const IconoSalirPantallaCompleta: React.FC<IconoProps> = (props) => (
+  <BaseIcon {...props}>
+    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+  </BaseIcon>
+);
 export const IconoMenu: React.FC<IconoProps> = (props) => (<BaseIcon {...props}><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></BaseIcon>);
 export const IconoLogout: React.FC<IconoProps> = (props) => (
   <svg {...props} viewBox="0 0 501.1 517.7" xmlns="http://www.w3.org/2000/svg" fill="currentColor">

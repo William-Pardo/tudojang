@@ -528,4 +528,45 @@ describe('MaterialPreviewModal', () => {
 
     expect(await screen.findByText(/archivo de drive no disponible/i)).toBeInTheDocument();
   });
+
+  it('permite alternar pantalla completa para maximizar el área de estudio', async () => {
+    const user = userEvent.setup();
+    render(<MaterialPreviewModal asignacion={asignacion} onCerrar={jest.fn()} />);
+
+    const botonFullscreen = screen.getByRole('button', { name: /pantalla completa/i });
+    expect(botonFullscreen).toBeInTheDocument();
+
+    await user.click(botonFullscreen);
+    expect(screen.getByRole('button', { name: /salir de pantalla completa/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /salir de pantalla completa/i }));
+    expect(screen.getByRole('button', { name: /pantalla completa/i })).toBeInTheDocument();
+  });
+
+  it('incluye escudo protector sobre el visor de presentaciones para bloquear apertura/compartir externa', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        url: 'https://proxy.example/file.pptx',
+        fileName: 'Presentacion.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn(),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Presentacion.pptx',
+          externalFileId: 'drive-slides-123',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    expect(await screen.findByTitle('Vista académica protegida')).toBeInTheDocument();
+  });
 });

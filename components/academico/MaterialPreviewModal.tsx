@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 import type { PreguntaQuiz } from '../../models/academico/quiz';
-import { IconoCerrar } from '../Iconos';
+import { IconoCerrar, IconoPantallaCompleta, IconoSalirPantallaCompleta } from '../Iconos';
 import QuizView, { type ResultadoQuiz } from './QuizView';
 import PdfViewer from './PdfViewer';
 import VideoPlayer from './VideoPlayer';
@@ -94,6 +94,11 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   // estado y su boton de reintentar (que efectivamente recarga).
   const [errorPreguntasQuiz, setErrorPreguntasQuiz] = React.useState(false);
   const [reintentosQuiz, setReintentosQuiz] = React.useState(0);
+  const [esFullscreen, setEsFullscreen] = React.useState(false);
+
+  const alternarFullscreen = () => {
+    setEsFullscreen((prev) => !prev);
+  };
 
   const tipoMaterial = React.useMemo<TipoMaterialResuelto>(
     () => resolverTipoMaterial(asignacion),
@@ -260,33 +265,48 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-tkd-dark/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" role="dialog" aria-modal="true">
-      <div className={`w-full max-w-4xl flex flex-col bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl overflow-hidden border border-white/10 ${tipoMaterial === 'pdf' ? 'h-[96vh] sm:h-[92vh]' : 'max-h-[96vh] sm:max-h-[92vh]'}`}>
-        <header className="p-4 sm:p-6 border-b border-gray-100 dark:border-white/10 flex items-start justify-between gap-4 shrink-0">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400">Vista previa del recurso</p>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">{obtenerEtiquetaTipoMaterial(tipoMaterial, asignacion.uso)}</p>
-            <h2 className="mt-2 text-xl sm:text-2xl font-black uppercase text-tkd-dark dark:text-white leading-tight">{asignacion.titulo}</h2>
+    <div className={`fixed inset-0 z-[120] bg-tkd-dark/75 backdrop-blur-sm flex items-center justify-center overflow-hidden ${esFullscreen ? 'p-0' : 'p-0 sm:p-4'}`} role="dialog" aria-modal="true">
+      <div className={`w-full flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden border-white/10 ${esFullscreen ? 'h-full max-h-none max-w-none rounded-none border-0' : 'h-full sm:h-auto sm:max-h-[94dvh] sm:max-w-4xl rounded-none sm:rounded-[2rem] sm:border'}`}>
+        <header className="px-3.5 py-2.5 sm:px-5 sm:py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3 shrink-0 bg-white/95 dark:bg-gray-900/95 sticky top-0 z-40">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-tkd-red/10 text-tkd-red">
+              {obtenerEtiquetaTipoMaterial(tipoMaterial, asignacion.uso)}
+            </span>
+            <h2 className="text-xs sm:text-sm font-black uppercase text-tkd-dark dark:text-white truncate">
+              {asignacion.titulo}
+            </h2>
           </div>
-          <button
-            type="button"
-            onClick={onCerrar}
-            className="shrink-0 w-11 h-11 rounded-2xl bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:bg-tkd-red hover:text-white transition-all flex items-center justify-center"
-            aria-label="Cerrar material"
-          >
-            <IconoCerrar className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={alternarFullscreen}
+              className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all flex items-center justify-center shrink-0"
+              aria-label={esFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              title={esFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            >
+              {esFullscreen ? <IconoSalirPantallaCompleta className="w-4 h-4" /> : <IconoPantallaCompleta className="w-4 h-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-tkd-red hover:text-white transition-all flex items-center justify-center shrink-0"
+              aria-label="Cerrar material"
+              title="Cerrar material"
+            >
+              <IconoCerrar className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
         </header>
 
-        <main className={`flex-1 min-h-0 ${tipoMaterial === 'pdf' ? 'overflow-hidden flex flex-col p-4 sm:p-6' : 'overflow-y-auto p-4 sm:p-6 space-y-4'}`}>
+        <main className={`flex-1 min-h-0 flex flex-col ${tipoMaterial === 'pdf' || tipoMaterial === 'presentacion' || tipoMaterial === 'imagen' ? 'overflow-hidden p-1 sm:p-3' : 'overflow-y-auto p-3 sm:p-5 space-y-3'}`}>
           {accesoTemporal && (
-            <div className="rounded-2xl bg-green-50 text-green-800 p-4 text-sm font-bold">
+            <div className="sr-only">
               Acceso seguro listo. URL temporal vence en {new Date(accesoTemporal.expiresAt).toLocaleTimeString()}.
             </div>
           )}
 
           {errorAcceso && (
-            <div className="rounded-2xl bg-red-50 text-red-700 p-4 text-sm font-bold">
+            <div className="rounded-2xl bg-red-50 text-red-700 p-4 text-sm font-bold shrink-0">
               {errorAcceso}
             </div>
           )}
@@ -388,88 +408,71 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
             />
           ) : tipoMaterial === 'imagen' ? (
             /* Tipo material: Imagen */
-            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
-                🖼
-              </div>
-              <div>
-                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Imagen / Gráfico de estudio</p>
-              </div>
-
+            <div className="flex-1 min-h-0 w-full flex items-center justify-center p-1 sm:p-2 overflow-hidden bg-gray-50/50 dark:bg-white/5 rounded-2xl">
               {blobUrl ? (
                 <img
                   src={blobUrl}
                   alt={asignacion.titulo}
                   loading="eager"
-                  className="max-h-[55vh] max-w-full object-contain rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm mt-3 transition-opacity duration-300"
+                  className="max-h-full max-w-full object-contain rounded-xl shadow-sm transition-opacity duration-300"
                 />
               ) : !errorAcceso ? (
                 <div className="flex flex-col items-center justify-center p-6 space-y-3">
                   <div className="w-8 h-8 border-3 border-tkd-blue border-t-transparent rounded-full animate-spin" />
                   <div className="text-xs text-gray-400 font-bold tracking-wider uppercase">
-                    Cargando imagen de estudio...
+                    Cargando imagen...
                   </div>
                 </div>
               ) : null}
             </div>
           ) : tipoMaterial === 'presentacion' ? (
             /* Tipo material: Presentación / Diapositivas */
-            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
-                📊
-              </div>
-              <div>
-                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Diapositivas / Presentación académica</p>
-              </div>
+            <div className="relative w-full flex-1 min-h-0 flex flex-col rounded-2xl overflow-hidden border border-gray-100 dark:border-white/10 bg-black">
               {asignacion.externalFileId ? (
                 <iframe
                   src={`https://drive.google.com/file/d/${asignacion.externalFileId}/preview`}
                   title={asignacion.titulo}
-                  className="w-full h-[55vh] rounded-2xl border border-gray-100 dark:border-white/10"
+                  className="w-full flex-1 border-0"
                   allow="autoplay"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
                 />
               ) : accesoTemporal?.url ? (
                 <iframe
                   src={`https://docs.google.com/viewer?url=${encodeURIComponent(accesoTemporal.url)}&embedded=true`}
                   title={asignacion.titulo}
-                  className="w-full h-[55vh] rounded-2xl border border-gray-100 dark:border-white/10"
+                  className="w-full flex-1 border-0"
+                  sandbox="allow-scripts allow-same-origin allow-forms"
                 />
               ) : !errorAcceso ? (
-                <div className="text-sm text-gray-500 font-bold mt-2">
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400 font-bold">
                   Cargando presentación interactiva...
                 </div>
               ) : null}
+              {/* Bloqueador de apertura externa / compartir de Drive */}
+              <div
+                className="absolute top-0 right-0 w-16 h-14 z-20 cursor-default bg-transparent pointer-events-auto"
+                title="Vista académica protegida"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              />
             </div>
           ) : (
             /* Tipo material: Generico (Texto, archivos descargables) */
-            <div className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-3xl bg-tkd-blue/10 text-tkd-blue flex items-center justify-center text-3xl">
-                📝
-              </div>
-              <div>
-                <h3 className="text-lg font-black uppercase text-tkd-dark dark:text-white">{asignacion.titulo}</h3>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest">Apertura registrada y validada para métricas</p>
-              </div>
-
-              {/* Render de texto */}
+            <div className="flex-1 min-h-0 w-full flex flex-col rounded-2xl p-4 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 overflow-hidden">
               {textoContenido !== null && (
-                <pre className="w-full max-h-[30vh] overflow-auto text-left text-xs bg-gray-50 dark:bg-white/5 rounded-2xl p-4 border border-gray-100 dark:border-white/10 font-mono text-gray-600 dark:text-gray-300">
+                <pre className="w-full flex-1 overflow-auto text-left text-xs bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-white/10 font-mono text-gray-600 dark:text-gray-300">
                   {textoContenido}
                 </pre>
               )}
-
-              {/* Si no se puede previsualizar */}
               {!blobUrl && !errorAcceso && (
-                <div className="text-sm text-gray-500 font-bold mt-2">
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-400 font-bold">
                   Cargando recurso seguro desde Google Drive...
                 </div>
               )}
             </div>
           )}
 
-          {tipoMaterial !== 'pdf' && (
+          {tipoMaterial !== 'pdf' && tipoMaterial !== 'presentacion' && tipoMaterial !== 'imagen' && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-black uppercase tracking-widest shrink-0">
               <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
                 <span className="block text-gray-400">Progreso</span>

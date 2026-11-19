@@ -146,33 +146,22 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   }, [paginaActual, hayPaginas, permanenciaMinimaMs, registrarPaginaConMetrica]);
 
   return (
-    <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-3 sm:p-5 flex flex-col flex-1 min-h-0 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 shrink-0">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">Visor PDF</p>
-          <h3 className="mt-1 text-lg sm:text-xl font-black uppercase text-tkd-dark dark:text-white leading-tight truncate">{titulo}</h3>
-          <p className="mt-0.5 text-xs text-gray-500">
-            Paginas registradas: {progreso.paginasVistas.length}/{totalPaginasEfectivo}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={flush}
-          className="rounded-xl bg-tkd-dark text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest self-start sm:self-auto shrink-0"
-        >
-          Sincronizar avance
-        </button>
-      </div>
+    <section className="flex flex-col flex-1 min-h-0 overflow-hidden p-0 sm:p-1">
+      <h3 className="sr-only">{titulo}</h3>
+      <p className="sr-only">Visor PDF</p>
 
       {!hayPaginas ? (
         <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 p-8 text-center text-sm font-bold text-gray-400">
           Sin paginas disponibles
         </div>
       ) : (
-        <div className="flex flex-col flex-1 min-h-0 space-y-3 overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 space-y-2 overflow-hidden">
+          <p className="sr-only">
+            Paginas registradas: {progreso.paginasVistas.length}/{totalPaginasEfectivo}
+          </p>
           <div
             ref={contenedorRef}
-            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-center flex-1 min-h-0 overflow-hidden p-2 select-none"
+            className="rounded-2xl border border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-center flex-1 min-h-0 overflow-hidden p-1 select-none"
           >
             {url && !errorCarga ? (
               <Document
@@ -204,40 +193,56 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between gap-3 shrink-0 pt-1">
+          <div className="flex items-center justify-between gap-2 shrink-0 pt-0.5">
             <button
               type="button"
               onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
               disabled={paginaActual <= 1}
-              className="rounded-xl bg-tkd-dark text-white px-3 sm:px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+              className="rounded-xl bg-tkd-dark text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
             >
               ‹ Anterior
             </button>
 
-            <p className="text-xs sm:text-sm font-black text-tkd-dark dark:text-white">
-              Pagina {paginaActual} de {totalPaginasEfectivo}
-              {progreso.paginasVistas.includes(paginaActual) && (
-                <span className="ml-2 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
-              )}
-            </p>
+            <div className="text-center">
+              <p className="text-xs font-black text-tkd-dark dark:text-white leading-tight">
+                Pagina {paginaActual} de {totalPaginasEfectivo}
+                {progreso.paginasVistas.includes(paginaActual) && (
+                  <span className="ml-1.5 text-green-500 text-[10px] font-black uppercase tracking-wider">✓ Vista</span>
+                )}
+              </p>
+              <p className="text-[9px] text-gray-400 font-bold">
+                {progreso.paginasVistas.length} de {totalPaginasEfectivo} registradas
+              </p>
+            </div>
 
             <button
               type="button"
               onClick={() => setPaginaActual((p) => Math.min(totalPaginasEfectivo, p + 1))}
               disabled={paginaActual >= totalPaginasEfectivo}
-              className="rounded-xl bg-tkd-dark text-white px-3 sm:px-4 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-40"
+              className="rounded-xl bg-tkd-dark text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
             >
               Siguiente ›
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => registrarPaginaConMetrica(paginaActual)}
-            className="w-full rounded-xl bg-tkd-blue text-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest shrink-0"
-          >
-            Marcar pagina actual como vista
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => registrarPaginaConMetrica(paginaActual)}
+              className="flex-1 rounded-xl bg-tkd-blue text-white px-3 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition"
+            >
+              Marcar pagina actual como vista
+            </button>
+
+            <button
+              type="button"
+              onClick={flush}
+              className="rounded-xl bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/20 px-3 py-2 text-[9px] font-black uppercase tracking-widest shrink-0 transition"
+              title="Sincronizar avance ahora"
+            >
+              Sincronizar avance
+            </button>
+          </div>
         </div>
       )}
     </section>
