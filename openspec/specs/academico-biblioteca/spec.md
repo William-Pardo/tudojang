@@ -94,6 +94,10 @@ El modal de clasificación de video directo MUST pre-validar en tiempo real la d
 - THEN se invoca `bibliotecaService.eliminarRecurso` eliminando el documento de Firestore
 - AND el recurso se retira de la lista activa en pantalla
 
+### Requirement: Navegación jerárquica de carpetas con migas de pan
+`BibliotecaView` MUST ofrecer una barra de migas de pan (breadcrumb) cuando el usuario navegue en subcarpetas de Google Drive, permitiendo retroceder a niveles previos sin desvincular los recursos indexados y aprobados de la biblioteca de materiales.
+
+
 
 `CentroEstudios.tsx` MUST mostrar exactamente 3 pasos — "Conectar Drive", "Centro de recursos" (clasificación+aprobación) y "Programa y publicación" (combinado, sin dividirse).
 
