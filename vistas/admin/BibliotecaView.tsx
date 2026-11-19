@@ -316,8 +316,8 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
   const recursosAprobadosCount = recursosAprobadosLista.length;
   const archivosDriveIds = React.useMemo(() => new Set(archivosDrive.map((archivo) => archivo.id)), [archivosDrive]);
   const recursosDirectos = React.useMemo(
-    () => recursos.filter((r) => r.estado === 'aprobado' && !archivosDriveIds.has(r.externalFileId)),
-    [recursos, archivosDriveIds]
+    () => recursos.filter((r) => r.estado === 'aprobado' && r.externalFileId?.startsWith('video-')),
+    [recursos]
   );
   const redirectUri = React.useMemo(
     () => `${window.location.origin}${window.location.pathname}`,
@@ -745,8 +745,6 @@ const BibliotecaView: React.FC<BibliotecaViewProps> = ({
       setError('Primero conecta Google Drive para seleccionar una carpeta real.');
       return;
     }
-
-    if (!confirmarCambioCarpetaDrive(id)) return;
 
     setError('');
     setValidandoCarpeta(true);

@@ -361,6 +361,57 @@ describe('BibliotecaView', () => {
     expect((await screen.findAllByText(/guia real de poomsae.pdf/i)).length).toBeGreaterThan(0);
   });
 
+  it('cambia de carpeta sin mostrar ventana de confirmacion aunque existan recursos indexados', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('tudojang:driveConnection:tenant-real', 'conn-global-123');
+    window.localStorage.setItem('tudojang:driveFolder:tenant-real', 'folder-inicial');
+    const spyConfirm = jest.spyOn(window, 'confirm');
+
+    const driveService = {
+      iniciarConexionOAuth: jest.fn(),
+      procesarCallbackOAuth: jest.fn(),
+      listarCarpetaDrive: jest.fn()
+        .mockResolvedValueOnce([
+          {
+            id: 'folder-nueva',
+            name: 'Carpeta Nueva',
+            mimeType: 'application/vnd.google-apps.folder',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'file-nueva-1',
+            name: 'Doc en Carpeta Nueva.pdf',
+            mimeType: 'application/pdf',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'file-nueva-1',
+            name: 'Doc en Carpeta Nueva.pdf',
+            mimeType: 'application/pdf',
+          },
+        ]),
+      guardarCarpetaActiva: jest.fn().mockResolvedValue({ ok: true }),
+    };
+
+    render(
+      <BibliotecaView
+        driveService={driveService as any}
+        tenantId="tenant-real"
+      />
+    );
+
+    // Abrir selector de carpetas
+    await user.click(await screen.findByRole('button', { name: /cambiar carpeta/i }));
+    await user.click(await screen.findByRole('button', { name: /carpeta nueva/i }));
+    await user.click(await screen.findByRole('button', { name: /usar esta carpeta/i }));
+
+    expect(spyConfirm).not.toHaveBeenCalled();
+    expect(await screen.findByText(/doc en carpeta nueva.pdf/i)).toBeInTheDocument();
+    spyConfirm.mockRestore();
+  });
+
   it('importa un archivo real listado usando tenantId real', async () => {
     const user = userEvent.setup();
     window.localStorage.setItem('tudojang:driveConnection:tenant-real', 'conn-global-123');
@@ -883,10 +934,54 @@ describe('BibliotecaView', () => {
   });
 
   describe('creación directa de video por URL (sin depender de Google Drive)', () => {
+    it('no muestra archivos de Drive como recursos directos cuando se listan carpetas', async () => {
+      window.localStorage.setItem('tudojang:driveConnection:tenant-demo', 'conn-1');
+      window.localStorage.setItem('tudojang:driveFolder:tenant-demo', 'folder-1');
+
+      const recursoDriveAprobado = {
+        id: 'rec-drive-otra-carpeta',
+        tenantId: 'tenant-demo',
+        nombre: 'PDF Antiguo Otra Carpeta.pdf',
+        tituloVisible: 'PDF Antiguo Otra Carpeta',
+        mimeType: 'application/pdf',
+        externalFileId: 'drive-file-abc',
+        estado: 'aprobado' as const,
+        ficha: {
+          disciplina: 'Taekwondo',
+          tipo: 'pdf' as const,
+          tags: ['teoria'],
+          dificultad: 'principiante' as const,
+          duracionMinutos: 10,
+        },
+      };
+
+      const driveService = {
+        iniciarConexionOAuth: jest.fn(),
+        procesarCallbackOAuth: jest.fn(),
+        listarCarpetaDrive: jest.fn().mockResolvedValue([]), // Carpeta actual vacía
+      };
+
+      render(
+        <BibliotecaView
+          tenantId="tenant-demo"
+          driveService={driveService as any}
+          bibliotecaService={{
+            ...defaultBibliotecaService,
+            listarRecursosAprobados: jest.fn().mockResolvedValue([recursoDriveAprobado]),
+          }}
+        />
+      );
+
+      // El archivo de Drive aprobado de otra carpeta no debe aparecer en la sección 2 como "Video · Enlace directo"
+      expect(await screen.findByText(/la carpeta activa no tiene archivos visibles/i)).toBeInTheDocument();
+      expect(screen.queryByText(/video · enlace directo · ✓ aprobado/i)).not.toBeInTheDocument();
+    });
+
     it('renderiza el botón de agregar video, abre el modal y guarda el video en la lista', async () => {
       const user = userEvent.setup();
       const mockCrearVideoDirecto = jest.fn().mockResolvedValue({
         id: 'rec-video-directo-1',
+        externalFileId: 'video-dQw4w9WgXcQ',
         tenantId: 'tenant-demo',
         nombre: 'Técnica Naeryo Chagi Directa',
         tituloVisible: 'Técnica Naeryo Chagi Directa',
