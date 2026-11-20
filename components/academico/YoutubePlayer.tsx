@@ -121,6 +121,8 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
 
       playerRef.current = new window.YT.Player(elementId, {
         videoId,
+        width: '100%',
+        height: '100%',
         events: {
           onReady: () => {
             if (activo) {
@@ -185,8 +187,8 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
       <p className="sr-only">Video académico (YouTube)</p>
       <h3 className="sr-only">{titulo}</h3>
 
-      <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black">
-        <div id={elementId} data-testid="youtube-player-target" aria-label={`Reproductor de YouTube: ${titulo}`} />
+      <div className="aspect-video w-full max-h-full overflow-hidden rounded-2xl bg-black flex items-center justify-center [&_iframe]:!w-full [&_iframe]:!h-full [&>div]:!w-full [&>div]:!h-full">
+        <div id={elementId} className="w-full h-full" data-testid="youtube-player-target" aria-label={`Reproductor de YouTube: ${titulo}`} />
       </div>
 
       {errorReproduccion && (

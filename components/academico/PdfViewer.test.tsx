@@ -74,6 +74,8 @@ describe('PdfViewer', () => {
   });
 
   it('cuando recibe una url real, renderiza el documento y usa el numero de paginas real del PDF', async () => {
+    const onRatioCalculado = jest.fn();
+
     render(
       <PdfViewer
         tenantId="tenant-1"
@@ -82,6 +84,7 @@ describe('PdfViewer', () => {
         url="https://drive-temporal.test/archivo.pdf"
         totalPaginas={3}
         sincronizar={jest.fn()}
+        onRatioCalculado={onRatioCalculado}
       />
     );
 
@@ -89,6 +92,7 @@ describe('PdfViewer', () => {
     // `file`, y el numero real debe reemplazar la estimacion de totalPaginas (3).
     expect(await screen.findByText(/pagina 1 de 5/i)).toBeInTheDocument();
     expect(screen.getByTestId('mock-pdf-document')).toBeInTheDocument();
+    expect(onRatioCalculado).toHaveBeenCalledWith(600 / 800);
   });
 
   it('fuerza sincronizacion manual del avance acumulado', async () => {

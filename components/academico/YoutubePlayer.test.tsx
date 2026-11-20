@@ -7,9 +7,11 @@ class FakeYoutubePlayer {
   currentTime = 0;
   duration = 90;
   events: any;
+  config: any;
   destroyed = false;
 
   constructor(_elementId: string, config: any) {
+    this.config = config;
     this.events = config.events;
     FakeYoutubePlayer.instancias.push(this);
     // Simula que la API tarda un microtask en confirmar que el player esta listo.
@@ -70,6 +72,8 @@ describe('YoutubePlayer', () => {
     await flushMicrotasks();
 
     expect(FakeYoutubePlayer.instancias).toHaveLength(1);
+    expect(FakeYoutubePlayer.instancias[0].config.width).toBe('100%');
+    expect(FakeYoutubePlayer.instancias[0].config.height).toBe('100%');
     expect(await screen.findByLabelText(/reproductor de youtube: clase 1: fundamentos/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText(/cargando reproductor de youtube/i)).not.toBeInTheDocument();

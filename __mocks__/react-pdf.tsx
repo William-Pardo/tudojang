@@ -24,6 +24,9 @@ export const Document: React.FC<{
   return <div data-testid="mock-pdf-document">{children}</div>;
 };
 
-export const Page: React.FC<{ pageNumber?: number }> = ({ pageNumber }) => (
-  <div data-testid="mock-pdf-page">Pagina mock {pageNumber}</div>
-);
+export const Page: React.FC<{ pageNumber?: number; onLoadSuccess?: (page: any) => void }> = ({ pageNumber, onLoadSuccess }) => {
+  React.useEffect(() => {
+    onLoadSuccess?.({ originalWidth: 600, originalHeight: 800 });
+  }, [onLoadSuccess]);
+  return <div data-testid="mock-pdf-page">Pagina mock {pageNumber}</div>;
+};

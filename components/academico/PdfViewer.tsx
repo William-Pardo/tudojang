@@ -19,6 +19,8 @@ interface PdfViewerProps {
   estudianteId?: string;
   estudianteNombre?: string;
   recursoId?: string;
+  /** Notifica la relación de aspecto calculada (ancho / alto) para que el modal adapte su ancho en desktop */
+  onRatioCalculado?: (ratio: number) => void;
 }
 
 const PdfViewer: React.FC<PdfViewerProps> = ({
@@ -33,6 +35,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
   estudianteId,
   estudianteNombre,
   recursoId,
+  onRatioCalculado,
 }) => {
   const { flush, progreso, registrarPaginaPdf } = useProgressSync({
     tenantId,
@@ -187,7 +190,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({
                     const origW = page.originalWidth || page.width || (page.view && page.view[2]) || 1;
                     const origH = page.originalHeight || page.height || (page.view && page.view[3]) || 1;
                     if (origW && origH) {
-                      setPageRatio(origW / origH);
+                      const ratio = origW / origH;
+                      setPageRatio(ratio);
+                      onRatioCalculado?.(ratio);
                     }
                   }}
                 />

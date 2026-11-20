@@ -96,9 +96,26 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
   const [errorPreguntasQuiz, setErrorPreguntasQuiz] = React.useState(false);
   const [reintentosQuiz, setReintentosQuiz] = React.useState(0);
   const [esFullscreen, setEsFullscreen] = React.useState(false);
+  const [ratioPdf, setRatioPdf] = React.useState<number | null>(null);
 
   const alternarFullscreen = () => {
     setEsFullscreen((prev) => !prev);
+  };
+
+  const obtenerClasesTamanoModal = () => {
+    if (esFullscreen) {
+      return 'h-full max-h-none max-w-none rounded-none border-0';
+    }
+    if (tipoMaterial === 'presentacion') {
+      return 'h-full sm:h-[88vh] sm:max-w-5xl rounded-none sm:rounded-[2rem] sm:border';
+    }
+    if (tipoMaterial === 'pdf') {
+      if (ratioPdf && ratioPdf < 0.85) {
+        return 'h-full sm:h-[92vh] sm:max-w-2xl rounded-none sm:rounded-[2rem] sm:border';
+      }
+      return 'h-full sm:h-[92vh] sm:max-w-5xl rounded-none sm:rounded-[2rem] sm:border';
+    }
+    return 'h-full sm:h-auto sm:max-h-[94dvh] sm:max-w-4xl rounded-none sm:rounded-[2rem] sm:border';
   };
 
   const tipoMaterial = React.useMemo<TipoMaterialResuelto>(
@@ -133,6 +150,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
   React.useEffect(() => {
     setResultadoQuiz(null);
+    setRatioPdf(null);
   }, [asignacion?.id]);
 
   // Carga el banco de preguntas real del recurso -- antes de este wire, QuizView siempre
@@ -271,7 +289,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
   return createPortal(
     <div className={`fixed inset-0 z-[9999] bg-tkd-dark/80 backdrop-blur-sm flex items-center justify-center overflow-hidden ${esFullscreen ? 'p-0' : 'p-0 sm:p-4'}`} role="dialog" aria-modal="true">
-      <div className={`w-full flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden border-white/10 ${esFullscreen ? 'h-full max-h-none max-w-none rounded-none border-0' : 'h-full sm:h-auto sm:max-h-[94dvh] sm:max-w-4xl rounded-none sm:rounded-[2rem] sm:border'}`}>
+      <div className={`w-full flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden border-white/10 ${obtenerClasesTamanoModal()}`}>
         <header className="px-3.5 py-2.5 sm:px-5 sm:py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3 shrink-0 bg-white dark:bg-gray-900 sticky top-0 z-50 shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <span className="sr-only">Vista previa del recurso</span>
@@ -411,6 +429,7 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               estudianteId={estudianteId}
               estudianteNombre={estudianteNombre}
               recursoId={asignacion.recursoId}
+              onRatioCalculado={setRatioPdf}
             />
           ) : tipoMaterial === 'imagen' ? (
             /* Tipo material: Imagen */

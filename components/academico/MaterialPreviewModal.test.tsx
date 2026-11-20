@@ -569,4 +569,34 @@ describe('MaterialPreviewModal', () => {
 
     expect(await screen.findByTitle('Vista académica protegida')).toBeInTheDocument();
   });
+
+  it('aplica clases de proporción amplia 16:9 en desktop para presentaciones', async () => {
+    const driveService = {
+      obtenerUrlTemporal: jest.fn().mockResolvedValue({
+        url: 'https://proxy.example/file.pptx',
+        fileName: 'Presentacion.pptx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        expiresAt: '2026-06-28T12:15:00.000Z',
+      }),
+      obtenerBlobProtegido: jest.fn(),
+    };
+
+    render(
+      <MaterialPreviewModal
+        asignacion={{
+          ...asignacion,
+          uso: 'estudio',
+          titulo: 'Presentacion.pptx',
+          externalFileId: 'drive-slides-123',
+        }}
+        onCerrar={jest.fn()}
+        driveService={driveService as any}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    const modalBox = dialog.firstElementChild;
+    expect(modalBox).toHaveClass('sm:h-[88vh]');
+    expect(modalBox).toHaveClass('sm:max-w-5xl');
+  });
 });
