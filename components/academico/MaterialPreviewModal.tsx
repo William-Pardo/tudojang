@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import type { AsignacionCentroEstudios } from '../../models/academico/asignacionService.types';
 import type { PreguntaQuiz } from '../../models/academico/quiz';
 import { IconoCerrar, IconoPantallaCompleta, IconoSalirPantallaCompleta } from '../Iconos';
@@ -264,10 +265,14 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
     );
   };
 
-  return (
-    <div className={`fixed inset-0 z-[120] bg-tkd-dark/75 backdrop-blur-sm flex items-center justify-center overflow-hidden ${esFullscreen ? 'p-0' : 'p-0 sm:p-4'}`} role="dialog" aria-modal="true">
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
+    <div className={`fixed inset-0 z-[9999] bg-tkd-dark/80 backdrop-blur-sm flex items-center justify-center overflow-hidden ${esFullscreen ? 'p-0' : 'p-0 sm:p-4'}`} role="dialog" aria-modal="true">
       <div className={`w-full flex flex-col bg-white dark:bg-gray-900 shadow-2xl overflow-hidden border-white/10 ${esFullscreen ? 'h-full max-h-none max-w-none rounded-none border-0' : 'h-full sm:h-auto sm:max-h-[94dvh] sm:max-w-4xl rounded-none sm:rounded-[2rem] sm:border'}`}>
-        <header className="px-3.5 py-2.5 sm:px-5 sm:py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3 shrink-0 bg-white/95 dark:bg-gray-900/95 sticky top-0 z-40">
+        <header className="px-3.5 py-2.5 sm:px-5 sm:py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3 shrink-0 bg-white dark:bg-gray-900 sticky top-0 z-50 shadow-sm">
           <div className="flex items-center gap-2 min-w-0">
             <span className="sr-only">Vista previa del recurso</span>
             <span className="shrink-0 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-tkd-red/10 text-tkd-red">
@@ -277,11 +282,11 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               {asignacion.titulo}
             </h2>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={alternarFullscreen}
-              className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all flex items-center justify-center shrink-0"
+              className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all flex items-center justify-center shrink-0"
               aria-label={esFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
               title={esFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
             >
@@ -290,11 +295,11 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
             <button
               type="button"
               onClick={onCerrar}
-              className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-gray-300 hover:bg-tkd-red hover:text-white transition-all flex items-center justify-center shrink-0"
+              className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-950/40 text-tkd-red dark:text-red-400 hover:bg-tkd-red hover:text-white dark:hover:bg-tkd-red dark:hover:text-white border border-red-100 dark:border-red-900/40 transition-all shadow-sm flex items-center justify-center shrink-0"
               aria-label="Cerrar material"
               title="Cerrar material"
             >
-              <IconoCerrar className="w-4 h-4 sm:w-5 sm:h-5" />
+              <IconoCerrar className="w-5 h-5" />
             </button>
           </div>
         </header>
@@ -474,24 +479,25 @@ const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
           )}
 
           {tipoMaterial !== 'pdf' && tipoMaterial !== 'presentacion' && tipoMaterial !== 'imagen' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px] font-black uppercase tracking-widest shrink-0">
-              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+            <div className="grid grid-cols-3 gap-2 p-2 sm:p-3 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 text-[9px] sm:text-[10px] font-black uppercase tracking-wider shrink-0 text-center">
+              <div>
                 <span className="block text-gray-400">Progreso</span>
-                <span className="block mt-1 text-tkd-blue">{progresoVisible}%</span>
+                <span className="block mt-0.5 text-tkd-blue font-extrabold">{progresoVisible}%</span>
               </div>
-              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+              <div className="border-x border-gray-200 dark:border-white/10">
                 <span className="block text-gray-400">Estado</span>
-                <span className="block mt-1 text-tkd-dark dark:text-white">{estadoVisible.replace('_', ' ')}</span>
+                <span className="block mt-0.5 text-tkd-dark dark:text-white truncate">{estadoVisible.replace('_', ' ')}</span>
               </div>
-              <div className="rounded-2xl bg-gray-50 dark:bg-white/5 p-4">
+              <div>
                 <span className="block text-gray-400">Urgencia</span>
-                <span className="block mt-1 text-tkd-dark dark:text-white">{asignacion.urgencia.replace('_', ' ')}</span>
+                <span className="block mt-0.5 text-tkd-dark dark:text-white truncate">{asignacion.urgencia.replace('_', ' ')}</span>
               </div>
             </div>
           )}
         </main>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

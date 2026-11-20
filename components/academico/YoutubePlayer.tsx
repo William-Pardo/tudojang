@@ -181,11 +181,11 @@ const YoutubePlayer: React.FC<YoutubePlayerProps> = ({
   }, [elementId, videoId]);
 
   return (
-    <section className="rounded-[1.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-6">
-      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tkd-red">Video académico (YouTube)</p>
-      <h3 className="mt-2 text-xl font-black uppercase text-tkd-dark dark:text-white">{titulo}</h3>
+    <section className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-white/10 p-1 sm:p-4">
+      <p className="sr-only">Video académico (YouTube)</p>
+      <h3 className="sr-only">{titulo}</h3>
 
-      <div className="mt-5 aspect-video w-full overflow-hidden rounded-2xl bg-black">
+      <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black">
         <div id={elementId} data-testid="youtube-player-target" aria-label={`Reproductor de YouTube: ${titulo}`} />
       </div>
 
